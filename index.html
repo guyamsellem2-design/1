@@ -212,8 +212,9 @@
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit;}
   .reset-btn:hover{color:var(--text); border-color:var(--muted);}
 
-  /* load meter */
-  .load-meter{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:14px 18px; margin-bottom:32px;}
+  /* load meter (collapsed by default) */
+  .load-section{margin-bottom:28px;}
+  .load-meter{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:14px 18px; margin-top:10px;}
   .load-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
   .load-label{font-size:13px; color:var(--muted); font-weight:500;}
   .load-hours{font-size:13px; color:var(--gold); font-weight:600;}
@@ -244,7 +245,10 @@
     <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🌙 מצב רגוע</button>
   </header>
 
-  <div class="load-meter" id="loadMeter"></div>
+  <div class="load-section">
+    <span class="balance-toggle" id="loadMeterToggle" onclick="toggleLoadMeter()">▸ כמה מהשבוע כבר תפוס</span>
+    <div class="load-meter" id="loadMeter" style="display:none;"></div>
+  </div>
 
   <section>
     <div class="section-head">
@@ -898,6 +902,7 @@ function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDat
 /* ---------- weekly load meter + domain balance ---------- */
 const LOAD_REFERENCE_HOURS = 40;
 let balanceOpen = false;
+let loadMeterOpen = false;
 function itemDurationHours(startTime, endTime, bufferMin){
   if(!startTime) return 1;
   const [sh,sm] = startTime.split(':').map(Number);
@@ -935,9 +940,14 @@ function computeDomainHours(){
   });
   return hours;
 }
+function toggleLoadMeter(){ loadMeterOpen = !loadMeterOpen; renderLoadMeter(); }
 function renderLoadMeter(){
+  const toggle = document.getElementById('loadMeterToggle');
   const el = document.getElementById('loadMeter');
-  if(!el) return;
+  if(!toggle || !el) return;
+  toggle.textContent = (loadMeterOpen ? '▾' : '▸') + ' כמה מהשבוע כבר תפוס';
+  if(!loadMeterOpen){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='block';
   const hours = computeWeekLoadHours();
   const pct = Math.min(100, Math.round((hours/LOAD_REFERENCE_HOURS)*100));
   const rounded = Math.round(hours*10)/10;
