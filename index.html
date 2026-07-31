@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=6.0, user-scalable=yes, viewport-fit=cover">
+<title>המפה השבועית שלי</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="המפה השבועית">
+<meta name="theme-color" content="#131f1a">
+<link rel="icon" id="faviconLink" href="">
+<link rel="apple-touch-icon" id="appleIconLink" href="">
+<link rel="manifest" id="manifestLink" href="">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#131f1a; --surface:#1a2721; --surface2:#213027; --surface3:#28382d;
+    --text:#ece4d3; --muted:#93a598; --muted2:#6d8175; --gold:#d4a24c;
+    --border:rgba(236,228,211,0.09); --border-strong:rgba(236,228,211,0.16);
+    --energy-low:#5fae72; --energy-mid:#d9b54a; --energy-high:#c96256;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(212,162,76,0.08), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(79,156,122,0.10), transparent),
+      var(--bg);
+    color:var(--text); font-family:'Heebo', sans-serif; min-height:100vh; padding:28px 16px 80px;
+    transition:filter .4s ease;
+  }
+  body.soft{ filter:saturate(0.55) brightness(0.94); }
+  .wrap{max-width:980px;margin:0 auto;}
+
+  header.top{margin-bottom:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;}
+  .eyebrow{font-size:12.5px; letter-spacing:0.14em; color:var(--muted2); text-transform:uppercase; margin-bottom:8px; font-weight:500;}
+  h1{font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:clamp(26px, 5vw, 38px); margin:0 0 8px; color:var(--text);}
+  .sub{color:var(--muted); font-size:14.5px; max-width:56ch; line-height:1.6;}
+  .soft-btn{
+    background:var(--surface); border:1px solid var(--border-strong); color:var(--muted);
+    padding:9px 16px; border-radius:999px; font-size:13px; cursor:pointer; font-family:inherit;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .soft-btn.on{ background:var(--gold); color:#1a1206; border-color:transparent; font-weight:600; }
+
+  .status{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    background:var(--surface3); border:1px solid var(--border-strong);
+    padding:8px 18px; border-radius:999px; font-size:13px; color:var(--muted);
+    opacity:0; transition:opacity .4s ease; pointer-events:none; z-index:50;
+  }
+  .status.show{opacity:1;}
+
+  section{margin-bottom:44px;}
+  .section-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap;}
+  h2{font-family:'Frank Ruhl Libre', serif; font-size:21px; font-weight:500; margin:0; display:flex; align-items:center; gap:10px;}
+  h2 .num{color:var(--gold); font-size:15px; font-weight:400; opacity:.8;}
+  .hint{font-size:12.5px; color:var(--muted2);}
+
+  /* domain editor */
+  .domain-editor{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:30px;}
+  .domain-chip{
+    display:flex; align-items:center; gap:4px; font-size:12.5px;
+    background:var(--surface); border:1px solid var(--border);
+    padding:5px 6px 5px 8px; border-radius:999px; color:var(--text);
+  }
+  .domain-chip input[type=color]{width:18px; height:18px; padding:0; border:none; border-radius:50%; background:none; cursor:pointer; overflow:hidden; direction:ltr;}
+  .domain-chip input[type=color]::-webkit-color-swatch-wrapper{padding:0;}
+  .domain-chip input[type=color]::-webkit-color-swatch{border:none; border-radius:50%;}
+  .palette-btn{width:16px; height:16px; border-radius:50%; border:1px solid var(--border-strong); cursor:pointer; padding:0; flex-shrink:0;}
+  .color-panel{width:100%; background:var(--surface2); border:1px solid var(--border-strong); border-radius:12px; padding:12px; margin:6px 0 4px; display:flex; flex-direction:column; gap:10px;}
+  .color-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .color-grid .swatch{width:26px; height:26px; border-radius:50%; cursor:pointer; border:2px solid transparent;}
+  .color-grid .swatch:active{border-color:var(--text);}
+  .color-panel .custom-row{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted);}
+  .color-panel .custom-row input[type=color]{width:28px; height:28px; border:none; border-radius:8px; padding:0; direction:ltr;}
+  .domain-chip input[type=text]{background:transparent; border:none; color:var(--text); font-family:inherit; font-size:12.5px; width:auto; min-width:40px; max-width:110px;}
+  .domain-chip input[type=text]:focus{outline:none;}
+  .domain-chip{transition:transform .15s ease, box-shadow .15s ease; touch-action:pan-y;}
+  .domain-chip.dragging{ z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; }
+  .domain-chip.drag-over{ outline:2px dashed var(--gold); outline-offset:2px; }
+  .domain-chip .grip{cursor:grab; color:var(--muted2); font-size:15px; padding:2px 4px; touch-action:none; user-select:none;}
+  .domain-chip .grip:hover{color:var(--text);}
+  .domain-chip .rm{cursor:pointer; color:var(--muted2); font-size:14px; padding:2px 5px;}
+  .domain-chip .rm:hover{color:var(--text);}
+  .add-domain-btn{background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:6px 14px; font-size:12.5px; cursor:pointer; font-family:inherit;}
+  .add-domain-btn:hover{color:var(--text); border-color:var(--muted);}
+
+  /* week grid */
+  .week-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
+  @media (max-width:760px){.week-grid{grid-template-columns:1fr 1fr;}}
+  .day-col{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column;}
+  .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);}
+  .anchor-chip{background:var(--surface2); border-radius:9px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer;}
+  .anchor-chip .time{color:var(--muted); font-size:11px; display:block; margin-bottom:1px;}
+  .anchor-chip .buf{color:var(--muted2); font-size:10px; display:block; margin-top:2px;}
+  .anchor-chip .row-icons{position:absolute; left:6px; top:5px; display:flex; gap:9px; opacity:0; transition:opacity .2s;}
+  .anchor-chip:hover .row-icons{opacity:1;}
+  .anchor-chip .row-icons span, .anchor-chip .row-icons a{color:var(--muted2); font-size:16px; text-decoration:none; line-height:1;}
+  .anchor-chip .row-icons span:hover, .anchor-chip .row-icons a:hover{color:var(--text);}
+  .add-anchor-btn{margin-top:auto; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:8px; padding:6px; font-size:12px; cursor:pointer; font-family:inherit;}
+  .add-anchor-btn:hover{color:var(--text); border-color:var(--muted);}
+  .anchor-form{margin-top:8px; display:flex; flex-direction:column; gap:6px; background:var(--surface2); padding:8px; border-radius:8px;}
+  .anchor-form input, .anchor-form select{background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:12.5px; font-family:inherit;}
+  .anchor-form label.buf-label{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted);}
+  .anchor-form-actions{display:flex; gap:6px;}
+  .anchor-form-actions button{flex:1; font-size:12px; padding:5px; border-radius:6px; border:none; cursor:pointer; font-family:inherit;}
+  .save-btn{background:var(--gold); color:#1a1206; font-weight:600;}
+  .cancel-btn{background:var(--surface3); color:var(--muted);}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px;}
+  .add-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .add-row input[type=text]{flex:1; min-width:160px; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:14px; font-family:inherit;}
+  .add-row select{background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:13px; font-family:inherit;}
+  .add-row button{background:var(--gold); color:#1a1206; border:none; padding:10px 18px; border-radius:9px; font-weight:600; cursor:pointer; font-family:inherit; font-size:14px;}
+  ul.tasks{list-style:none; margin:0; padding:0;}
+  ul.tasks li{display:flex; align-items:center; gap:9px; padding:10px 4px; border-bottom:1px solid var(--border);}
+  ul.tasks li:last-child{border-bottom:none;}
+  .chk{width:19px; height:19px; border-radius:50%; border:2px solid var(--border-strong); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:transparent;}
+  .chk.done{background:var(--gold); border-color:var(--gold);}
+  .energy-dot{width:11px; height:11px; border-radius:50%; flex-shrink:0; cursor:pointer; border:1px solid rgba(0,0,0,0.2);}
+  .task-text{flex:1; font-size:14.5px; cursor:pointer;}
+  .task-text.done{text-decoration:line-through; color:var(--muted2);}
+  .tag{font-size:11px; padding:3px 9px; border-radius:999px; color:#141a16; font-weight:600; white-space:nowrap;}
+  .gcal-link{color:var(--muted2); font-size:19px; text-decoration:none; padding:4px;}
+  .gcal-link:hover{color:var(--gold);}
+  .sched-link{color:var(--muted2); font-size:16px; cursor:pointer; padding:4px;}
+  .sched-link:hover{color:var(--text);}
+  .task-date-badge{font-size:10.5px; color:var(--muted2); white-space:nowrap;}
+
+  /* schedule grid */
+  .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
+  @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
+  .sched-col{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 8px; min-height:70px;}
+  .sched-day{font-family:'Frank Ruhl Libre', serif; font-size:14px; font-weight:500; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;}
+  .sched-date{color:var(--muted2); font-size:11px; font-weight:400;}
+  .sched-item{background:var(--surface2); border-radius:8px; padding:6px 8px; margin-bottom:5px; font-size:12px; line-height:1.4; cursor:pointer; position:relative;}
+  .sched-item.anchor-type{border-right:3px solid var(--gold);}
+  .sched-item.task-type{border-right:3px dashed;}
+  .sched-item .sched-time{color:var(--muted); font-size:10.5px; display:block;}
+  .sched-empty{color:var(--muted2); font-size:11.5px; font-style:italic; padding:4px 2px;}
+  .refresh-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit;}
+  .refresh-btn:hover{color:var(--text); border-color:var(--muted);}
+
+  .expand-btn{color:var(--muted2); cursor:pointer; font-size:13px; padding:4px; flex-shrink:0;}
+  .expand-btn:hover{color:var(--text);}
+  .expand-btn.has-content{color:var(--gold);}
+  ul.tasks li.detail-li{display:block; background:var(--surface2); border-radius:9px; padding:10px 12px; margin:-4px 0 8px; border-bottom:none;}
+  .detail-label{font-size:11.5px; color:var(--muted2); margin-bottom:4px; display:block;}
+  .detail-desc{width:100%; min-height:50px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; resize:vertical; margin-bottom:10px;}
+  .subtask-row{display:flex; align-items:center; gap:7px; padding:5px 0; font-size:13px;}
+  .subtask-row .chk{width:15px; height:15px;}
+  .subtask-text{flex:1; cursor:pointer;}
+  .subtask-text.done{text-decoration:line-through; color:var(--muted2);}
+  .subtask-add-row{display:flex; gap:6px; margin-top:6px;}
+  .subtask-add-row input{flex:1; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:6px 9px; border-radius:7px; font-size:12.5px; font-family:inherit;}
+  .subtask-add-row button{background:var(--surface3); border:1px solid var(--border-strong); color:var(--text); padding:6px 12px; border-radius:7px; font-size:12px; cursor:pointer; font-family:inherit;}
+  ul.tasks li.edit-li{display:block; padding:10px 4px;}
+  .del-task{color:var(--muted2); cursor:pointer; font-size:13px; padding:4px;}
+  .del-task:hover{color:var(--text);}
+  .empty{color:var(--muted2); font-size:13.5px; padding:6px 4px; font-style:italic;}
+  .soft-notice{font-size:12.5px; color:var(--gold); padding:4px 4px 12px; font-style:italic;}
+
+  .promote{font-size:11.5px; color:var(--gold); cursor:pointer; white-space:nowrap; border:1px solid rgba(212,162,76,0.35); padding:4px 9px; border-radius:999px;}
+  .promote:hover{background:rgba(212,162,76,0.12);}
+
+  /* notes */
+  .note-tabs{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;}
+  .note-tab{font-size:12.5px; padding:6px 13px; border-radius:999px; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--muted);}
+  .note-tab.active{color:#141a16; border-color:transparent; font-weight:600;}
+  textarea.note-area{width:100%; min-height:110px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:12px; font-size:14px; font-family:inherit; resize:vertical; line-height:1.6; margin-bottom:14px;}
+  .spark-row{display:flex; gap:8px; margin-bottom:10px;}
+  .spark-row input{flex:1; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:8px; font-size:13.5px; font-family:inherit;}
+  .spark-row button{background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); padding:8px 14px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px;}
+
+  /* reflection */
+  .reflect-q{margin-bottom:22px;}
+  .reflect-q:last-child{margin-bottom:0;}
+  .reflect-q label{display:flex; align-items:center; gap:7px; font-size:14px; color:var(--text); margin-bottom:7px; font-weight:500;}
+  .reflect-q textarea{width:100%; min-height:60px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:10px 12px; font-size:14px; font-family:inherit; resize:vertical; line-height:1.5; margin-bottom:6px;}
+  .bank-toggle{font-size:12px; color:var(--muted2); cursor:pointer; display:inline-block;}
+  .bank-toggle:hover{color:var(--text);}
+  .bank-list{margin-top:8px; display:flex; flex-direction:column; gap:6px;}
+  .bank-entry{background:var(--surface2); border-radius:8px; padding:8px 10px; font-size:13px; line-height:1.5; cursor:pointer;}
+  .bank-entry .bank-date{color:var(--muted2); font-size:11px; display:block; margin-bottom:2px;}
+
+  footer{margin-top:50px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted2); font-size:13px; line-height:1.7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
+  .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit;}
+  .reset-btn:hover{color:var(--text); border-color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow">מסגרת גמישה, לא עוד רשימה שלא שורדת</div>
+      <h1>המפה השבועית שלי</h1>
+      <p class="sub">עוגנים קבועים, משימות לשבוע, פתקים חופשיים, ומקום מנוחה לכל רעיון שעוד לא הגיע תורו.</p>
+    </div>
+    <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🌙 מצב רגוע</button>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">·</span> תחומים</h2>
+      <div class="hint">שם וצבע ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור</div>
+    </div>
+    <div class="domain-editor" id="domainEditor"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">01</span> עוגנים קבועים בשבוע</h2>
+      <div class="hint">לוחצים על עוגן קיים כדי לערוך אותו · 📅 מוסיף אותו ליומן גוגל כאירוע שבועי</div>
+    </div>
+    <div class="week-grid" id="weekGrid"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">02</span> השבוע</h2>
+      <div class="hint">הנקודה = רמת אנרגיה (לחיצה מחליפה) · לחיצה על הטקסט לעריכה</div>
+    </div>
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="taskInput" placeholder="משימה קטנה לשבוע הזה...">
+        <select id="taskDomain"></select>
+        <select id="taskEnergy">
+          <option value="low">🟢 מטעין</option>
+          <option value="mid" selected>🟡 בינוני</option>
+          <option value="high">🔴 מרוקן</option>
+        </select>
+        <button type="button" class="add-domain-btn" onclick="toggleTaskSchedule()" id="taskSchedToggle">📅 לתזמן (רשות)</button>
+        <button onclick="addTask()">הוסף</button>
+      </div>
+      <div class="add-row" id="taskSchedFields" style="display:none;">
+        <input type="date" id="taskDate">
+        <input type="time" id="taskTime" placeholder="שעת התחלה">
+        <input type="time" id="taskEndTime" placeholder="שעת סיום (רשות)">
+      </div>
+      <ul class="tasks" id="taskList"></ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">03</span> לוח השבוע</h2>
+      <div class="hint">עוגנים + משימות שתוזמנו לתאריך, מוצגים יחד · לחיצה פותחת לעריכה</div>
+      <button class="refresh-btn" onclick="renderScheduleGrid()">🔄 רענון</button>
+    </div>
+    <div class="schedule-grid" id="scheduleGrid"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">04</span> פתקים לפי תחום</h2>
+      <div class="hint">מקום לכתוב מחשבות, ומתוכן להעלות רעיון למשימה</div>
+    </div>
+    <div class="card">
+      <div class="note-tabs" id="noteTabs"></div>
+      <textarea class="note-area" id="noteArea" placeholder="לכתוב חופשי — מחשבות, סקיצה, כל דבר..."></textarea>
+      <div class="spark-row">
+        <input type="text" id="sparkInput" placeholder="רעיון קצר שצץ תוך כדי הכתיבה...">
+        <button onclick="addSpark()">+ הוסף</button>
+      </div>
+      <ul class="tasks" id="sparkList"></ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">05</span> אי־פעם</h2>
+      <div class="hint">כל רעיון גדול, בלי לגעת בו כל יום</div>
+    </div>
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
+        <select id="somedayDomain"></select>
+        <button onclick="addSomeday()">הוסף</button>
+      </div>
+      <ul class="tasks" id="somedayList"></ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">06</span> סקירה שבועית</h2>
+      <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת בשבוע הבא</div>
+    </div>
+    <div class="card" id="reflectionCard"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2><span class="num">·</span> גיבוי והעברה</h2>
+      <div class="hint">לפני שינוי גדול או מעבר בין גרסאות — הורדת גיבוי מבטיחה שלא תאבד כלום · אם הדפדפן תומך, תוכל לבחור בעצמך שם ומיקום; אחרת הקובץ יורד לתיקיית ההורדות (Downloads) עם שם הכולל תאריך ושעה</div>
+    </div>
+    <div class="card" style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="add-domain-btn" onclick="exportData()">⬇ הורדת גיבוי</button>
+      <button class="add-domain-btn" onclick="document.getElementById('importFile').click()">⬆ טעינת גיבוי</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+    </div>
+  </section>
+
+  <footer>
+    <span>סקירה שבועית של 15 דקות מספיקה. זה כל התהליך.</span>
+    <button class="reset-btn" onclick="clearDoneTasks()">🧹 ניקוי משימות שבוצעו</button>
+    <button class="reset-btn" onclick="resetAll()">איפוס הכל</button>
+  </footer>
+</div>
+
+<div class="status" id="status">נשמר</div>
+
+<script>
+const DEFAULT_DOMAINS = [
+  {id:'album',  name:'אלבום ויצירה', color:'#d4a24c'},
+  {id:'teach',  name:'הוראה',        color:'#6fa287'},
+  {id:'body',   name:'גוף ובריאות',  color:'#c98a7d'},
+  {id:'love',   name:'זוגיות',       color:'#a78bae'},
+  {id:'family', name:'משפחה',        color:'#c9793f'},
+  {id:'friends',name:'חברים',        color:'#7ca8c4'},
+  {id:'home',   name:'בית',          color:'#b5a16b'},
+  {id:'rest',   name:'מנוחה וטבע',   color:'#4f9c7a'},
+];
+const ENERGY_COLORS = {low:'#5fae72', mid:'#d9b54a', high:'#c96256'};
+const ENERGY_LABELS = {low:'🟢 מטעין', mid:'🟡 בינוני', high:'🔴 מרוקן'};
+const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
+const STORAGE_KEY = 'planner-data-v3';
+
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false };
+let openForm = null;
+let editingAnchorId = null;
+let activeNoteDomain = null;
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function domainById(id){ return data.domains.find(d=>d.id===id) || data.domains[0]; }
+function ensureNotes(id){ if(!data.notes[id]) data.notes[id] = {text:'', sparks:[]}; return data.notes[id]; }
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      data.domains = (parsed.domains && parsed.domains.length) ? parsed.domains : DEFAULT_DOMAINS.map(d=>({...d}));
+      data.anchors = parsed.anchors || [];
+      data.tasks = (parsed.tasks || []).map(t=>({energy:'mid', endTime:'', description:'', subtasks:[], ...t}));
+      data.someday = (parsed.someday || []).map(s=>({domain:data.domains[0].id, description:'', subtasks:[], ...s}));
+      data.notes = parsed.notes || {};
+      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[]};
+      if(parsed.reflection && !parsed.reflectionBanks){
+        const wk = ymd(new Date(new Date().setDate(new Date().getDate()-new Date().getDay())));
+        ['fed','hard','release'].forEach(k=>{
+          if(parsed.reflection[k]) data.reflectionBanks[k].push({id:uid(), weekKey:wk, text:parsed.reflection[k]});
+        });
+      }
+      data.softMode = !!parsed.softMode;
+    } else {
+      data.domains = DEFAULT_DOMAINS.map(d=>({...d}));
+    }
+  }catch(e){
+    data.domains = DEFAULT_DOMAINS.map(d=>({...d}));
+  }
+  activeNoteDomain = data.domains[0].id;
+  render();
+}
+
+let saveTimer=null;
+function saveData(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      flashStatus('נשמר');
+    }catch(e){
+      flashStatus('שגיאה בשמירה');
+    }
+  }, 250);
+}
+
+function flashStatus(msg){
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 1200);
+}
+
+/* ---------- soft mode ---------- */
+function toggleSoftMode(){
+  data.softMode = !data.softMode;
+  document.body.classList.toggle('soft', data.softMode);
+  document.getElementById('softBtn').classList.toggle('on', data.softMode);
+  saveData();
+  renderTasks();
+}
+
+/* ---------- domain editor ---------- */
+function renderDomainEditor(){
+  const el = document.getElementById('domainEditor');
+  el.innerHTML = data.domains.map((d,i)=>`
+    <div class="domain-chip" data-id="${d.id}">
+      <span class="grip" onpointerdown="onGripPointerDown(event,'${d.id}')" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
+      <button type="button" class="palette-btn" style="background:${d.color}" onclick="toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
+      <input type="text" value="${escapeAttr(d.name)}"
+        onchange="renameDomainCommit('${d.id}', this.value)"
+        oninput="updateDomainNameLive('${d.id}', this.value)"
+        style="width:${Math.max(40, d.name.length*8)}px">
+      <span class="rm" onclick="deleteDomain('${d.id}')">✕</span>
+    </div>
+  `).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ תחום</button>`
+    + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
+}
+const COLOR_PALETTE = ['#d4a24c','#e0895f','#c96256','#c9793f','#d9b54a','#b5a16b',
+  '#6fa287','#4f9c7a','#5fae72','#4a8a9e','#7ca8c4','#5aa0a0',
+  '#a78bae','#8a7ab5','#b06a9a','#9e6bb0','#c98a7d','#7a92c4'];
+let colorPickerForId = null;
+function toggleColorPicker(id){ colorPickerForId = colorPickerForId===id ? null : id; renderDomainEditor(); }
+function closeColorPicker(){ colorPickerForId = null; renderDomainEditor(); }
+function renderColorPanel(id){
+  const d = domainById(id);
+  return `<div class="color-panel">
+    <div class="color-grid">${COLOR_PALETTE.map(c=>`<span class="swatch" style="background:${c}" onclick="pickPresetColor('${id}','${c}')"></span>`).join('')}</div>
+    <div class="custom-row">צבע מותאם אישית: <input type="color" value="${d.color}" onchange="updateDomainColor('${id}', this.value)"></div>
+    <button class="cancel-btn" onclick="closeColorPicker()">סגור</button>
+  </div>`;
+}
+function pickPresetColor(id, color){
+  const d = domainById(id);
+  if(d){ d.color = color; saveData(); }
+  colorPickerForId = null;
+  renderAllDependent();
+  renderDomainEditor();
+}
+function updateDomainColor(id, color){ const d=domainById(id); if(d){ d.color=color; saveData(); renderAllDependent(); renderDomainEditor(); } }
+function updateDomainNameLive(id, name){ const d=domainById(id); if(d){ d.name=name; } }
+function renameDomainCommit(id, name){ const d=domainById(id); if(d){ d.name=name.trim()||d.name; saveData(); render(); } }
+let dragState = null;
+function onGripPointerDown(e, id){
+  e.preventDefault();
+  const chip = e.currentTarget.closest('.domain-chip');
+  dragState = {
+    id, pointerId:e.pointerId, startX:e.clientX, startY:e.clientY,
+    chip, active:false, targetId:null,
+    timer: setTimeout(()=>{
+      if(!dragState) return;
+      dragState.active = true;
+      dragState.chip.classList.add('dragging');
+      if(navigator.vibrate) navigator.vibrate(15);
+    }, 500)
+  };
+  try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(err){}
+}
+function onGripPointerMove(e){
+  if(!dragState) return;
+  if(!dragState.active){
+    const dx = e.clientX-dragState.startX, dy = e.clientY-dragState.startY;
+    if(Math.hypot(dx,dy) > 10){ clearTimeout(dragState.timer); dragState=null; }
+    return;
+  }
+  e.preventDefault();
+  const dx = e.clientX - dragState.startX;
+  const dy = e.clientY - dragState.startY;
+  dragState.chip.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
+  dragState.chip.style.pointerEvents = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  dragState.chip.style.pointerEvents = '';
+  const targetChip = under ? under.closest('.domain-chip') : null;
+  document.querySelectorAll('.domain-chip.drag-over').forEach(c=>c.classList.remove('drag-over'));
+  if(targetChip && targetChip!==dragState.chip){
+    targetChip.classList.add('drag-over');
+    dragState.targetId = targetChip.dataset.id;
+  } else {
+    dragState.targetId = null;
+  }
+}
+function onGripPointerUp(e){
+  if(!dragState) return;
+  clearTimeout(dragState.timer);
+  if(dragState.active){
+    dragState.chip.style.transform = '';
+    dragState.chip.classList.remove('dragging');
+    document.querySelectorAll('.domain-chip.drag-over').forEach(c=>c.classList.remove('drag-over'));
+    if(dragState.targetId && dragState.targetId!==dragState.id){
+      const from = data.domains.findIndex(d=>d.id===dragState.id);
+      const to = data.domains.findIndex(d=>d.id===dragState.targetId);
+      if(from>-1 && to>-1){
+        const [item] = data.domains.splice(from,1);
+        data.domains.splice(to,0,item);
+        saveData();
+        render();
+      }
+    }
+  }
+  dragState = null;
+}
+document.addEventListener('pointermove', onGripPointerMove);
+document.addEventListener('pointerup', onGripPointerUp);
+document.addEventListener('pointercancel', onGripPointerUp);
+function addDomain(){
+  const colors = ['#d4a24c','#6fa287','#c98a7d','#a78bae','#c9793f','#7ca8c4','#b5a16b','#4f9c7a','#8a7ab5','#5aa0a0'];
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  data.domains.push({id:uid(), name:'תחום חדש', color});
+  saveData();
+  render();
+}
+function deleteDomain(id){
+  if(data.domains.length<=1){ alert('צריך שיישאר לפחות תחום אחד.'); return; }
+  const d = domainById(id);
+  if(!confirm(`למחוק את "${d.name}"? פריטים ששייכים אליו יעברו לתחום אחר.`)) return;
+  const fallback = data.domains.find(x=>x.id!==id).id;
+  data.anchors.forEach(a=>{ if(a.domain===id) a.domain=fallback; });
+  data.tasks.forEach(t=>{ if(t.domain===id) t.domain=fallback; });
+  if(data.notes[id]){
+    const fb = ensureNotes(fallback);
+    if(data.notes[id].text) fb.text += (fb.text?'\n\n':'') + data.notes[id].text;
+    fb.sparks = fb.sparks.concat(data.notes[id].sparks || []);
+    delete data.notes[id];
+  }
+  data.domains = data.domains.filter(d=>d.id!==id);
+  if(activeNoteDomain===id) activeNoteDomain = data.domains[0].id;
+  saveData();
+  render();
+}
+function domainOptions(selectedId){
+  return data.domains.map(d=>`<option value="${d.id}" ${d.id===selectedId?'selected':''}>${d.name}</option>`).join('');
+}
+
+/* ---------- google calendar helpers ---------- */
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'T'+pad(d.getHours())+pad(d.getMinutes())+'00'; }
+function nextDateForDay(dayIdx, hour, min){
+  const now = new Date();
+  let diff = dayIdx - now.getDay();
+  if(diff < 0) diff += 7;
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()+diff, hour, min, 0);
+}
+function anchorCalendarUrl(a){
+  const dom = domainById(a.domain);
+  const [sh, sm] = (a.time||'09:00').split(':').map(Number);
+  let endH, endM;
+  if(a.endTime){ [endH, endM] = a.endTime.split(':').map(Number); }
+  else { endH = Math.min(sh+1,23); endM = sm; }
+  let endTotal = endH*60+endM + (a.buffer?15:0);
+  endH = Math.floor(endTotal/60)%24; endM = endTotal%60;
+  const start = nextDateForDay(a.day, sh, sm);
+  const end = nextDateForDay(a.day, endH, endM);
+  const params = new URLSearchParams({
+    action:'TEMPLATE',
+    text:a.label,
+    dates:fmtDate(start)+'/'+fmtDate(end),
+    details:`עוגן קבוע מתוך "המפה השבועית" · תחום: ${dom.name}`,
+    recur:`RRULE:FREQ=WEEKLY;BYDAY=${DAYS_ICAL[a.day]}`
+  });
+  return 'https://calendar.google.com/calendar/render?'+params.toString();
+}
+function taskCalendarUrl(t){
+  const dom = domainById(t.domain);
+  let start, end, note;
+  if(t.date){
+    const [y,m,d] = t.date.split('-').map(Number);
+    const [h,mi] = (t.time||'09:00').split(':').map(Number);
+    start = new Date(y, m-1, d, h, mi, 0);
+    if(t.endTime){
+      const [eh,emi] = t.endTime.split(':').map(Number);
+      end = new Date(y, m-1, d, eh, emi, 0);
+    } else {
+      end = new Date(y, m-1, d, h+1, mi, 0);
+    }
+    note = `משימה מתוזמנת מתוך "המפה השבועית" · תחום: ${dom.name}`;
+  } else {
+    const now = new Date();
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0);
+    note = `משימה מתוך "המפה השבועית" · תחום: ${dom.name} — לא תוזמנה לתאריך מסוים, אפשר לשנות תאריך ושעה לפני השמירה`;
+  }
+  const params = new URLSearchParams({ action:'TEMPLATE', text:t.text, dates:fmtDate(start)+'/'+fmtDate(end), details:note });
+  return 'https://calendar.google.com/calendar/render?'+params.toString();
+}
+
+/* ---------- week grid ---------- */
+function renderWeekGrid(){
+  const el = document.getElementById('weekGrid');
+  el.innerHTML = DAYS.map((dayName, dayIdx)=>{
+    const anchorsForDay = data.anchors.filter(a=>a.day===dayIdx).sort((a,b)=> (a.time||'').localeCompare(b.time||''));
+    const chips = anchorsForDay.map(a=>{
+      const dom = domainById(a.domain);
+      return `<div class="anchor-chip" style="border-right-color:${dom.color}">
+        <div class="row-icons">
+          <a href="${anchorCalendarUrl(a)}" target="_blank" onclick="event.stopPropagation()" title="הוספה ליומן גוגל">📅</a>
+          <span onclick="event.stopPropagation();deleteAnchor('${a.id}')">✕</span>
+        </div>
+        <div onclick="editAnchor('${a.id}', ${dayIdx})">
+          ${a.time ? `<span class="time">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
+          ${escapeHtml(a.label)}
+          ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+    const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
+    const isEditingThisDay = editingHere && editingHere.day===dayIdx;
+    const formHtml = openForm===dayIdx ? `
+      <div class="anchor-form">
+        <input type="time" id="anchorTime-${dayIdx}" value="${isEditingThisDay?editingHere.time||'':''}">
+        <input type="time" id="anchorEnd-${dayIdx}" placeholder="שעת סיום (ברירת מחדל: שעה)" value="${isEditingThisDay?editingHere.endTime||'':''}">
+        <input type="text" id="anchorLabel-${dayIdx}" placeholder="למשל: תרגול גיטרה" value="${isEditingThisDay?escapeAttr(editingHere.label):''}">
+        <select id="anchorDomain-${dayIdx}">${domainOptions(isEditingThisDay?editingHere.domain:null)}</select>
+        <label class="buf-label"><input type="checkbox" id="anchorBuffer-${dayIdx}" ${isEditingThisDay&&editingHere.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
+        <div class="anchor-form-actions">
+          <button class="save-btn" onclick="saveAnchor(${dayIdx})">שמור</button>
+          <button class="cancel-btn" onclick="closeForm()">בטל</button>
+        </div>
+      </div>` : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
+    return `<div class="day-col"><div class="day-name">${dayName}</div>${chips}${formHtml}</div>`;
+  }).join('');
+}
+function openAnchorForm(dayIdx){ openForm = dayIdx; editingAnchorId = null; renderWeekGrid(); }
+function editAnchor(id, dayIdx){ openForm = dayIdx; editingAnchorId = id; renderWeekGrid(); }
+function closeForm(){ openForm = null; editingAnchorId = null; renderWeekGrid(); }
+function saveAnchor(dayIdx){
+  const time = document.getElementById(`anchorTime-${dayIdx}`).value;
+  const endTime = document.getElementById(`anchorEnd-${dayIdx}`).value;
+  const label = document.getElementById(`anchorLabel-${dayIdx}`).value.trim();
+  const domain = document.getElementById(`anchorDomain-${dayIdx}`).value;
+  const buffer = document.getElementById(`anchorBuffer-${dayIdx}`).checked;
+  if(!label) return;
+  if(editingAnchorId){
+    const idx = data.anchors.findIndex(a=>a.id===editingAnchorId);
+    if(idx>-1) data.anchors[idx] = {...data.anchors[idx], time, endTime, label, domain, buffer};
+  } else {
+    data.anchors.push({id:uid(), day:dayIdx, time, endTime, label, domain, buffer});
+  }
+  openForm = null; editingAnchorId = null;
+  saveData();
+  renderWeekGrid();
+  renderScheduleGrid();
+}
+function deleteAnchor(id){
+  data.anchors = data.anchors.filter(a=>a.id!==id);
+  saveData();
+  renderWeekGrid();
+  renderScheduleGrid();
+}
+function editAnchorFromSchedule(id, dayIdx){
+  editAnchor(id, dayIdx);
+  const target = document.getElementById('weekGrid');
+  if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* ---------- tasks ---------- */
+let editingTaskId = null;
+const expandedTasks = new Set();
+function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(); }
+function sortByTime(list){
+  return [...list].sort((a,b)=> (a.time||'99:99').localeCompare(b.time||'99:99'));
+}
+function renderTasks(){
+  const el = document.getElementById('taskList');
+  let list = data.tasks;
+  const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — מוצגות רק משימות מטעינות 🟢</div>' : '';
+  if(data.softMode) list = list.filter(t=>t.energy==='low');
+  list = sortByTime(list);
+  if(list.length===0){
+    el.innerHTML = notice + `<li class="empty">${data.softMode ? 'אין כרגע משימות מטעינות — ואפשר גם פשוט לנוח' : 'אין עדיין משימות לשבוע — תוסיף/י את הדבר הכי קטן שאפשר להתחיל בו'}</li>`;
+    return;
+  }
+  el.innerHTML = notice + list.map(t=>taskRowHtml(t)).join('');
+}
+function taskRowHtml(t){
+  if(editingTaskId===t.id) return taskEditFormHtml(t);
+  const dom = domainById(t.domain);
+  const energy = t.energy||'mid';
+  const subCount = (t.subtasks||[]).length;
+  const isExpanded = expandedTasks.has(t.id);
+  const hasContent = subCount>0 || (t.description||'').trim();
+  const isOverdue = t.date && !t.done && t.date < ymd(new Date());
+  let html = `<li>
+    <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
+    <div class="energy-dot" style="background:${ENERGY_COLORS[energy]}" onclick="cycleEnergy('${t.id}')" title="${ENERGY_LABELS[energy]} — לחיצה משנה"></div>
+    <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')">${escapeHtml(t.text)}</span>
+    ${t.date ? `<span class="task-date-badge" style="${isOverdue?'color:var(--energy-high)':''}">${isOverdue?'⏰ ':''}${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
+    <span class="tag" style="background:${dom.color}">${dom.name}</span>
+    ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
+    <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleTaskExpand('${t.id}')" title="תיאור ותת-משימות">${isExpanded?'▾':'▸'}${subCount?' '+subCount:''}</span>
+    <a class="gcal-link" href="${taskCalendarUrl(t)}" target="_blank" title="הוספה ליומן גוגל">📅</a>
+    <span class="del-task" onclick="deleteTask('${t.id}')">✕</span>
+  </li>`;
+  if(isExpanded) html += taskDetailHtml(t);
+  return html;
+}
+function taskEditFormHtml(t){
+  return `<li class="edit-li">
+    <div class="anchor-form">
+      <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
+      <select id="taskEditDomain-${t.id}">${domainOptions(t.domain)}</select>
+      <select id="taskEditEnergy-${t.id}">
+        <option value="low" ${t.energy==='low'?'selected':''}>🟢 מטעין</option>
+        <option value="mid" ${(!t.energy||t.energy==='mid')?'selected':''}>🟡 בינוני</option>
+        <option value="high" ${t.energy==='high'?'selected':''}>🔴 מרוקן</option>
+      </select>
+      <input type="date" id="taskEditDate-${t.id}" value="${t.date||''}">
+      <input type="time" id="taskEditTime-${t.id}" value="${t.time||''}" placeholder="שעת התחלה">
+      <input type="time" id="taskEditEnd-${t.id}" value="${t.endTime||''}" placeholder="שעת סיום (רשות)">
+      <div class="anchor-form-actions">
+        <button class="save-btn" onclick="saveTaskEdit('${t.id}')">שמור</button>
+        <button class="cancel-btn" onclick="closeTaskEdit()">בטל</button>
+      </div>
+    </div>
+  </li>`;
+}
+function taskDetailHtml(t){
+  const subs = t.subtasks||[];
+  const subsHtml = subs.length ? subs.map(s=>`
+    <div class="subtask-row">
+      <div class="chk ${s.done?'done':''}" onclick="toggleSubtask('${t.id}','${s.id}')"></div>
+      <span class="subtask-text ${s.done?'done':''}" onclick="editSubtaskText('${t.id}','${s.id}')">${escapeHtml(s.text)}</span>
+      ${s.date ? `<span class="task-date-badge">${s.date.slice(5)}${s.time?' '+s.time:''}</span>` : ''}
+      <span class="sched-link" onclick="editSubtaskSchedule('${t.id}','${s.id}')" title="תזמון">🕐</span>
+      <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
+    </div>`).join('') : '<div class="empty">אין עדיין תת-משימות</div>';
+  return `<li class="detail-li">
+    <span class="detail-label">תיאור</span>
+    <textarea class="detail-desc" oninput="onTaskDescInput('${t.id}', this.value)" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>
+    <span class="detail-label">תת-משימות</span>
+    ${subsHtml}
+    <div class="subtask-add-row">
+      <input type="text" id="subtaskInput-${t.id}" placeholder="תת-משימה קטנה...">
+      <button onclick="addSubtask('${t.id}')">+ הוסף</button>
+    </div>
+  </li>`;
+}
+function toggleTaskExpand(id){
+  if(expandedTasks.has(id)) expandedTasks.delete(id); else expandedTasks.add(id);
+  renderTasks();
+}
+function openTaskEdit(id){ editingTaskId = id; renderTasks(); }
+function closeTaskEdit(){ editingTaskId = null; renderTasks(); }
+function saveTaskEdit(id){
+  const t = data.tasks.find(t=>t.id===id);
+  if(!t) return;
+  const text = document.getElementById(`taskEditText-${id}`).value.trim();
+  if(!text) return;
+  t.text = text;
+  t.domain = document.getElementById(`taskEditDomain-${id}`).value;
+  t.energy = document.getElementById(`taskEditEnergy-${id}`).value;
+  t.date = document.getElementById(`taskEditDate-${id}`).value || '';
+  t.time = document.getElementById(`taskEditTime-${id}`).value || '';
+  t.endTime = document.getElementById(`taskEditEnd-${id}`).value || '';
+  editingTaskId = null;
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+}
+function onTaskDescInput(id, val){
+  const t = data.tasks.find(t=>t.id===id);
+  if(t){ t.description = val; saveData(); }
+}
+function addSubtask(taskId){
+  const input = document.getElementById(`subtaskInput-${taskId}`);
+  const text = input.value.trim();
+  if(!text) return;
+  const t = data.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  if(!t.subtasks) t.subtasks = [];
+  t.subtasks.push({id:uid(), text, done:false, date:'', time:''});
+  input.value = '';
+  saveData();
+  renderTasks();
+}
+function toggleSubtask(taskId, subId){
+  const t = data.tasks.find(t=>t.id===taskId);
+  const s = t && (t.subtasks||[]).find(s=>s.id===subId);
+  if(s){ s.done = !s.done; saveData(); renderTasks(); }
+}
+function editSubtaskText(taskId, subId){
+  const t = data.tasks.find(t=>t.id===taskId);
+  const s = t && (t.subtasks||[]).find(s=>s.id===subId);
+  if(!s) return;
+  const val = prompt('עריכת תת-משימה:', s.text);
+  if(val!==null && val.trim()){ s.text=val.trim(); saveData(); renderTasks(); }
+}
+function editSubtaskSchedule(taskId, subId){
+  const t = data.tasks.find(t=>t.id===taskId);
+  const s = t && (t.subtasks||[]).find(s=>s.id===subId);
+  if(!s) return;
+  const current = s.date ? `${s.date}${s.time?' '+s.time:''}` : '';
+  const val = prompt('תאריך ושעה, לדוגמה: 2026-08-05 14:00\nהשאר ריק כדי להסיר תזמון:', current);
+  if(val===null) return;
+  const trimmed = val.trim();
+  if(!trimmed){ s.date=''; s.time=''; }
+  else{ const parts = trimmed.split(/\s+/); s.date = parts[0]||''; s.time = parts[1]||''; }
+  saveData();
+  renderTasks();
+}
+function deleteSubtask(taskId, subId){
+  const t = data.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  t.subtasks = (t.subtasks||[]).filter(s=>s.id!==subId);
+  saveData();
+  renderTasks();
+}
+function toggleTaskSchedule(){
+  const fields = document.getElementById('taskSchedFields');
+  fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
+}
+function addTask(){
+  const input = document.getElementById('taskInput');
+  const text = input.value.trim();
+  if(!text) return;
+  const domain = document.getElementById('taskDomain').value;
+  const energy = document.getElementById('taskEnergy').value;
+  const date = document.getElementById('taskDate').value || '';
+  const time = document.getElementById('taskTime').value || '';
+  const endTime = document.getElementById('taskEndTime').value || '';
+  data.tasks.push({id:uid(), text, domain, done:false, energy, date, time, endTime, description:'', subtasks:[]});
+  input.value='';
+  document.getElementById('taskDate').value='';
+  document.getElementById('taskTime').value='';
+  document.getElementById('taskEndTime').value='';
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+}
+function toggleTask(id){ const t=data.tasks.find(t=>t.id===id); if(t){ t.done=!t.done; saveData(); renderTasks(); renderScheduleGrid(); } }
+function cycleEnergy(id){
+  const t = data.tasks.find(t=>t.id===id);
+  if(!t) return;
+  const order = ['low','mid','high'];
+  t.energy = order[(order.indexOf(t.energy||'mid')+1)%3];
+  saveData();
+  renderTasks();
+}
+function deleteTask(id){ data.tasks = data.tasks.filter(t=>t.id!==id); expandedTasks.delete(id); saveData(); renderTasks(); renderScheduleGrid(); }
+function editTaskFromSchedule(id){
+  openTaskEdit(id);
+  const target = document.getElementById('taskList');
+  if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* ---------- weekly schedule (anchors + dated tasks together) ---------- */
+function currentWeekDates(){
+  const now = new Date();
+  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  return DAYS.map((_,i)=>{
+    const d = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate()+i);
+    return d;
+  });
+}
+function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function renderScheduleGrid(){
+  const el = document.getElementById('scheduleGrid');
+  if(!el) return;
+  const weekDates = currentWeekDates();
+  el.innerHTML = DAYS.map((dayName, dayIdx)=>{
+    const dateObj = weekDates[dayIdx];
+    const dateStr = ymd(dateObj);
+    const anchorItems = data.anchors.filter(a=>a.day===dayIdx).map(a=>({type:'anchor', time:a.time||'', item:a}));
+    const taskItems = data.tasks.filter(t=>t.date===dateStr).map(t=>({type:'task', time:t.time||'', item:t}));
+    const combined = anchorItems.concat(taskItems).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+    const itemsHtml = combined.length ? combined.map(entry=>{
+      if(entry.type==='anchor'){
+        const a = entry.item, dom = domainById(a.domain);
+        return `<div class="sched-item anchor-type" style="border-right-color:${dom.color}" onclick="editAnchorFromSchedule('${a.id}', ${dayIdx})">
+          ${a.time?`<span class="sched-time">🔁 ${a.time}</span>`:'<span class="sched-time">🔁</span>'}
+          ${escapeHtml(a.label)}
+        </div>`;
+      } else {
+        const t = entry.item, dom = domainById(t.domain);
+        return `<div class="sched-item task-type" style="border-right-color:${dom.color}" onclick="editTaskFromSchedule('${t.id}')">
+          ${t.time?`<span class="sched-time">${t.time}</span>`:'<span class="sched-time">כל היום</span>'}
+          ${escapeHtml(t.text)}
+        </div>`;
+      }
+    }).join('') : '<div class="sched-empty">כלום מתוזמן</div>';
+    return `<div class="sched-col">
+      <div class="sched-day">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
+      ${itemsHtml}
+    </div>`;
+  }).join('');
+}
+
+/* ---------- notes ---------- */
+function renderNoteTabs(){
+  const el = document.getElementById('noteTabs');
+  el.innerHTML = data.domains.map(d=>`
+    <div class="note-tab ${d.id===activeNoteDomain?'active':''}" style="${d.id===activeNoteDomain?`background:${d.color}`:''}" onclick="switchNoteDomain('${d.id}')">${d.name}</div>
+  `).join('');
+}
+function switchNoteDomain(id){ activeNoteDomain=id; renderNoteTabs(); renderNoteArea(); renderSparks(); }
+function renderNoteArea(){ document.getElementById('noteArea').value = ensureNotes(activeNoteDomain).text; }
+function onNoteInput(val){ ensureNotes(activeNoteDomain).text = val; saveData(); }
+function renderSparks(){
+  const n = ensureNotes(activeNoteDomain);
+  const el = document.getElementById('sparkList');
+  if(!n.sparks.length){ el.innerHTML = '<li class="empty">רעיונות קצרים שצצים תוך כדי הכתיבה — אפשר להעלות משם למשימה</li>'; return; }
+  el.innerHTML = n.sparks.map(s=>`
+    <li>
+      <span class="task-text" style="flex:1" onclick="editSpark('${s.id}')">${escapeHtml(s.text)}</span>
+      <span class="promote" onclick="promoteSparkToTask('${s.id}')">→ למשימה</span>
+      <span class="del-task" onclick="deleteSpark('${s.id}')">✕</span>
+    </li>`).join('');
+}
+function addSpark(){
+  const input = document.getElementById('sparkInput');
+  const text = input.value.trim();
+  if(!text) return;
+  ensureNotes(activeNoteDomain).sparks.push({id:uid(), text});
+  input.value='';
+  saveData();
+  renderSparks();
+}
+function editSpark(id){
+  const n = ensureNotes(activeNoteDomain);
+  const s = n.sparks.find(s=>s.id===id);
+  if(!s) return;
+  const val = prompt('עריכת רעיון:', s.text);
+  if(val!==null && val.trim()){ s.text=val.trim(); saveData(); renderSparks(); }
+}
+function deleteSpark(id){
+  const n = ensureNotes(activeNoteDomain);
+  n.sparks = n.sparks.filter(s=>s.id!==id);
+  saveData();
+  renderSparks();
+}
+function promoteSparkToTask(id){
+  const n = ensureNotes(activeNoteDomain);
+  const s = n.sparks.find(s=>s.id===id);
+  if(!s) return;
+  n.sparks = n.sparks.filter(s=>s.id!==id);
+  data.tasks.push({id:uid(), text:s.text, domain:activeNoteDomain, done:false, energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[]});
+  saveData();
+  renderSparks();
+  renderTasks();
+}
+
+/* ---------- someday ---------- */
+let editingSomedayId = null;
+const expandedSomeday = new Set();
+function renderSomedayDomainSelect(){ const el=document.getElementById('somedayDomain'); if(el) el.innerHTML = domainOptions(); }
+function renderSomeday(){
+  const el = document.getElementById('somedayList');
+  if(data.someday.length===0){ el.innerHTML = '<li class="empty">כל רעיון שעדיין לא הגיע תורו — כותבים ומשחררים</li>'; return; }
+  el.innerHTML = data.someday.map(s=>somedayRowHtml(s)).join('');
+}
+function somedayRowHtml(s){
+  if(editingSomedayId===s.id) return somedayEditFormHtml(s);
+  const dom = domainById(s.domain);
+  const subCount = (s.subtasks||[]).length;
+  const isExpanded = expandedSomeday.has(s.id);
+  const hasContent = subCount>0 || (s.description||'').trim();
+  let html = `<li>
+    <span class="task-text" style="flex:1" onclick="openSomedayEdit('${s.id}')">${escapeHtml(s.text)}</span>
+    <span class="tag" style="background:${dom.color}">${dom.name}</span>
+    <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור ותת-משימות">${isExpanded?'▾':'▸'}${subCount?' '+subCount:''}</span>
+    <span class="promote" onclick="promoteToWeek('${s.id}')">להעביר לשבוע ←</span>
+    <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
+  </li>`;
+  if(isExpanded) html += somedayDetailHtml(s);
+  return html;
+}
+function somedayEditFormHtml(s){
+  return `<li class="edit-li">
+    <div class="anchor-form">
+      <input type="text" id="somedayEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="הרעיון">
+      <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
+      <div class="anchor-form-actions">
+        <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
+        <button class="cancel-btn" onclick="closeSomedayEdit()">בטל</button>
+      </div>
+    </div>
+  </li>`;
+}
+function somedayDetailHtml(s){
+  const subs = s.subtasks||[];
+  const subsHtml = subs.length ? subs.map(sub=>`
+    <div class="subtask-row">
+      <div class="chk ${sub.done?'done':''}" onclick="toggleSomedaySubtask('${s.id}','${sub.id}')"></div>
+      <span class="subtask-text ${sub.done?'done':''}" onclick="editSomedaySubtaskText('${s.id}','${sub.id}')">${escapeHtml(sub.text)}</span>
+      <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')">✕</span>
+    </div>`).join('') : '<div class="empty">אין עדיין צעדים קטנים</div>';
+  return `<li class="detail-li">
+    <span class="detail-label">תיאור</span>
+    <textarea class="detail-desc" oninput="onSomedayDescInput('${s.id}', this.value)" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(s.description||'')}</textarea>
+    <span class="detail-label">צעדים קטנים — כדי לראות מתי זה מתקרב להיות ממשי</span>
+    ${subsHtml}
+    <div class="subtask-add-row">
+      <input type="text" id="somedaySubInput-${s.id}" placeholder="צעד קטן...">
+      <button onclick="addSomedaySubtask('${s.id}')">+ הוסף</button>
+    </div>
+  </li>`;
+}
+function toggleSomedayExpand(id){ if(expandedSomeday.has(id)) expandedSomeday.delete(id); else expandedSomeday.add(id); renderSomeday(); }
+function openSomedayEdit(id){ editingSomedayId = id; renderSomeday(); }
+function closeSomedayEdit(){ editingSomedayId = null; renderSomeday(); }
+function saveSomedayEdit(id){
+  const s = data.someday.find(s=>s.id===id);
+  if(!s) return;
+  const text = document.getElementById(`somedayEditText-${id}`).value.trim();
+  if(!text) return;
+  s.text = text;
+  s.domain = document.getElementById(`somedayEditDomain-${id}`).value;
+  editingSomedayId = null;
+  saveData();
+  renderSomeday();
+}
+function onSomedayDescInput(id, val){ const s=data.someday.find(s=>s.id===id); if(s){ s.description=val; saveData(); } }
+function addSomedaySubtask(id){
+  const input = document.getElementById(`somedaySubInput-${id}`);
+  const text = input.value.trim();
+  if(!text) return;
+  const s = data.someday.find(s=>s.id===id);
+  if(!s) return;
+  if(!s.subtasks) s.subtasks=[];
+  s.subtasks.push({id:uid(), text, done:false});
+  input.value='';
+  saveData();
+  renderSomeday();
+}
+function toggleSomedaySubtask(id, subId){
+  const s = data.someday.find(s=>s.id===id);
+  const sub = s && (s.subtasks||[]).find(x=>x.id===subId);
+  if(sub){ sub.done=!sub.done; saveData(); renderSomeday(); }
+}
+function editSomedaySubtaskText(id, subId){
+  const s = data.someday.find(s=>s.id===id);
+  const sub = s && (s.subtasks||[]).find(x=>x.id===subId);
+  if(!sub) return;
+  const val = prompt('עריכת צעד קטן:', sub.text);
+  if(val!==null && val.trim()){ sub.text=val.trim(); saveData(); renderSomeday(); }
+}
+function deleteSomedaySubtask(id, subId){
+  const s = data.someday.find(s=>s.id===id);
+  if(!s) return;
+  s.subtasks = (s.subtasks||[]).filter(x=>x.id!==subId);
+  saveData();
+  renderSomeday();
+}
+function addSomeday(){
+  const input = document.getElementById('somedayInput');
+  const text = input.value.trim();
+  if(!text) return;
+  const domainSel = document.getElementById('somedayDomain');
+  const domain = domainSel ? domainSel.value : data.domains[0].id;
+  data.someday.push({id:uid(), text, domain, description:'', subtasks:[]});
+  input.value='';
+  saveData();
+  renderSomeday();
+}
+function deleteSomeday(id){ data.someday = data.someday.filter(s=>s.id!==id); expandedSomeday.delete(id); saveData(); renderSomeday(); }
+function promoteToWeek(id){
+  const s = data.someday.find(s=>s.id===id);
+  if(!s) return;
+  data.someday = data.someday.filter(s=>s.id!==id);
+  data.tasks.push({id:uid(), text:s.text, domain:s.domain||data.domains[0].id, done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[]});
+  saveData();
+  renderSomeday();
+  renderTasks();
+  renderScheduleGrid();
+}
+
+/* ---------- reflection (insight banks) ---------- */
+const REFLECT_QUESTIONS = [
+  {key:'fed', icon:'🟢', label:'מה הזין אותי השבוע?'},
+  {key:'hard', icon:'🔴', label:'איפה הרגשתי עומס יתר?'},
+  {key:'release', icon:'🔵', label:'מה אני רוצה לשחרר לשבוע הבא?'}
+];
+const expandedBanks = new Set();
+function weekKey(){ return ymd(currentWeekDates()[0]); }
+function ensureBankEntry(bankKey){
+  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[]};
+  if(!data.reflectionBanks[bankKey]) data.reflectionBanks[bankKey] = [];
+  const wk = weekKey();
+  let entry = data.reflectionBanks[bankKey].find(e=>e.weekKey===wk);
+  if(!entry){
+    entry = {id:uid(), weekKey:wk, text:''};
+    data.reflectionBanks[bankKey].push(entry);
+  }
+  return entry;
+}
+function renderReflection(){
+  const el = document.getElementById('reflectionCard');
+  if(!el) return;
+  el.innerHTML = REFLECT_QUESTIONS.map(q=>{
+    const current = ensureBankEntry(q.key);
+    const history = (data.reflectionBanks[q.key]||[]).filter(e=>e.id!==current.id).sort((a,b)=> b.weekKey.localeCompare(a.weekKey));
+    const isOpen = expandedBanks.has(q.key);
+    const historyHtml = isOpen ? (history.length ? `<div class="bank-list">${history.map(e=>`
+        <div class="bank-entry" onclick="editBankEntry('${q.key}','${e.id}')">
+          <span class="bank-date">${e.weekKey}</span>${escapeHtml(e.text)}
+        </div>`).join('')}</div>` : '<div class="empty">עוד אין תובנות קודמות בבנק הזה</div>') : '';
+    return `<div class="reflect-q">
+      <label>${q.icon} ${q.label}</label>
+      <textarea id="reflect-${q.key}" oninput="onReflectInput('${q.key}', this.value)">${escapeHtml(current.text)}</textarea>
+      <span class="bank-toggle" onclick="toggleBank('${q.key}')">${isOpen?'▾':'▸'} בנק תובנות (${history.length})</span>
+      ${historyHtml}
+    </div>`;
+  }).join('');
+}
+function onReflectInput(bankKey, val){
+  const entry = ensureBankEntry(bankKey);
+  entry.text = val;
+  saveData();
+}
+function toggleBank(bankKey){
+  if(expandedBanks.has(bankKey)) expandedBanks.delete(bankKey); else expandedBanks.add(bankKey);
+  renderReflection();
+}
+function editBankEntry(bankKey, entryId){
+  const entry = (data.reflectionBanks[bankKey]||[]).find(e=>e.id===entryId);
+  if(!entry) return;
+  const val = prompt(`עריכת תובנה משבוע ${entry.weekKey}:`, entry.text);
+  if(val!==null && val.trim()){ entry.text=val.trim(); saveData(); renderReflection(); }
+}
+
+/* ---------- backup / restore ---------- */
+async function exportData(){
+  const now = new Date();
+  const stamp = now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+pad(now.getHours())+pad(now.getMinutes());
+  const filename = 'מפה-שבועית-גיבוי-' + stamp + '.json';
+  const jsonStr = JSON.stringify(data, null, 2);
+  if(window.showSaveFilePicker){
+    try{
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{description:'JSON', accept:{'application/json':['.json']}}]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(jsonStr);
+      await writable.close();
+      flashStatus('גיבוי נשמר');
+      return;
+    }catch(err){
+      if(err && err.name==='AbortError') return;
+      // fall through to default download if the picker failed
+    }
+  }
+  const blob = new Blob([jsonStr], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  flashStatus('גיבוי הורד לתיקיית ההורדות');
+}
+function importData(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const parsed = JSON.parse(ev.target.result);
+      if(!confirm('לטעון את הגיבוי הזה? זה יחליף את כל הנתונים הקיימים כרגע.')) return;
+      data.domains = (parsed.domains && parsed.domains.length) ? parsed.domains : DEFAULT_DOMAINS.map(d=>({...d}));
+      data.anchors = parsed.anchors || [];
+      data.tasks = (parsed.tasks || []).map(t=>({energy:'mid', endTime:'', description:'', subtasks:[], ...t}));
+      data.someday = (parsed.someday || []).map(s=>({domain:data.domains[0].id, description:'', subtasks:[], ...s}));
+      data.notes = parsed.notes || {};
+      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[]};
+      if(parsed.reflection && !parsed.reflectionBanks){
+        const wk = ymd(new Date(new Date().setDate(new Date().getDate()-new Date().getDay())));
+        ['fed','hard','release'].forEach(k=>{
+          if(parsed.reflection[k]) data.reflectionBanks[k].push({id:uid(), weekKey:wk, text:parsed.reflection[k]});
+        });
+      }
+      data.softMode = !!parsed.softMode;
+      activeNoteDomain = data.domains[0].id;
+      saveData();
+      render();
+      flashStatus('גיבוי נטען');
+    }catch(err){
+      alert('הקובץ לא תקין או פגום.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- utils ---------- */
+function escapeHtml(str){ const div=document.createElement('div'); div.textContent=str; return div.innerHTML; }
+function escapeAttr(str){ return String(str).replace(/"/g,'&quot;'); }
+function renderAllDependent(){
+  renderWeekGrid(); renderTaskDomainSelect(); renderTasks(); renderScheduleGrid();
+  renderNoteTabs(); renderSparks(); renderSomedayDomainSelect(); renderSomeday();
+}
+
+function resetAll(){
+  if(!confirm('לאפס את כל התחומים, העוגנים, המשימות, הפתקים ורשימת אי-פעם? בנק התובנות יישאר שמור. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
+  const keepReflection = data.reflectionBanks;
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false};
+  activeNoteDomain = data.domains[0].id;
+  document.body.classList.remove('soft');
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
+  render();
+}
+function clearDoneTasks(){
+  const doneCount = data.tasks.filter(t=>t.done).length;
+  if(doneCount===0){ flashStatus('אין משימות מסומנות כבוצע'); return; }
+  if(!confirm(`למחוק ${doneCount} משימות שסומנו כבוצע? זה לא נוגע במשימות שלא סימנת.`)) return;
+  data.tasks = data.tasks.filter(t=>!t.done);
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+}
+function pushTaskToNextWeek(id){
+  const t = data.tasks.find(t=>t.id===id);
+  if(!t || !t.date) return;
+  const [y,m,d] = t.date.split('-').map(Number);
+  const nd = new Date(y, m-1, d+7);
+  t.date = ymd(nd);
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+  flashStatus('הועבר לשבוע הבא');
+}
+
+function render(){
+  document.body.classList.toggle('soft', data.softMode);
+  document.getElementById('softBtn').classList.toggle('on', data.softMode);
+  renderDomainEditor();
+  renderWeekGrid();
+  renderTaskDomainSelect();
+  renderTasks();
+  renderScheduleGrid();
+  renderNoteTabs();
+  renderNoteArea();
+  renderSparks();
+  renderSomedayDomainSelect();
+  renderSomeday();
+  renderReflection();
+  bindNoteArea();
+}
+function bindNoteArea(){
+  const ta = document.getElementById('noteArea');
+  ta.oninput = (e)=> onNoteInput(e.target.value);
+}
+
+/* ---------- home-screen icon + manifest ---------- */
+function generateIconDataURL(size){
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const r = size*0.22;
+  ctx.fillStyle = '#131f1a';
+  roundRect(ctx, 0, 0, size, size, r);
+  ctx.fill();
+  const cx = size/2, cy = size/2;
+  ctx.strokeStyle = '#d4a24c';
+  ctx.lineWidth = size*0.075;
+  ctx.beginPath(); ctx.arc(cx, cy, size*0.28, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#d4a24c';
+  ctx.beginPath(); ctx.arc(cx, cy, size*0.09, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(79,156,122,0.55)';
+  ctx.lineWidth = size*0.035;
+  ctx.beginPath(); ctx.arc(cx, cy, size*0.38, Math.PI*1.15, Math.PI*1.75); ctx.stroke();
+  return canvas.toDataURL('image/png');
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function setupPWA(){
+  const icon192 = generateIconDataURL(192);
+  const icon512 = generateIconDataURL(512);
+  document.getElementById('faviconLink').href = icon192;
+  document.getElementById('appleIconLink').href = icon192;
+  const manifest = {
+    name: "המפה השבועית שלי", short_name: "המפה השבועית", start_url: ".",
+    display: "standalone", background_color: "#131f1a", theme_color: "#131f1a",
+    icons: [{src: icon192, sizes:"192x192", type:"image/png"}, {src: icon512, sizes:"512x512", type:"image/png"}]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  document.getElementById('manifestLink').href = URL.createObjectURL(blob);
+}
+
+setupPWA();
+loadData();
+</script>
+</body>
+</html>
