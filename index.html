@@ -349,8 +349,10 @@
     </div>
     <div class="card" style="display:flex; gap:10px; flex-wrap:wrap;">
       <button class="add-domain-btn" onclick="exportData()">⬇ הורדת גיבוי</button>
-      <button class="add-domain-btn" onclick="document.getElementById('importFile').click()">⬆ טעינת גיבוי</button>
+      <button class="add-domain-btn" onclick="document.getElementById('importFile').click()">⬆ טעינת גיבוי (מחליף הכל)</button>
       <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+      <button class="add-domain-btn" onclick="document.getElementById('importMergeFile').click()">➕ הוספת תוכן מקובץ (לא מוחק כלום)</button>
+      <input type="file" id="importMergeFile" accept="application/json" style="display:none" onchange="importDataMerge(event)">
     </div>
   </section>
 
@@ -1304,6 +1306,42 @@ function importData(e){
       saveData();
       render();
       flashStatus('גיבוי נטען');
+    }catch(err){
+      alert('הקובץ לא תקין או פגום.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+function mergeData(parsed){
+  const existingIds = new Set(data.domains.map(d=>d.id));
+  (parsed.domains||[]).forEach(d=>{
+    if(!existingIds.has(d.id)){ data.domains.push({...d}); existingIds.add(d.id); }
+  });
+  (parsed.anchors||[]).forEach(a=>{ data.anchors.push({...a, id:uid()}); });
+  (parsed.tasks||[]).forEach(t=>{ data.tasks.push({energy:'mid', endTime:'', description:'', subtasks:[], ...t, id:uid()}); });
+  (parsed.someday||[]).forEach(s=>{ data.someday.push({description:'', subtasks:[], ...s, id:uid()}); });
+  Object.keys(parsed.notes||{}).forEach(domainId=>{
+    const incoming = parsed.notes[domainId];
+    const existing = ensureNotes(domainId);
+    if(incoming.text) existing.text += (existing.text ? '\n\n' : '') + incoming.text;
+    existing.sparks = existing.sparks.concat((incoming.sparks||[]).map(s=>({...s, id:uid()})));
+  });
+  saveData();
+  render();
+}
+function importDataMerge(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const parsed = JSON.parse(ev.target.result);
+      const newDomains = (parsed.domains||[]).filter(d=>!data.domains.some(ex=>ex.id===d.id)).length;
+      const count = (parsed.someday||[]).length + (parsed.tasks||[]).length + (parsed.anchors||[]).length;
+      if(!confirm(`להוסיף ${count} פריטים${newDomains?` ו-${newDomains} תחומים חדשים`:''} לנתונים הקיימים? זה לא מוחק ולא מחליף שום דבר קיים.`)) return;
+      mergeData(parsed);
+      flashStatus('נוסף בהצלחה');
     }catch(err){
       alert('הקובץ לא תקין או פגום.');
     }
