@@ -17,27 +17,42 @@
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#131f1a; --surface:#1a2721; --surface2:#213027; --surface3:#28382d;
-    --text:#ece4d3; --muted:#93a598; --muted2:#6d8175; --gold:#d4a24c;
-    --border:rgba(236,228,211,0.09); --border-strong:rgba(236,228,211,0.16);
+    --bg:#161f1a; --surface:#1c2820; --surface2:#243327; --surface3:#2c3c2e;
+    --text:#f1e8d8; --muted:#9caa9a; --muted2:#748477; --gold:#dba75a;
+    --border:rgba(241,232,216,0.10); --border-strong:rgba(241,232,216,0.17);
     --energy-low:#5fae72; --energy-mid:#d9b54a; --energy-high:#c96256;
+    --glow-gold:rgba(219,167,90,0.20); --glow-rose:rgba(210,148,120,0.16); --glow-teal:rgba(95,174,138,0.16);
   }
   *{box-sizing:border-box;}
   body{
-    margin:0;
+    margin:0; position:relative; isolation:isolate;
     background:
-      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(212,162,76,0.08), transparent),
-      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(79,156,122,0.10), transparent),
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(219,167,90,0.10), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(95,174,138,0.12), transparent),
       var(--bg);
     color:var(--text); font-family:'Heebo', sans-serif; min-height:100vh; padding:28px 16px 80px;
     transition:filter .4s ease;
   }
+  body::before{
+    content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(480px 420px at 8% 18%, var(--glow-gold), transparent 70%),
+      radial-gradient(520px 460px at 96% 30%, var(--glow-teal), transparent 70%),
+      radial-gradient(560px 480px at 50% 105%, var(--glow-rose), transparent 70%);
+    opacity:.7;
+    animation: driftGlow 50s ease-in-out infinite alternate;
+  }
+  @keyframes driftGlow{
+    0%{ transform:translate(0,0) scale(1); }
+    100%{ transform:translate(1.5%,-2%) scale(1.04); }
+  }
+  @media (prefers-reduced-motion: reduce){ body::before{ animation:none; } }
   body.soft{ filter:saturate(0.55) brightness(0.94); }
   .wrap{max-width:980px;margin:0 auto;}
 
   header.top{margin-bottom:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;}
   .eyebrow{font-size:12.5px; letter-spacing:0.14em; color:var(--muted2); text-transform:uppercase; margin-bottom:8px; font-weight:500;}
-  h1{font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:clamp(26px, 5vw, 38px); margin:0 0 8px; color:var(--text);}
+  h1{font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:clamp(26px, 5vw, 38px); margin:0 0 8px; color:var(--text); text-shadow:0 0 26px rgba(219,167,90,0.28);}
   .sub{color:var(--muted); font-size:14.5px; max-width:56ch; line-height:1.6;}
   .soft-btn{
     background:var(--surface); border:1px solid var(--border-strong); color:var(--muted);
@@ -92,9 +107,11 @@
   /* week grid */
   .week-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
   @media (max-width:760px){.week-grid{grid-template-columns:1fr 1fr;}}
-  .day-col{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column;}
+  .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease;}
+  .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
   .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);}
-  .anchor-chip{background:var(--surface2); border-radius:9px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer;}
+  .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
+  .anchor-chip:hover{background:var(--surface3);}
   .anchor-chip .time{color:var(--muted); font-size:11px; display:block; margin-bottom:1px;}
   .anchor-chip .buf{color:var(--muted2); font-size:10px; display:block; margin-top:2px;}
   .anchor-chip .row-icons{position:absolute; left:6px; top:5px; display:flex; gap:9px; opacity:0; transition:opacity .2s;}
@@ -111,7 +128,9 @@
   .save-btn{background:var(--gold); color:#1a1206; font-weight:600;}
   .cancel-btn{background:var(--surface3); color:var(--muted);}
 
-  .card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px; transition:box-shadow .3s ease;}
+  .card:hover{box-shadow:0 10px 34px -16px var(--glow-gold);}
+  input:focus, textarea:focus, select:focus, button:focus-visible{ outline:2px solid var(--glow-gold); outline-offset:2px; }
   .add-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
   .add-row input[type=text]{flex:1; min-width:160px; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:14px; font-family:inherit;}
   .add-row select{background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:13px; font-family:inherit;}
@@ -134,10 +153,12 @@
   /* schedule grid */
   .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
-  .sched-col{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 8px; min-height:70px;}
+  .sched-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:10px 8px; min-height:70px; transition:box-shadow .3s ease;}
+  .sched-col:hover{box-shadow:0 8px 26px -14px var(--glow-teal);}
   .sched-day{font-family:'Frank Ruhl Libre', serif; font-size:14px; font-weight:500; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;}
   .sched-date{color:var(--muted2); font-size:11px; font-weight:400;}
-  .sched-item{background:var(--surface2); border-radius:8px; padding:6px 8px; margin-bottom:5px; font-size:12px; line-height:1.4; cursor:pointer; position:relative;}
+  .sched-item{background:var(--surface2); border-radius:10px; padding:6px 8px; margin-bottom:5px; font-size:12px; line-height:1.4; cursor:pointer; position:relative; transition:background .25s ease;}
+  .sched-item:hover{background:var(--surface3);}
   .sched-item.anchor-type{border-right:3px solid var(--gold);}
   .sched-item.task-type{border-right:3px dashed;}
   .sched-item .sched-time{color:var(--muted); font-size:10.5px; display:block;}
@@ -190,6 +211,25 @@
   footer{margin-top:50px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted2); font-size:13px; line-height:1.7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit;}
   .reset-btn:hover{color:var(--text); border-color:var(--muted);}
+
+  /* load meter */
+  .load-meter{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:14px 18px; margin-bottom:32px;}
+  .load-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
+  .load-label{font-size:13px; color:var(--muted); font-weight:500;}
+  .load-hours{font-size:13px; color:var(--gold); font-weight:600;}
+  .load-bar{height:8px; border-radius:999px; background:var(--surface3); overflow:hidden;}
+  .load-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--gold), #d2947c); transition:width .6s ease;}
+  .load-hint{font-size:11px; color:var(--muted2); margin-top:6px; font-style:italic;}
+
+  /* domain balance (collapsed by default) */
+  .balance-toggle{font-size:12.5px; color:var(--muted); cursor:pointer; display:inline-block;}
+  .balance-toggle:hover{color:var(--text);}
+  .balance-panel{margin-top:12px; display:flex; flex-direction:column; gap:9px;}
+  .balance-row{display:flex; align-items:center; gap:10px; font-size:12.5px;}
+  .balance-name{width:100px; flex-shrink:0; color:var(--text);}
+  .balance-bar{flex:1; height:7px; border-radius:999px; background:var(--surface3); overflow:hidden;}
+  .balance-fill{height:100%; border-radius:999px; transition:width .6s ease;}
+  .balance-hours{width:46px; flex-shrink:0; color:var(--muted2); text-align:left;}
 </style>
 </head>
 <body>
@@ -204,12 +244,16 @@
     <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🌙 מצב רגוע</button>
   </header>
 
+  <div class="load-meter" id="loadMeter"></div>
+
   <section>
     <div class="section-head">
       <h2><span class="num">·</span> תחומים</h2>
       <div class="hint">שם וצבע ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור</div>
     </div>
     <div class="domain-editor" id="domainEditor"></div>
+    <div class="balance-toggle" id="balanceToggle" onclick="toggleBalance()">▸ איזון בין תחומים השבוע</div>
+    <div class="balance-panel" id="balancePanel" style="display:none;"></div>
   </section>
 
   <section>
@@ -850,6 +894,83 @@ function currentWeekDates(){
   });
 }
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+
+/* ---------- weekly load meter + domain balance ---------- */
+const LOAD_REFERENCE_HOURS = 40;
+let balanceOpen = false;
+function itemDurationHours(startTime, endTime, bufferMin){
+  if(!startTime) return 1;
+  const [sh,sm] = startTime.split(':').map(Number);
+  let eh, em;
+  if(endTime){ [eh,em] = endTime.split(':').map(Number); } else { eh = sh+1; em = sm; }
+  let mins = (eh*60+em) - (sh*60+sm);
+  if(mins <= 0) mins += 24*60;
+  if(bufferMin) mins += bufferMin;
+  return mins/60;
+}
+function weekBounds(){
+  const dates = currentWeekDates();
+  return { start: ymd(dates[0]), end: ymd(dates[6]) };
+}
+function computeWeekLoadHours(){
+  let hours = 0;
+  data.anchors.forEach(a=>{ hours += itemDurationHours(a.time, a.endTime, a.buffer?15:0); });
+  const {start,end} = weekBounds();
+  data.tasks.forEach(t=>{
+    if(t.date && t.time && !t.done && t.date>=start && t.date<=end){
+      hours += itemDurationHours(t.time, t.endTime, 0);
+    }
+  });
+  return hours;
+}
+function computeDomainHours(){
+  const hours = {};
+  data.domains.forEach(d=>{ hours[d.id] = 0; });
+  data.anchors.forEach(a=>{ hours[a.domain] = (hours[a.domain]||0) + itemDurationHours(a.time, a.endTime, a.buffer?15:0); });
+  const {start,end} = weekBounds();
+  data.tasks.forEach(t=>{
+    if(t.date && t.time && t.date>=start && t.date<=end){
+      hours[t.domain] = (hours[t.domain]||0) + itemDurationHours(t.time, t.endTime, 0);
+    }
+  });
+  return hours;
+}
+function renderLoadMeter(){
+  const el = document.getElementById('loadMeter');
+  if(!el) return;
+  const hours = computeWeekLoadHours();
+  const pct = Math.min(100, Math.round((hours/LOAD_REFERENCE_HOURS)*100));
+  const rounded = Math.round(hours*10)/10;
+  el.innerHTML = `
+    <div class="load-top">
+      <span class="load-label">כמה מהשבוע כבר תפוס</span>
+      <span class="load-hours">${rounded} שעות מתוזמנות</span>
+    </div>
+    <div class="load-bar"><div class="load-fill" style="width:${pct}%"></div></div>
+    <div class="load-hint">רק כדי לתת תחושה מהירה לפני שעונים למישהו — לא מדד מדויק</div>
+  `;
+}
+function toggleBalance(){ balanceOpen = !balanceOpen; renderBalance(); }
+function renderBalance(){
+  const toggle = document.getElementById('balanceToggle');
+  const panel = document.getElementById('balancePanel');
+  if(!toggle || !panel) return;
+  toggle.textContent = (balanceOpen ? '▾' : '▸') + ' איזון בין תחומים השבוע';
+  if(!balanceOpen){ panel.style.display='none'; panel.innerHTML=''; return; }
+  panel.style.display='flex';
+  const hours = computeDomainHours();
+  const max = Math.max(1, ...Object.values(hours));
+  panel.innerHTML = data.domains.map(d=>{
+    const h = hours[d.id]||0;
+    const pct = Math.round((h/max)*100);
+    return `<div class="balance-row">
+      <span class="balance-name">${escapeHtml(d.name)}</span>
+      <div class="balance-bar"><div class="balance-fill" style="width:${pct}%; background:${d.color}"></div></div>
+      <span class="balance-hours">${Math.round(h*10)/10} ש׳</span>
+    </div>`;
+  }).join('');
+}
+
 function renderScheduleGrid(){
   const el = document.getElementById('scheduleGrid');
   if(!el) return;
@@ -880,6 +1001,8 @@ function renderScheduleGrid(){
       ${itemsHtml}
     </div>`;
   }).join('');
+  renderLoadMeter();
+  renderBalance();
 }
 
 /* ---------- notes ---------- */
