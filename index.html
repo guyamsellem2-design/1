@@ -17,18 +17,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#161f1a; --surface:#1c2820; --surface2:#243327; --surface3:#2c3c2e;
-    --text:#f1e8d8; --muted:#9caa9a; --muted2:#748477; --gold:#dba75a;
-    --border:rgba(241,232,216,0.10); --border-strong:rgba(241,232,216,0.17);
+    --bg:#0e2422; --surface:#153631; --surface2:#1c443c; --surface3:#245149;
+    --text:#f5ecd9; --muted:#a3c9bd; --muted2:#75988c; --gold:#e6ac5c;
+    --border:rgba(245,236,217,0.11); --border-strong:rgba(245,236,217,0.19);
     --energy-low:#5fae72; --energy-mid:#d9b54a; --energy-high:#c96256;
-    --glow-gold:rgba(219,167,90,0.20); --glow-rose:rgba(210,148,120,0.16); --glow-teal:rgba(95,174,138,0.16);
+    --glow-gold:rgba(230,172,92,0.24); --glow-rose:rgba(224,138,95,0.18); --glow-teal:rgba(45,196,168,0.22);
   }
   *{box-sizing:border-box;}
   body{
     margin:0; position:relative; isolation:isolate;
     background:
-      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(219,167,90,0.10), transparent),
-      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(95,174,138,0.12), transparent),
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(230,172,92,0.13), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(45,196,168,0.16), transparent),
       var(--bg);
     color:var(--text); font-family:'Heebo', sans-serif; min-height:100vh; padding:28px 16px 80px;
     transition:filter .4s ease;
@@ -39,7 +39,7 @@
       radial-gradient(480px 420px at 8% 18%, var(--glow-gold), transparent 70%),
       radial-gradient(520px 460px at 96% 30%, var(--glow-teal), transparent 70%),
       radial-gradient(560px 480px at 50% 105%, var(--glow-rose), transparent 70%);
-    opacity:.7;
+    opacity:.8;
     animation: driftGlow 50s ease-in-out infinite alternate;
   }
   @keyframes driftGlow{
@@ -52,7 +52,7 @@
 
   header.top{margin-bottom:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;}
   .eyebrow{font-size:12.5px; letter-spacing:0.14em; color:var(--muted2); text-transform:uppercase; margin-bottom:8px; font-weight:500;}
-  h1{font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:clamp(26px, 5vw, 38px); margin:0 0 8px; color:var(--text); text-shadow:0 0 26px rgba(219,167,90,0.28);}
+  h1{font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:clamp(26px, 5vw, 38px); margin:0 0 8px; color:var(--text); text-shadow:0 0 26px rgba(230,172,92,0.32);}
   .sub{color:var(--muted); font-size:14.5px; max-width:56ch; line-height:1.6;}
   .soft-btn{
     background:var(--surface); border:1px solid var(--border-strong); color:var(--muted);
@@ -218,7 +218,7 @@
   .load-label{font-size:13px; color:var(--muted); font-weight:500;}
   .load-hours{font-size:13px; color:var(--gold); font-weight:600;}
   .load-bar{height:8px; border-radius:999px; background:var(--surface3); overflow:hidden;}
-  .load-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--gold), #d2947c); transition:width .6s ease;}
+  .load-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--gold), #2dc4a8); transition:width .6s ease;}
   .load-hint{font-size:11px; color:var(--muted2); margin-top:6px; font-style:italic;}
 
   /* domain balance (collapsed by default) */
@@ -361,14 +361,14 @@
 
 <script>
 const DEFAULT_DOMAINS = [
-  {id:'album',  name:'אלבום ויצירה', color:'#d4a24c'},
-  {id:'teach',  name:'הוראה',        color:'#6fa287'},
-  {id:'body',   name:'גוף ובריאות',  color:'#c98a7d'},
-  {id:'love',   name:'זוגיות',       color:'#a78bae'},
-  {id:'family', name:'משפחה',        color:'#c9793f'},
-  {id:'friends',name:'חברים',        color:'#7ca8c4'},
-  {id:'home',   name:'בית',          color:'#b5a16b'},
-  {id:'rest',   name:'מנוחה וטבע',   color:'#4f9c7a'},
+  {id:'album',  name:'אלבום ויצירה', color:'#e2a34c'},
+  {id:'teach',  name:'הוראה',        color:'#3aa9a0'},
+  {id:'body',   name:'גוף ובריאות',  color:'#e08a72'},
+  {id:'love',   name:'זוגיות',       color:'#b98fc4'},
+  {id:'family', name:'משפחה',        color:'#e2903f'},
+  {id:'friends',name:'חברים',        color:'#4fb4d6'},
+  {id:'home',   name:'בית',          color:'#cf9a5c'},
+  {id:'rest',   name:'מנוחה וטבע',   color:'#3fae7a'},
 ];
 const ENERGY_COLORS = {low:'#5fae72', mid:'#d9b54a', high:'#c96256'};
 const ENERGY_LABELS = {low:'🟢 מטעין', mid:'🟡 בינוני', high:'🔴 מרוקן'};
@@ -458,9 +458,9 @@ function renderDomainEditor(){
   `).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ תחום</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
 }
-const COLOR_PALETTE = ['#d4a24c','#e0895f','#c96256','#c9793f','#d9b54a','#b5a16b',
-  '#6fa287','#4f9c7a','#5fae72','#4a8a9e','#7ca8c4','#5aa0a0',
-  '#a78bae','#8a7ab5','#b06a9a','#9e6bb0','#c98a7d','#7a92c4'];
+const COLOR_PALETTE = ['#e2a34c','#e6935f','#d9695c','#e2903f','#e6c052','#cf9a5c',
+  '#3aa9a0','#3fae7a','#5fc47f','#2f96a8','#4fb4d6','#3fb0ac',
+  '#b98fc4','#9d84c9','#c26fa0','#b06fc4','#e08a72','#6f95d6'];
 let colorPickerForId = null;
 function toggleColorPicker(id){ colorPickerForId = colorPickerForId===id ? null : id; renderDomainEditor(); }
 function closeColorPicker(){ colorPickerForId = null; renderDomainEditor(); }
@@ -545,7 +545,7 @@ document.addEventListener('pointermove', onGripPointerMove);
 document.addEventListener('pointerup', onGripPointerUp);
 document.addEventListener('pointercancel', onGripPointerUp);
 function addDomain(){
-  const colors = ['#d4a24c','#6fa287','#c98a7d','#a78bae','#c9793f','#7ca8c4','#b5a16b','#4f9c7a','#8a7ab5','#5aa0a0'];
+  const colors = ['#e2a34c','#3aa9a0','#e08a72','#b98fc4','#e2903f','#4fb4d6','#cf9a5c','#3fae7a','#9d84c9','#3fb0ac'];
   const color = colors[Math.floor(Math.random()*colors.length)];
   data.domains.push({id:uid(), name:'תחום חדש', color});
   saveData();
