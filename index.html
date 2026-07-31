@@ -644,7 +644,7 @@ function renderWeekGrid(){
           <span onclick="event.stopPropagation();deleteAnchor('${a.id}')">✕</span>
         </div>
         <div onclick="editAnchor('${a.id}', ${dayIdx})">
-          ${a.time ? `<span class="time">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
+          ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
           ${escapeHtml(a.label)}
           ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
         </div>
@@ -731,7 +731,7 @@ function taskRowHtml(t){
     <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
     <div class="energy-dot" style="background:${ENERGY_COLORS[energy]}" onclick="cycleEnergy('${t.id}')" title="${ENERGY_LABELS[energy]} — לחיצה משנה"></div>
     <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')">${escapeHtml(t.text)}</span>
-    ${t.date ? `<span class="task-date-badge" style="${isOverdue?'color:var(--energy-high)':''}">${isOverdue?'⏰ ':''}${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
+    ${t.date ? `<span class="task-date-badge" style="${isOverdue?'color:var(--energy-high)':''}">${isOverdue?'⏰ ':''}<span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
     <span class="tag" style="background:${dom.color}">${dom.name}</span>
     ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleTaskExpand('${t.id}')" title="תיאור ותת-משימות">${isExpanded?'▾':'▸'}${subCount?' '+subCount:''}</span>
