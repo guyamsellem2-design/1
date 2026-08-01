@@ -962,6 +962,7 @@ function taskEditFormHtml(t){
   return `<li class="edit-li">
     <div class="anchor-form">
       <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
+      <textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>
       <div class="edit-form-row">
         <select id="taskEditDomain-${t.id}">${domainOptions(t.domain)}</select>
         <select id="taskEditEnergy-${t.id}">
@@ -997,8 +998,6 @@ function taskDetailHtml(t){
       <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
     </div>`).join('') : '<div class="empty">אין עדיין תת-משימות</div>';
   return `<li class="detail-li">
-    <span class="detail-label">תיאור</span>
-    <textarea class="detail-desc" oninput="onTaskDescInput('${t.id}', this.value)" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>
     <span class="detail-label">תת-משימות</span>
     ${subsHtml}
     <div class="subtask-add-row">
@@ -1024,14 +1023,11 @@ function saveTaskEdit(id){
   t.date = document.getElementById(`taskEditDate-${id}`).value || '';
   t.time = document.getElementById(`taskEditTime-${id}`).value || '';
   t.endTime = document.getElementById(`taskEditEnd-${id}`).value || '';
+  t.description = document.getElementById(`taskEditDesc-${id}`).value || '';
   editingTaskId = null;
   saveData();
   renderTasks();
   renderScheduleGrid();
-}
-function onTaskDescInput(id, val){
-  const t = data.tasks.find(t=>t.id===id);
-  if(t){ t.description = val; saveData(); }
 }
 function addSubtask(taskId){
   const input = document.getElementById(`subtaskInput-${taskId}`);
