@@ -134,6 +134,30 @@
   .draw-size-dot span{display:block; border-radius:50%; background:var(--text);}
   .keep-note-canvas{width:100%; height:180px; border-radius:10px; margin-top:8px; touch-action:none; cursor:crosshair; background:#fff; border:1px solid var(--border); display:block;}
 
+  /* voice memos */
+  .memo-section{margin-top:10px; padding-top:9px; border-top:1px solid var(--border);}
+  .memo-toggle{font-size:13px; color:var(--muted); cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none;}
+  .memo-toggle:hover{color:var(--text);}
+  .memo-toggle .chev{font-size:11px; color:var(--muted2);}
+  .memo-list{margin:9px 0;}
+  .memo-row{background:var(--surface3); border-radius:10px; padding:7px 9px; margin-bottom:6px;}
+  .memo-row-head{display:flex; align-items:center; gap:7px;}
+  .memo-icon{font-size:14px; flex-shrink:0; cursor:pointer; padding:2px;}
+  .memo-icon:hover{filter:brightness(1.3);}
+  .memo-name-input{flex:1; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:13.5px; min-width:0; padding:2px 0;}
+  .memo-name-input:focus{outline:none;}
+  .memo-player{display:flex; align-items:center; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
+  .memo-ctrl{background:var(--surface2); border:1px solid var(--border-strong); border-radius:8px; padding:5px 10px; font-size:13px; cursor:pointer; font-family:inherit; color:var(--text);}
+  .memo-ctrl:hover{border-color:var(--gold);}
+  .memo-play{min-width:36px;}
+  .rec-btn{display:flex; align-items:center; justify-content:center; gap:10px; background:#1a1712; color:#f4efe4; border:none; border-radius:999px; padding:9px 22px; font-size:13.5px; font-weight:700; letter-spacing:.04em; cursor:pointer; font-family:inherit; margin-top:2px;}
+  .rec-btn:hover{background:#282219;}
+  .rec-btn .rec-dot{width:11px; height:11px; border-radius:50%; background:#d43a3a; flex-shrink:0;}
+  .rec-btn.recording{background:#3a1414;}
+  .rec-btn.recording .rec-dot{animation:recPulse 1s ease-in-out infinite;}
+  @keyframes recPulse{0%,100%{opacity:1;} 50%{opacity:.3;}}
+  @media (prefers-reduced-motion: reduce){ .rec-btn.recording .rec-dot{animation:none;} }
+
   .status{
     position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
     background:var(--surface3); border:1px solid var(--border-strong);
@@ -904,6 +928,12 @@ let drawingNoteId = null;
 let drawColor = '#1a1a1a';
 let drawSize = 5;
 const minimizedNoteIds = new Set();
+const expandedMemoNoteIds = new Set();
+let openMemoId = null;
+let recordingNoteId = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingStream = null;
 function toggleNoteMinimize(domainId, noteId){
   if(minimizedNoteIds.has(noteId)) minimizedNoteIds.delete(noteId); else minimizedNoteIds.add(noteId);
   renderKeepGrid(domainId);
@@ -949,6 +979,7 @@ function renderKeepGrid(id){
         <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
         <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
       </div>
+      ${renderMemoSection(id, n)}
     </div>`;
   }).join('');
   if(drawingNoteId){
@@ -956,10 +987,131 @@ function renderKeepGrid(id){
     if(canvas) initDrawCanvas(canvas);
   }
 }
+
+/* ---------- voice memos, per note ---------- */
+function renderMemoSection(domainId, n){
+  const memos = n.memos || [];
+  const isExpanded = expandedMemoNoteIds.has(n.id);
+  const isRecordingThisNote = recordingNoteId===n.id;
+  return `<div class="memo-section">
+    <div class="memo-toggle" onclick="toggleMemosExpand('${domainId}','${n.id}')">🎙 הקלטות${memos.length?' ('+memos.length+')':''} <span class="chev">${isExpanded?'▾':'▸'}</span></div>
+    ${isExpanded ? `
+      <div class="memo-list">
+        ${memos.length ? memos.map(m=>renderMemoRow(domainId, n.id, m)).join('') : '<div class="empty" style="font-size:13px; padding:4px 0;">עדיין אין הקלטות</div>'}
+      </div>
+      <button type="button" class="rec-btn ${isRecordingThisNote?'recording':''}" onclick="${isRecordingThisNote?'stopMemoRecording()':`startMemoRecording('${domainId}','${n.id}')`}">
+        <span class="rec-label">${isRecordingThisNote?'עצירה ושמירה':'REC'}</span><span class="rec-dot"></span>
+      </button>
+    ` : ''}
+  </div>`;
+}
+function renderMemoRow(domainId, noteId, m){
+  const isOpen = openMemoId===m.id;
+  return `<div class="memo-row">
+    <div class="memo-row-head">
+      <span class="memo-icon" onclick="toggleMemoPlayer('${m.id}')" title="נגן/כווץ">🎙</span>
+      <input type="text" class="memo-name-input" value="${escapeAttr(m.name||'')}" placeholder="הערה מהירה (רשות)..." onchange="renameMemo('${domainId}','${noteId}','${m.id}', this.value)">
+      <span class="del-task" onclick="deleteMemo('${domainId}','${noteId}','${m.id}')">✕</span>
+    </div>
+    ${isOpen ? `
+    <div class="memo-player">
+      <audio id="memoAudio-${m.id}" src="${m.audio}" preload="metadata" onplay="updateMemoPlayIcon('${m.id}', false)" onpause="updateMemoPlayIcon('${m.id}', true)" onended="updateMemoPlayIcon('${m.id}', true)"></audio>
+      <button type="button" class="memo-ctrl" onclick="seekMemo('${m.id}', -10)" title="10 שניות אחורה">⏪10</button>
+      <button type="button" class="memo-ctrl memo-play" id="memoPlayBtn-${m.id}" onclick="playPauseMemo('${m.id}')" title="נגן/השהה">▶️</button>
+      <button type="button" class="memo-ctrl" onclick="seekMemo('${m.id}', 10)" title="10 שניות קדימה">10⏩</button>
+      <button type="button" class="memo-ctrl" onclick="stopMemo('${m.id}')" title="עצור והתחל מהתחלה">⏹</button>
+    </div>` : ''}
+  </div>`;
+}
+function toggleMemosExpand(domainId, noteId){
+  if(expandedMemoNoteIds.has(noteId)) expandedMemoNoteIds.delete(noteId); else expandedMemoNoteIds.add(noteId);
+  renderKeepGrid(domainId);
+}
+function startMemoRecording(domainId, noteId){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    alert('הדפדפן הזה לא תומך בהקלטה מהמיקרופון.');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    recordingStream = stream;
+    recordingNoteId = noteId;
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e=>{ if(e.data && e.data.size>0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = ()=>{
+      const blob = new Blob(recordedChunks, {type: (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm'});
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+        if(n){
+          if(!n.memos) n.memos = [];
+          n.memos.unshift({id:uid(), name:'', audio:reader.result, createdAt:Date.now()});
+          saveData();
+          renderKeepGrid(domainId);
+        }
+      };
+      reader.readAsDataURL(blob);
+      if(recordingStream) recordingStream.getTracks().forEach(t=>t.stop());
+      recordingStream = null;
+      recordingNoteId = null;
+      mediaRecorder = null;
+    };
+    mediaRecorder.start();
+    renderKeepGrid(domainId);
+  }).catch(()=>{
+    alert('לא ניתן היה לגשת למיקרופון. יש לאשר הרשאת מיקרופון בדפדפן.');
+  });
+}
+function stopMemoRecording(){
+  if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
+}
+function toggleMemoPlayer(memoId){
+  if(openMemoId && openMemoId!==memoId){
+    const prevAudio = document.getElementById('memoAudio-'+openMemoId);
+    if(prevAudio) prevAudio.pause();
+  }
+  openMemoId = openMemoId===memoId ? null : memoId;
+  renderKeepGrid(activeNoteDomain);
+}
+function playPauseMemo(memoId){
+  const audio = document.getElementById('memoAudio-'+memoId);
+  if(!audio) return;
+  if(audio.paused) audio.play(); else audio.pause();
+}
+function seekMemo(memoId, delta){
+  const audio = document.getElementById('memoAudio-'+memoId);
+  if(!audio) return;
+  audio.currentTime = Math.max(0, audio.currentTime + delta);
+}
+function stopMemo(memoId){
+  const audio = document.getElementById('memoAudio-'+memoId);
+  if(!audio) return;
+  audio.pause();
+  audio.currentTime = 0;
+}
+function updateMemoPlayIcon(memoId, paused){
+  const btn = document.getElementById('memoPlayBtn-'+memoId);
+  if(btn) btn.textContent = paused ? '▶️' : '⏸️';
+}
+function renameMemo(domainId, noteId, memoId, name){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  const m = n && (n.memos||[]).find(m=>m.id===memoId);
+  if(m){ m.name = name.trim(); saveData(); }
+}
+function deleteMemo(domainId, noteId, memoId){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(n && n.memos){
+    n.memos = n.memos.filter(m=>m.id!==memoId);
+    if(openMemoId===memoId) openMemoId = null;
+    saveData();
+    renderKeepGrid(domainId);
+  }
+}
+
 function addDomainNote(){
   if(!activeNoteDomain) return;
   const notes = ensureDomainNotes(activeNoteDomain);
-  notes.unshift({id:uid(), text:'', color:'', drawing:''});
+  notes.unshift({id:uid(), text:'', color:'', drawing:'', memos:[]});
   saveData();
   renderKeepGrid(activeNoteDomain);
   requestAnimationFrame(()=>{ const ta = document.querySelector('#keepGrid textarea'); if(ta) ta.focus(); });
@@ -1236,7 +1388,7 @@ function syncGoogleCalendar(){
   runGcalSync();
 }
 
-function parseWeeklyRecurrenceDays(recurrenceArr, fallbackDate){
+function parseGcalRecurrence(recurrenceArr, fallbackDate){
   if(!recurrenceArr) return null;
   const rrule = recurrenceArr.find(r=>r.indexOf('RRULE')===0);
   if(!rrule) return null;
@@ -1245,12 +1397,22 @@ function parseWeeklyRecurrenceDays(recurrenceArr, fallbackDate){
     const [k,v] = p.split('=');
     parts[k]=v;
   });
-  if(parts.FREQ !== 'WEEKLY') return null;
+  if(parts.INTERVAL && parts.INTERVAL!=='1') return null; // "every N" recurrences don't map cleanly to our anchor model
   const DAY_MAP = {SU:0,MO:1,TU:2,WE:3,TH:4,FR:5,SA:6};
-  if(parts.BYDAY){
-    return parts.BYDAY.split(',').map(d=>DAY_MAP[d]).filter(d=>d!==undefined);
+  if(parts.FREQ === 'DAILY'){
+    return {repeatType:'daily'};
   }
-  return fallbackDate ? [fallbackDate.getDay()] : null;
+  if(parts.FREQ === 'WEEKLY'){
+    const days = parts.BYDAY ? parts.BYDAY.split(',').map(d=>DAY_MAP[d]).filter(d=>d!==undefined) : (fallbackDate ? [fallbackDate.getDay()] : null);
+    return (days && days.length) ? {repeatType:'weekly', days} : null;
+  }
+  if(parts.FREQ === 'MONTHLY' && fallbackDate){
+    return {repeatType:'monthly', date: ymd(fallbackDate)};
+  }
+  if(parts.FREQ === 'YEARLY' && fallbackDate){
+    return {repeatType:'yearly', date: ymd(fallbackDate)};
+  }
+  return null;
 }
 function runGcalSync(){
   if(gcalSyncing) return;
@@ -1303,8 +1465,8 @@ function runGcalSync(){
       masterResults.forEach(({group, master})=>{
         const sampleEv = group.instances[0];
         const sampleDate = (sampleEv.start && sampleEv.start.dateTime) ? new Date(sampleEv.start.dateTime) : null;
-        const days = (master && sampleDate) ? parseWeeklyRecurrenceDays(master.recurrence, sampleDate) : null;
-        if(days && days.length && sampleDate){
+        const recurrence = (master && sampleDate) ? parseGcalRecurrence(master.recurrence, sampleDate) : null;
+        if(recurrence && sampleDate){
           const sh = sampleDate.getHours(), sm = sampleDate.getMinutes();
           const time = pad(sh)+':'+pad(sm);
           let endTime = '';
@@ -1312,13 +1474,20 @@ function runGcalSync(){
             const ed = new Date(sampleEv.end.dateTime);
             endTime = pad(ed.getHours())+':'+pad(ed.getMinutes());
           }
-          days.forEach(dayIdx=>{
-            data.anchors.push({id:uid(), day:dayIdx, time, endTime, label:sampleEv.summary||'(ללא כותרת)',
-              domain:'', buffer:false, repeatType:'weekly', date:'', googleRecurringEventId:group.recurringEventId});
+          const label = sampleEv.summary||'(ללא כותרת)';
+          if(recurrence.repeatType==='weekly'){
+            recurrence.days.forEach(dayIdx=>{
+              data.anchors.push({id:uid(), day:dayIdx, time, endTime, label,
+                domain:'', buffer:false, repeatType:'weekly', date:'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
+              addedAnchors++;
+            });
+          } else {
+            data.anchors.push({id:uid(), day:sampleDate.getDay(), time, endTime, label,
+              domain:'', buffer:false, repeatType:recurrence.repeatType, date:recurrence.date||'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
             addedAnchors++;
-          });
+          }
         } else {
-          // not weekly (or master fetch failed) - fall back to syncing each instance as a regular task
+          // recurrence type we don't model as an anchor (or master fetch failed) - fall back to syncing each instance as a regular task
           group.instances.forEach(ev=>oneTimeEvents.push({ev, calId:group.calId}));
         }
       });
@@ -1341,7 +1510,7 @@ function runGcalSync(){
           }
         }
         data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:'', done:false, energy:'',
-          date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:gid});
+          date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:gid, createdAt:Date.now()});
         addedTasks++;
       });
 
@@ -1438,7 +1607,7 @@ function saveAnchor(dayIdx){
     const idx = data.anchors.findIndex(a=>a.id===editingAnchorId);
     if(idx>-1) data.anchors[idx] = {...data.anchors[idx], time, endTime, label, domain, buffer, repeatType, date};
   } else {
-    data.anchors.push({id:uid(), day:dayIdx, time, endTime, label, domain, buffer, repeatType, date});
+    data.anchors.push({id:uid(), day:dayIdx, time, endTime, label, domain, buffer, repeatType, date, createdAt:Date.now()});
   }
   openForm = null; editingAnchorId = null;
   saveData();
@@ -1659,7 +1828,7 @@ function addTask(){
   const date = document.getElementById('taskDate').value || '';
   const time = document.getElementById('taskTime').value || '';
   const endTime = document.getElementById('taskEndTime').value || '';
-  data.tasks.push({id:uid(), text, domain, done:false, energy, date, time, endTime, description:'', subtasks:[]});
+  data.tasks.push({id:uid(), text, domain, done:false, energy, date, time, endTime, description:'', subtasks:[], createdAt:Date.now()});
   input.value='';
   document.getElementById('taskDate').value='';
   document.getElementById('taskTime').value='';
@@ -1865,17 +2034,27 @@ function renderScheduleGrid(){
         </div>` : ''}
       </div>`;
 
-    const anchorEntries = anchorsForDay.map(a=>{
-      const dom = domainById(a.domain);
-      const chip = `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
-          ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
-          ${escapeHtml(a.label)}
-          ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
-      </div>`;
-      return chip + ((isEditingThisDay && editingHere.id===a.id) ? anchorFormHtml : '');
-    });
+    const chronoItems = anchorsForDay.map(a=>({type:'anchor', time:a.time||'', createdAt:a.createdAt||0, data:a}))
+      .concat(tasksForDay.map(t=>({type:'task', time:t.time||'', createdAt:t.createdAt||0, data:t})))
+      .sort((x,y)=>{
+        const xHas = !!x.time, yHas = !!y.time;
+        if(xHas && yHas && x.time!==y.time) return x.time < y.time ? -1 : 1;
+        if(xHas !== yHas) return xHas ? -1 : 1; // items with a start time come before untimed ones
+        return (x.createdAt||0) - (y.createdAt||0); // same start time (or both untimed): whoever was added first is first
+      });
 
-    const taskEntries = tasksForDay.map(t=>{
+    const chronoEntries = chronoItems.map(it=>{
+      if(it.type==='anchor'){
+        const a = it.data;
+        const dom = domainById(a.domain);
+        const chip = `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+            ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
+            ${escapeHtml(a.label)}
+            ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
+        </div>`;
+        return chip + ((isEditingThisDay && editingHere.id===a.id) ? anchorFormHtml : '');
+      }
+      const t = it.data;
       const dom = t.domain ? domainById(t.domain) : null;
       const isTaskOverdue = t.date && !t.done && t.date < ymd(new Date());
       return `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''}" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
@@ -1884,7 +2063,7 @@ function renderScheduleGrid(){
       </div>`;
     });
 
-    let entries = anchorEntries.concat(taskEntries);
+    let entries = chronoEntries;
     const totalCount = entries.length;
     const isMinimized = minimizedDays.has(dayIdx);
     let hiddenCount = 0;
@@ -2069,7 +2248,7 @@ function promoteToWeek(id){
   const s = data.someday.find(s=>s.id===id);
   if(!s) return;
   data.someday = data.someday.filter(s=>s.id!==id);
-  data.tasks.push({id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[]});
+  data.tasks.push({id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()});
   saveData();
   renderSomeday();
   renderTasks();
@@ -2156,7 +2335,7 @@ function convertSuggestionToTask(id){
   const s = data.suggestions.find(s=>s.id===id);
   if(!s) return;
   const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
-  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:'', endTime:'', description:'', subtasks:[]};
+  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
   data.tasks.push(newTask);
   saveData();
   openSection('tasks');
