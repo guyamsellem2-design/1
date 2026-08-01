@@ -141,6 +141,16 @@
   /* week grid */
   .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease;}
   .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
+  .day-col.focused{flex:1 1 260px; min-width:230px;}
+  .day-col.compact{
+    flex:0 0 62px; width:62px; min-height:0; cursor:pointer; border-color:var(--border);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    padding:14px 4px;
+  }
+  .day-col.compact:hover{box-shadow:0 8px 24px -14px var(--glow-teal); transform:translateY(-1px);}
+  .day-col.compact .day-letter{font-family:'Frank Ruhl Libre', serif; font-size:17px; font-weight:600; color:var(--text);}
+  .day-col.compact .day-date-compact{font-size:9.5px; color:var(--muted2);}
+  .day-col.compact .day-count{font-size:10.5px; color:var(--muted); text-align:center; line-height:1.3;}
   .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline; cursor:pointer; user-select:none;}
   .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
   .anchor-chip:hover{background:var(--surface3);}
@@ -177,8 +187,7 @@
   .task-date-badge{font-size:10.5px; color:var(--muted2); white-space:nowrap;}
 
   /* schedule grid */
-  .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
-  @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
+  .schedule-grid{display:flex; align-items:stretch; gap:8px; overflow-x:auto; padding-bottom:6px;}
   .sched-date{color:var(--muted2); font-size:11px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:11.5px; font-style:italic; padding:4px 2px;}
   .day-more{color:var(--muted2); font-size:11px; padding:2px 2px 6px; text-align:center;}
@@ -282,7 +291,7 @@
   <section>
     <div class="section-head">
       <h2 onclick="toggleSection('schedule')"><span class="num">01</span> לוח השבוע <span class="chev" id="chev-schedule">▾</span></h2>
-      <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
+      <div class="hint">היום מוצג מורחב, שאר הימים מצומצמים · לחיצה על יום אחר עוברת אליו · לחיצה על עוגן לעריכה/מחיקה/יומן</div>
     </div>
     <div id="secbody-schedule">
       <div class="schedule-grid" id="scheduleGrid"></div>
@@ -431,6 +440,7 @@ const DEFAULT_DOMAINS = [
 const ENERGY_COLORS = {low:'#5fae72', mid:'#d9b54a', high:'#c96256'};
 const ENERGY_LABELS = {low:'🟢 מטעין', mid:'🟡 בינוני', high:'🔴 מרוקן'};
 const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const DAY_LETTERS = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
@@ -438,6 +448,13 @@ let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflec
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set();
+let focusedDayIdx = new Date().getDay();
+function focusDay(dayIdx){
+  if(focusedDayIdx===dayIdx) return;
+  focusedDayIdx = dayIdx;
+  openForm = null; editingAnchorId = null;
+  renderScheduleGrid();
+}
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
   renderScheduleGrid();
@@ -1023,6 +1040,15 @@ function renderScheduleGrid(){
     const anchorsForDay = data.anchors.filter(a=>a.day===dayIdx).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     const tasksForDay = data.tasks.filter(t=>t.date===dateStr).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
 
+    if(dayIdx!==focusedDayIdx){
+      const count = anchorsForDay.length + tasksForDay.length;
+      return `<div class="day-col compact" onclick="focusDay(${dayIdx})">
+        <div class="day-letter">${DAY_LETTERS[dayIdx]}</div>
+        <div class="day-date-compact">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</div>
+        <div class="day-count">${count ? count+' פריט'+(count>1?'ים':'') : '–'}</div>
+      </div>`;
+    }
+
     const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
     const isEditingThisDay = !!(editingHere && editingHere.day===dayIdx && openForm===dayIdx);
     const isAddingThisDay = openForm===dayIdx && !editingAnchorId;
@@ -1077,7 +1103,7 @@ function renderScheduleGrid(){
 
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
-    return `<div class="day-col">
+    return `<div class="day-col focused">
       <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
       ${emptyNote}${itemsHtml}${moreHtml}
       ${bottomHtml}
