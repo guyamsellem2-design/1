@@ -349,6 +349,7 @@
     <div class="section-head">
       <h2 onclick="toggleSection('someday')"><span class="num">06</span> רעיונות ומשימות לעתיד <span class="chev" id="chev-someday">▾</span></h2>
       <div class="hint">כל רעיון גדול, בלי לגעת בו כל יום</div>
+      <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-someday">
     <div class="card">
@@ -1442,6 +1443,15 @@ function clearDoneTasks(){
   saveData();
   renderTasks();
   renderScheduleGrid();
+}
+function clearSomeday(){
+  if(data.someday.length===0){ flashStatus('הרשימה כבר ריקה'); return; }
+  if(!confirm(`למחוק את כל ${data.someday.length} הפריטים ב"רעיונות ומשימות לעתיד"? זה לא ניתן לביטול — מומלץ להוריד גיבוי קודם.`)) return;
+  data.someday = [];
+  expandedSomeday.clear();
+  saveData();
+  renderSomeday();
+  flashStatus('הרשימה נוקתה');
 }
 function pushTaskToNextWeek(id){
   const t = data.tasks.find(t=>t.id===id);
