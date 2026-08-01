@@ -200,9 +200,15 @@
   .chk{width:19px; height:19px; border-radius:50%; border:2px solid var(--border-strong); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:transparent;}
   .chk.done{background:var(--gold); border-color:var(--gold);}
   .energy-dot{width:11px; height:11px; border-radius:50%; flex-shrink:0; cursor:pointer; border:1px solid rgba(0,0,0,0.2);}
+  .energy-dot.energy-dot-empty{background:transparent; border:1.5px dashed var(--muted2);}
   .task-text{flex:1; font-size:15.5px; cursor:pointer;}
   .task-text.done{text-decoration:line-through; color:var(--muted2);}
   .tag{font-size:12.5px; padding:3px 9px; border-radius:999px; color:#141a16; font-weight:600; white-space:nowrap;}
+  .tag.tag-empty{background:transparent; border:1px dashed var(--border-strong); color:var(--muted2); font-weight:500;}
+  .dimmed-item{filter:saturate(0.5) brightness(0.92); opacity:.65;}
+  .overdue-divider{display:block; padding:16px 4px 6px; border-bottom:none;}
+  .overdue-divider-line{border-top:2px solid var(--gold); opacity:.55; margin-bottom:10px;}
+  .overdue-divider-title{font-family:'Frank Ruhl Libre', serif; font-size:15px; color:var(--gold); cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;}
   .sched-link{color:var(--muted2); font-size:16px; cursor:pointer; padding:4px;}
   .sched-link:hover{color:var(--text);}
   .task-date-badge{font-size:12px; color:var(--muted2); white-space:nowrap;}
@@ -764,6 +770,9 @@ function deleteDomain(id){
 function domainOptions(selectedId){
   return data.domains.map(d=>`<option value="${d.id}" ${d.id===selectedId?'selected':''}>${d.name}</option>`).join('');
 }
+function domainOptionsWithEmpty(selectedId){
+  return `<option value="" ${!selectedId?'selected':''}>ללא תחום</option>` + domainOptions(selectedId);
+}
 
 /* ---------- nav drawer + domain pages ---------- */
 let navOpen = false;
@@ -883,7 +892,8 @@ function anchorCalendarUrl(a){
   return 'https://calendar.google.com/calendar/render?'+params.toString();
 }
 function taskCalendarUrl(t){
-  const dom = domainById(t.domain);
+  const dom = t.domain ? domainById(t.domain) : null;
+  const domainNote = dom ? ` · תחום: ${dom.name}` : '';
   let start, end, note;
   if(t.date){
     const [y,m,d] = t.date.split('-').map(Number);
@@ -895,12 +905,12 @@ function taskCalendarUrl(t){
     } else {
       end = new Date(y, m-1, d, h+1, mi, 0);
     }
-    note = `משימה מתוזמנת מתוך "המפה השבועית" · תחום: ${dom.name}`;
+    note = `משימה מתוזמנת מתוך "המפה השבועית"${domainNote}`;
   } else {
     const now = new Date();
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
     end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0);
-    note = `משימה מתוך "המפה השבועית" · תחום: ${dom.name} — לא תוזמנה לתאריך מסוים, אפשר לשנות תאריך ושעה לפני השמירה`;
+    note = `משימה מתוך "המפה השבועית"${domainNote} — לא תוזמנה לתאריך מסוים, אפשר לשנות תאריך ושעה לפני השמירה`;
   }
   const params = new URLSearchParams({ action:'TEMPLATE', text:t.text, dates:fmtDate(start)+'/'+fmtDate(end), details:note });
   return 'https://calendar.google.com/calendar/render?'+params.toString();
@@ -1035,7 +1045,6 @@ function syncGoogleCalendar(){
       existingIds.add(t.googleEventId);
       if(t.googleEventId.indexOf(':')===-1) existingIds.add('primary:'+t.googleEventId);
     });
-    const defaultDomain = (data.domains[0] && data.domains[0].id) || '';
     let added = 0;
     allEvents.forEach(({ev,calId})=>{
       if(!ev.id || ev.status==='cancelled') return;
@@ -1054,7 +1063,7 @@ function syncGoogleCalendar(){
           endTime = pad(ed.getHours())+':'+pad(ed.getMinutes());
         }
       }
-      data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:defaultDomain, done:false, energy:'mid',
+      data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:'', done:false, energy:'',
         date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:gid});
       added++;
     });
@@ -1170,32 +1179,51 @@ function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHT
 function sortByTime(list){
   return [...list].sort((a,b)=> (a.time||'99:99').localeCompare(b.time||'99:99'));
 }
+let overdueSectionOpen = false;
+function toggleOverdueSection(){ overdueSectionOpen = !overdueSectionOpen; renderTasks(); }
 function renderTasks(){
   const el = document.getElementById('taskList');
   let list = data.tasks;
-  const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — מוצגות רק משימות מטעינות 🟢</div>' : '';
-  if(data.softMode) list = list.filter(t=>t.energy==='low');
-  list = sortByTime(list);
-  if(list.length===0){
-    el.innerHTML = notice + `<li class="empty">${data.softMode ? 'אין כרגע משימות מטעינות — ואפשר גם פשוט לנוח' : 'אין עדיין משימות לשבוע — תוסיף/י את הדבר הכי קטן שאפשר להתחיל בו'}</li>`;
-    return;
+  const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
+  if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
+  const today = ymd(new Date());
+  const isTaskOverdue = t => !!(t.date && !t.done && t.date < today);
+  const regular = sortByTime(list.filter(t=>!isTaskOverdue(t)));
+  const overdue = sortByTime(list.filter(isTaskOverdue));
+  let html = notice;
+  if(regular.length===0 && overdue.length===0){
+    html += `<li class="empty">${data.softMode ? 'אין כרגע משימות מטעינות — ואפשר גם פשוט לנוח' : 'אין עדיין משימות לשבוע — תוסיף/י את הדבר הכי קטן שאפשר להתחיל בו'}</li>`;
+  } else {
+    html += regular.map(t=>taskRowHtml(t)).join('');
   }
-  el.innerHTML = notice + list.map(t=>taskRowHtml(t)).join('');
+  if(overdue.length>0){
+    html += `
+      <li class="overdue-divider">
+        <div class="overdue-divider-line"></div>
+        <div class="overdue-divider-title" onclick="toggleOverdueSection()">
+          <span class="chev">${overdueSectionOpen?'▾':'▸'}</span> משימות שעבר זמנן (${overdue.length})
+        </div>
+      </li>
+      ${overdueSectionOpen ? overdue.map(t=>taskRowHtml(t)).join('') : ''}
+    `;
+  }
+  el.innerHTML = html;
 }
 function taskRowHtml(t){
   if(editingTaskId===t.id) return taskEditFormHtml(t);
-  const dom = domainById(t.domain);
-  const energy = t.energy||'mid';
+  const dom = t.domain ? domainById(t.domain) : null;
+  const energy = t.energy||'';
   const subCount = (t.subtasks||[]).length;
   const isExpanded = expandedTasks.has(t.id);
   const hasContent = subCount>0 || (t.description||'').trim();
   const isOverdue = t.date && !t.done && t.date < ymd(new Date());
-  let html = `<li>
+  const isDimmed = isOverdue || (data.softMode && !energy);
+  let html = `<li class="${isDimmed?'dimmed-item':''}">
     <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
-    <div class="energy-dot" style="background:${ENERGY_COLORS[energy]}" onclick="cycleEnergy('${t.id}')" title="${ENERGY_LABELS[energy]} — לחיצה משנה"></div>
+    <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
     <span class="task-text ${t.done?'done':''} ${hasContent?'has-content':''}" onclick="toggleTaskExpand('${t.id}')" title="תיאור ותת-משימות"><span class="text-chevron">${isExpanded?'▾':'▸'}</span>${escapeHtml(t.text)}${subCount?` <span class="sub-count">${subCount}</span>`:''}</span>
     ${t.date ? `<span class="task-date-badge" style="${isOverdue?'color:var(--energy-high)':''}">${isOverdue?'⏰ ':''}<span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
-    <span class="tag" style="background:${dom.color}">${dom.name}</span>
+    <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}`:''}">${dom?dom.name:'ללא תחום'}</span>
     ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
     <button type="button" class="edit-task-btn" onclick="openTaskEdit('${t.id}')" title="עריכת משימה" aria-label="עריכת משימה">✏️</button>
   </li>`;
@@ -1208,10 +1236,11 @@ function taskEditFormHtml(t){
       <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
       <textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>
       <div class="edit-form-row">
-        <select id="taskEditDomain-${t.id}">${domainOptions(t.domain)}</select>
+        <select id="taskEditDomain-${t.id}">${domainOptionsWithEmpty(t.domain)}</select>
         <select id="taskEditEnergy-${t.id}">
+          <option value="" ${!t.energy?'selected':''}>ללא רמת אנרגיה</option>
           <option value="low" ${t.energy==='low'?'selected':''}>🟢 מטעין</option>
-          <option value="mid" ${(!t.energy||t.energy==='mid')?'selected':''}>🟡 בינוני</option>
+          <option value="mid" ${t.energy==='mid'?'selected':''}>🟡 בינוני</option>
           <option value="high" ${t.energy==='high'?'selected':''}>🔴 מרוקן</option>
         </select>
       </div>
@@ -1345,7 +1374,7 @@ function cycleEnergy(id){
   const t = data.tasks.find(t=>t.id===id);
   if(!t) return;
   const order = ['low','mid','high'];
-  t.energy = order[(order.indexOf(t.energy||'mid')+1)%3];
+  t.energy = t.energy ? order[(order.indexOf(t.energy)+1)%3] : 'low';
   saveData();
   renderTasks();
 }
@@ -1535,8 +1564,9 @@ function renderScheduleGrid(){
     });
 
     const taskEntries = tasksForDay.map(t=>{
-      const dom = domainById(t.domain);
-      return `<div class="anchor-chip" style="border-right-color:${dom.color}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
+      const dom = t.domain ? domainById(t.domain) : null;
+      const isTaskOverdue = t.date && !t.done && t.date < ymd(new Date());
+      return `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''}" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
       </div>`;
