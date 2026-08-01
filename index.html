@@ -19,16 +19,16 @@
 <style>
   :root{
     --bg:#F8F3E6; --surface:rgba(255,255,255,0.72); --surface2:rgba(242,249,244,0.65); --surface3:rgba(231,242,236,0.65);
-    --text:#1C3B2B; --muted:#4f6d5c; --muted2:#7d9a8a; --gold:#E1A052;
+    --text:#1C3B2B; --muted:#4f6d5c; --muted2:#7d9a8a; --gold:#d7a66b;
     --border:rgba(110,157,108,0.22); --border-strong:rgba(110,157,108,0.38);
-    --energy-low:#6E9D6C; --energy-mid:#E1A052; --energy-high:#c9614a;
+    --energy-low:#7b9f79; --energy-mid:#d7a66b; --energy-high:#c27260;
     --glow-gold:rgba(225,160,82,0.18); --glow-rose:rgba(224,138,95,0.14); --glow-teal:rgba(108,154,139,0.16);
   }
   body.night-mode{
     --bg:#0A192F; --surface:rgba(13,37,63,0.65); --surface2:rgba(20,50,85,0.6); --surface3:rgba(27,73,101,0.55);
-    --text:#F1E8FF; --muted:#8892B0; --muted2:#6f76a8; --gold:#F4C430;
+    --text:#F1E8FF; --muted:#8892B0; --muted2:#6f76a8; --gold:#e4c04f;
     --border:rgba(0,210,211,0.18); --border-strong:rgba(0,210,211,0.32);
-    --energy-low:#5fae72; --energy-mid:#F4C430; --energy-high:#c96256;
+    --energy-low:#70ac7e; --energy-mid:#e4c04f; --energy-high:#c3746b;
     --glow-gold:rgba(244,196,48,0.24); --glow-rose:rgba(224,120,190,0.18); --glow-teal:rgba(0,210,211,0.20);
   }
   *{box-sizing:border-box;}
@@ -365,30 +365,10 @@
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:13.5px; cursor:pointer; font-family:inherit;}
   .reset-btn:hover{color:var(--text); border-color:var(--muted);}
 
-  /* load meter (collapsed by default) */
-  .load-section{margin-bottom:28px;}
-  .load-meter{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:14px 18px; margin-top:10px;}
-  .load-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
-  .load-label{font-size:14.5px; color:var(--muted); font-weight:500;}
-  .load-hours{font-size:14.5px; color:var(--gold); font-weight:600;}
-  .load-bar{height:8px; border-radius:999px; background:var(--surface3); overflow:hidden;}
-  .load-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--gold), #2dc4a8); transition:width .6s ease;}
-  .load-hint{font-size:12.5px; color:var(--muted2); margin-top:6px; font-style:italic;}
-
-  /* domain balance (collapsed by default) */
-  .balance-toggle{font-size:14px; color:var(--muted); cursor:pointer; display:inline-block;}
-  .balance-toggle:hover{color:var(--text);}
-  .balance-panel{margin-top:12px; display:flex; flex-direction:column; gap:9px;}
-  .balance-row{display:flex; align-items:center; gap:10px; font-size:14px;}
-  .balance-name{width:100px; flex-shrink:0; color:var(--text);}
-  .balance-bar{flex:1; height:7px; border-radius:999px; background:var(--surface3); overflow:hidden;}
-  .balance-fill{height:100%; border-radius:999px; transition:width .6s ease;}
-  .balance-hours{width:46px; flex-shrink:0; color:var(--muted2); text-align:left;}
-
   /* glass effect for surface-based components */
-  .card, .day-col, .keep-note, .load-meter, .nav-drawer, .domain-chip,
+  .card, .day-col, .keep-note, .nav-drawer, .domain-chip,
   .color-panel, .anchor-form, .status, .pull-refresh, .soft-btn, .hamburger-btn,
-  ul.tasks li.detail-li, .balance-panel .bank-entry, .bank-entry {
+  ul.tasks li.detail-li, .bank-entry {
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
@@ -427,11 +407,6 @@
       <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </header>
-
-  <div class="load-section">
-    <span class="balance-toggle" id="loadMeterToggle" onclick="toggleLoadMeter()">▸ כמה מהשבוע כבר תפוס</span>
-    <div class="load-meter" id="loadMeter" style="display:none;"></div>
-  </div>
 
   <section>
     <div class="section-head">
@@ -564,8 +539,6 @@
     <div class="add-row">
       <button onclick="addDomainNote()">+ פתק חדש</button>
     </div>
-    <div class="balance-toggle" id="balanceToggle" onclick="toggleBalance()">▸ איזון בין נושאים השבוע</div>
-    <div class="balance-panel" id="balancePanel" style="display:none;"></div>
     <div class="keep-grid" id="keepGrid"></div>
   </div>
 </div>
@@ -595,7 +568,7 @@ const STARTER_DOMAINS = [
   {id:'finance',  name:'כספים',                    color:'#cf9a5c'},
   {id:'growth',   name:'יצירתיות והתפתחות אישית',  color:'#e2a34c'},
 ];
-const ENERGY_COLORS = {low:'#5fae72', mid:'#d9b54a', high:'#c96256'};
+const ENERGY_COLORS = {low:'#70ac7e', mid:'#d0b463', high:'#c3746b'};
 const ENERGY_LABELS = {low:'🟢 מטעין', mid:'🟡 בינוני', high:'🔴 מרוקן'};
 const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
@@ -1699,7 +1672,7 @@ function taskRowHtml(t){
     <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
     <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
     <span class="task-text ${t.done?'done':''} ${hasContent?'has-content':''}" onclick="toggleTaskExpand('${t.id}')" title="תיאור ותת-משימות"><span class="text-chevron">${isExpanded?'▾':'▸'}</span>${escapeHtml(t.text)}${subCount?` <span class="sub-count">${subCount}</span>`:''}</span>
-    ${t.date ? `<span class="task-date-badge" style="${isOverdue?'color:var(--energy-high)':''}">${isOverdue?'⏰ ':''}<span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
+    ${t.date ? `<span class="task-date-badge"><span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
     <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}`:''}">${dom?dom.name:'ללא נושא'}</span>
     ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
     <button type="button" class="edit-task-btn" onclick="openTaskEdit('${t.id}')" title="עריכת משימה" aria-label="עריכת משימה">✏️</button>
@@ -1915,88 +1888,6 @@ document.addEventListener('touchend', (e)=>{
 }, {passive:true});
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 
-/* ---------- weekly load meter + domain balance ---------- */
-const LOAD_REFERENCE_HOURS = 40;
-let balanceOpen = false;
-let loadMeterOpen = false;
-function itemDurationHours(startTime, endTime, bufferMin){
-  if(!startTime) return 1;
-  const [sh,sm] = startTime.split(':').map(Number);
-  let eh, em;
-  if(endTime){ [eh,em] = endTime.split(':').map(Number); } else { eh = sh+1; em = sm; }
-  let mins = (eh*60+em) - (sh*60+sm);
-  if(mins <= 0) mins += 24*60;
-  if(bufferMin) mins += bufferMin;
-  return mins/60;
-}
-function weekBounds(){
-  const dates = currentWeekDates();
-  return { start: ymd(dates[0]), end: ymd(dates[6]) };
-}
-function computeWeekLoadHours(){
-  let hours = 0;
-  data.anchors.forEach(a=>{ hours += itemDurationHours(a.time, a.endTime, a.buffer?15:0); });
-  const {start,end} = weekBounds();
-  data.tasks.forEach(t=>{
-    if(t.date && t.time && !t.done && t.date>=start && t.date<=end){
-      hours += itemDurationHours(t.time, t.endTime, 0);
-    }
-  });
-  return hours;
-}
-function computeDomainHours(){
-  const hours = {};
-  data.domains.forEach(d=>{ hours[d.id] = 0; });
-  data.anchors.forEach(a=>{ hours[a.domain] = (hours[a.domain]||0) + itemDurationHours(a.time, a.endTime, a.buffer?15:0); });
-  const {start,end} = weekBounds();
-  data.tasks.forEach(t=>{
-    if(t.date && t.time && t.date>=start && t.date<=end){
-      hours[t.domain] = (hours[t.domain]||0) + itemDurationHours(t.time, t.endTime, 0);
-    }
-  });
-  return hours;
-}
-function toggleLoadMeter(){ loadMeterOpen = !loadMeterOpen; renderLoadMeter(); }
-function renderLoadMeter(){
-  const toggle = document.getElementById('loadMeterToggle');
-  const el = document.getElementById('loadMeter');
-  if(!toggle || !el) return;
-  toggle.textContent = (loadMeterOpen ? '▾' : '▸') + ' כמה מהשבוע כבר תפוס';
-  if(!loadMeterOpen){ el.style.display='none'; el.innerHTML=''; return; }
-  el.style.display='block';
-  const hours = computeWeekLoadHours();
-  const pct = Math.min(100, Math.round((hours/LOAD_REFERENCE_HOURS)*100));
-  const rounded = Math.round(hours*10)/10;
-  el.innerHTML = `
-    <div class="load-top">
-      <span class="load-label">כמה מהשבוע כבר תפוס</span>
-      <span class="load-hours">${rounded} שעות מתוזמנות</span>
-    </div>
-    <div class="load-bar"><div class="load-fill" style="width:${pct}%"></div></div>
-    <div class="load-hint">רק כדי לתת תחושה מהירה לפני שעונים למישהו — לא מדד מדויק</div>
-  `;
-}
-function toggleBalance(){ balanceOpen = !balanceOpen; renderBalance(); }
-function renderBalance(){
-  const toggle = document.getElementById('balanceToggle');
-  const panel = document.getElementById('balancePanel');
-  if(!toggle || !panel) return;
-  toggle.textContent = (balanceOpen ? '▾' : '▸') + ' איזון בין נושאים השבוע';
-  if(!balanceOpen){ panel.style.display='none'; panel.innerHTML=''; return; }
-  panel.style.display='flex';
-  const hours = computeDomainHours();
-  const max = Math.max(1, ...Object.values(hours));
-  panel.innerHTML = data.domains.map(d=>{
-    const h = hours[d.id]||0;
-    const pct = Math.round((h/max)*100);
-    return `<div class="balance-row">
-      <span class="balance-name">${escapeHtml(d.name)}</span>
-      <div class="balance-bar"><div class="balance-fill" style="width:${pct}%; background:${d.color}"></div></div>
-      <span class="balance-hours">${Math.round(h*10)/10} ש׳</span>
-    </div>`;
-  }).join('');
-}
-
 function renderScheduleGrid(){
   const el = document.getElementById('scheduleGrid');
   if(!el) return;
@@ -2094,8 +1985,6 @@ function renderScheduleGrid(){
       ${moreHtml}
     </div>`;
   }).join('');
-  renderLoadMeter();
-  renderBalance();
 }
 
 /* ---------- topics notebook: tab strip selects which topic's notes show below ---------- */
