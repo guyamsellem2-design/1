@@ -78,6 +78,8 @@
     white-space:nowrap; flex-shrink:0;
   }
   .soft-btn.on{ background:var(--gold); color:#1a1206; border-color:transparent; font-weight:600; }
+  .soft-btn .btn-icon{ display:inline-block; }
+  .soft-btn.on .btn-icon{ text-shadow: 0 0 1px #7a4a12, 0 0 5px rgba(230,126,34,0.9), 0 1px 2px rgba(0,0,0,0.35); }
   .header-actions{display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0;}
   .hamburger-btn{background:var(--surface); border:1px solid var(--border-strong); color:var(--text); width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-family:inherit;}
   .hamburger-btn:hover{border-color:var(--muted);}
@@ -107,6 +109,18 @@
   .keep-colors{display:flex; gap:5px;}
   .keep-colors span{width:14px; height:14px; border-radius:50%; cursor:pointer; border:1.5px solid rgba(128,128,128,0.25); flex-shrink:0;}
   .keep-colors span.active{border-color:var(--text);}
+  .pencil-btn{cursor:pointer; font-size:15px; padding:3px 5px; border-radius:6px; line-height:1;}
+  .pencil-btn.active{background:var(--gold);}
+  .keep-note-drawing-preview{width:100%; border-radius:8px; margin-top:8px; cursor:pointer; display:block; max-height:150px; object-fit:contain; background:#fff;}
+  .draw-toolbar{display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;}
+  .draw-colors{display:flex; gap:6px;}
+  .draw-color-swatch{width:20px; height:20px; border-radius:50%; cursor:pointer; border:2px solid transparent; flex-shrink:0;}
+  .draw-color-swatch.active{border-color:var(--text);}
+  .draw-sizes{display:flex; gap:6px; align-items:center;}
+  .draw-size-dot{width:24px; height:24px; border-radius:50%; border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; cursor:pointer; background:var(--surface3); flex-shrink:0;}
+  .draw-size-dot.active{border-color:var(--gold); background:var(--surface);}
+  .draw-size-dot span{display:block; border-radius:50%; background:var(--text);}
+  .keep-note-canvas{width:100%; height:180px; border-radius:10px; margin-top:8px; touch-action:none; cursor:crosshair; background:#fff; border:1px solid var(--border); display:block;}
 
   .status{
     position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
@@ -350,8 +364,8 @@
     </div>
     <div class="header-actions">
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
-      <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()">🌙 מצב לילה</button>
-      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🍃 מצב רגוע</button>
+      <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </header>
 
@@ -542,7 +556,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalInviteEmails:[] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -581,7 +595,6 @@ function loadData(){
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
-      data.gcalInviteEmails = parsed.gcalInviteEmails || [];
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
     }
@@ -613,17 +626,29 @@ function flashStatus(msg){
 }
 
 /* ---------- soft mode ---------- */
+function renderModeButtons(){
+  const nightBtn = document.getElementById('nightBtn');
+  const softBtn = document.getElementById('softBtn');
+  if(nightBtn){
+    nightBtn.classList.toggle('on', data.nightMode);
+    nightBtn.innerHTML = data.nightMode ? '<span class="btn-icon">☀️</span> מצב בהיר' : '<span class="btn-icon">🌙</span> מצב לילה';
+  }
+  if(softBtn){
+    softBtn.classList.toggle('on', data.softMode);
+    softBtn.innerHTML = '<span class="btn-icon">🍃</span> מצב רגוע';
+  }
+}
 function toggleSoftMode(){
   data.softMode = !data.softMode;
   document.body.classList.toggle('soft', data.softMode);
-  document.getElementById('softBtn').classList.toggle('on', data.softMode);
+  renderModeButtons();
   saveData();
   renderTasks();
 }
 function toggleNightMode(){
   data.nightMode = !data.nightMode;
   document.body.classList.toggle('night-mode', data.nightMode);
-  document.getElementById('nightBtn').classList.toggle('on', data.nightMode);
+  renderModeButtons();
   saveData();
 }
 
@@ -817,6 +842,11 @@ function applyRoute(){
 window.addEventListener('hashchange', applyRoute);
 
 const KEEP_COLORS = ['', '#e2a34c', '#3aa9a0', '#e08a72', '#b98fc4', '#4fb4d6'];
+const DRAW_COLORS = ['#1a1a1a', '#e04c4c', '#4c7de0', '#4caf6e', '#e6a23c', '#ffffff'];
+const DRAW_SIZES = [3, 7, 13];
+let drawingNoteId = null;
+let drawColor = '#1a1a1a';
+let drawSize = 5;
 function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(!data.domainNotes[id]) data.domainNotes[id] = []; return data.domainNotes[id]; }
 function renderDomainPage(id){
   const dom = domainById(id);
@@ -829,22 +859,43 @@ function renderKeepGrid(id){
   if(!el) return;
   const notes = ensureDomainNotes(id);
   if(notes.length===0){ el.innerHTML = '<div class="empty">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
-  el.innerHTML = notes.map(n=>`
+  el.innerHTML = notes.map(n=>{
+    const isDrawing = drawingNoteId===n.id;
+    return `
     <div class="keep-note" style="background:${n.color||'var(--surface2)'}">
       <textarea oninput="onKeepNoteInput('${id}','${n.id}', this.value)" placeholder="כתוב כאן...">${escapeHtml(n.text)}</textarea>
+      ${(n.drawing && !isDrawing) ? `<img class="keep-note-drawing-preview" src="${n.drawing}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="לחיצה לעריכת הציור">` : ''}
+      ${isDrawing ? `
+        <div class="draw-toolbar">
+          <div class="draw-colors">
+            ${DRAW_COLORS.map(c=>`<span class="draw-color-swatch ${drawColor===c?'active':''}" data-color="${c}" style="background:${c}" onclick="setDrawColor('${c}')"></span>`).join('')}
+          </div>
+          <div class="draw-sizes">
+            ${DRAW_SIZES.map(s=>`<span class="draw-size-dot ${drawSize===s?'active':''}" data-size="${s}" onclick="setDrawSize(${s})"><span style="width:${s}px;height:${s}px;"></span></span>`).join('')}
+          </div>
+          <span class="del-task" onclick="clearNoteDrawing('${id}','${n.id}')" title="נקה ציור">🗑</span>
+        </div>
+        <canvas class="keep-note-canvas" id="canvas-${n.id}" data-domain="${id}" data-note="${n.id}"></canvas>
+      ` : ''}
       <div class="keep-note-actions">
         <div class="keep-colors">
           ${KEEP_COLORS.map(c=>`<span class="${(n.color||'')===c?'active':''}" style="background:${c||'var(--surface3)'}" onclick="setKeepNoteColor('${id}','${n.id}','${c}')"></span>`).join('')}
         </div>
+        <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
         <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  if(drawingNoteId){
+    const canvas = document.getElementById('canvas-'+drawingNoteId);
+    if(canvas) initDrawCanvas(canvas);
+  }
 }
 function addDomainNote(){
   const route = currentRoute();
   if(route.type!=='domain') return;
   const notes = ensureDomainNotes(route.id);
-  notes.unshift({id:uid(), text:'', color:''});
+  notes.unshift({id:uid(), text:'', color:'', drawing:''});
   saveData();
   renderKeepGrid(route.id);
   requestAnimationFrame(()=>{ const ta = document.querySelector('#keepGrid textarea'); if(ta) ta.focus(); });
@@ -859,8 +910,94 @@ function setKeepNoteColor(domainId, noteId, color){
 }
 function deleteDomainNote(domainId, noteId){
   data.domainNotes[domainId] = ensureDomainNotes(domainId).filter(n=>n.id!==noteId);
+  if(drawingNoteId===noteId) drawingNoteId = null;
   saveData();
   renderKeepGrid(domainId);
+}
+function toggleNoteDrawing(domainId, noteId){
+  if(drawingNoteId===noteId){
+    const canvas = document.getElementById('canvas-'+noteId);
+    if(canvas) saveNoteDrawing(domainId, noteId, canvas);
+    drawingNoteId = null;
+  } else {
+    drawingNoteId = noteId;
+  }
+  renderKeepGrid(domainId);
+}
+function setDrawColor(c){
+  drawColor = c;
+  document.querySelectorAll('.draw-color-swatch').forEach(el=>el.classList.toggle('active', el.dataset.color===c));
+}
+function setDrawSize(s){
+  drawSize = s;
+  document.querySelectorAll('.draw-size-dot').forEach(el=>el.classList.toggle('active', Number(el.dataset.size)===s));
+}
+function saveNoteDrawing(domainId, noteId, canvas){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(n){ n.drawing = canvas.toDataURL('image/png'); saveData(); }
+}
+function clearNoteDrawing(domainId, noteId){
+  if(!confirm('לנקות את הציור?')) return;
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(n){ n.drawing = ''; saveData(); }
+  const canvas = document.getElementById('canvas-'+noteId);
+  if(canvas) initDrawCanvas(canvas);
+}
+function initDrawCanvas(canvas){
+  const domainId = canvas.dataset.domain;
+  const noteId = canvas.dataset.note;
+  const note = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || 260;
+  const cssHeight = 180;
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cssWidth, cssHeight);
+  if(note && note.drawing){
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 0, 0, cssWidth, cssHeight); };
+    img.src = note.drawing;
+  }
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+  function getPos(e){
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  canvas.onpointerdown = (e)=>{
+    drawing = true;
+    try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+    const p = getPos(e);
+    lastX = p.x; lastY = p.y;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, drawSize/2, 0, Math.PI*2);
+    ctx.fillStyle = drawColor;
+    ctx.fill();
+  };
+  canvas.onpointermove = (e)=>{
+    if(!drawing) return;
+    const p = getPos(e);
+    ctx.strokeStyle = drawColor;
+    ctx.lineWidth = drawSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  };
+  function endStroke(){
+    if(!drawing) return;
+    drawing = false;
+    saveNoteDrawing(domainId, noteId, canvas);
+  }
+  canvas.onpointerup = endStroke;
+  canvas.onpointerleave = endStroke;
+  canvas.onpointercancel = endStroke;
 }
 
 /* ---------- google calendar helpers ---------- */
@@ -921,60 +1058,33 @@ const GCAL_CLIENT_ID = '205912988147-1nd655pslkb8temou2oonfueep3lhvs4.apps.googl
 const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 let gcalAccessToken = null;
 let gcalSyncing = false;
-let gcalCalendarList = [];
 let gcalPickerOpen = false;
 
 function gcalReady(){ return !!(window.google && google.accounts && google.accounts.oauth2); }
 function gcalSelectedCalendarIds(){ return (data.gcalCalendarIds && data.gcalCalendarIds.length) ? data.gcalCalendarIds : ['primary']; }
+function gcalCalendarLabel(calId){ return calId==='primary' ? 'היומן הראשי שלי (primary)' : calId; }
 
-function fetchGcalCalendarList(){
-  if(!gcalAccessToken) return Promise.resolve([]);
-  return fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader', {
-    headers:{ Authorization: 'Bearer '+gcalAccessToken }
-  }).then(r=>{ if(!r.ok) throw new Error('gcal_list_'+r.status); return r.json(); })
-    .then(json=>{
-      gcalCalendarList = (json.items||[]).map(c=>({id:c.id, summary:c.summary||c.id, color:c.backgroundColor||'#999'}));
-      return gcalCalendarList;
-    }).catch(()=>{ gcalCalendarList = []; return []; });
-}
 function toggleGcalPicker(){
   gcalPickerOpen = !gcalPickerOpen;
-  if(gcalPickerOpen && gcalCalendarList.length===0){
-    fetchGcalCalendarList().then(renderGcalStatus);
-  } else {
-    renderGcalStatus();
-  }
+  renderGcalStatus();
 }
-function toggleGcalCalendarSelection(calId){
-  const ids = gcalSelectedCalendarIds().slice();
-  const idx = ids.indexOf(calId);
-  if(idx>-1){
-    if(ids.length>1) ids.splice(idx,1); else return;
-  } else {
-    ids.push(calId);
-  }
-  data.gcalCalendarIds = ids;
+function removeGcalCalendar(calId){
+  if(!confirm(`לנתק את הסנכרון מול "${gcalCalendarLabel(calId)}"? זה לא מוחק משימות שכבר יובאו ממנו, רק מפסיק לייבא ממנו מכאן והלאה.`)) return;
+  data.gcalCalendarIds = gcalSelectedCalendarIds().filter(id=>id!==calId);
   saveData();
   renderGcalStatus();
 }
-
-let gcalInviteListOpen = false;
-function toggleGcalInviteList(){ gcalInviteListOpen = !gcalInviteListOpen; renderGcalStatus(); }
-function addGcalInviteEmail(){
-  const input = document.getElementById('gcalInviteEmailInput');
-  const email = input.value.trim();
-  if(!email) return;
-  if(!data.gcalInviteEmails) data.gcalInviteEmails = [];
-  data.gcalInviteEmails.push({id:uid(), email});
+function addGcalCalendarId(){
+  const input = document.getElementById('gcalAddCalendarInput');
+  const calId = input.value.trim();
+  if(!calId) return;
+  const ids = gcalSelectedCalendarIds().slice();
+  if(!ids.includes(calId)) ids.push(calId);
+  data.gcalCalendarIds = ids;
   input.value = '';
   saveData();
   renderGcalStatus();
-  requestAnimationFrame(()=>{ const el = document.getElementById('gcalInviteEmailInput'); if(el) el.focus(); });
-}
-function deleteGcalInviteEmail(id){
-  data.gcalInviteEmails = (data.gcalInviteEmails||[]).filter(e=>e.id!==id);
-  saveData();
-  renderGcalStatus();
+  requestAnimationFrame(()=>{ const el = document.getElementById('gcalAddCalendarInput'); if(el) el.focus(); });
 }
 
 function connectGoogleCalendar(){
@@ -1079,34 +1189,11 @@ function syncGoogleCalendar(){
   });
 }
 
-function gcalInviteListHtml(){
-  if(!gcalInviteListOpen) return '';
-  const emails = data.gcalInviteEmails||[];
-  return `<div class="gcal-picker">
-    <div class="hint" style="margin-bottom:2px;">רשימה לזיכרון בלבד — כל מייל עדיין צריך להתווסף ידנית תחת Test users ב-Google Cloud</div>
-    <div class="add-row" style="margin:0;">
-      <input type="text" id="gcalInviteEmailInput" placeholder="מייל של חבר...">
-      <button onclick="addGcalInviteEmail()">+ הוסף</button>
-    </div>
-    ${emails.length ? emails.map(e=>`
-      <div class="gcal-cal-row">
-        <span style="flex:1">${escapeHtml(e.email)}</span>
-        <span class="del-task" onclick="deleteGcalInviteEmail('${e.id}')">✕</span>
-      </div>`).join('') : '<div class="empty">עדיין לא הוספת אף אחד</div>'}
-  </div>`;
-}
 function renderGcalStatus(){
   const el = document.getElementById('gcalSyncRow');
   if(!el) return;
-  const emailCount = (data.gcalInviteEmails||[]).length;
   if(!data.gcalConnected){
-    el.innerHTML = `
-      <div class="gcal-sync-row-inner">
-        <button class="reset-btn" onclick="connectGoogleCalendar()">🔗 חיבור ליומן גוגל (ייבוא בלבד, לא מוחק כלום)</button>
-        <button class="reset-btn" onclick="toggleGcalInviteList()">👥 רשימת מיילים (${emailCount})</button>
-      </div>
-      ${gcalInviteListHtml()}
-    `;
+    el.innerHTML = `<div class="gcal-sync-row-inner"><button class="reset-btn" onclick="connectGoogleCalendar()">🔗 חיבור ליומן גוגל (ייבוא בלבד, לא מוחק כלום)</button></div>`;
     return;
   }
   const lastSync = data.gcalLastSync ? new Date(data.gcalLastSync) : null;
@@ -1114,27 +1201,26 @@ function renderGcalStatus(){
   const selectedIds = gcalSelectedCalendarIds();
   let pickerHtml = '';
   if(gcalPickerOpen){
-    if(gcalCalendarList.length===0){
-      pickerHtml = `<div class="gcal-picker"><div class="empty">טוען רשימת יומנים...</div></div>`;
-    } else {
-      pickerHtml = `<div class="gcal-picker">${gcalCalendarList.map(c=>`
-        <label class="gcal-cal-row">
-          <input type="checkbox" ${selectedIds.includes(c.id)?'checked':''} onchange="toggleGcalCalendarSelection('${c.id}')">
-          <span class="gcal-cal-dot" style="background:${c.color}"></span>
-          <span>${escapeHtml(c.summary)}</span>
-        </label>`).join('')}</div>`;
-    }
+    pickerHtml = `<div class="gcal-picker">
+      ${selectedIds.length ? selectedIds.map(calId=>`
+        <div class="gcal-cal-row">
+          <span style="flex:1">${escapeHtml(gcalCalendarLabel(calId))}</span>
+          <span class="del-task" onclick="removeGcalCalendar('${escapeAttr(calId)}')">✕ נתק</span>
+        </div>`).join('') : '<div class="empty">לא נבחרו יומנים</div>'}
+      <div class="add-row" style="margin:8px 0 0;">
+        <input type="text" id="gcalAddCalendarInput" placeholder="מייל/מזהה של יומן נוסף...">
+        <button onclick="addGcalCalendarId()">הוסף יומן +</button>
+      </div>
+    </div>`;
   }
   el.innerHTML = `
     <div class="gcal-sync-row-inner">
       <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
       <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
-      <button class="reset-btn" onclick="toggleGcalInviteList()">👥 רשימת מיילים (${emailCount})</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
     ${pickerHtml}
-    ${gcalInviteListHtml()}
   `;
 }
 
@@ -1411,9 +1497,9 @@ function renderWeekNav(){
   const el = document.getElementById('weekNav');
   if(!el) return;
   el.innerHTML = `
-    <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>›</button>
+    <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>›</button>
     <span class="week-nav-label">${weekRangeLabel(weekOffset)}${weekOffset===0?' · השבוע':''}</span>
-    <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>‹</button>
+    <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>‹</button>
   `;
 }
 let weekSwipeState = { startX:null, startY:null, active:false };
@@ -1935,7 +2021,6 @@ function importData(e){
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
-      data.gcalInviteEmails = parsed.gcalInviteEmails || [];
       activeNoteDomain = data.domains[0].id;
       saveData();
       render();
@@ -2034,8 +2119,7 @@ function resetAll(){
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
-  const keepGcalInviteEmails = data.gcalInviteEmails;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalInviteEmails:keepGcalInviteEmails};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -2074,9 +2158,8 @@ function pushTaskToNextWeek(id){
 
 function render(){
   document.body.classList.toggle('soft', data.softMode);
-  document.getElementById('softBtn').classList.toggle('on', data.softMode);
   document.body.classList.toggle('night-mode', data.nightMode);
-  document.getElementById('nightBtn').classList.toggle('on', data.nightMode);
+  renderModeButtons();
   renderDomainEditor();
   renderTaskDomainSelect();
   renderTasks();
