@@ -106,11 +106,9 @@
   .add-domain-btn:hover{color:var(--text); border-color:var(--muted);}
 
   /* week grid */
-  .week-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
-  @media (max-width:760px){.week-grid{grid-template-columns:1fr 1fr;}}
   .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease;}
   .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
-  .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);}
+  .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline;}
   .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
   .anchor-chip:hover{background:var(--surface3);}
   .anchor-chip .time{color:var(--muted); font-size:11px; display:block; margin-bottom:1px;}
@@ -148,15 +146,7 @@
   /* schedule grid */
   .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
-  .sched-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:10px 8px; min-height:70px; transition:box-shadow .3s ease;}
-  .sched-col:hover{box-shadow:0 8px 26px -14px var(--glow-teal);}
-  .sched-day{font-family:'Frank Ruhl Libre', serif; font-size:14px; font-weight:500; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;}
   .sched-date{color:var(--muted2); font-size:11px; font-weight:400;}
-  .sched-item{background:var(--surface2); border-radius:10px; padding:6px 8px; margin-bottom:5px; font-size:12px; line-height:1.4; cursor:pointer; position:relative; transition:background .25s ease;}
-  .sched-item:hover{background:var(--surface3);}
-  .sched-item.anchor-type{border-right:3px solid var(--gold);}
-  .sched-item.task-type{border-right:3px dashed;}
-  .sched-item .sched-time{color:var(--muted); font-size:10.5px; display:block;}
   .sched-empty{color:var(--muted2); font-size:11.5px; font-style:italic; padding:4px 2px;}
   .refresh-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit;}
   .refresh-btn:hover{color:var(--text); border-color:var(--muted);}
@@ -256,7 +246,7 @@
   <section>
     <div class="section-head">
       <h2 onclick="toggleSection('schedule')"><span class="num">01</span> לוח השבוע <span class="chev" id="chev-schedule">▾</span></h2>
-      <div class="hint">עוגנים + משימות שתוזמנו לתאריך, מוצגים יחד · לחיצה פותחת לעריכה</div>
+      <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
       <button class="refresh-btn" onclick="renderScheduleGrid()">🔄 רענון</button>
     </div>
     <div id="secbody-schedule">
@@ -266,17 +256,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('anchors')"><span class="num">02</span> עוגנים קבועים בשבוע <span class="chev" id="chev-anchors">▾</span></h2>
-      <div class="hint">לוחצים על עוגן קיים כדי לערוך, למחוק, או להוסיף ליומן גוגל</div>
-    </div>
-    <div id="secbody-anchors">
-      <div class="week-grid" id="weekGrid"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2 onclick="toggleSection('tasks')"><span class="num">03</span> משימות <span class="chev" id="chev-tasks">▾</span></h2>
+      <h2 onclick="toggleSection('tasks')"><span class="num">02</span> משימות <span class="chev" id="chev-tasks">▾</span></h2>
       <div class="hint">הנקודה = רמת אנרגיה (לחיצה מחליפה) · לחיצה על הטקסט לעריכה</div>
     </div>
     <div id="secbody-tasks">
@@ -304,7 +284,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('domains')"><span class="num">04</span> תחומים <span class="chev" id="chev-domains">▾</span></h2>
+      <h2 onclick="toggleSection('domains')"><span class="num">03</span> תחומים <span class="chev" id="chev-domains">▾</span></h2>
       <div class="hint">שם וצבע ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור</div>
     </div>
     <div id="secbody-domains">
@@ -316,7 +296,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('suggestions')"><span class="num">05</span> העדפות של אחרים <span class="chev" id="chev-suggestions">▾</span></h2>
+      <h2 onclick="toggleSection('suggestions')"><span class="num">04</span> העדפות של אחרים <span class="chev" id="chev-suggestions">▾</span></h2>
       <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך — בלי שזה יילחץ עליך ישר</div>
     </div>
     <div id="secbody-suggestions">
@@ -333,7 +313,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('notes')"><span class="num">06</span> פתקים לפי תחום <span class="chev" id="chev-notes">▾</span></h2>
+      <h2 onclick="toggleSection('notes')"><span class="num">05</span> פתקים לפי תחום <span class="chev" id="chev-notes">▾</span></h2>
       <div class="hint">מקום לכתוב מחשבות, ומתוכן להעלות רעיון למשימה</div>
     </div>
     <div id="secbody-notes">
@@ -351,7 +331,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('someday')"><span class="num">07</span> רעיונות ומשימות לעתיד <span class="chev" id="chev-someday">▾</span></h2>
+      <h2 onclick="toggleSection('someday')"><span class="num">06</span> רעיונות ומשימות לעתיד <span class="chev" id="chev-someday">▾</span></h2>
       <div class="hint">כל רעיון גדול, בלי לגעת בו כל יום</div>
     </div>
     <div id="secbody-someday">
@@ -368,7 +348,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('reflection')"><span class="num">08</span> סקירה שבועית <span class="chev" id="chev-reflection">▾</span></h2>
+      <h2 onclick="toggleSection('reflection')"><span class="num">07</span> סקירה שבועית <span class="chev" id="chev-reflection">▾</span></h2>
       <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת בשבוע הבא</div>
     </div>
     <div id="secbody-reflection">
@@ -670,43 +650,9 @@ function taskCalendarUrl(t){
 }
 
 /* ---------- week grid ---------- */
-function renderWeekGrid(){
-  const el = document.getElementById('weekGrid');
-  el.innerHTML = DAYS.map((dayName, dayIdx)=>{
-    const anchorsForDay = data.anchors.filter(a=>a.day===dayIdx).sort((a,b)=> (a.time||'').localeCompare(b.time||''));
-    const chips = anchorsForDay.map(a=>{
-      const dom = domainById(a.domain);
-      return `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
-          ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
-          ${escapeHtml(a.label)}
-          ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
-      </div>`;
-    }).join('');
-    const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
-    const isEditingThisDay = editingHere && editingHere.day===dayIdx;
-    const formHtml = openForm===dayIdx ? `
-      <div class="anchor-form">
-        <input type="time" id="anchorTime-${dayIdx}" value="${isEditingThisDay?editingHere.time||'':''}">
-        <input type="time" id="anchorEnd-${dayIdx}" placeholder="שעת סיום (ברירת מחדל: שעה)" value="${isEditingThisDay?editingHere.endTime||'':''}">
-        <input type="text" id="anchorLabel-${dayIdx}" placeholder="למשל: תרגול גיטרה" value="${isEditingThisDay?escapeAttr(editingHere.label):''}">
-        <select id="anchorDomain-${dayIdx}">${domainOptions(isEditingThisDay?editingHere.domain:null)}</select>
-        <label class="buf-label"><input type="checkbox" id="anchorBuffer-${dayIdx}" ${isEditingThisDay&&editingHere.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
-        <div class="anchor-form-actions">
-          <button class="save-btn" onclick="saveAnchor(${dayIdx})">שמור</button>
-          <button class="cancel-btn" onclick="closeForm()">בטל</button>
-        </div>
-        ${isEditingThisDay ? `
-        <div class="anchor-form-actions">
-          <a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>
-          <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>
-        </div>` : ''}
-      </div>` : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
-    return `<div class="day-col"><div class="day-name">${dayName}</div>${chips}${formHtml}</div>`;
-  }).join('');
-}
-function openAnchorForm(dayIdx){ openForm = dayIdx; editingAnchorId = null; renderWeekGrid(); }
-function editAnchor(id, dayIdx){ openForm = dayIdx; editingAnchorId = id; renderWeekGrid(); }
-function closeForm(){ openForm = null; editingAnchorId = null; renderWeekGrid(); }
+function openAnchorForm(dayIdx){ openForm = dayIdx; editingAnchorId = null; renderScheduleGrid(); }
+function editAnchor(id, dayIdx){ openForm = dayIdx; editingAnchorId = id; renderScheduleGrid(); }
+function closeForm(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
 function saveAnchor(dayIdx){
   const time = document.getElementById(`anchorTime-${dayIdx}`).value;
   const endTime = document.getElementById(`anchorEnd-${dayIdx}`).value;
@@ -722,19 +668,13 @@ function saveAnchor(dayIdx){
   }
   openForm = null; editingAnchorId = null;
   saveData();
-  renderWeekGrid();
   renderScheduleGrid();
 }
 function deleteAnchor(id){
   data.anchors = data.anchors.filter(a=>a.id!==id);
+  openForm = null; editingAnchorId = null;
   saveData();
-  renderWeekGrid();
   renderScheduleGrid();
-}
-function editAnchorFromSchedule(id, dayIdx){
-  editAnchor(id, dayIdx);
-  const target = document.getElementById('weekGrid');
-  if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 /* ---------- tasks ---------- */
@@ -1029,27 +969,52 @@ function renderScheduleGrid(){
   el.innerHTML = DAYS.map((dayName, dayIdx)=>{
     const dateObj = weekDates[dayIdx];
     const dateStr = ymd(dateObj);
-    const anchorItems = data.anchors.filter(a=>a.day===dayIdx).map(a=>({type:'anchor', time:a.time||'', item:a}));
-    const taskItems = data.tasks.filter(t=>t.date===dateStr).map(t=>({type:'task', time:t.time||'', item:t}));
-    const combined = anchorItems.concat(taskItems).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-    const itemsHtml = combined.length ? combined.map(entry=>{
-      if(entry.type==='anchor'){
-        const a = entry.item, dom = domainById(a.domain);
-        return `<div class="sched-item anchor-type" style="border-right-color:${dom.color}" onclick="editAnchorFromSchedule('${a.id}', ${dayIdx})">
-          ${a.time?`<span class="sched-time">🔁 ${a.time}</span>`:'<span class="sched-time">🔁</span>'}
+    const anchorsForDay = data.anchors.filter(a=>a.day===dayIdx).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+    const tasksForDay = data.tasks.filter(t=>t.date===dateStr).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+
+    const anchorChips = anchorsForDay.map(a=>{
+      const dom = domainById(a.domain);
+      return `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+          ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
           ${escapeHtml(a.label)}
-        </div>`;
-      } else {
-        const t = entry.item, dom = domainById(t.domain);
-        return `<div class="sched-item task-type" style="border-right-color:${dom.color}" onclick="editTaskFromSchedule('${t.id}')">
-          ${t.time?`<span class="sched-time">${t.time}</span>`:'<span class="sched-time">כל היום</span>'}
+          ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
+      </div>`;
+    }).join('');
+
+    const taskChips = tasksForDay.map(t=>{
+      const dom = domainById(t.domain);
+      return `<div class="anchor-chip" style="border-right-color:${dom.color}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
+          ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
-        </div>`;
-      }
-    }).join('') : '<div class="sched-empty">כלום מתוזמן</div>';
-    return `<div class="sched-col">
-      <div class="sched-day">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
-      ${itemsHtml}
+      </div>`;
+    }).join('');
+
+    const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
+    const isEditingThisDay = editingHere && editingHere.day===dayIdx;
+    const formHtml = openForm===dayIdx ? `
+      <div class="anchor-form">
+        <input type="time" id="anchorTime-${dayIdx}" value="${isEditingThisDay?editingHere.time||'':''}">
+        <input type="time" id="anchorEnd-${dayIdx}" placeholder="שעת סיום (ברירת מחדל: שעה)" value="${isEditingThisDay?editingHere.endTime||'':''}">
+        <input type="text" id="anchorLabel-${dayIdx}" placeholder="למשל: תרגול גיטרה" value="${isEditingThisDay?escapeAttr(editingHere.label):''}">
+        <select id="anchorDomain-${dayIdx}">${domainOptions(isEditingThisDay?editingHere.domain:null)}</select>
+        <label class="buf-label"><input type="checkbox" id="anchorBuffer-${dayIdx}" ${isEditingThisDay&&editingHere.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
+        <div class="anchor-form-actions">
+          <button class="save-btn" onclick="saveAnchor(${dayIdx})">שמור</button>
+          <button class="cancel-btn" onclick="closeForm()">בטל</button>
+        </div>
+        ${isEditingThisDay ? `
+        <div class="anchor-form-actions">
+          <a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>
+          <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>
+        </div>` : ''}
+      </div>` : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
+
+    const emptyNote = (!anchorsForDay.length && !tasksForDay.length) ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
+
+    return `<div class="day-col">
+      <div class="day-name">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
+      ${emptyNote}${anchorChips}${taskChips}
+      ${formHtml}
     </div>`;
   }).join('');
   renderLoadMeter();
@@ -1439,7 +1404,7 @@ function importDataMerge(e){
 function escapeHtml(str){ const div=document.createElement('div'); div.textContent=str; return div.innerHTML; }
 function escapeAttr(str){ return String(str).replace(/"/g,'&quot;'); }
 function renderAllDependent(){
-  renderWeekGrid(); renderTaskDomainSelect(); renderTasks(); renderScheduleGrid();
+  renderTaskDomainSelect(); renderTasks(); renderScheduleGrid();
   renderNoteTabs(); renderSparks(); renderSomedayDomainSelect(); renderSomeday();
 }
 
@@ -1478,7 +1443,6 @@ function render(){
   document.body.classList.toggle('soft', data.softMode);
   document.getElementById('softBtn').classList.toggle('on', data.softMode);
   renderDomainEditor();
-  renderWeekGrid();
   renderTaskDomainSelect();
   renderTasks();
   renderScheduleGrid();
@@ -1498,7 +1462,7 @@ function bindNoteArea(){
 }
 
 /* ---------- collapsible sections ---------- */
-const SECTION_KEYS = ['schedule','anchors','tasks','domains','suggestions','notes','someday','reflection','backup'];
+const SECTION_KEYS = ['schedule','tasks','domains','suggestions','notes','someday','reflection','backup'];
 function toggleSection(key){
   if(!data.collapsedSections) data.collapsedSections = {};
   data.collapsedSections[key] = !data.collapsedSections[key];
