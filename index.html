@@ -26,7 +26,7 @@
   }
   body.night-mode{
     --bg:#0A192F; --surface:rgba(13,37,63,0.65); --surface2:rgba(20,50,85,0.6); --surface3:rgba(27,73,101,0.55);
-    --text:#F0F4F8; --muted:#8892B0; --muted2:#6f76a8; --gold:#F4C430;
+    --text:#F1E8FF; --muted:#8892B0; --muted2:#6f76a8; --gold:#F4C430;
     --border:rgba(0,210,211,0.18); --border-strong:rgba(0,210,211,0.32);
     --energy-low:#5fae72; --energy-mid:#F4C430; --energy-high:#c96256;
     --glow-gold:rgba(244,196,48,0.24); --glow-rose:rgba(224,120,190,0.18); --glow-teal:rgba(0,210,211,0.20);
@@ -133,7 +133,7 @@
 
   section{margin-bottom:44px;}
   .section-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap;}
-  h2{font-family:'Frank Ruhl Libre', serif; font-size:21px; font-weight:500; margin:0; display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;}
+  h2{font-family:'Frank Ruhl Libre', serif; font-size:21px; font-weight:500; margin:0; display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; flex:1;}
   h2 .chev{font-size:14px; color:var(--muted2); font-weight:400;}
   h2 .num{color:var(--gold); font-size:15px; font-weight:400; opacity:.8;}
   .hint{font-size:12.5px; color:var(--muted2);}
@@ -170,7 +170,7 @@
   /* week grid */
   .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease, border-color .3s ease;}
   .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
-  .day-col.expanded{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 10px 30px -14px var(--glow-gold);}
+  .day-col.expanded{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 0 6px 0 var(--gold);}
   .day-col.minimized{opacity:.72;}
   .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline; cursor:pointer; user-select:none;}
   .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
@@ -207,8 +207,19 @@
   .sched-link:hover{color:var(--text);}
   .task-date-badge{font-size:10.5px; color:var(--muted2); white-space:nowrap;}
 
-  .gcal-sync-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .gcal-sync-row{margin-bottom:10px;}
+  .gcal-sync-row-inner{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
   .gcal-status{font-size:12.5px; color:var(--muted);}
+  .gcal-picker{display:flex; flex-direction:column; gap:7px; margin-top:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:9px 11px;}
+  .gcal-cal-row{display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer;}
+  .gcal-cal-dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+
+  .week-nav{display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:10px;}
+  .week-nav-btn{background:var(--surface3); border:1px solid var(--border-strong); color:var(--text); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; font-family:inherit; flex-shrink:0;}
+  .week-nav-btn:hover{border-color:var(--gold);}
+  .week-nav-btn:disabled{opacity:.35; cursor:default;}
+  .week-nav-btn:disabled:hover{border-color:var(--border-strong);}
+  .week-nav-label{font-size:13.5px; color:var(--muted); min-width:120px; text-align:center; direction:ltr;}
 
   /* schedule grid */
   .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
@@ -350,6 +361,7 @@
     </div>
     <div id="secbody-schedule">
       <div class="gcal-sync-row" id="gcalSyncRow"></div>
+      <div class="week-nav" id="weekNav"></div>
       <div class="schedule-grid" id="scheduleGrid"></div>
     </div>
   </section>
@@ -524,7 +536,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -562,6 +574,7 @@ function loadData(){
       data.domainNotes = parsed.domainNotes || {};
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
+      data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
     }
@@ -897,8 +910,42 @@ const GCAL_CLIENT_ID = '205912988147-1nd655pslkb8temou2oonfueep3lhvs4.apps.googl
 const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 let gcalAccessToken = null;
 let gcalSyncing = false;
+let gcalCalendarList = [];
+let gcalPickerOpen = false;
 
 function gcalReady(){ return !!(window.google && google.accounts && google.accounts.oauth2); }
+function gcalSelectedCalendarIds(){ return (data.gcalCalendarIds && data.gcalCalendarIds.length) ? data.gcalCalendarIds : ['primary']; }
+
+function fetchGcalCalendarList(){
+  if(!gcalAccessToken) return Promise.resolve([]);
+  return fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader', {
+    headers:{ Authorization: 'Bearer '+gcalAccessToken }
+  }).then(r=>{ if(!r.ok) throw new Error('gcal_list_'+r.status); return r.json(); })
+    .then(json=>{
+      gcalCalendarList = (json.items||[]).map(c=>({id:c.id, summary:c.summary||c.id, color:c.backgroundColor||'#999'}));
+      return gcalCalendarList;
+    }).catch(()=>{ gcalCalendarList = []; return []; });
+}
+function toggleGcalPicker(){
+  gcalPickerOpen = !gcalPickerOpen;
+  if(gcalPickerOpen && gcalCalendarList.length===0){
+    fetchGcalCalendarList().then(renderGcalStatus);
+  } else {
+    renderGcalStatus();
+  }
+}
+function toggleGcalCalendarSelection(calId){
+  const ids = gcalSelectedCalendarIds().slice();
+  const idx = ids.indexOf(calId);
+  if(idx>-1){
+    if(ids.length>1) ids.splice(idx,1); else return;
+  } else {
+    ids.push(calId);
+  }
+  data.gcalCalendarIds = ids;
+  saveData();
+  renderGcalStatus();
+}
 
 function connectGoogleCalendar(){
   if(!gcalReady()){ alert('שירות ההתחברות של גוגל עוד לא נטען — נסה/י לרענן את הדף.'); return; }
@@ -948,21 +995,33 @@ function syncGoogleCalendar(){
   if(data.domains.length===0){ flashStatus('קודם צריך להוסיף תחום אחד לפחות'); return; }
   gcalSyncing = true;
   renderGcalStatus();
-  const weekDates = currentWeekDates();
-  const timeMin = new Date(weekDates[0].getFullYear(), weekDates[0].getMonth(), weekDates[0].getDate(), 0,0,0).toISOString();
-  const timeMax = new Date(weekDates[6].getFullYear(), weekDates[6].getMonth(), weekDates[6].getDate(), 23,59,59).toISOString();
+  const startDates = weekDatesForOffset(WEEK_OFFSET_MIN);
+  const endDates = weekDatesForOffset(WEEK_OFFSET_MAX);
+  const timeMin = new Date(startDates[0].getFullYear(), startDates[0].getMonth(), startDates[0].getDate(), 0,0,0).toISOString();
+  const timeMax = new Date(endDates[6].getFullYear(), endDates[6].getMonth(), endDates[6].getDate(), 23,59,59).toISOString();
   const params = new URLSearchParams({ timeMin, timeMax, singleEvents:'true', orderBy:'startTime', maxResults:'250' });
-  fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`, {
-    headers:{ Authorization: 'Bearer '+gcalAccessToken }
-  }).then(r=>{
-    if(!r.ok) throw new Error('gcal_'+r.status);
-    return r.json();
-  }).then(json=>{
-    const existingIds = new Set(data.tasks.filter(t=>t.googleEventId).map(t=>t.googleEventId));
+  const calIds = gcalSelectedCalendarIds();
+  Promise.all(calIds.map(calId=>
+    fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?${params.toString()}`, {
+      headers:{ Authorization: 'Bearer '+gcalAccessToken }
+    }).then(r=>{ if(!r.ok) throw new Error('gcal_'+r.status); return r.json(); })
+      .then(json=>(json.items||[]).map(ev=>({ev, calId})))
+      .catch(()=>[])
+  )).then(resultsPerCal=>{
+    const allEvents = resultsPerCal.flat();
+    const existingIds = new Set();
+    data.tasks.forEach(t=>{
+      if(!t.googleEventId) return;
+      existingIds.add(t.googleEventId);
+      if(t.googleEventId.indexOf(':')===-1) existingIds.add('primary:'+t.googleEventId);
+    });
     const defaultDomain = (data.domains[0] && data.domains[0].id) || '';
     let added = 0;
-    (json.items||[]).forEach(ev=>{
-      if(!ev.id || ev.status==='cancelled' || existingIds.has(ev.id)) return;
+    allEvents.forEach(({ev,calId})=>{
+      if(!ev.id || ev.status==='cancelled') return;
+      const gid = calId+':'+ev.id;
+      if(existingIds.has(gid)) return;
+      existingIds.add(gid);
       let date='', time='', endTime='';
       if(ev.start && ev.start.date){
         date = ev.start.date;
@@ -976,7 +1035,7 @@ function syncGoogleCalendar(){
         }
       }
       data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:defaultDomain, done:false, energy:'mid',
-        date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:ev.id});
+        date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:gid});
       added++;
     });
     gcalSyncing = false;
@@ -984,9 +1043,8 @@ function syncGoogleCalendar(){
     if(added>0){ saveData(); renderTasks(); renderScheduleGrid(); flashStatus(`יובאו ${added} אירועים חדשים מהיומן`); }
     else { saveData(); flashStatus('אין אירועים חדשים ביומן'); }
     renderGcalStatus();
-  }).catch(err=>{
+  }).catch(()=>{
     gcalSyncing = false;
-    if(String(err.message).indexOf('401')>-1) gcalAccessToken = null;
     renderGcalStatus();
     flashStatus('הסנכרון עם היומן נכשל');
   });
@@ -1001,10 +1059,28 @@ function renderGcalStatus(){
   }
   const lastSync = data.gcalLastSync ? new Date(data.gcalLastSync) : null;
   const lastSyncStr = lastSync ? `${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : '';
+  const selectedIds = gcalSelectedCalendarIds();
+  let pickerHtml = '';
+  if(gcalPickerOpen){
+    if(gcalCalendarList.length===0){
+      pickerHtml = `<div class="gcal-picker"><div class="empty">טוען רשימת יומנים...</div></div>`;
+    } else {
+      pickerHtml = `<div class="gcal-picker">${gcalCalendarList.map(c=>`
+        <label class="gcal-cal-row">
+          <input type="checkbox" ${selectedIds.includes(c.id)?'checked':''} onchange="toggleGcalCalendarSelection('${c.id}')">
+          <span class="gcal-cal-dot" style="background:${c.color}"></span>
+          <span>${escapeHtml(c.summary)}</span>
+        </label>`).join('')}</div>`;
+    }
+  }
   el.innerHTML = `
-    <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
-    <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
-    <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
+    <div class="gcal-sync-row-inner">
+      <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
+      <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
+      <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
+      <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
+    </div>
+    ${pickerHtml}
   `;
 }
 
@@ -1230,20 +1306,62 @@ function cycleEnergy(id){
 }
 function deleteTask(id){ data.tasks = data.tasks.filter(t=>t.id!==id); expandedTasks.delete(id); saveData(); renderTasks(); renderScheduleGrid(); }
 function editTaskFromSchedule(id){
+  openSection('tasks');
   openTaskEdit(id);
   const target = document.getElementById('taskList');
   if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 /* ---------- weekly schedule (anchors + dated tasks together) ---------- */
-function currentWeekDates(){
+const WEEK_OFFSET_MIN = -1, WEEK_OFFSET_MAX = 2;
+let weekOffset = 0;
+function weekDatesForOffset(offset){
   const now = new Date();
-  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-  return DAYS.map((_,i)=>{
-    const d = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate()+i);
-    return d;
-  });
+  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + offset*7);
+  return DAYS.map((_,i)=> new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate()+i));
 }
+function currentWeekDates(){ return weekDatesForOffset(0); }
+function viewedWeekDates(){ return weekDatesForOffset(weekOffset); }
+function changeWeek(delta){
+  const next = weekOffset + delta;
+  if(next < WEEK_OFFSET_MIN || next > WEEK_OFFSET_MAX) return;
+  weekOffset = next;
+  renderScheduleGrid();
+}
+function weekRangeLabel(offset){
+  const dates = weekDatesForOffset(offset);
+  const start = dates[0], end = dates[6];
+  return `${pad(start.getDate())}/${pad(start.getMonth()+1)} – ${pad(end.getDate())}/${pad(end.getMonth()+1)}`;
+}
+function renderWeekNav(){
+  const el = document.getElementById('weekNav');
+  if(!el) return;
+  el.innerHTML = `
+    <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>›</button>
+    <span class="week-nav-label">${weekRangeLabel(weekOffset)}${weekOffset===0?' · השבוע':''}</span>
+    <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>‹</button>
+  `;
+}
+let weekSwipeState = { startX:null, startY:null, active:false };
+document.addEventListener('touchstart', (e)=>{
+  const grid = e.target.closest && e.target.closest('#scheduleGrid');
+  if(!grid || !e.touches || e.touches.length!==1) return;
+  weekSwipeState.active = true;
+  weekSwipeState.startX = e.touches[0].clientX;
+  weekSwipeState.startY = e.touches[0].clientY;
+}, {passive:true});
+document.addEventListener('touchend', (e)=>{
+  if(!weekSwipeState.active) return;
+  weekSwipeState.active = false;
+  const touch = e.changedTouches && e.changedTouches[0];
+  if(!touch || weekSwipeState.startX===null) return;
+  const dx = touch.clientX - weekSwipeState.startX;
+  const dy = touch.clientY - weekSwipeState.startY;
+  weekSwipeState.startX = null;
+  if(Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)*1.5){
+    changeWeek(dx < 0 ? 1 : -1);
+  }
+}, {passive:true});
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 
 /* ---------- weekly load meter + domain balance ---------- */
@@ -1331,7 +1449,8 @@ function renderBalance(){
 function renderScheduleGrid(){
   const el = document.getElementById('scheduleGrid');
   if(!el) return;
-  const weekDates = currentWeekDates();
+  renderWeekNav();
+  const weekDates = viewedWeekDates();
   el.innerHTML = DAYS.map((dayName, dayIdx)=>{
     const dateObj = weekDates[dayIdx];
     const dateStr = ymd(dateObj);
@@ -1740,6 +1859,7 @@ function importData(e){
       data.domainNotes = parsed.domainNotes || {};
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
+      data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       activeNoteDomain = data.domains[0].id;
       saveData();
       render();
@@ -1751,14 +1871,41 @@ function importData(e){
   };
   reader.readAsText(file);
 }
+function anchorSignature(a){ return (a.label||'').trim().toLowerCase()+'|'+a.day+'|'+(a.time||''); }
+function taskSignature(t){ return (t.text||'').trim().toLowerCase()+'|'+(t.date||'')+'|'+(t.time||'')+'|'+(t.domain||''); }
+function somedaySignature(s){ return (s.text||'').trim().toLowerCase()+'|'+(s.domain||''); }
 function mergeData(parsed){
+  const counts = { domains:0, anchors:0, tasks:0, someday:0, skipped:0 };
   const existingIds = new Set(data.domains.map(d=>d.id));
   (parsed.domains||[]).forEach(d=>{
-    if(!existingIds.has(d.id)){ data.domains.push({...d}); existingIds.add(d.id); }
+    if(!existingIds.has(d.id)){ data.domains.push({...d}); existingIds.add(d.id); counts.domains++; }
   });
-  (parsed.anchors||[]).forEach(a=>{ data.anchors.push({...a, id:uid()}); });
-  (parsed.tasks||[]).forEach(t=>{ data.tasks.push({energy:'mid', endTime:'', description:'', subtasks:[], ...t, id:uid()}); });
-  (parsed.someday||[]).forEach(s=>{ data.someday.push({description:'', subtasks:[], ...s, id:uid()}); });
+  const existingAnchorSigs = new Set(data.anchors.map(anchorSignature));
+  (parsed.anchors||[]).forEach(a=>{
+    const sig = anchorSignature(a);
+    if(existingAnchorSigs.has(sig)){ counts.skipped++; return; }
+    existingAnchorSigs.add(sig);
+    data.anchors.push({...a, id:uid()});
+    counts.anchors++;
+  });
+  const existingTaskSigs = new Set(data.tasks.map(taskSignature));
+  (parsed.tasks||[]).forEach(t=>{
+    const norm = {energy:'mid', endTime:'', description:'', subtasks:[], ...t};
+    const sig = taskSignature(norm);
+    if(existingTaskSigs.has(sig)){ counts.skipped++; return; }
+    existingTaskSigs.add(sig);
+    data.tasks.push({...norm, id:uid()});
+    counts.tasks++;
+  });
+  const existingSomedaySigs = new Set(data.someday.map(somedaySignature));
+  (parsed.someday||[]).forEach(s=>{
+    const norm = {description:'', subtasks:[], ...s};
+    const sig = somedaySignature(norm);
+    if(existingSomedaySigs.has(sig)){ counts.skipped++; return; }
+    existingSomedaySigs.add(sig);
+    data.someday.push({...norm, id:uid()});
+    counts.someday++;
+  });
   (parsed.suggestions||[]).forEach(s=>{ data.suggestions.push({answered:false, ...s, id:uid()}); });
   Object.keys(parsed.notes||{}).forEach(domainId=>{
     const incoming = parsed.notes[domainId];
@@ -1773,6 +1920,7 @@ function mergeData(parsed){
   });
   saveData();
   render();
+  return counts;
 }
 function importDataMerge(e){
   const file = e.target.files[0];
@@ -1783,9 +1931,10 @@ function importDataMerge(e){
       const parsed = JSON.parse(ev.target.result);
       const newDomains = (parsed.domains||[]).filter(d=>!data.domains.some(ex=>ex.id===d.id)).length;
       const count = (parsed.someday||[]).length + (parsed.tasks||[]).length + (parsed.anchors||[]).length;
-      if(!confirm(`להוסיף ${count} פריטים${newDomains?` ו-${newDomains} תחומים חדשים`:''} לנתונים הקיימים? זה לא מוחק ולא מחליף שום דבר קיים.`)) return;
-      mergeData(parsed);
-      flashStatus('נוסף בהצלחה');
+      if(!confirm(`לבדוק ${count} פריטים${newDomains?` ו-${newDomains} תחומים חדשים`:''} ולהוסיף רק את מה שעוד לא קיים? זה לא מוחק ולא מחליף שום דבר קיים, וגם לא ייצור כפילויות.`)) return;
+      const counts = mergeData(parsed);
+      const added = counts.domains + counts.anchors + counts.tasks + counts.someday;
+      flashStatus(counts.skipped>0 ? `נוספו ${added} פריטים · ${counts.skipped} כבר היו קיימים ודולגו` : `נוספו ${added} פריטים חדשים`);
     }catch(err){
       alert('הקובץ לא תקין או פגום.');
     }
@@ -1808,7 +1957,8 @@ function resetAll(){
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null};
+  const keepGcalCalendarIds = data.gcalCalendarIds;
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -1879,6 +2029,13 @@ function isSectionCollapsed(key){
 function toggleSection(key){
   if(!data.collapsedSections) data.collapsedSections = {};
   data.collapsedSections[key] = !isSectionCollapsed(key);
+  saveData();
+  applySectionCollapse(key);
+}
+function openSection(key){
+  if(!isSectionCollapsed(key)) return;
+  if(!data.collapsedSections) data.collapsedSections = {};
+  data.collapsedSections[key] = false;
   saveData();
   applySectionCollapse(key);
 }
