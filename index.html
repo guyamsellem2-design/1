@@ -1464,7 +1464,7 @@ function bindNoteArea(){
 /* ---------- collapsible sections ---------- */
 const SECTION_KEYS = ['schedule','tasks','domains','suggestions','notes','someday','reflection','backup'];
 function isSectionCollapsed(key){
-  if(!data.collapsedSections || !(key in data.collapsedSections)) return true;
+  if(!data.collapsedSections || !(key in data.collapsedSections)) return key!=='schedule';
   return !!data.collapsedSections[key];
 }
 function toggleSection(key){
