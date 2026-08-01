@@ -78,6 +78,34 @@
   }
   .soft-btn.on{ background:var(--gold); color:#1a1206; border-color:transparent; font-weight:600; }
   .header-actions{display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0;}
+  .hamburger-btn{background:var(--surface); border:1px solid var(--border-strong); color:var(--text); width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-family:inherit;}
+  .hamburger-btn:hover{border-color:var(--muted);}
+
+  .nav-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.4); opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:200;}
+  .nav-overlay.open{opacity:1; pointer-events:auto;}
+  .nav-drawer{position:fixed; top:0; bottom:0; right:-300px; width:280px; max-width:82vw; background:var(--surface); border-left:1px solid var(--border-strong); z-index:201; padding:22px 18px; transition:right .3s ease; overflow-y:auto; box-shadow:-14px 0 34px -14px rgba(0,0,0,0.45);}
+  .nav-drawer.open{right:0;}
+  .nav-drawer h3{font-family:'Frank Ruhl Libre', serif; font-size:16px; margin:0 0 16px; color:var(--text);}
+  .nav-home-link{display:flex; align-items:center; gap:8px; padding:10px 8px; border-radius:10px; cursor:pointer; font-size:14px; color:var(--text); margin-bottom:4px;}
+  .nav-home-link:hover{background:var(--surface2);}
+  .nav-drawer hr{border:none; border-top:1px solid var(--border); margin:10px 0;}
+  .nav-domain-item{display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius:10px; cursor:pointer; font-size:14px; color:var(--text);}
+  .nav-domain-item:hover{background:var(--surface2);}
+  .nav-domain-item .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+
+  .domain-page-header{display:flex; align-items:center; gap:12px; margin:18px 0 24px;}
+  .domain-page-dot{width:16px; height:16px; border-radius:50%; flex-shrink:0;}
+  #domainPageTitle{font-family:'Frank Ruhl Libre', serif; font-size:clamp(22px,4vw,30px); margin:0; color:var(--text);}
+
+  .keep-grid{column-count:2; column-gap:12px; margin-top:16px;}
+  @media (max-width:640px){.keep-grid{column-count:1;}}
+  .keep-note{background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:12px; break-inside:avoid; transition:background .3s ease;}
+  .keep-note textarea{width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:14px; resize:vertical; line-height:1.55; padding:0;}
+  .keep-note textarea:focus{outline:none;}
+  .keep-note-actions{display:flex; justify-content:space-between; align-items:center; margin-top:8px;}
+  .keep-colors{display:flex; gap:5px;}
+  .keep-colors span{width:14px; height:14px; border-radius:50%; cursor:pointer; border:1.5px solid rgba(128,128,128,0.25); flex-shrink:0;}
+  .keep-colors span.active{border-color:var(--text);}
 
   .status{
     position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
@@ -262,7 +290,17 @@
 </head>
 <body>
 <div class="pull-refresh" id="pullRefresh"><span class="pull-refresh-icon">↓</span></div>
+
+<div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
+<div class="nav-drawer" id="navDrawer">
+  <h3>ניווט</h3>
+  <div class="nav-home-link" onclick="navigateHome()">🏠 דף הבית</div>
+  <hr>
+  <div id="navDomainList"></div>
+</div>
+
 <div class="wrap">
+<div id="homeView">
 
   <header class="top">
     <div>
@@ -271,6 +309,7 @@
       <p class="sub">עוגנים קבועים, משימות לשבוע, פתקים חופשיים, ומקום מנוחה לכל רעיון שעוד לא הגיע תורו.</p>
     </div>
     <div class="header-actions">
+      <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
       <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()">🌙 מצב לילה</button>
       <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🍃 מצב רגוע</button>
     </div>
@@ -415,6 +454,21 @@
     <button class="reset-btn" onclick="clearDoneTasks()">🧹 ניקוי משימות שבוצעו</button>
     <button class="reset-btn" onclick="resetAll()">איפוס הכל</button>
   </footer>
+
+</div>
+
+<div id="domainPageView" style="display:none;">
+  <button class="soft-btn" onclick="navigateHome()">→ חזרה לדף הבית</button>
+  <div class="domain-page-header">
+    <span class="domain-page-dot" id="domainPageDot"></span>
+    <h1 id="domainPageTitle"></h1>
+  </div>
+  <div class="add-row">
+    <button onclick="addDomainNote()">+ פתק חדש</button>
+  </div>
+  <div class="keep-grid" id="keepGrid"></div>
+</div>
+
 </div>
 
 <div class="status" id="status">נשמר</div>
@@ -436,7 +490,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {} };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -471,6 +525,7 @@ function loadData(){
       data.nightMode = !!parsed.nightMode;
       data.collapsedSections = parsed.collapsedSections || {};
       data.suggestions = parsed.suggestions || [];
+      data.domainNotes = parsed.domainNotes || {};
     } else {
       data.domains = DEFAULT_DOMAINS.map(d=>({...d}));
     }
@@ -531,6 +586,7 @@ function renderDomainEditor(){
     </div>
   `).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ תחום</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
+  renderNavList();
 }
 const COLOR_PALETTE = ['#e2a34c','#e6935f','#d9695c','#e2903f','#e6c052','#cf9a5c',
   '#3aa9a0','#3fae7a','#5fc47f','#2f96a8','#4fb4d6','#3fb0ac',
@@ -645,6 +701,95 @@ function deleteDomain(id){
 }
 function domainOptions(selectedId){
   return data.domains.map(d=>`<option value="${d.id}" ${d.id===selectedId?'selected':''}>${d.name}</option>`).join('');
+}
+
+/* ---------- nav drawer + domain pages ---------- */
+let navOpen = false;
+function toggleNav(){ navOpen = !navOpen; applyNavState(); }
+function closeNav(){ if(!navOpen) return; navOpen = false; applyNavState(); }
+function applyNavState(){
+  document.getElementById('navDrawer').classList.toggle('open', navOpen);
+  document.getElementById('navOverlay').classList.toggle('open', navOpen);
+}
+function renderNavList(){
+  const el = document.getElementById('navDomainList');
+  if(!el) return;
+  el.innerHTML = data.domains.map(d=>`
+    <div class="nav-domain-item" onclick="navigateToDomain('${d.id}')">
+      <span class="dot" style="background:${d.color}"></span>${escapeHtml(d.name)}
+    </div>`).join('');
+}
+function currentRoute(){
+  const m = location.hash.match(/^#domain\/(.+)$/);
+  return m ? {type:'domain', id:decodeURIComponent(m[1])} : {type:'home'};
+}
+function navigateToDomain(id){ location.hash = '#domain/'+encodeURIComponent(id); }
+function navigateHome(){
+  if(!location.hash){ applyRoute(); return; }
+  location.hash = '';
+}
+function applyRoute(){
+  const route = currentRoute();
+  const home = document.getElementById('homeView');
+  const domainView = document.getElementById('domainPageView');
+  if(route.type==='domain' && domainById(route.id)){
+    home.style.display = 'none';
+    domainView.style.display = '';
+    renderDomainPage(route.id);
+    window.scrollTo(0,0);
+  } else {
+    home.style.display = '';
+    domainView.style.display = 'none';
+  }
+  closeNav();
+}
+window.addEventListener('hashchange', applyRoute);
+
+const KEEP_COLORS = ['', '#e2a34c', '#3aa9a0', '#e08a72', '#b98fc4', '#4fb4d6'];
+function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(!data.domainNotes[id]) data.domainNotes[id] = []; return data.domainNotes[id]; }
+function renderDomainPage(id){
+  const dom = domainById(id);
+  document.getElementById('domainPageTitle').textContent = dom.name;
+  document.getElementById('domainPageDot').style.background = dom.color;
+  renderKeepGrid(id);
+}
+function renderKeepGrid(id){
+  const el = document.getElementById('keepGrid');
+  if(!el) return;
+  const notes = ensureDomainNotes(id);
+  if(notes.length===0){ el.innerHTML = '<div class="empty">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
+  el.innerHTML = notes.map(n=>`
+    <div class="keep-note" style="background:${n.color||'var(--surface2)'}">
+      <textarea oninput="onKeepNoteInput('${id}','${n.id}', this.value)" placeholder="כתוב כאן...">${escapeHtml(n.text)}</textarea>
+      <div class="keep-note-actions">
+        <div class="keep-colors">
+          ${KEEP_COLORS.map(c=>`<span class="${(n.color||'')===c?'active':''}" style="background:${c||'var(--surface3)'}" onclick="setKeepNoteColor('${id}','${n.id}','${c}')"></span>`).join('')}
+        </div>
+        <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
+      </div>
+    </div>`).join('');
+}
+function addDomainNote(){
+  const route = currentRoute();
+  if(route.type!=='domain') return;
+  const notes = ensureDomainNotes(route.id);
+  notes.unshift({id:uid(), text:'', color:''});
+  saveData();
+  renderKeepGrid(route.id);
+  requestAnimationFrame(()=>{ const ta = document.querySelector('#keepGrid textarea'); if(ta) ta.focus(); });
+}
+function onKeepNoteInput(domainId, noteId, val){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(n){ n.text = val; saveData(); }
+}
+function setKeepNoteColor(domainId, noteId, color){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(n){ n.color = color; saveData(); renderKeepGrid(domainId); }
+}
+function deleteDomainNote(domainId, noteId){
+  data.domainNotes[domainId] = ensureDomainNotes(domainId).filter(n=>n.id!==noteId);
+  saveData();
+  renderKeepGrid(domainId);
 }
 
 /* ---------- google calendar helpers ---------- */
@@ -1421,6 +1566,7 @@ function importData(e){
       data.softMode = !!parsed.softMode;
       data.nightMode = !!parsed.nightMode;
       data.suggestions = parsed.suggestions || [];
+      data.domainNotes = parsed.domainNotes || {};
       activeNoteDomain = data.domains[0].id;
       saveData();
       render();
@@ -1446,6 +1592,11 @@ function mergeData(parsed){
     const existing = ensureNotes(domainId);
     if(incoming.text) existing.text += (existing.text ? '\n\n' : '') + incoming.text;
     existing.sparks = existing.sparks.concat((incoming.sparks||[]).map(s=>({...s, id:uid()})));
+  });
+  Object.keys(parsed.domainNotes||{}).forEach(domainId=>{
+    const incoming = parsed.domainNotes[domainId] || [];
+    const existing = ensureDomainNotes(domainId);
+    incoming.forEach(n=>{ existing.push({...n, id:uid()}); });
   });
   saveData();
   render();
@@ -1483,7 +1634,7 @@ function resetAll(){
   const keepReflection = data.reflectionBanks;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[]};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -1666,6 +1817,7 @@ window.addEventListener('touchcancel', pullRefreshReset, {passive:true});
 
 setupPWA();
 loadData();
+applyRoute();
 </script>
 </body>
 </html>
