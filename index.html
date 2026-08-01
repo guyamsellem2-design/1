@@ -110,13 +110,13 @@
   .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease;}
   .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
   .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);}
-  .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
+  .anchor-chip{background:var(--surface2); border-radius:12px; padding:22px 9px 7px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
   .anchor-chip:hover{background:var(--surface3);}
   .anchor-chip .time{color:var(--muted); font-size:11px; display:block; margin-bottom:1px;}
   .anchor-chip .buf{color:var(--muted2); font-size:10px; display:block; margin-top:2px;}
-  .anchor-chip .row-icons{position:absolute; left:6px; top:5px; display:flex; gap:9px; opacity:0; transition:opacity .2s;}
+  .anchor-chip .row-icons{position:absolute; left:6px; top:5px; display:flex; gap:9px; opacity:.75; transition:opacity .2s;}
   .anchor-chip:hover .row-icons{opacity:1;}
-  .anchor-chip .row-icons span, .anchor-chip .row-icons a{color:var(--muted2); font-size:16px; text-decoration:none; line-height:1;}
+  .anchor-chip .row-icons span, .anchor-chip .row-icons a{color:var(--muted2); font-size:17px; text-decoration:none; line-height:1; padding:2px;}
   .anchor-chip .row-icons span:hover, .anchor-chip .row-icons a:hover{color:var(--text);}
   .add-anchor-btn{margin-top:auto; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:8px; padding:6px; font-size:12px; cursor:pointer; font-family:inherit;}
   .add-anchor-btn:hover{color:var(--text); border-color:var(--muted);}
@@ -201,12 +201,16 @@
   .reflect-q{margin-bottom:22px;}
   .reflect-q:last-child{margin-bottom:0;}
   .reflect-q label{display:flex; align-items:center; gap:7px; font-size:14px; color:var(--text); margin-bottom:7px; font-weight:500;}
-  .reflect-q textarea{width:100%; min-height:60px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:10px 12px; font-size:14px; font-family:inherit; resize:vertical; line-height:1.5; margin-bottom:6px;}
+  .reflect-q textarea{width:100%; min-height:60px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:10px 12px; font-size:14px; font-family:inherit; resize:vertical; line-height:1.5; margin-bottom:8px;}
+  .reflect-actions{display:flex; justify-content:flex-end; margin-bottom:8px;}
+  .reflect-add-btn{background:var(--gold); color:#1a1206; font-weight:600; border:none; padding:7px 16px; border-radius:999px; font-size:12.5px; cursor:pointer; font-family:inherit;}
+  .reflect-add-btn:hover{filter:brightness(1.06);}
   .bank-toggle{font-size:12px; color:var(--muted2); cursor:pointer; display:inline-block;}
   .bank-toggle:hover{color:var(--text);}
   .bank-list{margin-top:8px; display:flex; flex-direction:column; gap:6px;}
-  .bank-entry{background:var(--surface2); border-radius:8px; padding:8px 10px; font-size:13px; line-height:1.5; cursor:pointer;}
-  .bank-entry .bank-date{color:var(--muted2); font-size:11px; display:block; margin-bottom:2px;}
+  .bank-entry{background:var(--surface2); border-radius:8px; padding:8px 10px; font-size:13px; line-height:1.5; display:flex; align-items:flex-start; gap:8px;}
+  .bank-entry > span:nth-child(2){flex:1; cursor:pointer;}
+  .bank-entry .bank-date{color:var(--muted2); font-size:11px; flex-shrink:0; white-space:nowrap; padding-top:1px;}
 
   footer{margin-top:50px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted2); font-size:13px; line-height:1.7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit;}
@@ -1204,40 +1208,38 @@ const REFLECT_QUESTIONS = [
 ];
 const expandedBanks = new Set();
 function weekKey(){ return ymd(currentWeekDates()[0]); }
-function ensureBankEntry(bankKey){
-  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[]};
-  if(!data.reflectionBanks[bankKey]) data.reflectionBanks[bankKey] = [];
-  const wk = weekKey();
-  let entry = data.reflectionBanks[bankKey].find(e=>e.weekKey===wk);
-  if(!entry){
-    entry = {id:uid(), weekKey:wk, text:''};
-    data.reflectionBanks[bankKey].push(entry);
-  }
-  return entry;
-}
 function renderReflection(){
   const el = document.getElementById('reflectionCard');
   if(!el) return;
+  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[]};
   el.innerHTML = REFLECT_QUESTIONS.map(q=>{
-    const current = ensureBankEntry(q.key);
-    const history = (data.reflectionBanks[q.key]||[]).filter(e=>e.id!==current.id).sort((a,b)=> b.weekKey.localeCompare(a.weekKey));
+    const entries = (data.reflectionBanks[q.key]||[]).slice().sort((a,b)=> b.weekKey.localeCompare(a.weekKey));
     const isOpen = expandedBanks.has(q.key);
-    const historyHtml = isOpen ? (history.length ? `<div class="bank-list">${history.map(e=>`
-        <div class="bank-entry" onclick="editBankEntry('${q.key}','${e.id}')">
-          <span class="bank-date">${e.weekKey}</span>${escapeHtml(e.text)}
-        </div>`).join('')}</div>` : '<div class="empty">עוד אין תובנות קודמות בבנק הזה</div>') : '';
+    const historyHtml = isOpen ? (entries.length ? `<div class="bank-list">${entries.map(e=>`
+        <div class="bank-entry">
+          <span class="bank-date">${e.weekKey}</span>
+          <span onclick="editBankEntry('${q.key}','${e.id}')">${escapeHtml(e.text)}</span>
+          <span class="del-task" onclick="deleteBankEntry('${q.key}','${e.id}')">✕</span>
+        </div>`).join('')}</div>` : '<div class="empty">עוד אין תובנות בבנק הזה</div>') : '';
     return `<div class="reflect-q">
       <label>${q.icon} ${q.label}</label>
-      <textarea id="reflect-${q.key}" oninput="onReflectInput('${q.key}', this.value)">${escapeHtml(current.text)}</textarea>
-      <span class="bank-toggle" onclick="toggleBank('${q.key}')">${isOpen?'▾':'▸'} בנק תובנות (${history.length})</span>
+      <textarea id="reflect-${q.key}" placeholder="מה עולה לך?"></textarea>
+      <div class="reflect-actions"><button class="reflect-add-btn" onclick="addReflectionEntry('${q.key}')">+ הוסף תובנה</button></div>
+      <span class="bank-toggle" onclick="toggleBank('${q.key}')">${isOpen?'▾':'▸'} בנק תובנות (${entries.length})</span>
       ${historyHtml}
     </div>`;
   }).join('');
 }
-function onReflectInput(bankKey, val){
-  const entry = ensureBankEntry(bankKey);
-  entry.text = val;
+function addReflectionEntry(bankKey){
+  const ta = document.getElementById(`reflect-${bankKey}`);
+  const text = ta.value.trim();
+  if(!text) return;
+  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[]};
+  if(!data.reflectionBanks[bankKey]) data.reflectionBanks[bankKey] = [];
+  data.reflectionBanks[bankKey].push({id:uid(), weekKey:weekKey(), text});
   saveData();
+  renderReflection();
+  flashStatus('התובנה נשמרה בבנק');
 }
 function toggleBank(bankKey){
   if(expandedBanks.has(bankKey)) expandedBanks.delete(bankKey); else expandedBanks.add(bankKey);
@@ -1248,6 +1250,11 @@ function editBankEntry(bankKey, entryId){
   if(!entry) return;
   const val = prompt(`עריכת תובנה משבוע ${entry.weekKey}:`, entry.text);
   if(val!==null && val.trim()){ entry.text=val.trim(); saveData(); renderReflection(); }
+}
+function deleteBankEntry(bankKey, entryId){
+  data.reflectionBanks[bankKey] = (data.reflectionBanks[bankKey]||[]).filter(e=>e.id!==entryId);
+  saveData();
+  renderReflection();
 }
 
 /* ---------- backup / restore ---------- */
