@@ -139,8 +139,10 @@
   .add-domain-btn:hover{color:var(--text); border-color:var(--muted);}
 
   /* week grid */
-  .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease;}
+  .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease, border-color .3s ease;}
   .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
+  .day-col.expanded{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 10px 30px -14px var(--glow-gold);}
+  .day-col.minimized{opacity:.72;}
   .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline; cursor:pointer; user-select:none;}
   .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
   .anchor-chip:hover{background:var(--surface3);}
@@ -437,7 +439,7 @@ const STORAGE_KEY = 'planner-data-v3';
 let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [] };
 let openForm = null;
 let editingAnchorId = null;
-const minimizedDays = new Set();
+const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
   renderScheduleGrid();
@@ -1065,8 +1067,9 @@ function renderScheduleGrid(){
 
     let entries = anchorEntries.concat(taskEntries);
     const totalCount = entries.length;
+    const isMinimized = minimizedDays.has(dayIdx);
     let hiddenCount = 0;
-    if(minimizedDays.has(dayIdx) && entries.length > 2){
+    if(isMinimized && entries.length > 2){
       hiddenCount = entries.length - 2;
       entries = entries.slice(0, 2);
     }
@@ -1077,7 +1080,7 @@ function renderScheduleGrid(){
 
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
-    return `<div class="day-col">
+    return `<div class="day-col ${isMinimized?'minimized':'expanded'}">
       <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
       ${emptyNote}${itemsHtml}${moreHtml}
       ${bottomHtml}
