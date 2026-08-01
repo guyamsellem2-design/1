@@ -60,6 +60,7 @@
     white-space:nowrap; flex-shrink:0;
   }
   .soft-btn.on{ background:var(--gold); color:#1a1206; border-color:transparent; font-weight:600; }
+  .header-actions{display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0;}
 
   .status{
     position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
@@ -148,8 +149,6 @@
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
   .sched-date{color:var(--muted2); font-size:11px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:11.5px; font-style:italic; padding:4px 2px;}
-  .refresh-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit;}
-  .refresh-btn:hover{color:var(--text); border-color:var(--muted);}
 
   .expand-btn{color:var(--muted2); cursor:pointer; font-size:13px; padding:4px; flex-shrink:0;}
   .expand-btn:hover{color:var(--text);}
@@ -235,7 +234,10 @@
       <h1>המפה השבועית שלי</h1>
       <p class="sub">עוגנים קבועים, משימות לשבוע, פתקים חופשיים, ומקום מנוחה לכל רעיון שעוד לא הגיע תורו.</p>
     </div>
-    <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🌙 מצב רגוע</button>
+    <div class="header-actions">
+      <button class="soft-btn" onclick="location.reload()" title="רענון מלא של האתר">🔄 רענון</button>
+      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🌙 מצב רגוע</button>
+    </div>
   </header>
 
   <div class="load-section">
@@ -247,7 +249,6 @@
     <div class="section-head">
       <h2 onclick="toggleSection('schedule')"><span class="num">01</span> לוח השבוע <span class="chev" id="chev-schedule">▾</span></h2>
       <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
-      <button class="refresh-btn" onclick="renderScheduleGrid()">🔄 רענון</button>
     </div>
     <div id="secbody-schedule">
       <div class="schedule-grid" id="scheduleGrid"></div>
