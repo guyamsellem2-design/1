@@ -668,7 +668,10 @@ function taskCalendarUrl(t){
 
 /* ---------- week grid ---------- */
 function openAnchorForm(dayIdx){ openForm = dayIdx; editingAnchorId = null; renderScheduleGrid(); }
-function editAnchor(id, dayIdx){ openForm = dayIdx; editingAnchorId = id; renderScheduleGrid(); }
+function editAnchor(id, dayIdx){
+  if(openForm===dayIdx && editingAnchorId===id){ closeForm(); return; }
+  openForm = dayIdx; editingAnchorId = id; renderScheduleGrid();
+}
 function closeForm(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
 function saveAnchor(dayIdx){
   const time = document.getElementById(`anchorTime-${dayIdx}`).value;
@@ -989,26 +992,11 @@ function renderScheduleGrid(){
     const anchorsForDay = data.anchors.filter(a=>a.day===dayIdx).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     const tasksForDay = data.tasks.filter(t=>t.date===dateStr).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
 
-    const anchorChips = anchorsForDay.map(a=>{
-      const dom = domainById(a.domain);
-      return `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
-          ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
-          ${escapeHtml(a.label)}
-          ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
-      </div>`;
-    }).join('');
-
-    const taskChips = tasksForDay.map(t=>{
-      const dom = domainById(t.domain);
-      return `<div class="anchor-chip" style="border-right-color:${dom.color}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
-          ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
-          ${escapeHtml(t.text)}
-      </div>`;
-    }).join('');
-
     const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
-    const isEditingThisDay = editingHere && editingHere.day===dayIdx;
-    const formHtml = openForm===dayIdx ? `
+    const isEditingThisDay = !!(editingHere && editingHere.day===dayIdx && openForm===dayIdx);
+    const isAddingThisDay = openForm===dayIdx && !editingAnchorId;
+
+    const anchorFormHtml = `
       <div class="anchor-form">
         <input type="time" id="anchorTime-${dayIdx}" value="${isEditingThisDay?editingHere.time||'':''}">
         <input type="time" id="anchorEnd-${dayIdx}" placeholder="שעת סיום (ברירת מחדל: שעה)" value="${isEditingThisDay?editingHere.endTime||'':''}">
@@ -1024,14 +1012,34 @@ function renderScheduleGrid(){
           <a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>
           <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>
         </div>` : ''}
-      </div>` : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
+      </div>`;
+
+    const anchorChips = anchorsForDay.map(a=>{
+      const dom = domainById(a.domain);
+      const chip = `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+          ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
+          ${escapeHtml(a.label)}
+          ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
+      </div>`;
+      return chip + ((isEditingThisDay && editingHere.id===a.id) ? anchorFormHtml : '');
+    }).join('');
+
+    const taskChips = tasksForDay.map(t=>{
+      const dom = domainById(t.domain);
+      return `<div class="anchor-chip" style="border-right-color:${dom.color}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
+          ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
+          ${escapeHtml(t.text)}
+      </div>`;
+    }).join('');
+
+    const bottomHtml = isAddingThisDay ? anchorFormHtml : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
 
     const emptyNote = (!anchorsForDay.length && !tasksForDay.length) ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
     return `<div class="day-col">
       <div class="day-name">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
       ${emptyNote}${anchorChips}${taskChips}
-      ${formHtml}
+      ${bottomHtml}
     </div>`;
   }).join('');
   renderLoadMeter();
