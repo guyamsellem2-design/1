@@ -436,6 +436,7 @@
       <div class="add-row">
         <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
         <input type="text" id="suggText" placeholder="מה ההצעה...">
+        <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
         <button onclick="addSuggestion()">הוסף</button>
       </div>
       <ul class="tasks" id="suggestionList"></ul>
@@ -777,7 +778,11 @@ function addDomain(){
 function deleteDomain(id){
   if(data.domains.length<=1){ alert('צריך שיישאר לפחות תחום אחד.'); return; }
   const d = domainById(id);
-  if(!confirm(`למחוק את "${d.name}"? פריטים ששייכים אליו יעברו לתחום אחר.`)) return;
+  const noteCount = (data.domainNotes && data.domainNotes[id]) ? data.domainNotes[id].length : 0;
+  const warning = noteCount>0
+    ? `למחוק את "${d.name}"? יש בדף התחום הזה ${noteCount} פתק${noteCount>1?'ים':''} — הם יועברו לתחום אחר יחד עם שאר הפריטים ששייכים לתחום.`
+    : `למחוק את "${d.name}"? פריטים ששייכים אליו יעברו לתחום אחר.`;
+  if(!confirm(warning)) return;
   const fallback = data.domains.find(x=>x.id!==id).id;
   data.anchors.forEach(a=>{ if(a.domain===id) a.domain=fallback; });
   data.tasks.forEach(t=>{ if(t.domain===id) t.domain=fallback; });
@@ -786,6 +791,11 @@ function deleteDomain(id){
     if(data.notes[id].text) fb.text += (fb.text?'\n\n':'') + data.notes[id].text;
     fb.sparks = fb.sparks.concat(data.notes[id].sparks || []);
     delete data.notes[id];
+  }
+  if(noteCount>0){
+    const fbNotes = ensureDomainNotes(fallback);
+    fbNotes.push(...data.domainNotes[id]);
+    delete data.domainNotes[id];
   }
   data.domains = data.domains.filter(d=>d.id!==id);
   if(activeNoteDomain===id) activeNoteDomain = data.domains[0].id;
@@ -1876,17 +1886,20 @@ function renderSuggestions(){
   el.innerHTML = data.suggestions.map(s=>`
     <li>
       <span class="task-text" style="flex:1; ${s.answered?'text-decoration:line-through;color:var(--muted2);':''}" onclick="editSuggestion('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
-      <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'נענה ✓':'יש לענות'}</span>
+      ${s.replyDate ? `<span class="task-date-badge">עד <span dir="ltr">${s.replyDate.slice(5)}</span></span>` : ''}
+      <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
+      <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
     </li>`).join('');
 }
 function addSuggestion(){
   const whoInput = document.getElementById('suggWho');
   const textInput = document.getElementById('suggText');
+  const dateInput = document.getElementById('suggReplyDate');
   const text = textInput.value.trim();
   if(!text) return;
-  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false});
-  whoInput.value=''; textInput.value='';
+  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, replyDate: dateInput ? dateInput.value : ''});
+  whoInput.value=''; textInput.value=''; if(dateInput) dateInput.value='';
   saveData();
   renderSuggestions();
 }
@@ -1899,6 +1912,19 @@ function editSuggestion(id){
   if(!s) return;
   const val = prompt('עריכת ההצעה:', s.text);
   if(val!==null && val.trim()){ s.text=val.trim(); saveData(); renderSuggestions(); }
+}
+function convertSuggestionToTask(id){
+  const s = data.suggestions.find(s=>s.id===id);
+  if(!s) return;
+  const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
+  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:'', endTime:'', description:'', subtasks:[]};
+  data.tasks.push(newTask);
+  saveData();
+  openSection('tasks');
+  openTaskEdit(newTask.id);
+  renderScheduleGrid();
+  const target = document.getElementById('taskList');
+  if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
 }
 function deleteSuggestion(id){
   data.suggestions = data.suggestions.filter(s=>s.id!==id);
