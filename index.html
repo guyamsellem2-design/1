@@ -1072,7 +1072,7 @@ let gcalPickerOpen = false;
 
 function gcalReady(){ return !!(window.google && google.accounts && google.accounts.oauth2); }
 function gcalSelectedCalendarIds(){ return (data.gcalCalendarIds && data.gcalCalendarIds.length) ? data.gcalCalendarIds : ['primary']; }
-function gcalCalendarLabel(calId){ return calId==='primary' ? 'היומן הראשי שלי (primary)' : calId; }
+function gcalCalendarLabel(calId){ return calId; }
 
 function toggleGcalPicker(){
   gcalPickerOpen = !gcalPickerOpen;
@@ -1108,7 +1108,8 @@ function connectGoogleCalendar(){
         data.gcalConnected = true;
         saveData();
         renderGcalStatus();
-        syncGoogleCalendar();
+        resolvePrimaryCalendarId();
+        runGcalSync();
       }
     }
   });
@@ -1125,24 +1126,46 @@ function disconnectGoogleCalendar(){
   renderGcalStatus();
 }
 
-function tryGcalSilentConnect(){
-  if(!data.gcalConnected || !gcalReady()) return;
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: GCAL_CLIENT_ID,
-    scope: GCAL_SCOPE,
-    callback: (resp)=>{
-      if(resp && resp.access_token){
-        gcalAccessToken = resp.access_token;
-        syncGoogleCalendar();
+function resolvePrimaryCalendarId(){
+  if(!gcalAccessToken) return;
+  const ids = gcalSelectedCalendarIds();
+  if(!ids.includes('primary')) return;
+  fetch('https://www.googleapis.com/calendar/v3/calendars/primary', {
+    headers:{ Authorization: 'Bearer '+gcalAccessToken }
+  }).then(r=>{ if(!r.ok) throw new Error('resolve_failed'); return r.json(); })
+    .then(cal=>{
+      if(cal && cal.id && cal.id!=='primary'){
+        data.gcalCalendarIds = gcalSelectedCalendarIds().map(id=>id==='primary'?cal.id:id);
+        saveData();
+        renderGcalStatus();
       }
-    }
-  });
-  try{ client.requestAccessToken({prompt:''}); }catch(e){}
+    }).catch(()=>{});
 }
 
 function syncGoogleCalendar(){
-  if(!gcalAccessToken || gcalSyncing){ return; }
+  if(gcalSyncing) return;
   if(data.domains.length===0){ flashStatus('קודם צריך להוסיף תחום אחד לפחות'); return; }
+  if(!gcalAccessToken){
+    if(!gcalReady()){ alert('שירות ההתחברות של גוגל עוד לא נטען — נסה/י לרענן את הדף.'); return; }
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope: GCAL_SCOPE,
+      callback: (resp)=>{
+        if(resp && resp.access_token){
+          gcalAccessToken = resp.access_token;
+          resolvePrimaryCalendarId();
+          runGcalSync();
+        }
+      }
+    });
+    client.requestAccessToken();
+    return;
+  }
+  runGcalSync();
+}
+
+function runGcalSync(){
+  if(gcalSyncing) return;
   gcalSyncing = true;
   renderGcalStatus();
   const startDates = weekDatesForOffset(WEEK_OFFSET_MIN);
@@ -2150,7 +2173,6 @@ function resetAll(){
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
   render();
-  if(data.gcalConnected) tryGcalSilentConnect();
 }
 function clearDoneTasks(){
   const doneCount = data.tasks.filter(t=>t.done).length;
@@ -2337,7 +2359,6 @@ window.addEventListener('touchcancel', pullRefreshReset, {passive:true});
 setupPWA();
 loadData();
 applyRoute();
-window.addEventListener('load', tryGcalSilentConnect);
 </script>
 </body>
 </html>
