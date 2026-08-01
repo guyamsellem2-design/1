@@ -262,7 +262,8 @@
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
   .sched-date{color:var(--muted2); font-size:12.5px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:13px; font-style:italic; padding:4px 2px;}
-  .day-more{color:var(--muted2); font-size:12.5px; padding:2px 2px 6px; text-align:center;}
+  .day-more{display:block; width:100%; background:transparent; border:none; color:var(--muted2); font-size:12.5px; padding:6px 2px 2px; text-align:center; cursor:pointer; font-family:inherit;}
+  .day-more:hover{color:var(--text);}
 
   .expand-btn{color:var(--muted2); cursor:pointer; font-size:14.5px; padding:4px; flex-shrink:0;}
   .expand-btn:hover{color:var(--text);}
@@ -294,11 +295,16 @@
   .soft-notice{font-size:14px; color:var(--gold); padding:4px 4px 12px; font-style:italic;}
 
   .promote{font-size:13px; color:var(--gold); cursor:pointer; white-space:nowrap; border:1px solid rgba(212,162,76,0.35); padding:4px 9px; border-radius:999px;}
+  .fav-star{cursor:pointer; font-size:17px; color:var(--muted2); flex-shrink:0; line-height:1;}
+  .fav-star.active{color:var(--gold); text-shadow:0 0 7px var(--glow-gold);}
+  .fav-star:hover{color:var(--gold);}
   .promote:hover{background:rgba(212,162,76,0.12);}
 
   .suggestion-badge{font-size:12px; background:var(--surface3); color:var(--muted); padding:4px 9px; border-radius:999px; white-space:nowrap; font-weight:600; cursor:pointer; border:1px solid var(--border-strong);}
-  .suggestion-badge.answered{background:transparent; color:var(--muted2); border-color:var(--border);}
+  .suggestion-badge.answered{background:transparent; color:var(--muted2); border-color:var(--border); text-decoration:line-through;}
   .suggestion-badge:hover{color:var(--text);}
+  li.suggestion-done{opacity:.55;}
+  li.suggestion-done .task-text, li.suggestion-done .suggestion-badge{text-decoration:line-through;}
 
   /* notes */
   .note-tabs{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;}
@@ -587,7 +593,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -611,7 +617,7 @@ function loadData(){
       data.tasks = (parsed.tasks || []).map(t=>({energy:'mid', endTime:'', description:'', subtasks:[], ...t}));
       data.someday = (parsed.someday || []).map(s=>({domain:(data.domains[0]&&data.domains[0].id)||'', description:'', subtasks:[], ...s}));
       data.notes = parsed.notes || {};
-      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[]};
+      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[],insights:[]};
       if(parsed.reflection && !parsed.reflectionBanks){
         const wk = ymd(new Date(new Date().setDate(new Date().getDate()-new Date().getDay())));
         ['fed','hard','release'].forEach(k=>{
@@ -1909,16 +1915,17 @@ function renderScheduleGrid(){
       entries = entries.slice(0, 2);
     }
     const itemsHtml = entries.join('');
-    const moreHtml = hiddenCount>0 ? `<div class="day-more">+${hiddenCount} עוד</div>` : '';
+    const moreHtml = hiddenCount>0 ? `<button type="button" class="day-more" onclick="toggleDayMinimize(${dayIdx})">+${hiddenCount} עוד</button>` : '';
 
-    const bottomHtml = isAddingThisDay ? anchorFormHtml : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
+    const addAnchorHtml = isAddingThisDay ? anchorFormHtml : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
 
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
     return `<div class="day-col ${isMinimized?'minimized':'expanded'}">
       <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
-      ${emptyNote}${itemsHtml}${moreHtml}
-      ${bottomHtml}
+      ${emptyNote}${itemsHtml}
+      ${addAnchorHtml}
+      ${moreHtml}
     </div>`;
   }).join('');
   renderLoadMeter();
@@ -1979,15 +1986,16 @@ function renderSomeday(){
   renderSomedayFilterSelect();
   let list = data.someday.slice();
   if(somedayFilterDomain) list = list.filter(s=>s.domain===somedayFilterDomain);
-  if(somedaySortBy==='domain'){
-    list.sort((a,b)=>{
+  list.sort((a,b)=>{
+    const fav = (b.favorite?1:0)-(a.favorite?1:0);
+    if(fav!==0) return fav;
+    if(somedaySortBy==='domain'){
       const da = a.domain ? domainById(a.domain) : null;
       const db = b.domain ? domainById(b.domain) : null;
       return (da?da.name:'').localeCompare(db?db.name:'', 'he');
-    });
-  } else {
-    list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  }
+    }
+    return (b.createdAt||0)-(a.createdAt||0);
+  });
   if(list.length===0){
     el.innerHTML = `<li class="empty">${somedayFilterDomain ? 'אין רעיונות בנושא הזה כרגע' : 'כל רעיון שעדיין לא הגיע תורו — כותבים ומשחררים'}</li>`;
   } else {
@@ -2002,9 +2010,10 @@ function somedayRowHtml(s){
   const isExpanded = expandedSomeday.has(s.id);
   const hasContent = subCount>0 || (s.description||'').trim();
   let html = `<li>
+    <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSomedayFavorite('${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
     <span class="task-text" style="flex:1" onclick="openSomedayEdit('${s.id}')">${escapeHtml(s.text)}</span>
     <span class="tag" style="background:${dom.color}">${dom.name}</span>
-    <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור ותת-משימות">${isExpanded?'▾':'▸'}${subCount?' '+subCount:''}</span>
+    <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
     <span class="promote" onclick="promoteToWeek('${s.id}')">להעביר לשבוע ←</span>
     <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
   </li>`;
@@ -2043,6 +2052,10 @@ function somedayDetailHtml(s){
   </li>`;
 }
 function toggleSomedayExpand(id){ if(expandedSomeday.has(id)) expandedSomeday.delete(id); else expandedSomeday.add(id); renderSomeday(); }
+function toggleSomedayFavorite(id){
+  const s = data.someday.find(s=>s.id===id);
+  if(s){ s.favorite = !s.favorite; saveData(); renderSomeday(); }
+}
 function openSomedayEdit(id){ editingSomedayId = id; renderSomeday(); }
 function closeSomedayEdit(){ editingSomedayId = null; renderSomeday(); }
 function saveSomedayEdit(id){
@@ -2113,6 +2126,7 @@ function promoteToWeek(id){
 }
 
 /* ---------- others' suggestions ---------- */
+let editingSuggestionId = null;
 function renderSuggestions(){
   const el = document.getElementById('suggestionList');
   if(!el) return;
@@ -2121,15 +2135,52 @@ function renderSuggestions(){
     applyListCap('suggestion', 0);
     return;
   }
-  el.innerHTML = data.suggestions.map(s=>`
-    <li>
-      <span class="task-text" style="flex:1; ${s.answered?'text-decoration:line-through;color:var(--muted2);':''}" onclick="editSuggestion('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
+  const sorted = data.suggestions.slice().sort((a,b)=>(a.done?1:0)-(b.done?1:0));
+  el.innerHTML = sorted.map(s=>{
+    if(editingSuggestionId===s.id) return suggestionEditFormHtml(s);
+    return `
+    <li class="${s.done?'suggestion-done':''}">
+      <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
+      <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
       ${s.replyDate ? `<span class="task-date-badge">עד <span dir="ltr">${s.replyDate.slice(5)}</span></span>` : ''}
       <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
-    </li>`).join('');
+    </li>`;
+  }).join('');
   applyListCap('suggestion', data.suggestions.length);
+}
+function suggestionEditFormHtml(s){
+  return `<li class="edit-li">
+    <div class="anchor-form">
+      <input type="text" id="suggEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="מה ההצעה...">
+      <div class="edit-form-row">
+        <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע? (רשות)">
+        <label class="field-label">יודע/ת מתי תחזיר/י תשובה?<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}"></label>
+      </div>
+      <div class="anchor-form-actions">
+        <button class="save-btn" onclick="saveSuggestionEdit('${s.id}')">שמור</button>
+        <button class="cancel-btn" onclick="closeSuggestionEdit()">בטל</button>
+      </div>
+    </div>
+  </li>`;
+}
+function openSuggestionEdit(id){
+  editingSuggestionId = (editingSuggestionId===id) ? null : id;
+  renderSuggestions();
+}
+function closeSuggestionEdit(){ editingSuggestionId = null; renderSuggestions(); }
+function saveSuggestionEdit(id){
+  const s = data.suggestions.find(s=>s.id===id);
+  if(!s) return;
+  const text = document.getElementById(`suggEditText-${id}`).value.trim();
+  if(!text) return;
+  s.text = text;
+  s.who = document.getElementById(`suggEditWho-${id}`).value.trim();
+  s.replyDate = document.getElementById(`suggEditDate-${id}`).value || '';
+  editingSuggestionId = null;
+  saveData();
+  renderSuggestions();
 }
 function addSuggestion(){
   const whoInput = document.getElementById('suggWho');
@@ -2137,7 +2188,7 @@ function addSuggestion(){
   const dateInput = document.getElementById('suggReplyDate');
   const text = textInput.value.trim();
   if(!text) return;
-  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, replyDate: dateInput ? dateInput.value : ''});
+  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : ''});
   whoInput.value=''; textInput.value=''; if(dateInput) dateInput.value='';
   saveData();
   renderSuggestions();
@@ -2146,11 +2197,9 @@ function toggleSuggestionAnswered(id){
   const s = data.suggestions.find(s=>s.id===id);
   if(s){ s.answered = !s.answered; saveData(); renderSuggestions(); }
 }
-function editSuggestion(id){
+function toggleSuggestionDone(id){
   const s = data.suggestions.find(s=>s.id===id);
-  if(!s) return;
-  const val = prompt('עריכת ההצעה:', s.text);
-  if(val!==null && val.trim()){ s.text=val.trim(); saveData(); renderSuggestions(); }
+  if(s){ s.done = !s.done; saveData(); renderSuggestions(); }
 }
 function convertSuggestionToTask(id){
   const s = data.suggestions.find(s=>s.id===id);
@@ -2174,15 +2223,16 @@ function deleteSuggestion(id){
 /* ---------- reflection (insight banks) ---------- */
 const REFLECT_QUESTIONS = [
   {key:'fed', icon:'🟢', label:'מה הזין אותי השבוע?'},
-  {key:'hard', icon:'🔴', label:'איפה הרגשתי עומס יתר?'},
-  {key:'release', icon:'🔵', label:'מה אני רוצה לשחרר לשבוע הבא?'}
+  {key:'hard', icon:'🔴', label:'איפה הרגשתי עומס יתר / התרוקנות של אנרגיה?'},
+  {key:'release', icon:'🔵', label:'מה אני רוצה לשחרר לשבוע הבא?'},
+  {key:'insights', icon:'💡', label:'תובנות מהשבוע'}
 ];
 const expandedBanks = new Set();
 function weekKey(){ return ymd(currentWeekDates()[0]); }
 function renderReflection(){
   const el = document.getElementById('reflectionCard');
   if(!el) return;
-  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[]};
+  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[], insights:[]};
   el.innerHTML = REFLECT_QUESTIONS.map(q=>{
     const entries = (data.reflectionBanks[q.key]||[]).slice().sort((a,b)=> b.weekKey.localeCompare(a.weekKey));
     const isOpen = expandedBanks.has(q.key);
@@ -2205,7 +2255,7 @@ function addReflectionEntry(bankKey){
   const ta = document.getElementById(`reflect-${bankKey}`);
   const text = ta.value.trim();
   if(!text) return;
-  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[]};
+  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[], insights:[]};
   if(!data.reflectionBanks[bankKey]) data.reflectionBanks[bankKey] = [];
   data.reflectionBanks[bankKey].push({id:uid(), weekKey:weekKey(), text});
   saveData();
@@ -2272,7 +2322,7 @@ function importData(e){
       data.tasks = (parsed.tasks || []).map(t=>({energy:'mid', endTime:'', description:'', subtasks:[], ...t}));
       data.someday = (parsed.someday || []).map(s=>({domain:data.domains[0].id, description:'', subtasks:[], ...s}));
       data.notes = parsed.notes || {};
-      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[]};
+      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[],insights:[]};
       if(parsed.reflection && !parsed.reflectionBanks){
         const wk = ymd(new Date(new Date().setDate(new Date().getDate()-new Date().getDay())));
         ['fed','hard','release'].forEach(k=>{
