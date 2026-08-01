@@ -493,10 +493,13 @@
     <div id="secbody-suggestions">
     <div class="card">
       <div class="add-row">
-        <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
         <input type="text" id="suggText" placeholder="מה ההצעה...">
-        <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
+        <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ פרטים (רשות)</button>
         <button onclick="addSuggestion()">הוסף</button>
+      </div>
+      <div class="add-row" id="suggDetailsFields" style="display:none;">
+        <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
+        <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
       </div>
       <ul class="tasks scroll-cap" id="suggestionList"></ul>
       <div class="list-expand-row" id="suggestionListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('suggestion')"></button></div>
@@ -1349,6 +1352,8 @@ function resolvePrimaryCalendarId(){
 }
 
 function syncGoogleCalendar(){
+  // sync only ever refreshes content from calendars already connected — it must never open a Google sign-in screen.
+  // that screen only belongs to connectGoogleCalendar(), used for the initial connect or adding another calendar manually.
   if(gcalSyncing) return;
   if(data.domains.length===0){ flashStatus('קודם צריך להוסיף נושא אחד לפחות'); return; }
   if(!gcalAccessToken){
@@ -1361,10 +1366,15 @@ function syncGoogleCalendar(){
           gcalAccessToken = resp.access_token;
           resolvePrimaryCalendarId();
           runGcalSync();
+        } else {
+          flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו');
         }
+      },
+      error_callback: ()=>{
+        flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו');
       }
     });
-    client.requestAccessToken();
+    client.requestAccessToken({prompt:''}); // silent-only: renews the token quietly, never shows a sign-in page
     return;
   }
   runGcalSync();
@@ -2210,6 +2220,10 @@ function saveSuggestionEdit(id){
   saveData();
   renderSuggestions();
 }
+function toggleSuggDetails(){
+  const fields = document.getElementById('suggDetailsFields');
+  fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
+}
 function addSuggestion(){
   const whoInput = document.getElementById('suggWho');
   const textInput = document.getElementById('suggText');
@@ -2233,14 +2247,13 @@ function convertSuggestionToTask(id){
   const s = data.suggestions.find(s=>s.id===id);
   if(!s) return;
   const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
+  // created quietly, no topic and no energy chosen — added to the list, editable whenever you actually want to touch it
   const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
   data.tasks.push(newTask);
   saveData();
-  openSection('tasks');
-  openTaskEdit(newTask.id);
+  renderTasks();
   renderScheduleGrid();
-  const target = document.getElementById('taskList');
-  if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+  flashStatus('נוספה כמשימה');
 }
 function deleteSuggestion(id){
   data.suggestions = data.suggestions.filter(s=>s.id!==id);
