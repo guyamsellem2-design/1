@@ -493,6 +493,16 @@ const DEFAULT_DOMAINS = [
   {id:'home',   name:'בית',          color:'#cf9a5c'},
   {id:'rest',   name:'מנוחה וטבע',   color:'#3fae7a'},
 ];
+/* תחומי חיים כלליים ואוניברסליים — נקודת פתיחה לכל מי שנכנס בפעם הראשונה */
+const STARTER_DOMAINS = [
+  {id:'health',   name:'בריאות וגוף',              color:'#3fae7a'},
+  {id:'family',   name:'משפחה',                    color:'#e2903f'},
+  {id:'love',     name:'זוגיות',                   color:'#b98fc4'},
+  {id:'friends',  name:'חברים',                    color:'#4fb4d6'},
+  {id:'career',   name:'קריירה ועבודה',            color:'#3aa9a0'},
+  {id:'finance',  name:'כספים',                    color:'#cf9a5c'},
+  {id:'growth',   name:'יצירתיות והתפתחות אישית',  color:'#e2a34c'},
+];
 const ENERGY_COLORS = {low:'#5fae72', mid:'#d9b54a', high:'#c96256'};
 const ENERGY_LABELS = {low:'🟢 מטעין', mid:'🟡 בינוני', high:'🔴 מרוקן'};
 const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -536,10 +546,10 @@ function loadData(){
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
     } else {
-      data.domains = [];
+      data.domains = STARTER_DOMAINS.map(d=>({...d}));
     }
   }catch(e){
-    data.domains = [];
+    data.domains = STARTER_DOMAINS.map(d=>({...d}));
   }
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
   render();
