@@ -17,21 +17,31 @@
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0e2422; --surface:#153631; --surface2:#1c443c; --surface3:#245149;
-    --text:#f5ecd9; --muted:#a3c9bd; --muted2:#75988c; --gold:#e6ac5c;
-    --border:rgba(245,236,217,0.11); --border-strong:rgba(245,236,217,0.19);
+    --bg:#eaf5ee; --surface:#ffffff; --surface2:#f2f9f4; --surface3:#e7f2ec;
+    --text:#20392c; --muted:#5c7d6c; --muted2:#87a494; --gold:#e0a052;
+    --border:rgba(32,57,44,0.10); --border-strong:rgba(32,57,44,0.18);
+    --energy-low:#4f9c68; --energy-mid:#d9a93f; --energy-high:#c9614a;
+    --glow-gold:rgba(224,160,82,0.18); --glow-rose:rgba(224,138,95,0.14); --glow-teal:rgba(45,170,140,0.14);
+  }
+  body.night-mode{
+    --bg:#1a1d3a; --surface:#212555; --surface2:#282c60; --surface3:#31356e;
+    --text:#edeffa; --muted:#9aa0c8; --muted2:#6f76a8; --gold:#e6ac5c;
+    --border:rgba(237,239,250,0.12); --border-strong:rgba(237,239,250,0.20);
     --energy-low:#5fae72; --energy-mid:#d9b54a; --energy-high:#c96256;
-    --glow-gold:rgba(230,172,92,0.24); --glow-rose:rgba(224,138,95,0.18); --glow-teal:rgba(45,196,168,0.22);
+    --glow-gold:rgba(230,172,92,0.24); --glow-rose:rgba(224,120,190,0.18); --glow-teal:rgba(70,210,190,0.20);
   }
   *{box-sizing:border-box;}
   body{
     margin:0; position:relative; isolation:isolate;
+    background: linear-gradient(180deg, #ddf0e2, #f9fcf7 55%);
+    color:var(--text); font-family:'Heebo', sans-serif; min-height:100vh; padding:28px 16px 80px;
+    transition:filter .4s ease, background .3s ease, color .3s ease;
+  }
+  body.night-mode{
     background:
       radial-gradient(ellipse 900px 500px at 15% -5%, rgba(230,172,92,0.13), transparent),
-      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(45,196,168,0.16), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(70,210,190,0.16), transparent),
       var(--bg);
-    color:var(--text); font-family:'Heebo', sans-serif; min-height:100vh; padding:28px 16px 80px;
-    transition:filter .4s ease;
   }
   body::before{
     content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
@@ -39,9 +49,10 @@
       radial-gradient(480px 420px at 8% 18%, var(--glow-gold), transparent 70%),
       radial-gradient(520px 460px at 96% 30%, var(--glow-teal), transparent 70%),
       radial-gradient(560px 480px at 50% 105%, var(--glow-rose), transparent 70%);
-    opacity:.8;
+    opacity:0; transition:opacity .3s ease;
     animation: driftGlow 50s ease-in-out infinite alternate;
   }
+  body.night-mode::before{ opacity:.8; }
   @keyframes driftGlow{
     0%{ transform:translate(0,0) scale(1); }
     100%{ transform:translate(1.5%,-2%) scale(1.04); }
@@ -252,7 +263,8 @@
       <p class="sub">עוגנים קבועים, משימות לשבוע, פתקים חופשיים, ומקום מנוחה לכל רעיון שעוד לא הגיע תורו.</p>
     </div>
     <div class="header-actions">
-      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🌙 מצב רגוע</button>
+      <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()">🌙 מצב לילה</button>
+      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🍃 מצב רגוע</button>
     </div>
   </header>
 
@@ -416,7 +428,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, collapsedSections:{}, suggestions: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set();
@@ -448,6 +460,7 @@ function loadData(){
         });
       }
       data.softMode = !!parsed.softMode;
+      data.nightMode = !!parsed.nightMode;
       data.collapsedSections = parsed.collapsedSections || {};
       data.suggestions = parsed.suggestions || [];
     } else {
@@ -487,6 +500,12 @@ function toggleSoftMode(){
   document.getElementById('softBtn').classList.toggle('on', data.softMode);
   saveData();
   renderTasks();
+}
+function toggleNightMode(){
+  data.nightMode = !data.nightMode;
+  document.body.classList.toggle('night-mode', data.nightMode);
+  document.getElementById('nightBtn').classList.toggle('on', data.nightMode);
+  saveData();
 }
 
 /* ---------- domain editor ---------- */
@@ -1391,6 +1410,7 @@ function importData(e){
         });
       }
       data.softMode = !!parsed.softMode;
+      data.nightMode = !!parsed.nightMode;
       data.suggestions = parsed.suggestions || [];
       activeNoteDomain = data.domains[0].id;
       saveData();
@@ -1453,7 +1473,8 @@ function resetAll(){
   if(!confirm('לאפס את כל התחומים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ורעיונות ומשימות לעתיד? בנק התובנות יישאר שמור. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
   const keepCollapsed = data.collapsedSections;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, collapsedSections:keepCollapsed, suggestions:[]};
+  const keepNight = data.nightMode;
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[]};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -1492,6 +1513,8 @@ function pushTaskToNextWeek(id){
 function render(){
   document.body.classList.toggle('soft', data.softMode);
   document.getElementById('softBtn').classList.toggle('on', data.softMode);
+  document.body.classList.toggle('night-mode', data.nightMode);
+  document.getElementById('nightBtn').classList.toggle('on', data.nightMode);
   renderDomainEditor();
   renderTaskDomainSelect();
   renderTasks();
@@ -1514,7 +1537,7 @@ function bindNoteArea(){
 /* ---------- collapsible sections ---------- */
 const SECTION_KEYS = ['schedule','tasks','domains','suggestions','notes','someday','reflection','backup'];
 function isSectionCollapsed(key){
-  if(!data.collapsedSections || !(key in data.collapsedSections)) return key!=='schedule';
+  if(!data.collapsedSections || !(key in data.collapsedSections)) return false;
   return !!data.collapsedSections[key];
 }
 function toggleSection(key){
