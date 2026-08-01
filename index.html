@@ -518,10 +518,10 @@ function loadData(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      data.domains = (parsed.domains && parsed.domains.length) ? parsed.domains : DEFAULT_DOMAINS.map(d=>({...d}));
+      data.domains = parsed.domains ? parsed.domains : DEFAULT_DOMAINS.map(d=>({...d}));
       data.anchors = parsed.anchors || [];
       data.tasks = (parsed.tasks || []).map(t=>({energy:'mid', endTime:'', description:'', subtasks:[], ...t}));
-      data.someday = (parsed.someday || []).map(s=>({domain:data.domains[0].id, description:'', subtasks:[], ...s}));
+      data.someday = (parsed.someday || []).map(s=>({domain:(data.domains[0]&&data.domains[0].id)||'', description:'', subtasks:[], ...s}));
       data.notes = parsed.notes || {};
       data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[]};
       if(parsed.reflection && !parsed.reflectionBanks){
@@ -536,12 +536,12 @@ function loadData(){
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
     } else {
-      data.domains = DEFAULT_DOMAINS.map(d=>({...d}));
+      data.domains = [];
     }
   }catch(e){
-    data.domains = DEFAULT_DOMAINS.map(d=>({...d}));
+    data.domains = [];
   }
-  activeNoteDomain = data.domains[0].id;
+  activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
   render();
 }
 
@@ -583,7 +583,8 @@ function toggleNightMode(){
 /* ---------- domain editor ---------- */
 function renderDomainEditor(){
   const el = document.getElementById('domainEditor');
-  el.innerHTML = data.domains.map((d,i)=>`
+  const emptyHint = data.domains.length===0 ? '<div class="empty" style="flex-basis:100%;">עדיין אין כאן תחומים — זה בית ריק שמחכה לך. תתחיל/י עם הכפתור "+ תחום" למטה 🌱</div>' : '';
+  el.innerHTML = emptyHint + data.domains.map((d,i)=>`
     <div class="domain-chip" data-id="${d.id}">
       <span class="grip" onpointerdown="onGripPointerDown(event,'${d.id}')" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <button type="button" class="palette-btn" style="background:${d.color}" onclick="toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
@@ -865,7 +866,10 @@ function taskCalendarUrl(t){
 }
 
 /* ---------- week grid ---------- */
-function openAnchorForm(dayIdx){ openForm = dayIdx; editingAnchorId = null; renderScheduleGrid(); }
+function openAnchorForm(dayIdx){
+  if(data.domains.length===0){ alert('קודם צריך להוסיף תחום אחד לפחות (בסעיף "תחומים").'); return; }
+  openForm = dayIdx; editingAnchorId = null; renderScheduleGrid();
+}
 function editAnchor(id, dayIdx){
   if(openForm===dayIdx && editingAnchorId===id){ closeForm(); return; }
   openForm = dayIdx; editingAnchorId = id; renderScheduleGrid();
@@ -1054,6 +1058,7 @@ function toggleTaskSchedule(){
   fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
 }
 function addTask(){
+  if(data.domains.length===0){ alert('קודם צריך להוסיף תחום אחד לפחות (בסעיף "תחומים").'); return; }
   const input = document.getElementById('taskInput');
   const text = input.value.trim();
   if(!text) return;
@@ -1263,11 +1268,12 @@ function renderNoteTabs(){
   `).join('');
 }
 function switchNoteDomain(id){ activeNoteDomain=id; renderNoteTabs(); renderNoteArea(); renderSparks(); }
-function renderNoteArea(){ document.getElementById('noteArea').value = ensureNotes(activeNoteDomain).text; }
-function onNoteInput(val){ ensureNotes(activeNoteDomain).text = val; saveData(); }
+function renderNoteArea(){ document.getElementById('noteArea').value = activeNoteDomain ? ensureNotes(activeNoteDomain).text : ''; }
+function onNoteInput(val){ if(!activeNoteDomain) return; ensureNotes(activeNoteDomain).text = val; saveData(); }
 function renderSparks(){
-  const n = ensureNotes(activeNoteDomain);
   const el = document.getElementById('sparkList');
+  if(!activeNoteDomain){ el.innerHTML = '<li class="empty">קודם צריך להוסיף תחום (בסעיף "תחומים") כדי לכתוב פתקים</li>'; return; }
+  const n = ensureNotes(activeNoteDomain);
   if(!n.sparks.length){ el.innerHTML = '<li class="empty">רעיונות קצרים שצצים תוך כדי הכתיבה — אפשר להעלות משם למשימה</li>'; return; }
   el.innerHTML = n.sparks.map(s=>`
     <li>
@@ -1277,6 +1283,7 @@ function renderSparks(){
     </li>`).join('');
 }
 function addSpark(){
+  if(!activeNoteDomain) return;
   const input = document.getElementById('sparkInput');
   const text = input.value.trim();
   if(!text) return;
@@ -1412,6 +1419,7 @@ function deleteSomedaySubtask(id, subId){
   renderSomeday();
 }
 function addSomeday(){
+  if(data.domains.length===0){ alert('קודם צריך להוסיף תחום אחד לפחות (בסעיף "תחומים").'); return; }
   const input = document.getElementById('somedayInput');
   const text = input.value.trim();
   if(!text) return;
@@ -1427,7 +1435,7 @@ function promoteToWeek(id){
   const s = data.someday.find(s=>s.id===id);
   if(!s) return;
   data.someday = data.someday.filter(s=>s.id!==id);
-  data.tasks.push({id:uid(), text:s.text, domain:s.domain||data.domains[0].id, done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[]});
+  data.tasks.push({id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[]});
   saveData();
   renderSomeday();
   renderTasks();
