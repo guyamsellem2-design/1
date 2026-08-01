@@ -216,6 +216,16 @@
   .expand-btn{color:var(--muted2); cursor:pointer; font-size:13px; padding:4px; flex-shrink:0;}
   .expand-btn:hover{color:var(--text);}
   .expand-btn.has-content{color:var(--gold);}
+  .text-chevron{color:var(--muted2); font-size:11px; margin-left:5px; display:inline-block;}
+  .task-text.has-content .text-chevron{color:var(--gold);}
+  .sub-count{font-size:10.5px; color:var(--muted2); background:var(--surface3); border-radius:999px; padding:1px 6px; margin-right:4px;}
+  .task-text.has-content .sub-count{color:var(--gold);}
+  .edit-task-btn{flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--border-strong); background:var(--surface3); color:var(--text); font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; font-family:inherit;}
+  .edit-task-btn:hover{background:var(--surface2); border-color:var(--gold);}
+  .edit-form-row{display:flex; gap:6px;}
+  .edit-form-row select, .edit-form-row .field-label{flex:1; min-width:0;}
+  .field-label{display:flex; flex-direction:column; gap:3px; font-size:10.5px; color:var(--muted2);}
+  .field-label input{width:100%; box-sizing:border-box;}
   ul.tasks li.detail-li{display:block; background:var(--surface2); border-radius:9px; padding:10px 12px; margin:-4px 0 8px; border-bottom:none;}
   .detail-label{font-size:11.5px; color:var(--muted2); margin-bottom:4px; display:block;}
   .detail-desc{width:100%; min-height:50px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; resize:vertical; margin-bottom:10px;}
@@ -939,11 +949,11 @@ function taskRowHtml(t){
   let html = `<li>
     <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
     <div class="energy-dot" style="background:${ENERGY_COLORS[energy]}" onclick="cycleEnergy('${t.id}')" title="${ENERGY_LABELS[energy]} — לחיצה משנה"></div>
-    <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')">${escapeHtml(t.text)}</span>
+    <span class="task-text ${t.done?'done':''} ${hasContent?'has-content':''}" onclick="toggleTaskExpand('${t.id}')" title="תיאור ותת-משימות"><span class="text-chevron">${isExpanded?'▾':'▸'}</span>${escapeHtml(t.text)}${subCount?` <span class="sub-count">${subCount}</span>`:''}</span>
     ${t.date ? `<span class="task-date-badge" style="${isOverdue?'color:var(--energy-high)':''}">${isOverdue?'⏰ ':''}<span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
     <span class="tag" style="background:${dom.color}">${dom.name}</span>
     ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
-    <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleTaskExpand('${t.id}')" title="תיאור ותת-משימות">${isExpanded?'▾':'▸'}${subCount?' '+subCount:''}</span>
+    <button type="button" class="edit-task-btn" onclick="openTaskEdit('${t.id}')" title="עריכת משימה" aria-label="עריכת משימה">✏️</button>
   </li>`;
   if(isExpanded) html += taskDetailHtml(t);
   return html;
@@ -952,15 +962,19 @@ function taskEditFormHtml(t){
   return `<li class="edit-li">
     <div class="anchor-form">
       <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
-      <select id="taskEditDomain-${t.id}">${domainOptions(t.domain)}</select>
-      <select id="taskEditEnergy-${t.id}">
-        <option value="low" ${t.energy==='low'?'selected':''}>🟢 מטעין</option>
-        <option value="mid" ${(!t.energy||t.energy==='mid')?'selected':''}>🟡 בינוני</option>
-        <option value="high" ${t.energy==='high'?'selected':''}>🔴 מרוקן</option>
-      </select>
-      <input type="date" id="taskEditDate-${t.id}" value="${t.date||''}">
-      <input type="time" id="taskEditTime-${t.id}" value="${t.time||''}" placeholder="שעת התחלה">
-      <input type="time" id="taskEditEnd-${t.id}" value="${t.endTime||''}" placeholder="שעת סיום (רשות)">
+      <div class="edit-form-row">
+        <select id="taskEditDomain-${t.id}">${domainOptions(t.domain)}</select>
+        <select id="taskEditEnergy-${t.id}">
+          <option value="low" ${t.energy==='low'?'selected':''}>🟢 מטעין</option>
+          <option value="mid" ${(!t.energy||t.energy==='mid')?'selected':''}>🟡 בינוני</option>
+          <option value="high" ${t.energy==='high'?'selected':''}>🔴 מרוקן</option>
+        </select>
+      </div>
+      <div class="edit-form-row">
+        <label class="field-label">תאריך<input type="date" id="taskEditDate-${t.id}" value="${t.date||''}"></label>
+        <label class="field-label">התחלה<input type="time" id="taskEditTime-${t.id}" value="${t.time||''}"></label>
+        <label class="field-label">סיום<input type="time" id="taskEditEnd-${t.id}" value="${t.endTime||''}"></label>
+      </div>
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveTaskEdit('${t.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeTaskEdit()">בטל</button>
