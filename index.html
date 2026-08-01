@@ -1463,14 +1463,18 @@ function bindNoteArea(){
 
 /* ---------- collapsible sections ---------- */
 const SECTION_KEYS = ['schedule','tasks','domains','suggestions','notes','someday','reflection','backup'];
+function isSectionCollapsed(key){
+  if(!data.collapsedSections || !(key in data.collapsedSections)) return true;
+  return !!data.collapsedSections[key];
+}
 function toggleSection(key){
   if(!data.collapsedSections) data.collapsedSections = {};
-  data.collapsedSections[key] = !data.collapsedSections[key];
+  data.collapsedSections[key] = !isSectionCollapsed(key);
   saveData();
   applySectionCollapse(key);
 }
 function applySectionCollapse(key){
-  const collapsed = !!(data.collapsedSections && data.collapsedSections[key]);
+  const collapsed = isSectionCollapsed(key);
   const body = document.getElementById('secbody-'+key);
   const chev = document.getElementById('chev-'+key);
   if(body) body.style.display = collapsed ? 'none' : '';
