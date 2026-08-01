@@ -225,8 +225,10 @@
 
   /* topic notebook tab strip */
   .topic-tab-strip{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:0;}
-  .topic-tab-strip .domain-chip{cursor:pointer;}
-  .topic-tab-strip .domain-chip.active{border-color:transparent; box-shadow:0 3px 12px -4px rgba(0,0,0,0.35);}
+  .topic-tab-strip .domain-chip{cursor:pointer; padding:6px 12px;}
+  .topic-tab-strip .domain-chip.active{border-color:transparent; box-shadow:0 3px 12px -4px rgba(0,0,0,0.35); padding:5px 6px 5px 8px;}
+  .topic-tab-strip .domain-chip .chip-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+  .topic-tab-strip .domain-chip .chip-name{font-size:13.5px; white-space:nowrap; color:var(--text);}
   .notebook-body{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px 20px; margin-top:14px;}
 
   /* week grid */
@@ -724,16 +726,23 @@ function renderDomainEditor(){
   const el = document.getElementById('topicTabStrip');
   if(!el) return;
   const emptyHint = data.domains.length===0 ? '<div class="empty" style="flex-basis:100%;">עדיין אין כאן נושאים — זה בית ריק שמחכה לך. תתחיל/י עם הכפתור "+ נושא" למטה 🌱</div>' : '';
-  el.innerHTML = emptyHint + data.domains.map((d,i)=>`
-    <div class="domain-chip ${d.id===activeNoteDomain?'active':''}" data-id="${d.id}" style="${d.id===activeNoteDomain?`background:${d.color}`:''}" onclick="selectTopicTab('${d.id}')">
+  el.innerHTML = emptyHint + data.domains.map((d,i)=>{
+    if(d.id!==activeNoteDomain){
+      // compact when not selected, so short topic names don't leave dead space before the next tab wraps
+      return `<div class="domain-chip" data-id="${d.id}" onclick="selectTopicTab('${d.id}')">
+        <span class="chip-dot" style="background:${d.color}"></span>
+        <span class="chip-name">${escapeHtml(d.name)}</span>
+      </div>`;
+    }
+    return `<div class="domain-chip active" data-id="${d.id}" style="background:${d.color}">
       <span class="grip" onpointerdown="event.stopPropagation(); onGripPointerDown(event,'${d.id}')" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <button type="button" class="palette-btn" style="background:${d.color}" onclick="event.stopPropagation(); toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
       <input type="text" value="${escapeAttr(d.name)}"
         onchange="renameDomainCommit('${d.id}', this.value)"
         oninput="updateDomainNameLive('${d.id}', this.value); sizeChipInput(this)">
       <span class="rm" onclick="event.stopPropagation(); deleteDomain('${d.id}')">✕</span>
-    </div>
-  `).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
+    </div>`;
+  }).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
   el.querySelectorAll('input[type="text"]').forEach(sizeChipInput);
   renderNavList();
