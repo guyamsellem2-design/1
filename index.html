@@ -124,7 +124,7 @@
   /* week grid */
   .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease;}
   .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
-  .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline;}
+  .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline; cursor:pointer; user-select:none;}
   .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:12.5px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
   .anchor-chip:hover{background:var(--surface3);}
   .anchor-chip .time{color:var(--muted); font-size:11px; display:block; margin-bottom:1px;}
@@ -164,6 +164,7 @@
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
   .sched-date{color:var(--muted2); font-size:11px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:11.5px; font-style:italic; padding:4px 2px;}
+  .day-more{color:var(--muted2); font-size:11px; padding:2px 2px 6px; text-align:center;}
 
   .expand-btn{color:var(--muted2); cursor:pointer; font-size:13px; padding:4px; flex-shrink:0;}
   .expand-btn:hover{color:var(--text);}
@@ -418,6 +419,11 @@ const STORAGE_KEY = 'planner-data-v3';
 let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, collapsedSections:{}, suggestions: [] };
 let openForm = null;
 let editingAnchorId = null;
+const minimizedDays = new Set();
+function toggleDayMinimize(dayIdx){
+  if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
+  renderScheduleGrid();
+}
 let activeNoteDomain = null;
 
 function uid(){ return Math.random().toString(36).slice(2,10); }
@@ -1014,7 +1020,7 @@ function renderScheduleGrid(){
         </div>` : ''}
       </div>`;
 
-    const anchorChips = anchorsForDay.map(a=>{
+    const anchorEntries = anchorsForDay.map(a=>{
       const dom = domainById(a.domain);
       const chip = `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
           ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
@@ -1022,23 +1028,33 @@ function renderScheduleGrid(){
           ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
       </div>`;
       return chip + ((isEditingThisDay && editingHere.id===a.id) ? anchorFormHtml : '');
-    }).join('');
+    });
 
-    const taskChips = tasksForDay.map(t=>{
+    const taskEntries = tasksForDay.map(t=>{
       const dom = domainById(t.domain);
       return `<div class="anchor-chip" style="border-right-color:${dom.color}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
       </div>`;
-    }).join('');
+    });
+
+    let entries = anchorEntries.concat(taskEntries);
+    const totalCount = entries.length;
+    let hiddenCount = 0;
+    if(minimizedDays.has(dayIdx) && entries.length > 2){
+      hiddenCount = entries.length - 2;
+      entries = entries.slice(0, 2);
+    }
+    const itemsHtml = entries.join('');
+    const moreHtml = hiddenCount>0 ? `<div class="day-more">+${hiddenCount} עוד</div>` : '';
 
     const bottomHtml = isAddingThisDay ? anchorFormHtml : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
 
-    const emptyNote = (!anchorsForDay.length && !tasksForDay.length) ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
+    const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
     return `<div class="day-col">
-      <div class="day-name">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
-      ${emptyNote}${anchorChips}${taskChips}
+      <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
+      ${emptyNote}${itemsHtml}${moreHtml}
       ${bottomHtml}
     </div>`;
   }).join('');
