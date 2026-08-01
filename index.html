@@ -70,6 +70,21 @@
   }
   .status.show{opacity:1;}
 
+  .pull-refresh{
+    position:fixed; top:0; left:50%; transform:translate(-50%, -60px);
+    width:42px; height:42px; border-radius:50%; background:var(--surface2); border:1px solid var(--border-strong);
+    display:flex; align-items:center; justify-content:center; z-index:100; pointer-events:none;
+    opacity:0; box-shadow:0 8px 20px -8px rgba(0,0,0,0.5);
+  }
+  .pull-refresh.dragging{transition:none;}
+  .pull-refresh:not(.dragging){transition:transform .25s ease, opacity .25s ease;}
+  .pull-refresh.visible{opacity:1;}
+  .pull-refresh-icon{font-size:18px; color:var(--gold); display:inline-block; transition:transform .2s ease;}
+  .pull-refresh.ready .pull-refresh-icon{transform:rotate(180deg);}
+  .pull-refresh.spinning .pull-refresh-icon{animation:pullSpin .7s linear infinite;}
+  @keyframes pullSpin{ to{ transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce){ .pull-refresh, .pull-refresh-icon{transition:none; animation:none;} }
+
   section{margin-bottom:44px;}
   .section-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap;}
   h2{font-family:'Frank Ruhl Libre', serif; font-size:21px; font-weight:500; margin:0; display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;}
@@ -226,6 +241,7 @@
 </style>
 </head>
 <body>
+<div class="pull-refresh" id="pullRefresh"><span class="pull-refresh-icon">↓</span></div>
 <div class="wrap">
 
   <header class="top">
@@ -235,7 +251,6 @@
       <p class="sub">עוגנים קבועים, משימות לשבוע, פתקים חופשיים, ומקום מנוחה לכל רעיון שעוד לא הגיע תורו.</p>
     </div>
     <div class="header-actions">
-      <button class="soft-btn" onclick="location.reload()" title="רענון מלא של האתר">🔄 רענון</button>
       <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()">🌙 מצב רגוע</button>
     </div>
   </header>
@@ -1527,6 +1542,61 @@ function setupPWA(){
   const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
   document.getElementById('manifestLink').href = URL.createObjectURL(blob);
 }
+
+/* ---------- pull-to-refresh (for PWA/home-screen installs with no browser chrome) ---------- */
+const PULL_RELEASE_THRESHOLD = 46;
+const PULL_MAX = 100;
+let pullState = { startY:null, pulling:false, ready:false };
+function pullRefreshStart(clientY){
+  if(window.scrollY > 0) return;
+  pullState.startY = clientY;
+  pullState.pulling = true;
+  pullState.ready = false;
+  const el = document.getElementById('pullRefresh');
+  if(el) el.classList.add('dragging');
+}
+function pullRefreshMove(clientY){
+  const el = document.getElementById('pullRefresh');
+  if(!pullState.pulling || pullState.startY===null || !el) return;
+  if(window.scrollY > 0){ pullRefreshReset(); return; }
+  const delta = clientY - pullState.startY;
+  if(delta <= 0){
+    el.classList.remove('visible','ready');
+    el.style.transform = 'translate(-50%, -60px)';
+    pullState.ready = false;
+    return;
+  }
+  const dampened = Math.min(delta * 0.5, PULL_MAX);
+  el.classList.add('visible');
+  pullState.ready = dampened >= PULL_RELEASE_THRESHOLD;
+  el.classList.toggle('ready', pullState.ready);
+  el.style.transform = `translate(-50%, ${dampened - 60}px)`;
+}
+function pullRefreshEnd(){
+  const el = document.getElementById('pullRefresh');
+  if(!pullState.pulling || !el) return;
+  el.classList.remove('dragging');
+  if(pullState.ready){
+    el.classList.add('spinning');
+    el.style.transform = 'translate(-50%, 20px)';
+    setTimeout(()=>location.reload(), 150);
+  } else {
+    pullRefreshReset();
+  }
+}
+function pullRefreshReset(){
+  const el = document.getElementById('pullRefresh');
+  if(el){ el.classList.remove('dragging','visible','ready'); el.style.transform=''; }
+  pullState = { startY:null, pulling:false, ready:false };
+}
+window.addEventListener('touchstart', (e)=>{
+  if(e.touches && e.touches.length===1) pullRefreshStart(e.touches[0].clientY);
+}, {passive:true});
+window.addEventListener('touchmove', (e)=>{
+  if(e.touches && e.touches.length===1) pullRefreshMove(e.touches[0].clientY);
+}, {passive:true});
+window.addEventListener('touchend', pullRefreshEnd, {passive:true});
+window.addEventListener('touchcancel', pullRefreshReset, {passive:true});
 
 setupPWA();
 loadData();
