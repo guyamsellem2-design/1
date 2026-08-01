@@ -15,6 +15,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg:#F8F3E6; --surface:rgba(255,255,255,0.72); --surface2:rgba(242,249,244,0.65); --surface3:rgba(231,242,236,0.65);
@@ -206,6 +207,9 @@
   .sched-link:hover{color:var(--text);}
   .task-date-badge{font-size:10.5px; color:var(--muted2); white-space:nowrap;}
 
+  .gcal-sync-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .gcal-status{font-size:12.5px; color:var(--muted);}
+
   /* schedule grid */
   .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
@@ -345,6 +349,7 @@
       <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
     </div>
     <div id="secbody-schedule">
+      <div class="gcal-sync-row" id="gcalSyncRow"></div>
       <div class="schedule-grid" id="scheduleGrid"></div>
     </div>
   </section>
@@ -519,7 +524,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {} };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -555,6 +560,8 @@ function loadData(){
       data.collapsedSections = parsed.collapsedSections || {};
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
+      data.gcalConnected = !!parsed.gcalConnected;
+      data.gcalLastSync = parsed.gcalLastSync || null;
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
     }
@@ -883,6 +890,122 @@ function taskCalendarUrl(t){
   }
   const params = new URLSearchParams({ action:'TEMPLATE', text:t.text, dates:fmtDate(start)+'/'+fmtDate(end), details:note });
   return 'https://calendar.google.com/calendar/render?'+params.toString();
+}
+
+/* ---------- google calendar sync (import-only, additive) ---------- */
+const GCAL_CLIENT_ID = '205912988147-1nd655pslkb8temou2oonfueep3lhvs4.apps.googleusercontent.com';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+let gcalAccessToken = null;
+let gcalSyncing = false;
+
+function gcalReady(){ return !!(window.google && google.accounts && google.accounts.oauth2); }
+
+function connectGoogleCalendar(){
+  if(!gcalReady()){ alert('שירות ההתחברות של גוגל עוד לא נטען — נסה/י לרענן את הדף.'); return; }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GCAL_CLIENT_ID,
+    scope: GCAL_SCOPE,
+    callback: (resp)=>{
+      if(resp && resp.access_token){
+        gcalAccessToken = resp.access_token;
+        data.gcalConnected = true;
+        saveData();
+        renderGcalStatus();
+        syncGoogleCalendar();
+      }
+    }
+  });
+  client.requestAccessToken();
+}
+
+function disconnectGoogleCalendar(){
+  if(gcalAccessToken && gcalReady()){
+    try{ google.accounts.oauth2.revoke(gcalAccessToken, ()=>{}); }catch(e){}
+  }
+  gcalAccessToken = null;
+  data.gcalConnected = false;
+  saveData();
+  renderGcalStatus();
+}
+
+function tryGcalSilentConnect(){
+  if(!data.gcalConnected || !gcalReady()) return;
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GCAL_CLIENT_ID,
+    scope: GCAL_SCOPE,
+    callback: (resp)=>{
+      if(resp && resp.access_token){
+        gcalAccessToken = resp.access_token;
+        syncGoogleCalendar();
+      }
+    }
+  });
+  try{ client.requestAccessToken({prompt:''}); }catch(e){}
+}
+
+function syncGoogleCalendar(){
+  if(!gcalAccessToken || gcalSyncing){ return; }
+  if(data.domains.length===0){ flashStatus('קודם צריך להוסיף תחום אחד לפחות'); return; }
+  gcalSyncing = true;
+  renderGcalStatus();
+  const weekDates = currentWeekDates();
+  const timeMin = new Date(weekDates[0].getFullYear(), weekDates[0].getMonth(), weekDates[0].getDate(), 0,0,0).toISOString();
+  const timeMax = new Date(weekDates[6].getFullYear(), weekDates[6].getMonth(), weekDates[6].getDate(), 23,59,59).toISOString();
+  const params = new URLSearchParams({ timeMin, timeMax, singleEvents:'true', orderBy:'startTime', maxResults:'250' });
+  fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`, {
+    headers:{ Authorization: 'Bearer '+gcalAccessToken }
+  }).then(r=>{
+    if(!r.ok) throw new Error('gcal_'+r.status);
+    return r.json();
+  }).then(json=>{
+    const existingIds = new Set(data.tasks.filter(t=>t.googleEventId).map(t=>t.googleEventId));
+    const defaultDomain = (data.domains[0] && data.domains[0].id) || '';
+    let added = 0;
+    (json.items||[]).forEach(ev=>{
+      if(!ev.id || ev.status==='cancelled' || existingIds.has(ev.id)) return;
+      let date='', time='', endTime='';
+      if(ev.start && ev.start.date){
+        date = ev.start.date;
+      } else if(ev.start && ev.start.dateTime){
+        const sd = new Date(ev.start.dateTime);
+        date = ymd(sd);
+        time = pad(sd.getHours())+':'+pad(sd.getMinutes());
+        if(ev.end && ev.end.dateTime){
+          const ed = new Date(ev.end.dateTime);
+          endTime = pad(ed.getHours())+':'+pad(ed.getMinutes());
+        }
+      }
+      data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:defaultDomain, done:false, energy:'mid',
+        date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:ev.id});
+      added++;
+    });
+    gcalSyncing = false;
+    data.gcalLastSync = Date.now();
+    if(added>0){ saveData(); renderTasks(); renderScheduleGrid(); flashStatus(`יובאו ${added} אירועים חדשים מהיומן`); }
+    else { saveData(); flashStatus('אין אירועים חדשים ביומן'); }
+    renderGcalStatus();
+  }).catch(err=>{
+    gcalSyncing = false;
+    if(String(err.message).indexOf('401')>-1) gcalAccessToken = null;
+    renderGcalStatus();
+    flashStatus('הסנכרון עם היומן נכשל');
+  });
+}
+
+function renderGcalStatus(){
+  const el = document.getElementById('gcalSyncRow');
+  if(!el) return;
+  if(!data.gcalConnected){
+    el.innerHTML = `<button class="reset-btn" onclick="connectGoogleCalendar()">🔗 חיבור ליומן גוגל (ייבוא בלבד, לא מוחק כלום)</button>`;
+    return;
+  }
+  const lastSync = data.gcalLastSync ? new Date(data.gcalLastSync) : null;
+  const lastSyncStr = lastSync ? `${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : '';
+  el.innerHTML = `
+    <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
+    <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
+    <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
+  `;
 }
 
 /* ---------- week grid ---------- */
@@ -1615,6 +1738,8 @@ function importData(e){
       data.nightMode = !!parsed.nightMode;
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
+      data.gcalConnected = !!parsed.gcalConnected;
+      data.gcalLastSync = parsed.gcalLastSync || null;
       activeNoteDomain = data.domains[0].id;
       saveData();
       render();
@@ -1682,11 +1807,13 @@ function resetAll(){
   const keepReflection = data.reflectionBanks;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}};
+  const keepGcalConnected = data.gcalConnected;
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
   render();
+  if(data.gcalConnected) tryGcalSilentConnect();
 }
 function clearDoneTasks(){
   const doneCount = data.tasks.filter(t=>t.done).length;
@@ -1727,6 +1854,7 @@ function render(){
   renderTaskDomainSelect();
   renderTasks();
   renderScheduleGrid();
+  renderGcalStatus();
   renderNoteTabs();
   renderNoteArea();
   renderSparks();
@@ -1866,6 +1994,7 @@ window.addEventListener('touchcancel', pullRefreshReset, {passive:true});
 setupPWA();
 loadData();
 applyRoute();
+window.addEventListener('load', tryGcalSilentConnect);
 </script>
 </body>
 </html>
