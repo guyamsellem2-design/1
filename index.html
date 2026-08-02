@@ -1889,13 +1889,32 @@ function pushAnchorToGcal(a){
     pushEventToGcal(body, a.googleRecurringEventId, ev=>{ a.googleRecurringEventId = ev.id; saveData(); });
   });
 }
-function maybePromptGcalSync(item, kind, changedTiming){
-  if(!data.gcalConnected || !changedTiming) return;
-  if(kind==='task' && !item.date) return;
-  const already = kind==='task' ? !!item.googleEventId : !!item.googleRecurringEventId;
-  const question = already ? 'לעדכן את השינוי גם ביומן גוגל?' : 'להוסיף את זה גם ליומן גוגל?';
-  if(!confirm(question)) return;
-  if(kind==='task') pushTaskToGcal(item); else pushAnchorToGcal(item);
+function deleteEventFromGcal(eventId, onDone){
+  ensureGcalWriteToken(()=>{
+    const calId = gcalSelectedCalendarIds()[0] || 'primary';
+    fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`, {
+      method:'DELETE', headers:{ Authorization: 'Bearer '+gcalAccessToken }
+    }).then(()=>{ onDone(); flashStatus('הוסר מיומן גוגל'); }).catch(()=>{ onDone(); });
+  });
+}
+// the "עדכון ביומן גוגל" checkbox (default on, per item) replaced the old per-save confirm prompt:
+// checked (or unset) + a date -> auto-create/update the linked gcal event; unchecked -> remove the linked event, if any.
+function applyGcalSyncForTask(t, timingOrSyncChanged){
+  if(!data.gcalConnected || !timingOrSyncChanged) return;
+  if(t.gcalSync===false){
+    if(t.googleEventId){ const evId = t.googleEventId; t.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+    return;
+  }
+  if(!t.date) return;
+  pushTaskToGcal(t);
+}
+function applyGcalSyncForAnchor(a, timingOrSyncChanged){
+  if(!data.gcalConnected || !timingOrSyncChanged) return;
+  if(a.gcalSync===false){
+    if(a.googleRecurringEventId){ const evId = a.googleRecurringEventId; a.googleRecurringEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+    return;
+  }
+  pushAnchorToGcal(a);
 }
 
 function syncGoogleCalendar(){
@@ -2158,7 +2177,7 @@ function saveNewTaskFromSchedule(dayIdx, dateStr){
   saveData();
   renderScheduleGrid();
   renderTasks();
-  maybePromptGcalSync(newTask, 'task', true);
+  applyGcalSyncForTask(newTask, true);
 }
 function toggleAnchorDateField(dayIdx){
   const sel = document.getElementById(`anchorRepeat-${dayIdx}`);
@@ -2185,13 +2204,16 @@ function saveAnchor(dayIdx){
   const dateEl = document.getElementById(`anchorDate-${dayIdx}`);
   const date = (['once','monthly','yearly'].includes(repeatType) && dateEl) ? dateEl.value : '';
   if(!label) return;
-  let anchorRef, changedTiming;
+  const gcalSyncEl = document.getElementById(`anchorGcalSync-${dayIdx}`);
+  let anchorRef, changedTiming, prevGcalSync;
   if(editingAnchorId){
     const idx = data.anchors.findIndex(a=>a.id===editingAnchorId);
     if(idx>-1){
       const prev = data.anchors[idx];
+      prevGcalSync = prev.gcalSync;
       changedTiming = prev.time!==time || prev.endTime!==endTime || prev.repeatType!==repeatType || prev.date!==date;
-      data.anchors[idx] = {...prev, time, endTime, label, domain, buffer, repeatType, date};
+      const gcalSync = gcalSyncEl ? gcalSyncEl.checked : prev.gcalSync;
+      data.anchors[idx] = {...prev, time, endTime, label, domain, buffer, repeatType, date, gcalSync};
       anchorRef = data.anchors[idx];
     }
   } else {
@@ -2202,13 +2224,18 @@ function saveAnchor(dayIdx){
   openForm = null; editingAnchorId = null;
   saveData();
   renderScheduleGrid();
-  if(anchorRef) maybePromptGcalSync(anchorRef, 'anchor', changedTiming);
+  if(anchorRef){
+    const syncFlagChanged = prevGcalSync===false ? anchorRef.gcalSync!==false : anchorRef.gcalSync===false;
+    applyGcalSyncForAnchor(anchorRef, changedTiming || syncFlagChanged);
+  }
 }
 function deleteAnchor(id){
+  const removed = data.anchors.find(a=>a.id===id);
   data.anchors = data.anchors.filter(a=>a.id!==id);
   openForm = null; editingAnchorId = null;
   saveData();
   renderScheduleGrid();
+  if(data.gcalConnected && removed && removed.googleRecurringEventId) deleteEventFromGcal(removed.googleRecurringEventId, ()=>{});
 }
 
 /* ---------- tasks ---------- */
@@ -2245,7 +2272,11 @@ document.addEventListener('pointerup', cancelTaskLongPress);
 document.addEventListener('pointercancel', cancelTaskLongPress);
 function unscheduleTaskFromWeek(id){
   const t = data.tasks.find(t=>t.id===id);
-  if(t){ t.date=''; t.time=''; t.endTime=''; saveData(); }
+  if(t){
+    t.date=''; t.time=''; t.endTime='';
+    saveData();
+    if(data.gcalConnected && t.googleEventId){ const evId = t.googleEventId; t.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+  }
   longPressedTaskId = null;
   renderScheduleGrid();
   renderTasks();
@@ -2406,7 +2437,9 @@ function taskEditFormInner(t){
         <label class="field-label">התחלה<input type="time" id="taskEditTime-${t.id}" value="${t.time||''}"></label>
         <label class="field-label">סיום<input type="time" id="taskEditEnd-${t.id}" value="${t.endTime||''}"></label>
       </div>
-      <a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${taskCalendarUrl(t)}" target="_blank">📅 הוספה ליומן</a>
+      ${data.gcalConnected
+        ? `<label class="buf-label"><input type="checkbox" id="taskEditGcalSync-${t.id}" ${t.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
+        : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${taskCalendarUrl(t)}" target="_blank">📅 הוספה ליומן</a>`}
       ` : ''}
       <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDescOpen('${t.id}')">${descOpen?'▾ תיאור':'▸ תיאור'}</button>
       ${descOpen ? `<textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>` : ''}
@@ -2454,7 +2487,7 @@ function saveTaskEdit(id){
   if(!t) return;
   const text = document.getElementById(`taskEditText-${id}`).value.trim();
   if(!text) return;
-  const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
+  const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime, prevGcalSync = t.gcalSync;
   t.text = text;
   t.domain = document.getElementById(`taskEditDomain-${id}`).value;
   t.energy = document.getElementById(`taskEditEnergy-${id}`).value;
@@ -2466,6 +2499,8 @@ function saveTaskEdit(id){
   if(endEl) t.endTime = endEl.value || '';
   const descEl = document.getElementById(`taskEditDesc-${id}`);
   if(descEl) t.description = descEl.value || '';
+  const gcalSyncEl = document.getElementById(`taskEditGcalSync-${id}`);
+  if(gcalSyncEl) t.gcalSync = gcalSyncEl.checked;
   editingTaskId = null;
   scheduleEditingTaskId = null;
   taskDateOpenIds.delete(id);
@@ -2474,7 +2509,8 @@ function saveTaskEdit(id){
   renderTasks();
   renderScheduleGrid();
   const changedTiming = t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd;
-  maybePromptGcalSync(t, 'task', changedTiming);
+  const syncFlagChanged = prevGcalSync===false ? t.gcalSync!==false : t.gcalSync===false;
+  applyGcalSyncForTask(t, changedTiming || syncFlagChanged);
 }
 function addSubtask(taskId){
   const input = document.getElementById(`subtaskInput-${taskId}`);
@@ -2543,7 +2579,7 @@ function addTask(){
   saveData();
   renderTasks();
   renderScheduleGrid();
-  maybePromptGcalSync(newTask, 'task', true);
+  applyGcalSyncForTask(newTask, true);
 }
 function toggleTask(id){ const t=data.tasks.find(t=>t.id===id); if(t){ t.done=!t.done; saveData(); renderTasks(); renderScheduleGrid(); } }
 function cycleEnergy(id){
@@ -2555,6 +2591,7 @@ function cycleEnergy(id){
   renderTasks();
 }
 function deleteTask(id){
+  const removed = data.tasks.find(t=>t.id===id);
   data.tasks = data.tasks.filter(t=>t.id!==id);
   expandedTasks.delete(id);
   if(editingTaskId===id) editingTaskId = null;
@@ -2562,6 +2599,7 @@ function deleteTask(id){
   saveData();
   renderTasks();
   renderScheduleGrid();
+  if(data.gcalConnected && removed && removed.googleEventId) deleteEventFromGcal(removed.googleEventId, ()=>{});
 }
 function editTaskFromSchedule(id){
   scheduleEditingTaskId = (scheduleEditingTaskId===id) ? null : id;
@@ -2665,8 +2703,10 @@ function renderScheduleGrid(){
           <button class="cancel-btn" onclick="closeForm()">בטל</button>
         </div>
         ${isEditingThisDay ? `
+        ${data.gcalConnected
+          ? `<label class="buf-label"><input type="checkbox" id="anchorGcalSync-${dayIdx}" ${editingHere.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
+          : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>`}
         <div class="anchor-form-actions">
-          <a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>
           <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>
         </div>` : ''}
       </div>`;
