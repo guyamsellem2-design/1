@@ -187,7 +187,8 @@
   .main-tab-btn:hover{color:var(--text); border-color:var(--muted);}
   .main-tab-btn.active{background:var(--gold); color:#241a06; border-color:transparent; box-shadow:0 6px 18px -8px var(--glow-gold);}
 
-  section{margin-bottom:44px;}
+  section{margin-bottom:44px; padding-top:32px; border-top:1px solid var(--border);}
+  section:first-of-type{padding-top:0; border-top:none;}
   .section-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap;}
   h2{font-family:'Frank Ruhl Libre', serif; font-size:21px; font-weight:500; margin:0; display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; flex:1;}
   h2 .chev{font-size:14px; color:var(--muted2); font-weight:400;}
@@ -204,14 +205,14 @@
   .domain-chip input[type=color]{width:18px; height:18px; padding:0; border:none; border-radius:50%; background:none; cursor:pointer; overflow:hidden; direction:ltr;}
   .domain-chip input[type=color]::-webkit-color-swatch-wrapper{padding:0;}
   .domain-chip input[type=color]::-webkit-color-swatch{border:none; border-radius:50%;}
-  .palette-btn{width:16px; height:16px; border-radius:50%; border:1px solid var(--border-strong); cursor:pointer; padding:0; flex-shrink:0;}
+  .palette-btn{width:24px; height:24px; border-radius:50%; border:1px solid var(--border-strong); cursor:pointer; padding:0; flex-shrink:0;}
   .color-panel{width:100%; background:var(--surface2); border:1px solid var(--border-strong); border-radius:12px; padding:12px; margin:6px 0 4px; display:flex; flex-direction:column; gap:10px;}
   .color-grid{display:flex; flex-wrap:wrap; gap:8px;}
   .color-grid .swatch{width:26px; height:26px; border-radius:50%; cursor:pointer; border:2px solid transparent;}
   .color-grid .swatch:active{border-color:var(--text);}
   .color-panel .custom-row{display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--muted);}
   .color-panel .custom-row input[type=color]{width:28px; height:28px; border:none; border-radius:8px; padding:0; direction:ltr;}
-  .domain-chip input[type=text]{background:transparent; border:none; color:var(--text); font-family:inherit; font-size:14px; width:auto; min-width:40px; max-width:220px;}
+  .domain-chip input[type=text]{background:transparent; border:none; color:var(--text); font-family:inherit; font-size:14px; width:auto; min-width:40px; max-width:100%;}
   .domain-chip input[type=text]:focus{outline:none;}
   .domain-chip{transition:transform .15s ease, box-shadow .15s ease; touch-action:pan-y;}
   .domain-chip.dragging{ z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; }
@@ -237,7 +238,7 @@
   .notebook-body{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px 20px; margin-top:14px;}
 
   /* week grid */
-  .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease, border-color .3s ease;}
+  .day-col{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:12px 10px; min-height:120px; min-width:0; display:flex; flex-direction:column; transition:box-shadow .3s ease, transform .3s ease, border-color .3s ease;}
   .day-col:hover{box-shadow:0 8px 28px -12px var(--glow-gold); transform:translateY(-1px);}
   .day-col.expanded{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 0 6px 0 var(--gold);}
   .day-col.minimized{opacity:.72;}
@@ -251,6 +252,7 @@
   .add-anchor-btn{margin-top:auto; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:8px; padding:6px; font-size:13.5px; cursor:pointer; font-family:inherit;}
   .add-anchor-btn:hover{color:var(--text); border-color:var(--muted);}
   .anchor-form{margin-top:8px; display:flex; flex-direction:column; gap:6px; background:var(--surface2); padding:8px; border-radius:8px;}
+  .anchor-form-spaced{gap:11px; padding:12px 10px;}
   .anchor-form input, .anchor-form select{background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:14px; font-family:inherit;}
   .anchor-form label.buf-label{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted);}
   .anchor-form-actions{display:flex; gap:6px;}
@@ -321,8 +323,10 @@
   .task-row-meta{display:flex; align-items:center; gap:9px; padding-right:28px; min-height:11px;}
   .subtask-toggle-btn{flex-shrink:0; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit; white-space:nowrap;}
   .subtask-toggle-btn:hover{color:var(--text); border-color:var(--muted);}
-  .edit-form-row{display:flex; gap:6px;}
-  .edit-form-row select, .edit-form-row .field-label{flex:1; min-width:0;}
+  .edit-form-row{display:flex; gap:6px; min-width:0;}
+  .edit-form-row select, .edit-form-row .field-label, .edit-form-row input[type=text]{flex:1; min-width:0;}
+  .anchor-form{min-width:0;}
+  .anchor-form input, .anchor-form select, .anchor-form textarea, .anchor-form button{min-width:0; box-sizing:border-box; max-width:100%;}
   .field-label{display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted2);}
   .field-label input{width:100%; box-sizing:border-box;}
   ul.tasks li.detail-li{display:block; background:var(--surface2); border-radius:9px; padding:10px 12px; margin:-4px 0 8px; border-bottom:none;}
@@ -615,6 +619,14 @@ let activeNoteDomain = null;
 
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function domainById(id){ return data.domains.find(d=>d.id===id) || data.domains[0]; }
+function contrastTextColor(hex){
+  if(!hex) return '#141a16';
+  const c = hex.replace('#','');
+  if(c.length!==6) return '#141a16';
+  const r = parseInt(c.substring(0,2),16), g = parseInt(c.substring(2,4),16), b = parseInt(c.substring(4,6),16);
+  const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+  return luminance > 0.55 ? '#141a16' : '#ffffff';
+}
 function ensureNotes(id){ if(!data.notes[id]) data.notes[id] = {text:'', sparks:[]}; return data.notes[id]; }
 
 function loadData(){
@@ -803,10 +815,10 @@ function renderDomainEditor(){
         <span class="chip-name">${escapeHtml(d.name)}</span>
       </div>`;
     }
-    return `<div class="domain-chip active" data-id="${d.id}" style="background:${d.color}">
+    return `<div class="domain-chip active" data-id="${d.id}" style="background:${d.color}; color:${contrastTextColor(d.color)};">
       <span class="grip" onpointerdown="event.stopPropagation(); onGripPointerDown(event,'${d.id}')" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <button type="button" class="palette-btn" style="background:${d.color}" onclick="event.stopPropagation(); toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
-      <input type="text" value="${escapeAttr(d.name)}"
+      <input type="text" style="color:inherit;" value="${escapeAttr(d.name)}"
         onchange="renameDomainCommit('${d.id}', this.value)"
         oninput="updateDomainNameLive('${d.id}', this.value); sizeChipInput(this)">
       <span class="rm" onclick="event.stopPropagation(); deleteDomain('${d.id}')">✕</span>
@@ -1732,6 +1744,46 @@ function editAnchor(id, dayIdx){
   openForm = dayIdx; editingAnchorId = id; renderScheduleGrid();
 }
 function closeForm(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
+let addingTaskDayIdx = null;
+function openAddTaskForm(dayIdx){
+  if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
+  addingTaskDayIdx = (addingTaskDayIdx===dayIdx) ? null : dayIdx;
+  renderScheduleGrid();
+}
+function closeAddTaskForm(){ addingTaskDayIdx = null; renderScheduleGrid(); }
+function addTaskFormHtml(dayIdx, dateStr){
+  return `<div class="anchor-form">
+    <div class="edit-form-row">
+      <input type="text" id="newTaskText-${dayIdx}" placeholder="משימה קטנה...">
+      <select id="newTaskDomain-${dayIdx}">${domainOptionsWithEmpty()}</select>
+    </div>
+    <div class="edit-form-row">
+      <select id="newTaskEnergy-${dayIdx}">
+        <option value="">ללא רמת אנרגיה</option>
+        <option value="low">🟢 מטעין</option>
+        <option value="mid" selected>🟡 בינוני</option>
+        <option value="high">🔴 מרוקן</option>
+      </select>
+      <input type="time" id="newTaskTime-${dayIdx}" placeholder="שעה (רשות)">
+    </div>
+    <div class="anchor-form-actions">
+      <button class="save-btn" onclick="saveNewTaskFromSchedule(${dayIdx}, '${dateStr}')">שמור</button>
+      <button class="cancel-btn" onclick="closeAddTaskForm()">בטל</button>
+    </div>
+  </div>`;
+}
+function saveNewTaskFromSchedule(dayIdx, dateStr){
+  const text = document.getElementById(`newTaskText-${dayIdx}`).value.trim();
+  if(!text) return;
+  const domain = document.getElementById(`newTaskDomain-${dayIdx}`).value;
+  const energy = document.getElementById(`newTaskEnergy-${dayIdx}`).value;
+  const time = document.getElementById(`newTaskTime-${dayIdx}`).value || '';
+  data.tasks.push({id:uid(), text, domain, done:false, energy, date:dateStr, time, endTime:'', description:'', subtasks:[], createdAt:Date.now()});
+  addingTaskDayIdx = null;
+  saveData();
+  renderScheduleGrid();
+  renderTasks();
+}
 function toggleAnchorDateField(dayIdx){
   const sel = document.getElementById(`anchorRepeat-${dayIdx}`);
   const wrap = document.getElementById(`anchorDateWrap-${dayIdx}`);
@@ -1922,7 +1974,7 @@ function taskRowHtml(t){
       ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
       <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
-      <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}`:''}">${dom?dom.name:'ללא נושא'}</span>
+      <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}">${dom?dom.name:'ללא נושא'}</span>
       <button type="button" class="subtask-toggle-btn" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
     </div>
     <div class="task-row-meta">
@@ -1951,7 +2003,7 @@ function taskEditFormInner(t){
   const dateBtnLabel = (t.date || t.time) ? `📅 ${t.date?t.date.slice(5):''}${t.time?' '+t.time:''}` : '📅 תזמון';
   return `<div class="anchor-form">
       <div class="edit-form-row">
-        <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה" style="flex:2;">
+        <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
         <select id="taskEditDomain-${t.id}">${domainOptionsWithEmpty(t.domain)}</select>
       </div>
       <div class="edit-form-row">
@@ -2198,21 +2250,25 @@ function renderScheduleGrid(){
     const defaultDateVal = (isEditingThisDay && editingHere.date) ? editingHere.date : dateStr;
 
     const anchorFormHtml = `
-      <div class="anchor-form">
-        <select id="anchorRepeat-${dayIdx}" onchange="toggleAnchorDateField(${dayIdx})">
-          <option value="once" ${currentRepeatType==='once'?'selected':''}>חד-פעמי</option>
-          <option value="daily" ${currentRepeatType==='daily'?'selected':''}>מדי יום</option>
-          <option value="weekly" ${currentRepeatType==='weekly'?'selected':''}>מדי שבוע</option>
-          <option value="monthly" ${currentRepeatType==='monthly'?'selected':''}>מדי חודש</option>
-          <option value="yearly" ${currentRepeatType==='yearly'?'selected':''}>מדי שנה</option>
-        </select>
+      <div class="anchor-form anchor-form-spaced">
+        <input type="text" id="anchorLabel-${dayIdx}" placeholder="למשל: תרגול גיטרה" value="${isEditingThisDay?escapeAttr(editingHere.label):''}">
+        <div class="edit-form-row">
+          <select id="anchorRepeat-${dayIdx}" onchange="toggleAnchorDateField(${dayIdx})">
+            <option value="once" ${currentRepeatType==='once'?'selected':''}>חד-פעמי</option>
+            <option value="daily" ${currentRepeatType==='daily'?'selected':''}>מדי יום</option>
+            <option value="weekly" ${currentRepeatType==='weekly'?'selected':''}>מדי שבוע</option>
+            <option value="monthly" ${currentRepeatType==='monthly'?'selected':''}>מדי חודש</option>
+            <option value="yearly" ${currentRepeatType==='yearly'?'selected':''}>מדי שנה</option>
+          </select>
+          <select id="anchorDomain-${dayIdx}">${domainOptions(isEditingThisDay?editingHere.domain:null)}</select>
+        </div>
         <div id="anchorDateWrap-${dayIdx}" style="display:${showDateField?'block':'none'};">
           <input type="date" id="anchorDate-${dayIdx}" value="${defaultDateVal}">
         </div>
-        <input type="time" id="anchorTime-${dayIdx}" value="${isEditingThisDay?editingHere.time||'':''}">
-        <input type="time" id="anchorEnd-${dayIdx}" placeholder="שעת סיום (ברירת מחדל: שעה)" value="${isEditingThisDay?editingHere.endTime||'':''}">
-        <input type="text" id="anchorLabel-${dayIdx}" placeholder="למשל: תרגול גיטרה" value="${isEditingThisDay?escapeAttr(editingHere.label):''}">
-        <select id="anchorDomain-${dayIdx}">${domainOptions(isEditingThisDay?editingHere.domain:null)}</select>
+        <div class="edit-form-row">
+          <input type="time" id="anchorTime-${dayIdx}" value="${isEditingThisDay?editingHere.time||'':''}">
+          <input type="time" id="anchorEnd-${dayIdx}" placeholder="שעת סיום (ברירת מחדל: שעה)" value="${isEditingThisDay?editingHere.endTime||'':''}">
+        </div>
         <label class="buf-label"><input type="checkbox" id="anchorBuffer-${dayIdx}" ${isEditingThisDay&&editingHere.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
         <div class="anchor-form-actions">
           <button class="save-btn" onclick="saveAnchor(${dayIdx})">שמור</button>
@@ -2269,6 +2325,8 @@ function renderScheduleGrid(){
     const moreHtml = hiddenCount>0 ? `<button type="button" class="day-more" onclick="toggleDayMinimize(${dayIdx})">+${hiddenCount} עוד</button>` : '';
 
     const addAnchorHtml = isAddingThisDay ? anchorFormHtml : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
+    const isAddingTaskThisDay = addingTaskDayIdx===dayIdx;
+    const addTaskHtml = isAddingTaskThisDay ? addTaskFormHtml(dayIdx, dateStr) : `<button class="add-anchor-btn" onclick="openAddTaskForm(${dayIdx})">+ משימה</button>`;
 
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
@@ -2276,6 +2334,7 @@ function renderScheduleGrid(){
       <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
       ${emptyNote}${itemsHtml}
       ${addAnchorHtml}
+      ${addTaskHtml}
       ${moreHtml}
     </div>`;
   }).join('');
@@ -2294,6 +2353,7 @@ function updateAddNoteBtnColor(){
   if(!btn) return;
   const dom = activeNoteDomain ? domainById(activeNoteDomain) : null;
   btn.style.background = dom ? dom.color : '';
+  btn.style.color = dom ? contrastTextColor(dom.color) : '';
 }
 
 /* ---------- someday ---------- */
@@ -2344,7 +2404,7 @@ function somedayRowHtml(s){
     ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${s.id}','.someday-li',reorderSomeday)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
     <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSomedayFavorite('${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
     <span class="task-text" style="flex:1" onclick="openSomedayEdit('${s.id}')">${escapeHtml(s.text)}</span>
-    <span class="tag" style="background:${dom.color}">${dom.name}</span>
+    <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${dom.name}</span>
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
     <span class="promote" onclick="promoteToWeek('${s.id}')">להעביר לשבוע ←</span>
     <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
@@ -2932,8 +2992,9 @@ function setupPWA(){
 const PULL_RELEASE_THRESHOLD = 46;
 const PULL_MAX = 100;
 let pullState = { startY:null, pulling:false, ready:false };
-function pullRefreshStart(clientY){
+function pullRefreshStart(clientY, target){
   if(window.scrollY > 0) return;
+  if(target && target.closest && target.closest('textarea, input, select, .keep-note-canvas')) return; // let text fields / scrollable inputs handle their own scrolling
   pullState.startY = clientY;
   pullState.pulling = true;
   pullState.ready = false;
@@ -2976,7 +3037,7 @@ function pullRefreshReset(){
   pullState = { startY:null, pulling:false, ready:false };
 }
 window.addEventListener('touchstart', (e)=>{
-  if(e.touches && e.touches.length===1) pullRefreshStart(e.touches[0].clientY);
+  if(e.touches && e.touches.length===1) pullRefreshStart(e.touches[0].clientY, e.target);
 }, {passive:true});
 window.addEventListener('touchmove', (e)=>{
   if(e.touches && e.touches.length===1) pullRefreshMove(e.touches[0].clientY);
