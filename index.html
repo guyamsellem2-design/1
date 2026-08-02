@@ -162,6 +162,30 @@
   @keyframes recPulse{0%,100%{opacity:1;} 50%{opacity:.3;}}
   @media (prefers-reduced-motion: reduce){ .rec-btn.recording .rec-dot{animation:none;} }
 
+  /* global recordings tab */
+  .recordings-list{margin-top:18px;}
+  .recording-row{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:10px;}
+  .recording-row-head{display:flex; align-items:center; gap:8px;}
+  .recording-icon{font-size:16px; flex-shrink:0; cursor:pointer; padding:2px;}
+  .recording-icon:hover{filter:brightness(1.3);}
+  .recording-name-input{flex:1; min-width:0; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; padding:3px 0;}
+  .recording-name-input:focus{outline:none; border-bottom:1px solid var(--border-strong);}
+  .recording-topic-tag{font-size:11.5px; padding:2px 9px; border-radius:999px; flex-shrink:0;}
+  .recording-meta{font-size:11.5px; color:var(--muted2); margin:2px 0 0 32px;}
+  .recording-player{display:flex; align-items:center; gap:6px; margin-top:9px; padding-top:9px; border-top:1px solid var(--border); flex-wrap:wrap;}
+  .recording-ctrl{background:var(--surface3); border:1px solid var(--border-strong); border-radius:8px; padding:6px 11px; font-size:14px; cursor:pointer; font-family:inherit; color:var(--text);}
+  .recording-ctrl:hover{border-color:var(--gold);}
+  .recording-play{min-width:38px;}
+  .recording-actions{display:flex; gap:6px; margin-inline-start:auto;}
+
+  /* simple modal */
+  .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px;}
+  .modal-box{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:22px; width:100%; max-width:380px; box-shadow:0 20px 50px -12px rgba(0,0,0,0.6);}
+  .modal-box h3{margin:0 0 14px; font-size:18px;}
+  .modal-box label{display:block; font-size:13px; color:var(--muted); margin:10px 0 5px;}
+  .modal-box input[type="text"], .modal-box select{width:100%; box-sizing:border-box;}
+  .modal-actions{display:flex; gap:8px; margin-top:18px; justify-content:flex-end;}
+
   .status{
     position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
     background:var(--surface3); border:1px solid var(--border-strong);
@@ -414,6 +438,7 @@
 <div class="main-tab-bar">
   <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 בית</button>
   <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 נושאים</button>
+  <button class="main-tab-btn" id="mainTabRecordingsBtn" onclick="switchMainView('recordings')">🔴 הקלטות</button>
 </div>
 
 <div id="homeView">
@@ -428,6 +453,9 @@
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
       <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
       <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+      <button type="button" class="rec-btn" id="homeRecBtn" onclick="toggleGlobalRecording()">
+        <span class="rec-label">REC</span><span class="rec-dot"></span>
+      </button>
     </div>
   </header>
 
@@ -580,7 +608,21 @@
   </div>
 </div>
 
+<div id="recordingsView" style="display:none;">
+  <div class="domain-page-topbar">
+    <div class="domain-page-header"><h1>🔴 הקלטות</h1></div>
+    <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+  </div>
+  <p class="hint" style="margin:0 0 18px;">כל ההקלטות שלך במקום אחד · לחיצה על 🎙 להאזנה, שמירה לטלפון או שיתוף</p>
+  <button type="button" class="rec-btn" id="recordingsTabRecBtn" onclick="toggleGlobalRecording()">
+    <span class="rec-label">REC</span><span class="rec-dot"></span>
+  </button>
+  <div class="recordings-list" id="recordingsList"></div>
 </div>
+
+</div>
+
+<div id="modalRoot"></div>
 
 <div class="status" id="status">נשמר</div>
 
@@ -611,7 +653,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false, recordings: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -665,7 +707,8 @@ function loadData(){
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.notesMigrated = !!parsed.notesMigrated;
-      mainView = parsed.mainView === 'topics' ? 'topics' : 'home';
+      data.recordings = parsed.recordings || [];
+      mainView = ['topics','recordings'].includes(parsed.mainView) ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
     }
@@ -1075,18 +1118,27 @@ function switchMainView(view){
 function applyMainViewState(){
   const home = document.getElementById('homeView');
   const topicsView = document.getElementById('domainPageView');
+  const recordingsView = document.getElementById('recordingsView');
   const homeBtn = document.getElementById('mainTabHomeBtn');
   const topicsBtn = document.getElementById('mainTabTopicsBtn');
+  const recordingsBtn = document.getElementById('mainTabRecordingsBtn');
   const showTopics = mainView==='topics';
-  home.style.display = showTopics ? 'none' : '';
+  const showRecordings = mainView==='recordings';
+  home.style.display = (showTopics || showRecordings) ? 'none' : '';
   topicsView.style.display = showTopics ? '' : 'none';
-  if(homeBtn) homeBtn.classList.toggle('active', !showTopics);
+  recordingsView.style.display = showRecordings ? '' : 'none';
+  if(homeBtn) homeBtn.classList.toggle('active', !showTopics && !showRecordings);
   if(topicsBtn) topicsBtn.classList.toggle('active', showTopics);
+  if(recordingsBtn) recordingsBtn.classList.toggle('active', showRecordings);
   if(showTopics){
     if(!activeNoteDomain || !domainById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
     renderDomainEditor();
     renderKeepGrid(activeNoteDomain);
     updateAddNoteBtnColor();
+    window.scrollTo(0,0);
+  }
+  if(showRecordings){
+    renderRecordingsList();
     window.scrollTo(0,0);
   }
 }
@@ -1276,6 +1328,208 @@ function deleteMemo(domainId, noteId, memoId){
     saveData();
     renderKeepGrid(domainId);
   }
+}
+
+/* ---------- global recordings (home + הקלטות tab) ---------- */
+let globalMediaRecorder = null;
+let globalRecordedChunks = [];
+let globalRecordingStream = null;
+let globalRecordingActive = false;
+let pendingRecordingAudio = null;
+let recordingSaveModalOpen = false;
+let openRecordingId = null;
+
+function toggleGlobalRecording(){
+  if(globalRecordingActive){ stopGlobalRecording(); } else { startGlobalRecording(); }
+}
+function startGlobalRecording(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    alert('הדפדפן הזה לא תומך בהקלטה מהמיקרופון.');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    globalRecordingStream = stream;
+    globalRecordedChunks = [];
+    globalMediaRecorder = new MediaRecorder(stream);
+    globalMediaRecorder.ondataavailable = e=>{ if(e.data && e.data.size>0) globalRecordedChunks.push(e.data); };
+    globalMediaRecorder.onstop = ()=>{
+      const blob = new Blob(globalRecordedChunks, {type: (globalMediaRecorder && globalMediaRecorder.mimeType) || 'audio/webm'});
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        pendingRecordingAudio = reader.result;
+        recordingSaveModalOpen = true;
+        renderRecordingSaveModal();
+      };
+      reader.readAsDataURL(blob);
+      if(globalRecordingStream) globalRecordingStream.getTracks().forEach(t=>t.stop());
+      globalRecordingStream = null;
+      globalMediaRecorder = null;
+      globalRecordingActive = false;
+      updateRecBtns();
+    };
+    globalMediaRecorder.start();
+    globalRecordingActive = true;
+    updateRecBtns();
+  }).catch(()=>{
+    alert('לא ניתן היה לגשת למיקרופון. יש לאשר הרשאת מיקרופון בדפדפן.');
+  });
+}
+function stopGlobalRecording(){
+  if(globalMediaRecorder && globalMediaRecorder.state==='recording') globalMediaRecorder.stop();
+}
+function updateRecBtns(){
+  [document.getElementById('homeRecBtn'), document.getElementById('recordingsTabRecBtn')].forEach(btn=>{
+    if(!btn) return;
+    btn.classList.toggle('recording', globalRecordingActive);
+    btn.querySelector('.rec-label').textContent = globalRecordingActive ? 'עצירה ושמירה' : 'REC';
+  });
+}
+function renderRecordingSaveModal(){
+  const el = document.getElementById('modalRoot');
+  if(!el) return;
+  if(!recordingSaveModalOpen || !pendingRecordingAudio){ el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this) cancelSaveRecording()">
+      <div class="modal-box">
+        <h3>שמירת הקלטה</h3>
+        <label for="recSaveName">שם ההקלטה</label>
+        <input type="text" id="recSaveName" placeholder="למשל: רעיון למנגינה" autofocus>
+        <label for="recSaveTopic">נושא</label>
+        <select id="recSaveTopic">
+          ${data.domains.length ? data.domains.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('') : '<option value="">אין נושאים עדיין</option>'}
+        </select>
+        <div class="modal-actions">
+          <button type="button" class="reset-btn" onclick="cancelSaveRecording()">ביטול</button>
+          <button type="button" onclick="confirmSaveRecording()">שמירה</button>
+        </div>
+      </div>
+    </div>`;
+}
+function cancelSaveRecording(){
+  pendingRecordingAudio = null;
+  recordingSaveModalOpen = false;
+  renderRecordingSaveModal();
+}
+function confirmSaveRecording(){
+  const nameInput = document.getElementById('recSaveName');
+  const topicSelect = document.getElementById('recSaveTopic');
+  const name = nameInput ? nameInput.value.trim() : '';
+  const topic = topicSelect ? topicSelect.value : '';
+  data.recordings.unshift({id:uid(), name: name || 'הקלטה ללא שם', topic, audio: pendingRecordingAudio, createdAt: Date.now()});
+  pendingRecordingAudio = null;
+  recordingSaveModalOpen = false;
+  saveData();
+  renderRecordingSaveModal();
+  renderRecordingsList();
+  flashStatus('ההקלטה נשמרה');
+}
+function recordingAudioExt(dataUrl){
+  const m = /^data:audio\/([a-z0-9]+)/i.exec(dataUrl||'');
+  const type = m ? m[1].toLowerCase() : '';
+  if(type==='mpeg') return 'mp3';
+  if(type==='mp4') return 'm4a';
+  if(type==='webm') return 'webm';
+  if(type==='ogg') return 'ogg';
+  if(type==='wav') return 'wav';
+  return type || 'audio';
+}
+function renderRecordingsList(){
+  const el = document.getElementById('recordingsList');
+  if(!el) return;
+  if(!data.recordings.length){ el.innerHTML = '<div class="empty">עדיין אין הקלטות — לחיצה על REC למעלה תתחיל אחת</div>'; return; }
+  el.innerHTML = data.recordings.map(r=>renderRecordingRow(r)).join('');
+}
+function renderRecordingRow(r){
+  const isOpen = openRecordingId===r.id;
+  const topic = r.topic ? domainByIdOrNull(r.topic) : null;
+  const dt = new Date(r.createdAt);
+  const dateStr = `${pad(dt.getDate())}.${pad(dt.getMonth()+1)}.${dt.getFullYear()} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  return `<div class="recording-row">
+    <div class="recording-row-head">
+      <span class="recording-icon" onclick="toggleRecordingPlayer('${r.id}')" title="נגן/כווץ">🎙</span>
+      <input type="text" class="recording-name-input" value="${escapeAttr(r.name||'')}" onchange="renameRecording('${r.id}', this.value)">
+      ${topic ? `<span class="recording-topic-tag" style="background:${topic.color}; color:${contrastTextColor(topic.color)};">${escapeHtml(topic.name)}</span>` : ''}
+      <span class="del-task" onclick="deleteRecording('${r.id}')">✕</span>
+    </div>
+    <div class="recording-meta">${dateStr}</div>
+    ${isOpen ? `
+    <div class="recording-player">
+      <audio id="recordingAudio-${r.id}" src="${r.audio}" preload="metadata" onplay="updateRecordingPlayIcon('${r.id}', false)" onpause="updateRecordingPlayIcon('${r.id}', true)" onended="updateRecordingPlayIcon('${r.id}', true)"></audio>
+      <button type="button" class="recording-ctrl" onclick="seekRecording('${r.id}', -5)" title="5 שניות אחורה">⏪5</button>
+      <button type="button" class="recording-ctrl recording-play" id="recordingPlayBtn-${r.id}" onclick="playPauseRecording('${r.id}')" title="נגן/השהה">▶</button>
+      <button type="button" class="recording-ctrl" onclick="seekRecording('${r.id}', 5)" title="5 שניות קדימה">5⏩</button>
+      <button type="button" class="recording-ctrl" onclick="stopRecordingPlayback('${r.id}')" title="עצור והתחל מהתחלה">⏹</button>
+      <div class="recording-actions">
+        <button type="button" class="recording-ctrl" onclick="saveRecordingToPhone('${r.id}')" title="שמירה לטלפון">⬇ שמירה</button>
+        <button type="button" class="recording-ctrl" onclick="shareRecording('${r.id}')" title="שיתוף">↗ שיתוף</button>
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+function domainByIdOrNull(id){ return data.domains.find(d=>d.id===id) || null; }
+function toggleRecordingPlayer(id){
+  if(openRecordingId && openRecordingId!==id){
+    const prevAudio = document.getElementById('recordingAudio-'+openRecordingId);
+    if(prevAudio) prevAudio.pause();
+  }
+  openRecordingId = openRecordingId===id ? null : id;
+  renderRecordingsList();
+}
+function playPauseRecording(id){
+  const audio = document.getElementById('recordingAudio-'+id);
+  if(!audio) return;
+  if(audio.paused) audio.play(); else audio.pause();
+}
+function seekRecording(id, delta){
+  const audio = document.getElementById('recordingAudio-'+id);
+  if(!audio) return;
+  audio.currentTime = Math.max(0, audio.currentTime + delta);
+}
+function stopRecordingPlayback(id){
+  const audio = document.getElementById('recordingAudio-'+id);
+  if(!audio) return;
+  audio.pause();
+  audio.currentTime = 0;
+}
+function updateRecordingPlayIcon(id, paused){
+  const btn = document.getElementById('recordingPlayBtn-'+id);
+  if(btn) btn.textContent = paused ? '▶' : '⏸';
+}
+function renameRecording(id, name){
+  const r = data.recordings.find(r=>r.id===id);
+  if(r){ r.name = name.trim() || 'הקלטה ללא שם'; saveData(); }
+}
+function deleteRecording(id){
+  data.recordings = data.recordings.filter(r=>r.id!==id);
+  if(openRecordingId===id) openRecordingId = null;
+  saveData();
+  renderRecordingsList();
+}
+function saveRecordingToPhone(id){
+  const r = data.recordings.find(r=>r.id===id);
+  if(!r) return;
+  const ext = recordingAudioExt(r.audio);
+  const a = document.createElement('a');
+  a.href = r.audio;
+  a.download = `${(r.name||'הקלטה').replace(/[\\/:*?"<>|]/g,'')}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+async function shareRecording(id){
+  const r = data.recordings.find(r=>r.id===id);
+  if(!r) return;
+  try{
+    const res = await fetch(r.audio);
+    const blob = await res.blob();
+    const ext = recordingAudioExt(r.audio);
+    const file = new File([blob], `${(r.name||'הקלטה').replace(/[\\/:*?"<>|]/g,'')}.${ext}`, {type: blob.type});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title: r.name||'הקלטה'});
+      return;
+    }
+  }catch(e){ /* fall through to fallback */ }
+  alert('שיתוף ישיר לא נתמך בדפדפן הזה. אפשר לשמור לטלפון (⬇ שמירה) ואז לשתף מהגלריה או מהאפליקציה של הקבצים.');
 }
 
 function addDomainNote(){
@@ -2915,6 +3169,8 @@ function render(){
   applyAllSectionCollapse();
   applyMainViewState();
   updateUndoRedoButtons();
+  updateRecBtns();
+  renderRecordingSaveModal();
 }
 
 /* ---------- collapsible sections ---------- */
