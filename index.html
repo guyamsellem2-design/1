@@ -238,6 +238,8 @@
   .day-col.minimized{opacity:.72;}
   .day-name{font-family:'Frank Ruhl Libre', serif; font-size:15px; font-weight:500; color:var(--text); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:baseline; cursor:pointer; user-select:none;}
   .anchor-chip{background:var(--surface2); border-radius:12px; padding:7px 9px; margin-bottom:6px; font-size:14px; line-height:1.4; position:relative; border-right:3px solid var(--gold); cursor:pointer; transition:background .25s ease;}
+  .task-chip-trash{position:absolute; left:6px; top:50%; transform:translateY(-50%); background:var(--surface3); border:1px solid var(--border-strong); border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; z-index:2;}
+  .task-chip-trash:hover{border-color:var(--gold);}
   .anchor-chip:hover{background:var(--surface3);}
   .anchor-chip .time{color:var(--muted); font-size:12.5px; display:block; margin-bottom:1px;}
   .anchor-chip .buf{color:var(--muted2); font-size:11.5px; display:block; margin-top:2px;}
@@ -255,6 +257,7 @@
   .card:hover{box-shadow:0 10px 34px -16px var(--glow-gold);}
   input:focus, textarea:focus, select:focus, button:focus-visible{ outline:2px solid var(--glow-gold); outline-offset:2px; }
   .add-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .section-divider{border-top:1px solid var(--border); margin:4px 0 16px;}
   .add-row input[type=text]{flex:1; min-width:160px; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:15px; font-family:inherit;}
   .add-row select{background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:14.5px; font-family:inherit;}
   .add-row button{background:var(--gold); color:#1a1206; border:none; padding:10px 18px; border-radius:9px; font-weight:600; cursor:pointer; font-family:inherit; font-size:15px;}
@@ -308,6 +311,11 @@
   .task-text.has-content .sub-count{color:var(--gold);}
   .edit-task-btn{flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--border-strong); background:var(--surface3); color:var(--text); font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; font-family:inherit;}
   .edit-task-btn:hover{background:var(--surface2); border-color:var(--gold);}
+  ul.tasks li.task-li{flex-direction:column; align-items:stretch; gap:5px;}
+  .task-row-main{display:flex; align-items:center; gap:9px;}
+  .task-row-meta{display:flex; align-items:center; gap:9px; padding-right:28px; min-height:11px;}
+  .subtask-toggle-btn{flex-shrink:0; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit; white-space:nowrap;}
+  .subtask-toggle-btn:hover{color:var(--text); border-color:var(--muted);}
   .edit-form-row{display:flex; gap:6px;}
   .edit-form-row select, .edit-form-row .field-label{flex:1; min-width:0;}
   .field-label{display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted2);}
@@ -435,7 +443,7 @@
           <option value="mid" selected>🟡 בינוני</option>
           <option value="high">🔴 מרוקן</option>
         </select>
-        <button type="button" class="add-domain-btn" onclick="toggleTaskSchedule()" id="taskSchedToggle">📅 לתזמן (רשות)</button>
+        <button type="button" class="add-domain-btn" onclick="toggleTaskSchedule()" id="taskSchedToggle">📅 לתזמן</button>
         <button onclick="addTask()">הוסף</button>
       </div>
       <div class="add-row" id="taskSchedFields" style="display:none;">
@@ -443,6 +451,7 @@
         <input type="time" id="taskTime" placeholder="שעת התחלה">
         <input type="time" id="taskEndTime" placeholder="שעת סיום (רשות)">
       </div>
+      <div class="section-divider"></div>
       <ul class="tasks scroll-cap" id="taskList"></ul>
       <div class="list-expand-row" id="taskListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('task')"></button></div>
     </div>
@@ -577,7 +586,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],release:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -601,12 +610,18 @@ function loadData(){
       data.tasks = (parsed.tasks || []).map(t=>({energy:'mid', endTime:'', description:'', subtasks:[], ...t}));
       data.someday = (parsed.someday || []).map(s=>({domain:(data.domains[0]&&data.domains[0].id)||'', description:'', subtasks:[], ...s}));
       data.notes = parsed.notes || {};
-      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[],insights:[]};
+      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],insights:[]};
+      if(!data.reflectionBanks.insights) data.reflectionBanks.insights = [];
+      if(data.reflectionBanks.release && data.reflectionBanks.release.length){
+        data.reflectionBanks.insights = data.reflectionBanks.insights.concat(data.reflectionBanks.release);
+      }
+      delete data.reflectionBanks.release;
       if(parsed.reflection && !parsed.reflectionBanks){
         const wk = ymd(new Date(new Date().setDate(new Date().getDate()-new Date().getDay())));
-        ['fed','hard','release'].forEach(k=>{
+        ['fed','hard'].forEach(k=>{
           if(parsed.reflection[k]) data.reflectionBanks[k].push({id:uid(), weekKey:wk, text:parsed.reflection[k]});
         });
+        if(parsed.reflection.release) data.reflectionBanks.insights.push({id:uid(), weekKey:wk, text:parsed.reflection.release});
       }
       data.softMode = !!parsed.softMode;
       data.nightMode = !!parsed.nightMode;
@@ -1615,6 +1630,43 @@ function deleteAnchor(id){
 
 /* ---------- tasks ---------- */
 let editingTaskId = null;
+let scheduleEditingTaskId = null;
+let taskLongPressState = null;
+let longPressedTaskId = null;
+let justLongPressedTaskId = null;
+function startTaskLongPress(e, id){
+  e.stopPropagation();
+  const startX = e.clientX, startY = e.clientY;
+  taskLongPressState = {
+    id, startX, startY,
+    timer: setTimeout(()=>{
+      taskLongPressState = null;
+      longPressedTaskId = id;
+      justLongPressedTaskId = id;
+      if(navigator.vibrate) navigator.vibrate(15);
+      renderScheduleGrid();
+      setTimeout(()=>{ if(justLongPressedTaskId===id) justLongPressedTaskId = null; }, 400);
+    }, 500)
+  };
+}
+function cancelTaskLongPressMove(e){
+  if(!taskLongPressState) return;
+  const dx = e.clientX - taskLongPressState.startX, dy = e.clientY - taskLongPressState.startY;
+  if(Math.hypot(dx,dy) > 10){ clearTimeout(taskLongPressState.timer); taskLongPressState = null; }
+}
+function cancelTaskLongPress(){
+  if(taskLongPressState){ clearTimeout(taskLongPressState.timer); taskLongPressState = null; }
+}
+document.addEventListener('pointermove', cancelTaskLongPressMove);
+document.addEventListener('pointerup', cancelTaskLongPress);
+document.addEventListener('pointercancel', cancelTaskLongPress);
+function unscheduleTaskFromWeek(id){
+  const t = data.tasks.find(t=>t.id===id);
+  if(t){ t.date=''; t.time=''; t.endTime=''; saveData(); }
+  longPressedTaskId = null;
+  renderScheduleGrid();
+  renderTasks();
+}
 const expandedTasks = new Set();
 function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(); }
 function sortByTime(list){
@@ -1681,51 +1733,73 @@ function taskRowHtml(t){
   const dom = t.domain ? domainById(t.domain) : null;
   const energy = t.energy||'';
   const subCount = (t.subtasks||[]).length;
-  const isExpanded = expandedTasks.has(t.id);
-  const hasContent = subCount>0 || (t.description||'').trim();
+  const isSubtasksOpen = expandedTasks.has(t.id);
   const isOverdue = t.date && !t.done && t.date < ymd(new Date());
   const isDimmed = isOverdue || (data.softMode && !energy);
-  let html = `<li class="${isDimmed?'dimmed-item':''}">
-    <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
-    <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
-    <span class="task-text ${t.done?'done':''} ${hasContent?'has-content':''}" onclick="toggleTaskExpand('${t.id}')" title="תיאור ותת-משימות"><span class="text-chevron">${isExpanded?'▾':'▸'}</span>${escapeHtml(t.text)}${subCount?` <span class="sub-count">${subCount}</span>`:''}</span>
-    ${t.date ? `<span class="task-date-badge"><span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
-    <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}`:''}">${dom?dom.name:'ללא נושא'}</span>
-    ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
-    <button type="button" class="edit-task-btn" onclick="openTaskEdit('${t.id}')" title="עריכת משימה" aria-label="עריכת משימה">✏️</button>
+  const subBtnLabel = isSubtasksOpen ? `▾ תת-משימות${subCount?' ('+subCount+')':''}` : (subCount ? `▸ תת-משימות (${subCount})` : '+ תת-משימה');
+  let html = `<li class="task-li ${isDimmed?'dimmed-item':''}">
+    <div class="task-row-main">
+      <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
+      <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
+      <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}`:''}">${dom?dom.name:'ללא נושא'}</span>
+      <button type="button" class="subtask-toggle-btn" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
+    </div>
+    <div class="task-row-meta">
+      <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
+      ${t.date ? `<span class="task-date-badge"><span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
+      ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
+    </div>
   </li>`;
-  if(isExpanded) html += taskDetailHtml(t);
+  if(isSubtasksOpen) html += taskDetailHtml(t);
   return html;
 }
-function taskEditFormHtml(t){
-  return `<li class="edit-li">
-    <div class="anchor-form">
-      <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
-      <textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>
+const taskDescOpenIds = new Set();
+function toggleTaskDescOpen(id){
+  if(taskDescOpenIds.has(id)) taskDescOpenIds.delete(id); else taskDescOpenIds.add(id);
+  renderTasks();
+}
+const taskDateOpenIds = new Set();
+function toggleTaskDateOpen(id){
+  if(taskDateOpenIds.has(id)) taskDateOpenIds.delete(id); else taskDateOpenIds.add(id);
+  renderTasks();
+}
+function taskEditFormInner(t){
+  const descOpen = taskDescOpenIds.has(t.id);
+  const dateOpen = taskDateOpenIds.has(t.id) || !!t.date || !!t.time;
+  const dateBtnLabel = (t.date || t.time) ? `📅 ${t.date?t.date.slice(5):''}${t.time?' '+t.time:''}` : '📅 תזמון';
+  return `<div class="anchor-form">
       <div class="edit-form-row">
+        <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה" style="flex:2;">
         <select id="taskEditDomain-${t.id}">${domainOptionsWithEmpty(t.domain)}</select>
+      </div>
+      <div class="edit-form-row">
         <select id="taskEditEnergy-${t.id}">
           <option value="" ${!t.energy?'selected':''}>ללא רמת אנרגיה</option>
           <option value="low" ${t.energy==='low'?'selected':''}>🟢 מטעין</option>
           <option value="mid" ${t.energy==='mid'?'selected':''}>🟡 בינוני</option>
           <option value="high" ${t.energy==='high'?'selected':''}>🔴 מרוקן</option>
         </select>
+        <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDateOpen('${t.id}')">${dateBtnLabel}</button>
       </div>
+      ${dateOpen ? `
       <div class="edit-form-row">
         <label class="field-label">תאריך<input type="date" id="taskEditDate-${t.id}" value="${t.date||''}"></label>
         <label class="field-label">התחלה<input type="time" id="taskEditTime-${t.id}" value="${t.time||''}"></label>
         <label class="field-label">סיום<input type="time" id="taskEditEnd-${t.id}" value="${t.endTime||''}"></label>
       </div>
+      <a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${taskCalendarUrl(t)}" target="_blank">📅 הוספה ליומן</a>
+      ` : ''}
+      <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDescOpen('${t.id}')">${descOpen?'▾ תיאור':'▸ תיאור'}</button>
+      ${descOpen ? `<textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>` : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveTaskEdit('${t.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeTaskEdit()">בטל</button>
+        <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteTask('${t.id}')">🗑 מחק</button>
       </div>
-      <div class="anchor-form-actions">
-        <a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${taskCalendarUrl(t)}" target="_blank">📅 הוספה ליומן</a>
-        <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteTask('${t.id}')">🗑 מחק משימה</button>
-      </div>
-    </div>
-  </li>`;
+    </div>`;
+}
+function taskEditFormHtml(t){
+  return `<li class="edit-li">${taskEditFormInner(t)}</li>`;
 }
 function taskDetailHtml(t){
   const subs = t.subtasks||[];
@@ -1750,8 +1824,8 @@ function toggleTaskExpand(id){
   if(expandedTasks.has(id)) expandedTasks.delete(id); else expandedTasks.add(id);
   renderTasks();
 }
-function openTaskEdit(id){ editingTaskId = id; renderTasks(); }
-function closeTaskEdit(){ editingTaskId = null; renderTasks(); }
+function openTaskEdit(id){ editingTaskId = (editingTaskId===id) ? null : id; renderTasks(); }
+function closeTaskEdit(){ editingTaskId = null; scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid(); }
 function saveTaskEdit(id){
   const t = data.tasks.find(t=>t.id===id);
   if(!t) return;
@@ -1760,11 +1834,18 @@ function saveTaskEdit(id){
   t.text = text;
   t.domain = document.getElementById(`taskEditDomain-${id}`).value;
   t.energy = document.getElementById(`taskEditEnergy-${id}`).value;
-  t.date = document.getElementById(`taskEditDate-${id}`).value || '';
-  t.time = document.getElementById(`taskEditTime-${id}`).value || '';
-  t.endTime = document.getElementById(`taskEditEnd-${id}`).value || '';
-  t.description = document.getElementById(`taskEditDesc-${id}`).value || '';
+  const dateEl = document.getElementById(`taskEditDate-${id}`);
+  const timeEl = document.getElementById(`taskEditTime-${id}`);
+  const endEl = document.getElementById(`taskEditEnd-${id}`);
+  if(dateEl) t.date = dateEl.value || '';
+  if(timeEl) t.time = timeEl.value || '';
+  if(endEl) t.endTime = endEl.value || '';
+  const descEl = document.getElementById(`taskEditDesc-${id}`);
+  if(descEl) t.description = descEl.value || '';
   editingTaskId = null;
+  scheduleEditingTaskId = null;
+  taskDateOpenIds.delete(id);
+  taskDescOpenIds.delete(id);
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -1845,12 +1926,19 @@ function cycleEnergy(id){
   saveData();
   renderTasks();
 }
-function deleteTask(id){ data.tasks = data.tasks.filter(t=>t.id!==id); expandedTasks.delete(id); saveData(); renderTasks(); renderScheduleGrid(); }
+function deleteTask(id){
+  data.tasks = data.tasks.filter(t=>t.id!==id);
+  expandedTasks.delete(id);
+  if(editingTaskId===id) editingTaskId = null;
+  if(scheduleEditingTaskId===id) scheduleEditingTaskId = null;
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+}
 function editTaskFromSchedule(id){
-  openSection('tasks');
-  openTaskEdit(id);
-  const target = document.getElementById('taskList');
-  if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+  scheduleEditingTaskId = (scheduleEditingTaskId===id) ? null : id;
+  longPressedTaskId = null;
+  renderScheduleGrid();
 }
 
 /* ---------- weekly schedule (anchors + dated tasks together) ---------- */
@@ -1878,9 +1966,9 @@ function renderWeekNav(){
   const el = document.getElementById('weekNav');
   if(!el) return;
   el.innerHTML = `
-    <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>›</button>
+    <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>›</button>
     <span class="week-nav-label">${weekRangeLabel(weekOffset)}${weekOffset===0?' · השבוע':''}</span>
-    <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>‹</button>
+    <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>‹</button>
   `;
 }
 let weekSwipeState = { startX:null, startY:null, active:false };
@@ -1974,10 +2062,13 @@ function renderScheduleGrid(){
       const t = it.data;
       const dom = t.domain ? domainById(t.domain) : null;
       const isTaskOverdue = t.date && !t.done && t.date < ymd(new Date());
-      return `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''}" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed;" onclick="editTaskFromSchedule('${t.id}')">
+      const showTrash = longPressedTaskId===t.id;
+      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''}" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
+          ${showTrash ? `<span class="task-chip-trash" onclick="event.stopPropagation(); unscheduleTaskFromWeek('${t.id}')" title="הסרה מתצוגת השבוע">🗑</span>` : ''}
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
       </div>`;
+      return chip + (scheduleEditingTaskId===t.id ? taskEditFormInner(t) : '');
     });
 
     let entries = chronoEntries;
@@ -2279,7 +2370,6 @@ function deleteSuggestion(id){
 const REFLECT_QUESTIONS = [
   {key:'fed', icon:'🟢', label:'מה הזין אותי השבוע?'},
   {key:'hard', icon:'🔴', label:'איפה הרגשתי עומס יתר / התרוקנות של אנרגיה?'},
-  {key:'release', icon:'🔵', label:'מה אני רוצה לשחרר לשבוע הבא?'},
   {key:'insights', icon:'💡', label:'תובנות מהשבוע'}
 ];
 const expandedBanks = new Set();
@@ -2287,7 +2377,7 @@ function weekKey(){ return ymd(currentWeekDates()[0]); }
 function renderReflection(){
   const el = document.getElementById('reflectionCard');
   if(!el) return;
-  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[], insights:[]};
+  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], insights:[]};
   el.innerHTML = REFLECT_QUESTIONS.map(q=>{
     const entries = (data.reflectionBanks[q.key]||[]).slice().sort((a,b)=> b.weekKey.localeCompare(a.weekKey));
     const isOpen = expandedBanks.has(q.key);
@@ -2310,7 +2400,7 @@ function addReflectionEntry(bankKey){
   const ta = document.getElementById(`reflect-${bankKey}`);
   const text = ta.value.trim();
   if(!text) return;
-  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], release:[], insights:[]};
+  if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], insights:[]};
   if(!data.reflectionBanks[bankKey]) data.reflectionBanks[bankKey] = [];
   data.reflectionBanks[bankKey].push({id:uid(), weekKey:weekKey(), text});
   saveData();
@@ -2377,12 +2467,18 @@ function importData(e){
       data.tasks = (parsed.tasks || []).map(t=>({energy:'mid', endTime:'', description:'', subtasks:[], ...t}));
       data.someday = (parsed.someday || []).map(s=>({domain:data.domains[0].id, description:'', subtasks:[], ...s}));
       data.notes = parsed.notes || {};
-      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],release:[],insights:[]};
+      data.reflectionBanks = parsed.reflectionBanks || {fed:[],hard:[],insights:[]};
+      if(!data.reflectionBanks.insights) data.reflectionBanks.insights = [];
+      if(data.reflectionBanks.release && data.reflectionBanks.release.length){
+        data.reflectionBanks.insights = data.reflectionBanks.insights.concat(data.reflectionBanks.release);
+      }
+      delete data.reflectionBanks.release;
       if(parsed.reflection && !parsed.reflectionBanks){
         const wk = ymd(new Date(new Date().setDate(new Date().getDate()-new Date().getDay())));
-        ['fed','hard','release'].forEach(k=>{
+        ['fed','hard'].forEach(k=>{
           if(parsed.reflection[k]) data.reflectionBanks[k].push({id:uid(), weekKey:wk, text:parsed.reflection[k]});
         });
+        if(parsed.reflection.release) data.reflectionBanks.insights.push({id:uid(), weekKey:wk, text:parsed.reflection.release});
       }
       data.softMode = !!parsed.softMode;
       data.nightMode = !!parsed.nightMode;
