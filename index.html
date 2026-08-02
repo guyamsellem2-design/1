@@ -258,8 +258,9 @@
 
   /* swipe-to-delete: drag a row right to reveal a trash panel, past a threshold asks to confirm */
   .task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip{touch-action:pan-y;}
-  .swipe-trash-reveal{position:absolute; display:flex; align-items:center; padding-inline-start:18px; background:var(--energy-high); color:#fff; font-size:19px; border-radius:inherit; box-sizing:border-box; pointer-events:none;}
-  .swipe-trash-reveal.armed{background:#a52f2f;}
+  .swipe-trash-reveal{position:absolute; border-radius:inherit; box-sizing:border-box; pointer-events:none; background:linear-gradient(to right, rgba(199,116,107,0.85) 0, rgba(199,116,107,0.85) 34px, rgba(199,116,107,0) 120px);}
+  .swipe-trash-reveal.armed{background:linear-gradient(to right, rgba(165,47,47,0.92) 0, rgba(165,47,47,0.92) 34px, rgba(165,47,47,0) 140px);}
+  .swipe-trash-icon{position:absolute; top:50%; left:16px; transform:translateY(-50%); color:#fff; font-size:19px;}
   .add-anchor-btn{margin-top:auto; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:8px; padding:6px; font-size:13.5px; cursor:pointer; font-family:inherit;}
   .add-anchor-btn:hover{color:var(--text); border-color:var(--muted);}
   .anchor-form{margin-top:8px; display:flex; flex-direction:column; gap:6px; background:var(--surface2); padding:8px; border-radius:8px;}
@@ -833,13 +834,14 @@ function renderDomainEditor(){
         <span class="chip-name">${escapeHtml(d.name)}</span>
       </div>`;
     }
-    return `<div class="domain-chip active" data-id="${d.id}" style="background:${d.color}; color:${contrastTextColor(d.color)};">
-      <span class="grip" onpointerdown="event.stopPropagation(); onGripPointerDown(event,'${d.id}')" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
-      <button type="button" class="palette-btn" style="background:${d.color}" onclick="event.stopPropagation(); toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
+    const activeChipFg = contrastTextColor(d.color);
+    return `<div class="domain-chip active" data-id="${d.id}" style="background:${d.color}; color:${activeChipFg};">
+      <span class="grip" style="color:${activeChipFg}; opacity:0.75;" onpointerdown="event.stopPropagation(); onGripPointerDown(event,'${d.id}')" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
+      <button type="button" class="palette-btn" style="background:${d.color}; border-color:${activeChipFg};" onclick="event.stopPropagation(); toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
       <input type="text" style="color:inherit;" value="${escapeAttr(d.name)}"
         onchange="renameDomainCommit('${d.id}', this.value)"
         oninput="updateDomainNameLive('${d.id}', this.value); sizeChipInput(this)">
-      <span class="rm" onclick="event.stopPropagation(); deleteDomain('${d.id}')">✕</span>
+      <span class="rm" style="color:${activeChipFg};" onclick="event.stopPropagation(); deleteDomain('${d.id}')">✕</span>
     </div>`;
   }).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
@@ -3294,7 +3296,7 @@ function gestureEngage(g){
     const containerRect = container.getBoundingClientRect();
     const trash = document.createElement('div');
     trash.className = 'swipe-trash-reveal';
-    trash.textContent = '🗑';
+    trash.innerHTML = '<span class="swipe-trash-icon">🗑</span>';
     trash.style.top = (rowRect.top - containerRect.top) + 'px';
     trash.style.left = (rowRect.left - containerRect.left) + 'px';
     trash.style.width = rowRect.width + 'px';
