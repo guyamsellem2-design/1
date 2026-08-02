@@ -66,7 +66,9 @@
   }
   @media (prefers-reduced-motion: reduce){ body::before{ animation:none; } }
   body.soft{ filter:saturate(0.55) brightness(0.94); }
-  .wrap{max-width:980px;margin:0 auto;}
+  .wrap{max-width:980px;margin:0 auto; position:relative;}
+  .carousel-dragging{position:absolute; top:0; left:0; right:0; width:100%;}
+  .nav-drawer.dragging, .nav-overlay.dragging{transition:none;}
 
   header.top{margin-bottom:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;}
   .eyebrow{font-size:14px; letter-spacing:0.14em; color:var(--muted2); text-transform:uppercase; margin-bottom:8px; font-weight:500;}
@@ -252,6 +254,11 @@
   .anchor-chip:hover{background:var(--surface3);}
   .anchor-chip .time{color:var(--muted); font-size:12.5px; display:block; margin-bottom:1px;}
   .anchor-chip .buf{color:var(--muted2); font-size:11.5px; display:block; margin-top:2px;}
+
+  /* swipe-to-delete: drag a row right to reveal a trash panel, past a threshold asks to confirm */
+  .task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip{touch-action:pan-y;}
+  .swipe-trash-reveal{position:absolute; display:flex; align-items:center; padding-inline-start:18px; background:var(--energy-high); color:#fff; font-size:19px; border-radius:inherit; box-sizing:border-box; pointer-events:none;}
+  .swipe-trash-reveal.armed{background:#a52f2f;}
   .add-anchor-btn{margin-top:auto; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:8px; padding:6px; font-size:13.5px; cursor:pointer; font-family:inherit;}
   .add-anchor-btn:hover{color:var(--text); border-color:var(--muted);}
   .anchor-form{margin-top:8px; display:flex; flex-direction:column; gap:6px; background:var(--surface2); padding:8px; border-radius:8px;}
@@ -2467,7 +2474,7 @@ function renderScheduleGrid(){
       if(it.type==='anchor'){
         const a = it.data;
         const dom = domainById(a.domain);
-        const chip = `<div class="anchor-chip" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+        const chip = `<div class="anchor-chip" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
             ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
             ${escapeHtml(a.label)}
             ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
@@ -2478,7 +2485,7 @@ function renderScheduleGrid(){
       const dom = t.domain ? domainById(t.domain) : null;
       const isTaskOverdue = t.date && !t.done && t.date < ymd(new Date());
       const showTrash = longPressedTaskId===t.id;
-      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''}" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
+      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
           ${showTrash ? `<span class="task-chip-trash" onclick="event.stopPropagation(); unscheduleTaskFromWeek('${t.id}')" title="הסרה מתצוגת השבוע">🗑</span>` : ''}
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
@@ -2819,7 +2826,7 @@ function renderReflection(){
     const entries = (data.reflectionBanks[q.key]||[]).slice().sort((a,b)=> b.weekKey.localeCompare(a.weekKey));
     const isOpen = expandedBanks.has(q.key);
     const historyHtml = isOpen ? (entries.length ? `<div class="bank-list">${entries.map(e=>`
-        <div class="bank-entry">
+        <div class="bank-entry" data-bank-key="${q.key}" data-entry-id="${e.id}">
           <span class="bank-date">${e.weekKey}</span>
           <span onclick="editBankEntry('${q.key}','${e.id}')">${escapeHtml(e.text)}</span>
           <span class="del-task" onclick="deleteBankEntry('${q.key}','${e.id}')">✕</span>
@@ -3223,43 +3230,247 @@ window.addEventListener('touchmove', (e)=>{
 window.addEventListener('touchend', pullRefreshEnd, {passive:true});
 window.addEventListener('touchcancel', pullRefreshReset, {passive:true});
 
-/* ---------- edge-swipe gestures: right edge <-> nav drawer, left edge <-> home/topics tab ---------- */
+/* ---------- unified horizontal touch gestures ----------
+   one gesture at a time, decided at touch-start by priority:
+   1) swipe-to-delete a row (task/someday/suggestion/insight/schedule chip)
+   2) nav drawer (open from the right edge, or close by dragging anywhere while open)
+   3) week carousel (dragging inside the schedule grid)
+   4) tab carousel (from the left edge, home <-> topics)
+   all of them follow the finger live and either commit (past ~50%) or spring back on release. */
 const EDGE_ZONE = 24;
-const EDGE_SWIPE_THRESHOLD = 60;
-let edgeSwipeState = { startX:null, startY:null, edge:null };
-function edgeSwipeStart(clientX, clientY, target){
-  if(target && target.closest && target.closest('textarea, input, select, .keep-note-canvas')){
-    edgeSwipeState = { startX:null, startY:null, edge:null };
+const SWIPE_ROW_SELECTOR = '.task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip';
+const SWIPE_DELETE_THRESHOLD = 78;
+function resolveSwipeDeleteAction(row){
+  if(row.classList.contains('task-li')) return ()=>deleteTask(row.dataset.dragId);
+  if(row.classList.contains('someday-li')) return ()=>deleteSomeday(row.dataset.dragId);
+  if(row.classList.contains('suggestion-li')) return ()=>deleteSuggestion(row.dataset.dragId);
+  if(row.classList.contains('bank-entry')) return ()=>deleteBankEntry(row.dataset.bankKey, row.dataset.entryId);
+  if(row.classList.contains('anchor-chip')){
+    const id = row.dataset.dragId;
+    return row.dataset.itemKind==='anchor' ? ()=>deleteAnchor(id) : ()=>deleteTask(id);
+  }
+  return null;
+}
+
+let gesture = null;
+function gestureStart(clientX, clientY, target){
+  if(gesture || !target || !target.closest) return;
+  if(target.closest('textarea, input, select, .keep-note-canvas')) return;
+
+  const swipeRow = target.closest(SWIPE_ROW_SELECTOR);
+  if(swipeRow && !target.closest('.grip, button, a')){
+    const action = resolveSwipeDeleteAction(swipeRow);
+    if(action){ gesture = { kind:'swipe-delete', row:swipeRow, action, startX:clientX, startY:clientY, locked:null, dx:0 }; return; }
+  }
+
+  const w = window.innerWidth;
+  if(navOpen || clientX >= w - EDGE_ZONE){
+    gesture = { kind:'nav-drawer', startX:clientX, startY:clientY, locked:null, width:0 };
     return;
   }
-  const w = window.innerWidth;
-  if(clientX >= w - EDGE_ZONE) edgeSwipeState = { startX:clientX, startY:clientY, edge:'right' };
-  else if(clientX <= EDGE_ZONE) edgeSwipeState = { startX:clientX, startY:clientY, edge:'left' };
-  else edgeSwipeState = { startX:null, startY:null, edge:null };
-}
-function edgeSwipeEnd(clientX, clientY){
-  const { startX, startY, edge } = edgeSwipeState;
-  edgeSwipeState = { startX:null, startY:null, edge:null };
-  if(!edge || startX===null) return;
-  const dx = clientX - startX;
-  const dy = clientY - startY;
-  if(Math.abs(dy) > Math.abs(dx)) return; // mostly-vertical drag, not an edge swipe
-  if(edge==='right'){
-    if(dx <= -EDGE_SWIPE_THRESHOLD && !navOpen){ navOpen = true; applyNavState(); }
-    else if(dx >= EDGE_SWIPE_THRESHOLD && navOpen) closeNav();
-  } else if(edge==='left'){
-    if(Math.abs(dx) >= EDGE_SWIPE_THRESHOLD){
-      if(mainView==='home') switchMainView('topics');
-      else if(mainView==='topics') switchMainView('home');
-    }
+
+  const scheduleGridEl = target.closest('#scheduleGrid');
+  if(scheduleGridEl && mainView==='home' && !target.closest('button, select, input, textarea, a')){
+    gesture = { kind:'week-carousel', startX:clientX, startY:clientY, locked:null, dx:0 };
+    return;
+  }
+
+  if(clientX <= EDGE_ZONE){
+    gesture = { kind:'tab-carousel', startX:clientX, startY:clientY, locked:null, dx:0 };
   }
 }
+function gestureEngage(g){
+  if(g.kind==='swipe-delete'){
+    g.row.style.transition = 'none';
+    if(getComputedStyle(g.row).position==='static') g.row.style.position = 'relative';
+    g.prevZ = g.row.style.zIndex; g.row.style.zIndex = '2';
+    const container = g.row.parentElement;
+    if(getComputedStyle(container).position==='static') container.style.position = 'relative';
+    const rowRect = g.row.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const trash = document.createElement('div');
+    trash.className = 'swipe-trash-reveal';
+    trash.textContent = '🗑';
+    trash.style.top = (rowRect.top - containerRect.top) + 'px';
+    trash.style.left = (rowRect.left - containerRect.left) + 'px';
+    trash.style.width = rowRect.width + 'px';
+    trash.style.height = rowRect.height + 'px';
+    container.appendChild(trash);
+    g.trashEl = trash;
+  } else if(g.kind==='nav-drawer'){
+    const drawer = document.getElementById('navDrawer');
+    g.width = Math.min(drawer.getBoundingClientRect().width || 280, window.innerWidth*0.82);
+    drawer.classList.add('dragging');
+    document.getElementById('navOverlay').classList.add('dragging');
+  } else if(g.kind==='week-carousel'){
+    const grid = document.getElementById('scheduleGrid');
+    grid.style.transition = 'none';
+    g.width = grid.clientWidth || window.innerWidth;
+  } else if(g.kind==='tab-carousel'){
+    g.width = document.querySelector('.wrap').clientWidth || window.innerWidth;
+    const home = document.getElementById('homeView'), topics = document.getElementById('domainPageView');
+    home.classList.add('carousel-dragging'); topics.classList.add('carousel-dragging');
+    home.style.transition = 'none'; topics.style.transition = 'none';
+    home.style.display = ''; topics.style.display = '';
+  }
+}
+function gestureMove(clientX, clientY){
+  if(!gesture) return;
+  const dx = clientX - gesture.startX, dy = clientY - gesture.startY;
+  if(gesture.locked===null){
+    if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    gesture.locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if(gesture.locked==='y'){ gesture = null; return; }
+    gestureEngage(gesture);
+  }
+  if(gesture.locked!=='x') return;
+  gesture.dx = dx;
+  if(gesture.kind==='swipe-delete') swipeDeleteMove(gesture, dx);
+  else if(gesture.kind==='nav-drawer') navDrawerDragMove(gesture, dx);
+  else if(gesture.kind==='week-carousel') weekCarouselMove(gesture, dx);
+  else if(gesture.kind==='tab-carousel') tabCarouselMove(gesture, dx);
+}
+function gestureEnd(){
+  if(!gesture) return;
+  if(gesture.locked==='x'){
+    if(gesture.kind==='swipe-delete') swipeDeleteEnd(gesture);
+    else if(gesture.kind==='nav-drawer') navDrawerDragEnd(gesture);
+    else if(gesture.kind==='week-carousel') weekCarouselEnd(gesture);
+    else if(gesture.kind==='tab-carousel') tabCarouselEnd(gesture);
+  }
+  gesture = null;
+}
+function gestureCancel(){
+  if(gesture && gesture.locked==='x'){
+    if(gesture.kind==='swipe-delete') swipeDeleteCancel(gesture);
+    else if(gesture.kind==='nav-drawer') navDrawerDragCancel(gesture);
+    else if(gesture.kind==='week-carousel') weekCarouselCancel(gesture);
+    else if(gesture.kind==='tab-carousel') tabCarouselCancel(gesture);
+  }
+  gesture = null;
+}
+
+/* swipe-to-delete */
+function swipeDeleteMove(g, dx){
+  const clamped = Math.max(0, dx);
+  g.row.style.transform = `translateX(${clamped}px)`;
+  const armed = clamped > SWIPE_DELETE_THRESHOLD;
+  g.row.classList.toggle('swipe-armed', armed);
+  if(g.trashEl) g.trashEl.classList.toggle('armed', armed);
+}
+function swipeDeleteSettle(g){
+  g.row.style.transition = 'transform .2s ease';
+  g.row.style.transform = '';
+  g.row.classList.remove('swipe-armed');
+  setTimeout(()=>{
+    g.row.style.transition = '';
+    g.row.style.zIndex = g.prevZ || '';
+    if(g.trashEl) g.trashEl.remove();
+  }, 210);
+}
+function swipeDeleteEnd(g){
+  const dx = Math.max(0, g.dx||0);
+  swipeDeleteSettle(g);
+  if(dx > SWIPE_DELETE_THRESHOLD){ if(confirm('למחוק?')) g.action(); }
+}
+function swipeDeleteCancel(g){ swipeDeleteSettle(g); }
+
+/* nav drawer drag */
+function navDrawerDragMove(g, dx){
+  const drawer = document.getElementById('navDrawer');
+  const overlay = document.getElementById('navOverlay');
+  const openPx = navOpen ? Math.max(0, Math.min(g.width, g.width - dx)) : Math.max(0, Math.min(g.width, -dx));
+  drawer.style.right = (openPx - g.width) + 'px';
+  overlay.style.opacity = String(openPx / g.width);
+  overlay.style.pointerEvents = openPx>0 ? 'auto' : 'none';
+  g.openPx = openPx;
+}
+function navDrawerDragSettle(g, willOpen){
+  const drawer = document.getElementById('navDrawer');
+  const overlay = document.getElementById('navOverlay');
+  drawer.classList.remove('dragging');
+  overlay.classList.remove('dragging');
+  drawer.style.right = '';
+  overlay.style.opacity = '';
+  overlay.style.pointerEvents = '';
+  navOpen = willOpen;
+  applyNavState();
+}
+function navDrawerDragEnd(g){ navDrawerDragSettle(g, ((g.openPx||0)/g.width) > 0.5); }
+function navDrawerDragCancel(g){ navDrawerDragSettle(g, navOpen); }
+
+/* week carousel */
+function weekCarouselMove(g, dx){
+  const grid = document.getElementById('scheduleGrid');
+  const canPrev = weekOffset > WEEK_OFFSET_MIN, canNext = weekOffset < WEEK_OFFSET_MAX;
+  let clamped = dx;
+  if(dx > 0 && !canPrev) clamped = dx * 0.25;
+  if(dx < 0 && !canNext) clamped = dx * 0.25;
+  grid.style.transform = `translateX(${clamped}px)`;
+}
+function weekCarouselEnd(g){
+  const grid = document.getElementById('scheduleGrid');
+  const rawDx = g.dx || 0;
+  const delta = rawDx > 0 ? -1 : 1; // drag right reveals the previous week, drag left reveals the next
+  const canMove = (delta===-1 && weekOffset>WEEK_OFFSET_MIN) || (delta===1 && weekOffset<WEEK_OFFSET_MAX);
+  grid.style.transition = 'transform .22s ease';
+  if(canMove && Math.abs(rawDx) > g.width * 0.5){
+    grid.style.transform = `translateX(${rawDx>0?g.width:-g.width}px)`;
+    setTimeout(()=>{ grid.style.transition=''; grid.style.transform=''; changeWeek(delta); }, 220);
+  } else {
+    grid.style.transform = '';
+    setTimeout(()=>{ grid.style.transition=''; }, 220);
+  }
+}
+function weekCarouselCancel(g){
+  const grid = document.getElementById('scheduleGrid');
+  grid.style.transition = 'transform .2s ease';
+  grid.style.transform = '';
+  setTimeout(()=>{ grid.style.transition=''; }, 210);
+}
+
+/* tab carousel: home <-> topics */
+function tabCarouselMove(g, dx){
+  const home = document.getElementById('homeView'), topics = document.getElementById('domainPageView');
+  const W = g.width;
+  if(mainView==='home'){
+    const clamped = Math.max(0, dx);
+    home.style.transform = `translateX(${clamped}px)`;
+    topics.style.transform = `translateX(${clamped - W}px)`;
+    g.progress = clamped / W;
+  } else {
+    const clamped = Math.min(0, dx);
+    topics.style.transform = `translateX(${clamped}px)`;
+    home.style.transform = `translateX(${clamped + W}px)`;
+    g.progress = -clamped / W;
+  }
+}
+function tabCarouselSettleTo(view){
+  const home = document.getElementById('homeView'), topics = document.getElementById('domainPageView');
+  const W = document.querySelector('.wrap').clientWidth || window.innerWidth;
+  home.style.transition = 'transform .2s ease';
+  topics.style.transition = 'transform .2s ease';
+  if(view==='topics'){ home.style.transform = `translateX(${W}px)`; topics.style.transform = 'translateX(0)'; }
+  else { home.style.transform = 'translateX(0)'; topics.style.transform = `translateX(${-W}px)`; }
+  setTimeout(()=>{
+    home.style.transition = ''; topics.style.transition = '';
+    home.style.transform = ''; topics.style.transform = '';
+    home.classList.remove('carousel-dragging'); topics.classList.remove('carousel-dragging');
+    home.style.display = ''; topics.style.display = '';
+    if(view !== mainView) switchMainView(view); else applyMainViewState();
+  }, 210);
+}
+function tabCarouselEnd(g){ tabCarouselSettleTo((g.progress||0) > 0.5 ? (mainView==='home'?'topics':'home') : mainView); }
+function tabCarouselCancel(g){ tabCarouselSettleTo(mainView); }
+
 window.addEventListener('touchstart', (e)=>{
-  if(e.touches && e.touches.length===1) edgeSwipeStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+  if(e.touches && e.touches.length===1) gestureStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
 }, {passive:true});
-window.addEventListener('touchend', (e)=>{
-  if(e.changedTouches && e.changedTouches.length===1) edgeSwipeEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+window.addEventListener('touchmove', (e)=>{
+  if(e.touches && e.touches.length===1) gestureMove(e.touches[0].clientX, e.touches[0].clientY);
 }, {passive:true});
+window.addEventListener('touchend', gestureEnd, {passive:true});
+window.addEventListener('touchcancel', gestureCancel, {passive:true});
 
 setupPWA();
 loadData();
