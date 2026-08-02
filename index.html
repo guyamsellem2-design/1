@@ -92,9 +92,13 @@
   .nav-home-link{display:flex; align-items:center; gap:8px; padding:10px 8px; border-radius:10px; cursor:pointer; font-size:15px; color:var(--text); margin-bottom:4px;}
   .nav-home-link:hover{background:var(--surface2);}
   .nav-drawer hr{border:none; border-top:1px solid var(--border); margin:10px 0;}
-  .nav-domain-item{display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius:10px; cursor:pointer; font-size:15px; color:var(--text);}
-  .nav-domain-item:hover{background:var(--surface2);}
+  .nav-domain-item{display:flex; align-items:center; gap:8px; padding:6px 4px; border-radius:10px; font-size:15px; color:var(--text);}
   .nav-domain-item .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+  .nav-domain-color-btn{width:22px; height:22px; border-radius:50%; border:1px solid var(--border-strong); cursor:pointer; padding:0; flex-shrink:0;}
+  .nav-domain-name-input{flex:1; min-width:0; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; padding:4px 2px;}
+  .nav-domain-name-input:focus{outline:none; border-bottom:1px solid var(--border-strong);}
+  .nav-domain-open{color:var(--muted2); font-size:19px; cursor:pointer; padding:2px 4px; flex-shrink:0;}
+  .nav-domain-open:hover{color:var(--text);}
 
   .domain-page-topbar{display:flex; align-items:center; justify-content:space-between; gap:8px;}
   .domain-page-header{margin:14px 0 6px;}
@@ -1046,9 +1050,16 @@ function renderNavList(){
   const el = document.getElementById('navDomainList');
   if(!el) return;
   el.innerHTML = data.domains.map(d=>`
-    <div class="nav-domain-item" onclick="navigateToDomain('${d.id}')">
-      <span class="dot" style="background:${d.color}"></span>${escapeHtml(d.name)}
-    </div>`).join('');
+    <div class="nav-domain-item">
+      <button type="button" class="nav-domain-color-btn" style="background:${d.color}" onclick="toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
+      <input type="text" class="nav-domain-name-input" value="${escapeAttr(d.name)}"
+        onchange="renameDomainCommit('${d.id}', this.value)"
+        oninput="updateDomainNameLive('${d.id}', this.value)">
+      <span class="nav-domain-open" onclick="navigateToDomain('${d.id}')" title="פתיחת דף הנושא">›</span>
+      <span class="del-task" onclick="deleteDomain('${d.id}')">✕</span>
+    </div>
+    ${colorPickerForId===d.id ? renderColorPanel(d.id) : ''}
+  `).join('') + `<button class="add-domain-btn" onclick="addDomain()" style="margin-top:12px; width:100%;">+ נושא</button>`;
 }
 /* ---------- two main tabs: בית / נושאים ---------- */
 let mainView = 'home';
