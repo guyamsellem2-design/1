@@ -3321,6 +3321,44 @@ window.addEventListener('touchmove', (e)=>{
 window.addEventListener('touchend', pullRefreshEnd, {passive:true});
 window.addEventListener('touchcancel', pullRefreshReset, {passive:true});
 
+/* ---------- edge-swipe gestures: right edge <-> nav drawer, left edge <-> home/topics tab ---------- */
+const EDGE_ZONE = 24;
+const EDGE_SWIPE_THRESHOLD = 60;
+let edgeSwipeState = { startX:null, startY:null, edge:null };
+function edgeSwipeStart(clientX, clientY, target){
+  if(target && target.closest && target.closest('textarea, input, select, .keep-note-canvas')){
+    edgeSwipeState = { startX:null, startY:null, edge:null };
+    return;
+  }
+  const w = window.innerWidth;
+  if(clientX >= w - EDGE_ZONE) edgeSwipeState = { startX:clientX, startY:clientY, edge:'right' };
+  else if(clientX <= EDGE_ZONE) edgeSwipeState = { startX:clientX, startY:clientY, edge:'left' };
+  else edgeSwipeState = { startX:null, startY:null, edge:null };
+}
+function edgeSwipeEnd(clientX, clientY){
+  const { startX, startY, edge } = edgeSwipeState;
+  edgeSwipeState = { startX:null, startY:null, edge:null };
+  if(!edge || startX===null) return;
+  const dx = clientX - startX;
+  const dy = clientY - startY;
+  if(Math.abs(dy) > Math.abs(dx)) return; // mostly-vertical drag, not an edge swipe
+  if(edge==='right'){
+    if(dx <= -EDGE_SWIPE_THRESHOLD && !navOpen){ navOpen = true; applyNavState(); }
+    else if(dx >= EDGE_SWIPE_THRESHOLD && navOpen) closeNav();
+  } else if(edge==='left'){
+    if(Math.abs(dx) >= EDGE_SWIPE_THRESHOLD){
+      if(mainView==='home') switchMainView('topics');
+      else if(mainView==='topics') switchMainView('home');
+    }
+  }
+}
+window.addEventListener('touchstart', (e)=>{
+  if(e.touches && e.touches.length===1) edgeSwipeStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+}, {passive:true});
+window.addEventListener('touchend', (e)=>{
+  if(e.changedTouches && e.changedTouches.length===1) edgeSwipeEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+}, {passive:true});
+
 setupPWA();
 loadData();
 </script>
