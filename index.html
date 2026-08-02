@@ -493,12 +493,12 @@
     <div id="secbody-suggestions">
     <div class="card">
       <div class="add-row">
+        <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
         <input type="text" id="suggText" placeholder="מה ההצעה...">
-        <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ פרטים (רשות)</button>
+        <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ תאריך תשובה (רשות)</button>
         <button onclick="addSuggestion()">הוסף</button>
       </div>
       <div class="add-row" id="suggDetailsFields" style="display:none;">
-        <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
         <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
       </div>
       <ul class="tasks scroll-cap" id="suggestionList"></ul>
@@ -540,7 +540,7 @@
   <div class="topic-tab-strip" id="topicTabStrip"></div>
   <div class="notebook-body">
     <div class="add-row">
-      <button onclick="addDomainNote()">+ פתק חדש</button>
+      <button id="addNoteBtn" onclick="addDomainNote()">+ פתק חדש</button>
     </div>
     <div class="keep-grid" id="keepGrid"></div>
   </div>
@@ -902,6 +902,7 @@ function applyMainViewState(){
     if(!activeNoteDomain || !domainById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
     renderDomainEditor();
     renderKeepGrid(activeNoteDomain);
+    updateAddNoteBtnColor();
     window.scrollTo(0,0);
   }
 }
@@ -1627,6 +1628,12 @@ function toggleListExpand(key){
   listExpandState[key] = !listExpandState[key];
   const el = document.getElementById(key+'List');
   applyListCap(key, el ? Number(el.dataset.itemCount||0) : 0);
+  if(listExpandState[key] && el){
+    // expanding can grow the list well past the bottom of the screen — scroll back to the section's
+    // beginning so the newly-revealed content is seen from the top, not from wherever it happened to land
+    const section = el.closest('section') || el.closest('.card') || el;
+    requestAnimationFrame(()=>{ section.scrollIntoView({behavior:'smooth', block:'start'}); });
+  }
 }
 function applyListCap(key, itemCount){
   const listEl = document.getElementById(key+'List');
@@ -2003,6 +2010,13 @@ function selectTopicTab(id){
   activeNoteDomain = id;
   renderDomainEditor();
   renderKeepGrid(id);
+  updateAddNoteBtnColor();
+}
+function updateAddNoteBtnColor(){
+  const btn = document.getElementById('addNoteBtn');
+  if(!btn) return;
+  const dom = activeNoteDomain ? domainById(activeNoteDomain) : null;
+  btn.style.background = dom ? dom.color : '';
 }
 
 /* ---------- someday ---------- */
@@ -2467,7 +2481,7 @@ function escapeHtml(str){ const div=document.createElement('div'); div.textConte
 function escapeAttr(str){ return String(str).replace(/"/g,'&quot;'); }
 function renderAllDependent(){
   renderTaskDomainSelect(); renderTasks(); renderScheduleGrid();
-  renderDomainEditor(); renderKeepGrid(activeNoteDomain); renderSomedayDomainSelect(); renderSomeday();
+  renderDomainEditor(); renderKeepGrid(activeNoteDomain); updateAddNoteBtnColor(); renderSomedayDomainSelect(); renderSomeday();
 }
 
 function resetAll(){
