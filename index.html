@@ -1716,7 +1716,7 @@ function taskCalendarUrl(t){
 
 /* ---------- google calendar sync (import-only, additive) ---------- */
 const GCAL_CLIENT_ID = '205912988147-1nd655pslkb8temou2oonfueep3lhvs4.apps.googleusercontent.com';
-const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 let gcalAccessToken = null;
 let gcalSyncing = false;
 let gcalPickerOpen = false;
@@ -1791,6 +1791,111 @@ function resolvePrimaryCalendarId(){
         renderGcalStatus();
       }
     }).catch(()=>{});
+}
+
+/* ---------- two-way sync: push local date/time changes to Google Calendar ---------- */
+function ensureGcalWriteToken(onReady){
+  if(gcalAccessToken){ onReady(); return; }
+  if(!gcalReady()){ alert('שירות ההתחברות של גוגל עוד לא נטען — נסה/י לרענן את הדף.'); return; }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GCAL_CLIENT_ID,
+    scope: GCAL_SCOPE,
+    callback: (resp)=>{
+      if(resp && resp.access_token){ gcalAccessToken = resp.access_token; onReady(); }
+      else { flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
+    },
+    error_callback: ()=>{ flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
+  });
+  client.requestAccessToken({prompt:''});
+}
+function pushEventToGcal(eventBody, existingEventId, onSuccess){
+  const calId = gcalSelectedCalendarIds()[0] || 'primary';
+  const method = existingEventId ? 'PATCH' : 'POST';
+  const url = existingEventId
+    ? `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(existingEventId)}`
+    : `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
+  fetch(url, { method, headers:{ Authorization: 'Bearer '+gcalAccessToken, 'Content-Type':'application/json' }, body: JSON.stringify(eventBody) })
+    .then(r=>{
+      if(r.status===401 || r.status===403){
+        gcalAccessToken = null;
+        if(confirm('צריך לחדש את ההרשאה ליומן גוגל (כולל הרשאת כתיבה) כדי לעדכן שם. לחבר עכשיו?')) connectGoogleCalendar();
+        return null;
+      }
+      if(!r.ok) throw new Error('http_'+r.status);
+      return r.json();
+    })
+    .then(ev=>{ if(ev){ onSuccess(ev); flashStatus('עודכן ביומן גוגל'); } })
+    .catch(()=>{ flashStatus('העדכון ביומן גוגל נכשל'); });
+}
+function pushTaskToGcal(t){
+  if(!t.date) return;
+  ensureGcalWriteToken(()=>{
+    const dom = t.domain ? domainById(t.domain) : null;
+    const [y,m,d] = t.date.split('-').map(Number);
+    const [h,mi] = (t.time||'09:00').split(':').map(Number);
+    const start = new Date(y, m-1, d, h, mi, 0);
+    let end;
+    if(t.endTime){ const [eh,emi] = t.endTime.split(':').map(Number); end = new Date(y,m-1,d,eh,emi,0); }
+    else { end = new Date(y,m-1,d,h+1,mi,0); }
+    const body = {
+      summary: t.text,
+      description: `משימה מתוך "המפה השבועית"${dom?' · נושא: '+dom.name:''}`,
+      start: { dateTime: start.toISOString() },
+      end: { dateTime: end.toISOString() }
+    };
+    pushEventToGcal(body, t.googleEventId, ev=>{ t.googleEventId = ev.id; saveData(); });
+  });
+}
+function anchorRecurrenceRule(a){
+  const repeatType = a.repeatType || 'weekly';
+  if(repeatType==='daily') return 'RRULE:FREQ=DAILY';
+  if(repeatType==='monthly') return 'RRULE:FREQ=MONTHLY';
+  if(repeatType==='yearly') return 'RRULE:FREQ=YEARLY';
+  if(repeatType==='once') return null;
+  return `RRULE:FREQ=WEEKLY;BYDAY=${DAYS_ICAL[a.day]}`;
+}
+function pushAnchorToGcal(a){
+  ensureGcalWriteToken(()=>{
+    const dom = a.domain ? domainById(a.domain) : null;
+    const [sh, sm] = (a.time||'09:00').split(':').map(Number);
+    let endH, endM;
+    if(a.endTime){ [endH, endM] = a.endTime.split(':').map(Number); }
+    else { endH = Math.min(sh+1,23); endM = sm; }
+    let endTotal = endH*60+endM + (a.buffer?15:0);
+    endH = Math.floor(endTotal/60)%24; endM = endTotal%60;
+    const repeatType = a.repeatType || 'weekly';
+    let start, end;
+    if(repeatType==='daily'){
+      const refDateStr = a.date || ymd(new Date());
+      const [y,m,d] = refDateStr.split('-').map(Number);
+      start = new Date(y, m-1, d, sh, sm, 0);
+      end = new Date(y, m-1, d, endH, endM, 0);
+    } else if(repeatType!=='weekly' && a.date){
+      const [y,m,d] = a.date.split('-').map(Number);
+      start = new Date(y, m-1, d, sh, sm, 0);
+      end = new Date(y, m-1, d, endH, endM, 0);
+    } else {
+      start = nextDateForDay(a.day, sh, sm);
+      end = nextDateForDay(a.day, endH, endM);
+    }
+    const recur = anchorRecurrenceRule(a);
+    const body = {
+      summary: a.label,
+      description: `עוגן קבוע מתוך "המפה השבועית"${dom?' · נושא: '+dom.name:''}`,
+      start: { dateTime: start.toISOString() },
+      end: { dateTime: end.toISOString() }
+    };
+    if(recur) body.recurrence = [recur];
+    pushEventToGcal(body, a.googleRecurringEventId, ev=>{ a.googleRecurringEventId = ev.id; saveData(); });
+  });
+}
+function maybePromptGcalSync(item, kind, changedTiming){
+  if(!data.gcalConnected || !changedTiming) return;
+  if(kind==='task' && !item.date) return;
+  const already = kind==='task' ? !!item.googleEventId : !!item.googleRecurringEventId;
+  const question = already ? 'לעדכן את השינוי גם ביומן גוגל?' : 'להוסיף את זה גם ליומן גוגל?';
+  if(!confirm(question)) return;
+  if(kind==='task') pushTaskToGcal(item); else pushAnchorToGcal(item);
 }
 
 function syncGoogleCalendar(){
@@ -2047,11 +2152,13 @@ function saveNewTaskFromSchedule(dayIdx, dateStr){
   const domain = document.getElementById(`newTaskDomain-${dayIdx}`).value;
   const energy = document.getElementById(`newTaskEnergy-${dayIdx}`).value;
   const time = document.getElementById(`newTaskTime-${dayIdx}`).value || '';
-  data.tasks.push({id:uid(), text, domain, done:false, energy, date:dateStr, time, endTime:'', description:'', subtasks:[], createdAt:Date.now()});
+  const newTask = {id:uid(), text, domain, done:false, energy, date:dateStr, time, endTime:'', description:'', subtasks:[], createdAt:Date.now()};
+  data.tasks.push(newTask);
   addingTaskDayIdx = null;
   saveData();
   renderScheduleGrid();
   renderTasks();
+  maybePromptGcalSync(newTask, 'task', true);
 }
 function toggleAnchorDateField(dayIdx){
   const sel = document.getElementById(`anchorRepeat-${dayIdx}`);
@@ -2078,15 +2185,24 @@ function saveAnchor(dayIdx){
   const dateEl = document.getElementById(`anchorDate-${dayIdx}`);
   const date = (['once','monthly','yearly'].includes(repeatType) && dateEl) ? dateEl.value : '';
   if(!label) return;
+  let anchorRef, changedTiming;
   if(editingAnchorId){
     const idx = data.anchors.findIndex(a=>a.id===editingAnchorId);
-    if(idx>-1) data.anchors[idx] = {...data.anchors[idx], time, endTime, label, domain, buffer, repeatType, date};
+    if(idx>-1){
+      const prev = data.anchors[idx];
+      changedTiming = prev.time!==time || prev.endTime!==endTime || prev.repeatType!==repeatType || prev.date!==date;
+      data.anchors[idx] = {...prev, time, endTime, label, domain, buffer, repeatType, date};
+      anchorRef = data.anchors[idx];
+    }
   } else {
-    data.anchors.push({id:uid(), day:dayIdx, time, endTime, label, domain, buffer, repeatType, date, createdAt:Date.now()});
+    anchorRef = {id:uid(), day:dayIdx, time, endTime, label, domain, buffer, repeatType, date, createdAt:Date.now()};
+    data.anchors.push(anchorRef);
+    changedTiming = true;
   }
   openForm = null; editingAnchorId = null;
   saveData();
   renderScheduleGrid();
+  if(anchorRef) maybePromptGcalSync(anchorRef, 'anchor', changedTiming);
 }
 function deleteAnchor(id){
   data.anchors = data.anchors.filter(a=>a.id!==id);
@@ -2338,6 +2454,7 @@ function saveTaskEdit(id){
   if(!t) return;
   const text = document.getElementById(`taskEditText-${id}`).value.trim();
   if(!text) return;
+  const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
   t.text = text;
   t.domain = document.getElementById(`taskEditDomain-${id}`).value;
   t.energy = document.getElementById(`taskEditEnergy-${id}`).value;
@@ -2356,6 +2473,8 @@ function saveTaskEdit(id){
   saveData();
   renderTasks();
   renderScheduleGrid();
+  const changedTiming = t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd;
+  maybePromptGcalSync(t, 'task', changedTiming);
 }
 function addSubtask(taskId){
   const input = document.getElementById(`subtaskInput-${taskId}`);
@@ -2415,7 +2534,8 @@ function addTask(){
   const date = document.getElementById('taskDate').value || '';
   const time = document.getElementById('taskTime').value || '';
   const endTime = document.getElementById('taskEndTime').value || '';
-  data.tasks.push({id:uid(), text, domain, done:false, energy, date, time, endTime, description:'', subtasks:[], createdAt:Date.now()});
+  const newTask = {id:uid(), text, domain, done:false, energy, date, time, endTime, description:'', subtasks:[], createdAt:Date.now()};
+  data.tasks.push(newTask);
   input.value='';
   document.getElementById('taskDate').value='';
   document.getElementById('taskTime').value='';
@@ -2423,6 +2543,7 @@ function addTask(){
   saveData();
   renderTasks();
   renderScheduleGrid();
+  maybePromptGcalSync(newTask, 'task', true);
 }
 function toggleTask(id){ const t=data.tasks.find(t=>t.id===id); if(t){ t.done=!t.done; saveData(); renderTasks(); renderScheduleGrid(); } }
 function cycleEnergy(id){
