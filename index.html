@@ -216,6 +216,11 @@
   .domain-chip{transition:transform .15s ease, box-shadow .15s ease; touch-action:pan-y;}
   .domain-chip.dragging{ z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; }
   .domain-chip.drag-over{ outline:2px dashed var(--gold); outline-offset:2px; }
+  .grip{cursor:grab; color:var(--muted2); font-size:15px; padding:2px 4px; touch-action:none; user-select:none; flex-shrink:0;}
+  .grip:hover{color:var(--text);}
+  ul.tasks li{transition:transform .15s ease, box-shadow .15s ease; touch-action:pan-y;}
+  ul.tasks li.dragging{z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; background:var(--surface2);}
+  ul.tasks li.list-drag-over{outline:2px dashed var(--gold); outline-offset:-2px;}
   .domain-chip .grip{cursor:grab; color:var(--muted2); font-size:15px; padding:2px 4px; touch-action:none; user-select:none;}
   .domain-chip .grip:hover{color:var(--text);}
   .domain-chip .rm{cursor:pointer; color:var(--muted2); font-size:14px; padding:2px 5px;}
@@ -451,6 +456,13 @@
         <input type="time" id="taskTime" placeholder="שעת התחלה">
         <input type="time" id="taskEndTime" placeholder="שעת סיום (רשות)">
       </div>
+      <div class="add-row" style="margin-bottom:10px;">
+        <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
+          <option value="manual" selected>מיון לפי: ידני (גרירה)</option>
+          <option value="time">מיון לפי: זמן</option>
+          <option value="topic">מיון לפי: נושא</option>
+        </select>
+      </div>
       <div class="section-divider"></div>
       <ul class="tasks scroll-cap" id="taskList"></ul>
       <div class="list-expand-row" id="taskListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('task')"></button></div>
@@ -485,6 +497,7 @@
         <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
           <option value="date">מיון לפי: תאריך</option>
           <option value="domain">מיון לפי: נושא</option>
+          <option value="manual">מיון לפי: ידני (גרירה)</option>
         </select>
         <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
       </div>
@@ -835,6 +848,74 @@ function onGripPointerUp(e){
 document.addEventListener('pointermove', onGripPointerMove);
 document.addEventListener('pointerup', onGripPointerUp);
 document.addEventListener('pointercancel', onGripPointerUp);
+
+/* ---------- generic manual drag-to-reorder, used by tasks/suggestions/someday ---------- */
+let listDragState = null;
+function startListDrag(e, id, itemSelector, reorderFn){
+  e.preventDefault();
+  e.stopPropagation();
+  const chip = e.currentTarget.closest(itemSelector);
+  if(!chip) return;
+  listDragState = {
+    id, chip, itemSelector, reorderFn, active:false, targetId:null,
+    startX:e.clientX, startY:e.clientY,
+    timer: setTimeout(()=>{
+      if(!listDragState) return;
+      listDragState.active = true;
+      listDragState.chip.classList.add('dragging');
+      if(navigator.vibrate) navigator.vibrate(15);
+    }, 500)
+  };
+  try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(err){}
+}
+function onListDragPointerMove(e){
+  if(!listDragState) return;
+  if(!listDragState.active){
+    const dx = e.clientX-listDragState.startX, dy = e.clientY-listDragState.startY;
+    if(Math.hypot(dx,dy) > 10){ clearTimeout(listDragState.timer); listDragState=null; }
+    return;
+  }
+  e.preventDefault();
+  const dx = e.clientX - listDragState.startX;
+  const dy = e.clientY - listDragState.startY;
+  listDragState.chip.style.transform = `translate(${dx}px, ${dy}px) scale(1.01)`;
+  listDragState.chip.style.pointerEvents = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  listDragState.chip.style.pointerEvents = '';
+  const targetChip = under ? under.closest(listDragState.itemSelector) : null;
+  document.querySelectorAll('.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+  if(targetChip && targetChip!==listDragState.chip){
+    targetChip.classList.add('list-drag-over');
+    listDragState.targetId = targetChip.dataset.dragId;
+  } else {
+    listDragState.targetId = null;
+  }
+}
+function onListDragPointerUp(){
+  if(!listDragState) return;
+  clearTimeout(listDragState.timer);
+  if(listDragState.active){
+    listDragState.chip.style.transform = '';
+    listDragState.chip.classList.remove('dragging');
+    document.querySelectorAll('.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+    if(listDragState.targetId && listDragState.targetId!==listDragState.id){
+      listDragState.reorderFn(listDragState.id, listDragState.targetId);
+    }
+  }
+  listDragState = null;
+}
+document.addEventListener('pointermove', onListDragPointerMove);
+document.addEventListener('pointerup', onListDragPointerUp);
+document.addEventListener('pointercancel', onListDragPointerUp);
+function reorderArrayById(arr, fromId, toId){
+  const from = arr.findIndex(x=>x.id===fromId);
+  const to = arr.findIndex(x=>x.id===toId);
+  if(from>-1 && to>-1){
+    const [item] = arr.splice(from,1);
+    arr.splice(to,0,item);
+  }
+}
+
 function addDomain(){
   const colors = ['#e2a34c','#3aa9a0','#e08a72','#b98fc4','#e2903f','#4fb4d6','#cf9a5c','#3fae7a','#9d84c9','#3fb0ac'];
   const color = colors[Math.floor(Math.random()*colors.length)];
@@ -1669,8 +1750,31 @@ function unscheduleTaskFromWeek(id){
 }
 const expandedTasks = new Set();
 function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(); }
-function sortByTime(list){
-  return [...list].sort((a,b)=> (a.time||'99:99').localeCompare(b.time||'99:99'));
+let taskSortBy = 'manual';
+function setTaskSortBy(val){ taskSortBy = val; renderTasks(); }
+function taskChronoCompare(a, b){
+  const aHas = !!a.time, bHas = !!b.time;
+  if(aHas && bHas && a.time!==b.time) return a.time < b.time ? -1 : 1;
+  if(aHas !== bHas) return aHas ? -1 : 1;
+  return (a.createdAt||0) - (b.createdAt||0);
+}
+function sortTasksForDisplay(list){
+  if(taskSortBy==='time') return list.slice().sort(taskChronoCompare);
+  if(taskSortBy==='topic'){
+    const domainOrder = new Map(data.domains.map((d,i)=>[d.id,i]));
+    return list.slice().sort((a,b)=>{
+      const ai = a.domain && domainOrder.has(a.domain) ? domainOrder.get(a.domain) : 9999;
+      const bi = b.domain && domainOrder.has(b.domain) ? domainOrder.get(b.domain) : 9999;
+      if(ai!==bi) return ai-bi;
+      return taskChronoCompare(a,b);
+    });
+  }
+  return list.slice(); // manual: keep data.tasks array order (drag-reorderable)
+}
+function reorderTasks(fromId, toId){
+  reorderArrayById(data.tasks, fromId, toId);
+  saveData();
+  renderTasks();
 }
 let overdueSectionOpen = false;
 function toggleOverdueSection(){ overdueSectionOpen = !overdueSectionOpen; renderTasks(); }
@@ -1706,8 +1810,9 @@ function renderTasks(){
   if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
   const today = ymd(new Date());
   const isTaskOverdue = t => !!(t.date && !t.done && t.date < today);
-  const regular = sortByTime(list.filter(t=>!isTaskOverdue(t)));
-  const overdue = sortByTime(list.filter(isTaskOverdue));
+  const sorted = sortTasksForDisplay(list);
+  const regular = sorted.filter(t=>!isTaskOverdue(t));
+  const overdue = sorted.filter(isTaskOverdue);
   let html = notice;
   if(regular.length===0 && overdue.length===0){
     html += `<li class="empty">${data.softMode ? 'אין כרגע משימות מטעינות — ואפשר גם פשוט לנוח' : 'אין עדיין משימות לשבוע — תוסיף/י את הדבר הכי קטן שאפשר להתחיל בו'}</li>`;
@@ -1737,8 +1842,10 @@ function taskRowHtml(t){
   const isOverdue = t.date && !t.done && t.date < ymd(new Date());
   const isDimmed = isOverdue || (data.softMode && !energy);
   const subBtnLabel = isSubtasksOpen ? `▾ תת-משימות${subCount?' ('+subCount+')':''}` : (subCount ? `▸ תת-משימות (${subCount})` : '+ תת-משימה');
-  let html = `<li class="task-li ${isDimmed?'dimmed-item':''}">
+  const canDrag = taskSortBy==='manual';
+  let html = `<li class="task-li ${isDimmed?'dimmed-item':''}" data-drag-id="${t.id}">
     <div class="task-row-main">
+      ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
       <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
       <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}`:''}">${dom?dom.name:'ללא נושא'}</span>
@@ -2137,6 +2244,7 @@ function renderSomeday(){
       const db = b.domain ? domainById(b.domain) : null;
       return (da?da.name:'').localeCompare(db?db.name:'', 'he');
     }
+    if(somedaySortBy==='manual') return 0; // keep data.someday array order (drag-reorderable), stable sort preserves it
     return (b.createdAt||0)-(a.createdAt||0);
   });
   if(list.length===0){
@@ -2152,7 +2260,9 @@ function somedayRowHtml(s){
   const subCount = (s.subtasks||[]).length;
   const isExpanded = expandedSomeday.has(s.id);
   const hasContent = subCount>0 || (s.description||'').trim();
-  let html = `<li>
+  const canDrag = somedaySortBy==='manual';
+  let html = `<li class="someday-li" data-drag-id="${s.id}">
+    ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${s.id}','.someday-li',reorderSomeday)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
     <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSomedayFavorite('${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
     <span class="task-text" style="flex:1" onclick="openSomedayEdit('${s.id}')">${escapeHtml(s.text)}</span>
     <span class="tag" style="background:${dom.color}">${dom.name}</span>
@@ -2257,6 +2367,11 @@ function addSomeday(){
   renderSomeday();
 }
 function deleteSomeday(id){ data.someday = data.someday.filter(s=>s.id!==id); expandedSomeday.delete(id); saveData(); renderSomeday(); }
+function reorderSomeday(fromId, toId){
+  reorderArrayById(data.someday, fromId, toId);
+  saveData();
+  renderSomeday();
+}
 function promoteToWeek(id){
   const s = data.someday.find(s=>s.id===id);
   if(!s) return;
@@ -2282,7 +2397,8 @@ function renderSuggestions(){
   el.innerHTML = sorted.map(s=>{
     if(editingSuggestionId===s.id) return suggestionEditFormHtml(s);
     return `
-    <li class="${s.done?'suggestion-done':''}">
+    <li class="suggestion-li ${s.done?'suggestion-done':''}" data-drag-id="${s.id}">
+      <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
       <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
       ${s.replyDate ? `<span class="task-date-badge">עד <span dir="ltr">${s.replyDate.slice(5)}</span></span>` : ''}
@@ -2362,6 +2478,11 @@ function convertSuggestionToTask(id){
 }
 function deleteSuggestion(id){
   data.suggestions = data.suggestions.filter(s=>s.id!==id);
+  saveData();
+  renderSuggestions();
+}
+function reorderSuggestions(fromId, toId){
+  reorderArrayById(data.suggestions, fromId, toId);
   saveData();
   renderSuggestions();
 }
