@@ -376,6 +376,8 @@
 
   footer{margin-top:50px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted2); font-size:14.5px; line-height:1.7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:13.5px; cursor:pointer; font-family:inherit;}
+  .reset-btn:disabled{opacity:.4; cursor:default;}
+  .reset-btn:disabled:hover{color:var(--muted2); border-color:var(--border-strong);}
   .reset-btn:hover{color:var(--text); border-color:var(--muted);}
 
   /* glass effect for surface-based components */
@@ -547,6 +549,8 @@
 
   <footer>
     <span>סקירה שבועית של 15 דקות מספיקה. זה כל התהליך.</span>
+    <button class="reset-btn" id="undoBtn" onclick="performUndo()" disabled>↶ בטל</button>
+    <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled>↷ בצע שוב</button>
     <button class="reset-btn" onclick="clearDoneTasks()">🧹 ניקוי משימות שבוצעו</button>
     <button class="reset-btn" onclick="resetAll()">איפוס הכל</button>
   </footer>
@@ -654,6 +658,7 @@ function loadData(){
   }
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
   migrateOldNotesToDomainNotes();
+  lastSnapshotJSON = JSON.stringify(data);
   render();
 }
 function migrateOldNotesToDomainNotes(){
@@ -679,7 +684,22 @@ function migrateOldNotesToDomainNotes(){
 }
 
 let saveTimer=null;
+let undoStack = [];
+let redoStack = [];
+const UNDO_LIMIT = 50;
+let lastSnapshotJSON = null;
+let isRestoringHistory = false;
 function saveData(){
+  if(!isRestoringHistory){
+    const current = JSON.stringify(data);
+    if(lastSnapshotJSON!==null && lastSnapshotJSON!==current){
+      undoStack.push(lastSnapshotJSON);
+      if(undoStack.length > UNDO_LIMIT) undoStack.shift();
+      redoStack = [];
+      updateUndoRedoButtons();
+    }
+    lastSnapshotJSON = current;
+  }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{
     try{
@@ -689,6 +709,36 @@ function saveData(){
       flashStatus('שגיאה בשמירה');
     }
   }, 250);
+}
+function updateUndoRedoButtons(){
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  if(undoBtn) undoBtn.disabled = undoStack.length===0;
+  if(redoBtn) redoBtn.disabled = redoStack.length===0;
+}
+function restoreSnapshot(json){
+  isRestoringHistory = true;
+  data = JSON.parse(json);
+  lastSnapshotJSON = json;
+  try{ localStorage.setItem(STORAGE_KEY, json); }catch(e){}
+  editingTaskId = null; scheduleEditingTaskId = null; editingSuggestionId = null; editingSomedayId = null;
+  editingAnchorId = null; openForm = null; drawingNoteId = null; colorPickerForId = null;
+  longPressedTaskId = null;
+  render();
+  updateUndoRedoButtons();
+  isRestoringHistory = false;
+}
+function performUndo(){
+  if(undoStack.length===0) return;
+  redoStack.push(JSON.stringify(data));
+  restoreSnapshot(undoStack.pop());
+  flashStatus('בוטל');
+}
+function performRedo(){
+  if(redoStack.length===0) return;
+  undoStack.push(JSON.stringify(data));
+  restoreSnapshot(redoStack.pop());
+  flashStatus('בוצע שוב');
 }
 
 function flashStatus(msg){
@@ -1855,6 +1905,7 @@ function taskRowHtml(t){
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
       ${t.date ? `<span class="task-date-badge"><span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
       ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
+      <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
   </li>`;
   if(isSubtasksOpen) html += taskDetailHtml(t);
@@ -2760,6 +2811,7 @@ function render(){
   renderReflection();
   applyAllSectionCollapse();
   applyMainViewState();
+  updateUndoRedoButtons();
 }
 
 /* ---------- collapsible sections ---------- */
@@ -2770,9 +2822,11 @@ function isSectionCollapsed(key){
 }
 function toggleSection(key){
   if(!data.collapsedSections) data.collapsedSections = {};
-  data.collapsedSections[key] = !isSectionCollapsed(key);
+  const wasCollapsed = isSectionCollapsed(key);
+  data.collapsedSections[key] = !wasCollapsed;
   saveData();
   applySectionCollapse(key);
+  if(wasCollapsed) scrollSectionHeaderToTop(key);
 }
 function openSection(key){
   if(!isSectionCollapsed(key)) return;
@@ -2780,6 +2834,13 @@ function openSection(key){
   data.collapsedSections[key] = false;
   saveData();
   applySectionCollapse(key);
+  scrollSectionHeaderToTop(key);
+}
+function scrollSectionHeaderToTop(key){
+  const body = document.getElementById('secbody-'+key);
+  const section = body && body.closest('section');
+  if(!section) return;
+  requestAnimationFrame(()=>{ section.scrollIntoView({behavior:'smooth', block:'start'}); });
 }
 function applySectionCollapse(key){
   const collapsed = isSectionCollapsed(key);
