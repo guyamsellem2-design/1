@@ -315,11 +315,13 @@
   .sched-link:hover{color:var(--text);}
   .task-date-badge{font-size:12px; color:var(--muted2); white-space:nowrap;}
 
-  .gcal-sync-row{margin-bottom:10px;}
-  .gcal-sync-row-inner{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-  .gcal-status{font-size:14px; color:var(--muted);}
-  .gcal-picker{display:flex; flex-direction:column; gap:7px; margin-top:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:9px 11px;}
+  .gcal-block{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px; margin-bottom:28px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
+  .gcal-block-title{font-size:15px; font-weight:700; color:var(--text); margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+  .gcal-sync-row-inner{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .gcal-status{font-size:15px; color:var(--muted);}
+  .gcal-picker{display:flex; flex-direction:column; gap:7px; margin-top:10px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:9px 11px;}
   .gcal-cal-row{display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;}
+  .gcal-connect-btn{background:var(--gold); color:#1a1206; border:none; padding:12px 20px; border-radius:10px; font-weight:600; cursor:pointer; font-family:inherit; font-size:15px;}
   .gcal-cal-dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
 
   .week-nav{display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:10px;}
@@ -459,13 +461,14 @@
     </div>
   </header>
 
+  <div class="gcal-block" id="gcalSyncRow"></div>
+
   <section>
     <div class="section-head">
       <h2 onclick="toggleSection('schedule')"><span class="num">01</span> לוח השבוע <span class="chev" id="chev-schedule">▾</span></h2>
       <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
     </div>
     <div id="secbody-schedule">
-      <div class="gcal-sync-row" id="gcalSyncRow"></div>
       <div class="week-nav" id="weekNav"></div>
       <div class="schedule-grid" id="scheduleGrid"></div>
     </div>
@@ -1968,7 +1971,7 @@ function renderGcalStatus(){
   const el = document.getElementById('gcalSyncRow');
   if(!el) return;
   if(!data.gcalConnected){
-    el.innerHTML = `<div class="gcal-sync-row-inner"><button class="reset-btn" onclick="connectGoogleCalendar()">🔗 חיבור ליומן גוגל (ייבוא בלבד, לא מוחק כלום)</button></div>`;
+    el.innerHTML = `<div class="gcal-block-title">📅 יומן גוגל</div><div class="gcal-sync-row-inner"><button class="gcal-connect-btn" onclick="connectGoogleCalendar()">🔗 חיבור ליומן גוגל (ייבוא בלבד, לא מוחק כלום)</button></div>`;
     return;
   }
   const lastSync = data.gcalLastSync ? new Date(data.gcalLastSync) : null;
@@ -1989,6 +1992,7 @@ function renderGcalStatus(){
     </div>`;
   }
   el.innerHTML = `
+    <div class="gcal-block-title">📅 יומן גוגל</div>
     <div class="gcal-sync-row-inner">
       <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
       <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
@@ -3293,7 +3297,12 @@ function pullRefreshEnd(){
     el.classList.add('spinning');
     el.style.transform = 'translate(-50%, 20px)';
     flushSaveData();
-    setTimeout(()=>location.reload(), 150);
+    if(data.gcalConnected && mainView==='home'){
+      syncGoogleCalendar();
+      setTimeout(pullRefreshReset, 500);
+    } else {
+      setTimeout(()=>location.reload(), 150);
+    }
   } else {
     pullRefreshReset();
   }
