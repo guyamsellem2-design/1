@@ -684,6 +684,7 @@ function migrateOldNotesToDomainNotes(){
 }
 
 let saveTimer=null;
+let saveIsPending = false;
 let undoStack = [];
 let redoStack = [];
 const UNDO_LIMIT = 50;
@@ -701,15 +702,29 @@ function saveData(){
     lastSnapshotJSON = current;
   }
   clearTimeout(saveTimer);
+  saveIsPending = true;
   saveTimer = setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       flashStatus('נשמר');
     }catch(e){
       flashStatus('שגיאה בשמירה');
+    } finally {
+      saveIsPending = false;
     }
   }, 250);
 }
+function flushSaveData(){
+  // writes immediately, bypassing the debounce — must be called before anything that could
+  // reload/close the page (pull-to-refresh, tab hidden), so a pending change is never silently lost.
+  // no-op when nothing is pending, so it never clobbers storage with a stale in-memory copy.
+  if(!saveIsPending) return;
+  clearTimeout(saveTimer);
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
+  saveIsPending = false;
+}
+window.addEventListener('pagehide', flushSaveData);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushSaveData(); });
 function updateUndoRedoButtons(){
   const undoBtn = document.getElementById('undoBtn');
   const redoBtn = document.getElementById('redoBtn');
@@ -2949,6 +2964,7 @@ function pullRefreshEnd(){
   if(pullState.ready){
     el.classList.add('spinning');
     el.style.transform = 'translate(-50%, 20px)';
+    flushSaveData();
     setTimeout(()=>location.reload(), 150);
   } else {
     pullRefreshReset();
