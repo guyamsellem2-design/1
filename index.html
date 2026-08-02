@@ -254,6 +254,7 @@
   .anchor-chip:hover{background:var(--surface3);}
   .anchor-chip .time{color:var(--muted); font-size:12.5px; display:block; margin-bottom:1px;}
   .anchor-chip .buf{color:var(--muted2); font-size:11.5px; display:block; margin-top:2px;}
+  .anchor-chip.chip-editing{box-shadow:0 0 0 2px #6cf6ff, 0 0 14px 2px rgba(108,246,255,0.75); background:var(--surface3);}
 
   /* swipe-to-delete: drag a row right to reveal a trash panel, past a threshold asks to confirm */
   .task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip{touch-action:pan-y;}
@@ -478,6 +479,7 @@
         <input type="time" id="taskTime" placeholder="שעת התחלה">
         <input type="time" id="taskEndTime" placeholder="שעת סיום (רשות)">
       </div>
+      <div class="section-divider"></div>
       <div class="add-row" style="margin-bottom:10px;">
         <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
           <option value="manual" selected>מיון לפי: ידני (גרירה)</option>
@@ -2474,23 +2476,25 @@ function renderScheduleGrid(){
       if(it.type==='anchor'){
         const a = it.data;
         const dom = domainById(a.domain);
-        const chip = `<div class="anchor-chip" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+        const isEditingThisAnchor = isEditingThisDay && editingHere.id===a.id;
+        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
             ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
             ${escapeHtml(a.label)}
             ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
         </div>`;
-        return chip + ((isEditingThisDay && editingHere.id===a.id) ? anchorFormHtml : '');
+        return chip + (isEditingThisAnchor ? anchorFormHtml : '');
       }
       const t = it.data;
       const dom = t.domain ? domainById(t.domain) : null;
       const isTaskOverdue = t.date && !t.done && t.date < ymd(new Date());
       const showTrash = longPressedTaskId===t.id;
-      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
+      const isEditingThisTask = scheduleEditingTaskId===t.id;
+      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
           ${showTrash ? `<span class="task-chip-trash" onclick="event.stopPropagation(); unscheduleTaskFromWeek('${t.id}')" title="הסרה מתצוגת השבוע">🗑</span>` : ''}
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
       </div>`;
-      return chip + (scheduleEditingTaskId===t.id ? taskEditFormInner(t) : '');
+      return chip + (isEditingThisTask ? taskEditFormInner(t) : '');
     });
 
     let entries = chronoEntries;
