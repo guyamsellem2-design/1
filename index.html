@@ -1841,6 +1841,15 @@ function toggleListExpand(key){
     requestAnimationFrame(()=>{ section.scrollIntoView({behavior:'smooth', block:'start'}); });
   }
 }
+function ensureListExpanded(key){
+  // called whenever an item inside a capped list opens (edit/detail) so the growing content
+  // never gets squeezed into the small scrollable box — no need to scroll to see the editing tools
+  if(!listExpandState[key]){
+    listExpandState[key] = true;
+    const el = document.getElementById(key+'List');
+    applyListCap(key, el ? Number(el.dataset.itemCount||0) : 0);
+  }
+}
 function applyListCap(key, itemCount){
   const listEl = document.getElementById(key+'List');
   const expandRow = document.getElementById(key+'ListExpandRow');
@@ -1979,10 +1988,14 @@ function taskDetailHtml(t){
   </li>`;
 }
 function toggleTaskExpand(id){
-  if(expandedTasks.has(id)) expandedTasks.delete(id); else expandedTasks.add(id);
+  if(expandedTasks.has(id)){ expandedTasks.delete(id); } else { expandedTasks.add(id); ensureListExpanded('task'); }
   renderTasks();
 }
-function openTaskEdit(id){ editingTaskId = (editingTaskId===id) ? null : id; renderTasks(); }
+function openTaskEdit(id){
+  editingTaskId = (editingTaskId===id) ? null : id;
+  if(editingTaskId) ensureListExpanded('task');
+  renderTasks();
+}
 function closeTaskEdit(){ editingTaskId = null; scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid(); }
 function saveTaskEdit(id){
   const t = data.tasks.find(t=>t.id===id);
@@ -2355,12 +2368,15 @@ function somedayDetailHtml(s){
     </div>
   </li>`;
 }
-function toggleSomedayExpand(id){ if(expandedSomeday.has(id)) expandedSomeday.delete(id); else expandedSomeday.add(id); renderSomeday(); }
+function toggleSomedayExpand(id){
+  if(expandedSomeday.has(id)){ expandedSomeday.delete(id); } else { expandedSomeday.add(id); ensureListExpanded('someday'); }
+  renderSomeday();
+}
 function toggleSomedayFavorite(id){
   const s = data.someday.find(s=>s.id===id);
   if(s){ s.favorite = !s.favorite; saveData(); renderSomeday(); }
 }
-function openSomedayEdit(id){ editingSomedayId = id; renderSomeday(); }
+function openSomedayEdit(id){ editingSomedayId = id; ensureListExpanded('someday'); renderSomeday(); }
 function closeSomedayEdit(){ editingSomedayId = null; renderSomeday(); }
 function saveSomedayEdit(id){
   const s = data.someday.find(s=>s.id===id);
@@ -2477,6 +2493,7 @@ function suggestionEditFormHtml(s){
 }
 function openSuggestionEdit(id){
   editingSuggestionId = (editingSuggestionId===id) ? null : id;
+  if(editingSuggestionId) ensureListExpanded('suggestion');
   renderSuggestions();
 }
 function closeSuggestionEdit(){ editingSuggestionId = null; renderSuggestions(); }
