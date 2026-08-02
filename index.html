@@ -2091,10 +2091,10 @@ function renderTasks(){
   const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
   if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
   const today = ymd(new Date());
-  const isTaskOverdue = t => !!(t.date && !t.done && t.date < today);
+  const isTucked = t => t.done || !!(t.date && t.date < today);
   const sorted = sortTasksForDisplay(list);
-  const regular = sorted.filter(t=>!isTaskOverdue(t));
-  const overdue = sorted.filter(isTaskOverdue);
+  const regular = sorted.filter(t=>!isTucked(t));
+  const overdue = sorted.filter(isTucked);
   let html = notice;
   if(regular.length===0 && overdue.length===0){
     html += `<li class="empty">${data.softMode ? 'אין כרגע משימות מטעינות — ואפשר גם פשוט לנוח' : 'אין עדיין משימות לשבוע — תוסיף/י את הדבר הכי קטן שאפשר להתחיל בו'}</li>`;
