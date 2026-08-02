@@ -334,6 +334,9 @@
   .anchor-form input, .anchor-form select, .anchor-form textarea, .anchor-form button{min-width:0; box-sizing:border-box; max-width:100%;}
   .field-label{display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted2);}
   .field-label input{width:100%; box-sizing:border-box;}
+  .anchor-form input[type="date"]::-webkit-calendar-picker-indicator,
+  .anchor-form input[type="time"]::-webkit-calendar-picker-indicator{display:none;}
+  .anchor-form input[type="date"], .anchor-form input[type="time"]{padding-left:6px;}
   ul.tasks li.detail-li{display:block; background:var(--surface2); border-radius:9px; padding:10px 12px; margin:-4px 0 8px; border-bottom:none;}
   .detail-label{font-size:13px; color:var(--muted2); margin-bottom:4px; display:block;}
   .detail-desc{width:100%; min-height:50px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:14.5px; font-family:inherit; resize:vertical; margin-bottom:10px;}
@@ -2172,8 +2175,8 @@ function taskEditFormInner(t){
         <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDateOpen('${t.id}')">${dateBtnLabel}</button>
       </div>
       ${dateOpen ? `
+      <label class="field-label">תאריך<input type="date" id="taskEditDate-${t.id}" value="${t.date||''}"></label>
       <div class="edit-form-row">
-        <label class="field-label">תאריך<input type="date" id="taskEditDate-${t.id}" value="${t.date||''}"></label>
         <label class="field-label">התחלה<input type="time" id="taskEditTime-${t.id}" value="${t.time||''}"></label>
         <label class="field-label">סיום<input type="time" id="taskEditEnd-${t.id}" value="${t.endTime||''}"></label>
       </div>
