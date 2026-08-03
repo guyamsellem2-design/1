@@ -314,6 +314,8 @@
   .task-text{flex:1; font-size:15.5px; cursor:pointer;}
   .task-text.done{text-decoration:line-through; color:var(--muted2);}
   .tag{font-size:12.5px; padding:3px 9px; border-radius:999px; color:#141a16; font-weight:600; white-space:nowrap;}
+  select.tag{appearance:none; -webkit-appearance:none; border:none; cursor:pointer; font-family:inherit; background-image:none; max-width:110px; text-overflow:ellipsis;}
+  select.tag:focus{outline:2px solid var(--glow-gold); outline-offset:1px;}
   .tag.tag-empty{background:transparent; border:1px dashed var(--border-strong); color:var(--muted2); font-weight:500;}
   .dimmed-item{filter:saturate(0.5) brightness(0.92); opacity:.65;}
   .overdue-divider{display:block; padding:16px 4px 6px; border-bottom:none;}
@@ -321,6 +323,7 @@
   .overdue-divider-title{font-family:'Frank Ruhl Libre', serif; font-size:15px; color:var(--gold); cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;}
   .sched-link{color:var(--muted2); font-size:16px; cursor:pointer; padding:4px;}
   .sched-link:hover{color:var(--text);}
+  .sched-link.active{color:var(--gold);}
   .task-date-badge{font-size:12px; color:var(--muted2); white-space:nowrap;}
 
   .gcal-block{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px; margin-bottom:28px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
@@ -372,11 +375,17 @@
   .anchor-form input[type="date"], .anchor-form input[type="time"]{padding-left:6px;}
   ul.tasks li.detail-li{display:block; background:var(--surface2); border-radius:9px; padding:10px 12px; margin:-4px 0 8px; border-bottom:none;}
   .detail-label{font-size:13px; color:var(--muted2); margin-bottom:4px; display:block;}
+  .detail-label-row{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; cursor:pointer; user-select:none;}
+  .detail-label-row .detail-label{margin-bottom:0;}
+  .subtask-minimize-btn{background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:3px 10px; font-size:11.5px; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:4px; flex-shrink:0;}
+  .subtask-minimize-btn:hover{color:var(--text); border-color:var(--muted);}
   .detail-desc{width:100%; min-height:50px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:14.5px; font-family:inherit; resize:vertical; margin-bottom:10px;}
   .subtask-row{display:flex; align-items:center; gap:7px; padding:5px 0; font-size:14.5px;}
   .subtask-row .chk{width:15px; height:15px;}
   .subtask-text{flex:1; cursor:pointer;}
   .subtask-text.done{text-decoration:line-through; color:var(--muted2);}
+  .subtask-schedule-form{background:var(--surface3); border-radius:9px; padding:8px; margin:-2px 0 8px; display:flex; flex-direction:column; gap:6px;}
+  .subtask-schedule-form .edit-form-row{display:flex; gap:6px;}
   .subtask-add-row{display:flex; gap:6px; margin-top:6px;}
   .subtask-add-row input{flex:1; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:6px 9px; border-radius:7px; font-size:14px; font-family:inherit;}
   .subtask-add-row button{background:var(--surface3); border:1px solid var(--border-strong); color:var(--text); padding:6px 12px; border-radius:7px; font-size:13.5px; cursor:pointer; font-family:inherit;}
@@ -2168,7 +2177,7 @@ function taskRowHtml(t){
       ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
       <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
-      <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}">${dom?dom.name:'ללא נושא'}</span>
+      <select class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
       <button type="button" class="subtask-toggle-btn" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
     </div>
     <div class="task-row-meta">
@@ -2231,24 +2240,63 @@ function taskEditFormInner(t){
 function taskEditFormHtml(t){
   return `<li class="edit-li">${taskEditFormInner(t)}</li>`;
 }
+const subtaskDateOpenIds = new Set();
+function toggleSubtaskDateOpen(taskId, subId){
+  const key = taskId+':'+subId;
+  if(subtaskDateOpenIds.has(key)) subtaskDateOpenIds.delete(key); else subtaskDateOpenIds.add(key);
+  renderTasks();
+}
+function subtaskScheduleFormHtml(t, s){
+  const gcalRow = data.gcalConnected
+    ? `<label class="buf-label"><input type="checkbox" id="subtaskGcalSync-${t.id}-${s.id}" ${s.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
+    : '';
+  return `<div class="subtask-schedule-form">
+    <div class="edit-form-row">
+      <label class="field-label">תאריך<input type="date" id="subtaskDate-${t.id}-${s.id}" value="${s.date||''}"></label>
+      <label class="field-label">התחלה<input type="time" id="subtaskTime-${t.id}-${s.id}" value="${s.time||''}"></label>
+      <label class="field-label">סיום<input type="time" id="subtaskEnd-${t.id}-${s.id}" value="${s.endTime||''}"></label>
+    </div>
+    ${gcalRow}
+    <div class="anchor-form-actions">
+      <button class="save-btn" onclick="saveSubtaskSchedule('${t.id}','${s.id}')">שמור</button>
+      <button class="cancel-btn" onclick="cancelSubtaskScheduleForm('${t.id}','${s.id}')">✕ ביטול תזמון</button>
+    </div>
+  </div>`;
+}
 function taskDetailHtml(t){
   const subs = t.subtasks||[];
-  const subsHtml = subs.length ? subs.map(s=>`
-    <div class="subtask-row">
+  const subsHtml = subs.length ? subs.map(s=>{
+    const isOpen = subtaskDateOpenIds.has(t.id+':'+s.id);
+    const hasSchedule = !!(s.date || s.time);
+    let html = `<div class="subtask-row" data-task-id="${t.id}" data-drag-id="${s.id}">
       <div class="chk ${s.done?'done':''}" onclick="toggleSubtask('${t.id}','${s.id}')"></div>
       <span class="subtask-text ${s.done?'done':''}" onclick="editSubtaskText('${t.id}','${s.id}')">${escapeHtml(s.text)}</span>
-      ${s.date ? `<span class="task-date-badge">${s.date.slice(5)}${s.time?' '+s.time:''}</span>` : ''}
-      <span class="sched-link" onclick="editSubtaskSchedule('${t.id}','${s.id}')" title="תזמון">🕐</span>
+      ${s.date ? `<span class="task-date-badge"><span dir="ltr">${s.date.slice(5)}${s.time?' '+s.time:''}</span></span>` : ''}
+      <span class="sched-link ${hasSchedule?'active':''}" onclick="toggleSubtaskDateOpen('${t.id}','${s.id}')" title="תזמון">🕐</span>
       <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
-    </div>`).join('') : '<div class="empty">אין עדיין תת-משימות</div>';
+    </div>`;
+    if(isOpen) html += subtaskScheduleFormHtml(t, s);
+    return html;
+  }).join('') : '<div class="empty">אין עדיין תת-משימות</div>';
   return `<li class="detail-li">
-    <span class="detail-label">תת-משימות</span>
+    <div class="detail-label-row" onclick="toggleTaskExpand('${t.id}')">
+      <span class="detail-label">תת-משימות</span>
+      <button type="button" class="subtask-minimize-btn" onclick="event.stopPropagation(); toggleTaskExpand('${t.id}')">מזער ⌃</button>
+    </div>
     ${subsHtml}
     <div class="subtask-add-row">
       <input type="text" id="subtaskInput-${t.id}" placeholder="תת-משימה קטנה...">
       <button onclick="addSubtask('${t.id}')">+ הוסף</button>
     </div>
   </li>`;
+}
+function quickChangeTaskDomain(id, domainId){
+  const t = data.tasks.find(t=>t.id===id);
+  if(!t) return;
+  t.domain = domainId;
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
 }
 function toggleTaskExpand(id){
   if(expandedTasks.has(id)){ expandedTasks.delete(id); } else { expandedTasks.add(id); ensureListExpanded('task'); }
@@ -2297,7 +2345,7 @@ function addSubtask(taskId){
   const t = data.tasks.find(t=>t.id===taskId);
   if(!t) return;
   if(!t.subtasks) t.subtasks = [];
-  t.subtasks.push({id:uid(), text, done:false, date:'', time:''});
+  t.subtasks.push({id:uid(), text, done:false, date:'', time:'', endTime:''});
   input.value = '';
   saveData();
   renderTasks();
@@ -2314,25 +2362,72 @@ function editSubtaskText(taskId, subId){
   const val = prompt('עריכת תת-משימה:', s.text);
   if(val!==null && val.trim()){ s.text=val.trim(); saveData(); renderTasks(); }
 }
-function editSubtaskSchedule(taskId, subId){
+function pushSubtaskToGcal(taskId, s){
+  if(!s.date) return;
+  const t = data.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  ensureGcalWriteToken(()=>{
+    const dom = t.domain ? domainById(t.domain) : null;
+    const [y,m,d] = s.date.split('-').map(Number);
+    const [h,mi] = (s.time||'09:00').split(':').map(Number);
+    const start = new Date(y, m-1, d, h, mi, 0);
+    let end;
+    if(s.endTime){ const [eh,emi] = s.endTime.split(':').map(Number); end = new Date(y,m-1,d,eh,emi,0); }
+    else { end = new Date(y,m-1,d,h+1,mi,0); }
+    const body = {
+      summary: s.text,
+      description: `תת-משימה של "${t.text}"${dom?' · נושא: '+dom.name:''}`,
+      start: { dateTime: start.toISOString() },
+      end: { dateTime: end.toISOString() }
+    };
+    pushEventToGcal(body, s.googleEventId, ev=>{ s.googleEventId = ev.id; saveData(); });
+  });
+}
+function applyGcalSyncForSubtask(taskId, s, timingOrSyncChanged){
+  if(!data.gcalConnected || !timingOrSyncChanged) return;
+  if(s.gcalSync===false){
+    if(s.googleEventId){ const evId = s.googleEventId; s.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+    return;
+  }
+  if(!s.date) return;
+  pushSubtaskToGcal(taskId, s);
+}
+function saveSubtaskSchedule(taskId, subId){
   const t = data.tasks.find(t=>t.id===taskId);
   const s = t && (t.subtasks||[]).find(s=>s.id===subId);
   if(!s) return;
-  const current = s.date ? `${s.date}${s.time?' '+s.time:''}` : '';
-  const val = prompt('תאריך ושעה, לדוגמה: 2026-08-05 14:00\nהשאר ריק כדי להסיר תזמון:', current);
-  if(val===null) return;
-  const trimmed = val.trim();
-  if(!trimmed){ s.date=''; s.time=''; }
-  else{ const parts = trimmed.split(/\s+/); s.date = parts[0]||''; s.time = parts[1]||''; }
+  const prevDate = s.date, prevTime = s.time, prevEnd = s.endTime, prevGcalSync = s.gcalSync;
+  s.date = document.getElementById(`subtaskDate-${taskId}-${subId}`).value || '';
+  s.time = document.getElementById(`subtaskTime-${taskId}-${subId}`).value || '';
+  s.endTime = document.getElementById(`subtaskEnd-${taskId}-${subId}`).value || '';
+  const gcalCheckbox = document.getElementById(`subtaskGcalSync-${taskId}-${subId}`);
+  if(gcalCheckbox) s.gcalSync = gcalCheckbox.checked;
+  subtaskDateOpenIds.delete(taskId+':'+subId);
   saveData();
   renderTasks();
+  const changedTiming = s.date!==prevDate || s.time!==prevTime || s.endTime!==prevEnd;
+  const syncFlagChanged = prevGcalSync===false ? s.gcalSync!==false : s.gcalSync===false;
+  applyGcalSyncForSubtask(taskId, s, changedTiming || syncFlagChanged);
+}
+function cancelSubtaskScheduleForm(taskId, subId){
+  const t = data.tasks.find(t=>t.id===taskId);
+  const s = t && (t.subtasks||[]).find(s=>s.id===subId);
+  if(!s) return;
+  s.date = ''; s.time = ''; s.endTime = '';
+  subtaskDateOpenIds.delete(taskId+':'+subId);
+  saveData();
+  renderTasks();
+  if(s.googleEventId){ const evId = s.googleEventId; s.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
 }
 function deleteSubtask(taskId, subId){
   const t = data.tasks.find(t=>t.id===taskId);
   if(!t) return;
+  const removed = (t.subtasks||[]).find(s=>s.id===subId);
   t.subtasks = (t.subtasks||[]).filter(s=>s.id!==subId);
+  subtaskDateOpenIds.delete(taskId+':'+subId);
   saveData();
   renderTasks();
+  if(data.gcalConnected && removed && removed.googleEventId) deleteEventFromGcal(removed.googleEventId, ()=>{});
 }
 function toggleTaskSchedule(){
   const fields = document.getElementById('taskSchedFields');
@@ -2645,7 +2740,7 @@ function somedayEditFormHtml(s){
 function somedayDetailHtml(s){
   const subs = s.subtasks||[];
   const subsHtml = subs.length ? subs.map(sub=>`
-    <div class="subtask-row">
+    <div class="subtask-row" data-someday-id="${s.id}" data-drag-id="${sub.id}">
       <div class="chk ${sub.done?'done':''}" onclick="toggleSomedaySubtask('${s.id}','${sub.id}')"></div>
       <span class="subtask-text ${sub.done?'done':''}" onclick="editSomedaySubtaskText('${s.id}','${sub.id}')">${escapeHtml(sub.text)}</span>
       <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')">✕</span>
@@ -3286,7 +3381,7 @@ window.addEventListener('touchcancel', pullRefreshReset, {passive:true});
    4) tab carousel (from the left edge, home <-> topics)
    all of them follow the finger live and either commit (past ~50%) or spring back on release. */
 const EDGE_ZONE = 24;
-const SWIPE_ROW_SELECTOR = '.task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip';
+const SWIPE_ROW_SELECTOR = '.task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip, .subtask-row';
 const SWIPE_DELETE_THRESHOLD = 78;
 function resolveSwipeDeleteAction(row){
   if(row.classList.contains('task-li')) return ()=>deleteTask(row.dataset.dragId);
@@ -3296,6 +3391,11 @@ function resolveSwipeDeleteAction(row){
   if(row.classList.contains('anchor-chip')){
     const id = row.dataset.dragId;
     return row.dataset.itemKind==='anchor' ? ()=>deleteAnchor(id) : ()=>deleteTask(id);
+  }
+  if(row.classList.contains('subtask-row')){
+    const subId = row.dataset.dragId;
+    if(row.dataset.taskId) return ()=>deleteSubtask(row.dataset.taskId, subId);
+    if(row.dataset.somedayId) return ()=>deleteSomedaySubtask(row.dataset.somedayId, subId);
   }
   return null;
 }
