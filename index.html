@@ -349,7 +349,8 @@
 
   /* schedule grid */
   .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px; border-radius:16px; transition:box-shadow .35s ease, padding .35s ease;}
-  .schedule-grid.current-week{padding:10px; box-shadow:0 0 0 1px rgba(108,246,255,0.55), 0 0 12px 1px rgba(108,246,255,0.28);}
+  .schedule-grid.current-week{padding:10px; box-shadow:0 0 0 1.5px rgba(15,165,182,0.7), 0 0 14px 2px rgba(15,165,182,0.38);}
+  body.night-mode .schedule-grid.current-week{box-shadow:0 0 0 1px rgba(108,246,255,0.55), 0 0 12px 1px rgba(108,246,255,0.28);}
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
   .sched-date{color:var(--muted2); font-size:12.5px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:13px; font-style:italic; padding:4px 2px;}
@@ -1180,7 +1181,7 @@ function renderKeepGrid(id){
   const el = document.getElementById('keepGrid');
   if(!el) return;
   const notes = ensureDomainNotes(id);
-  if(notes.length===0){ el.innerHTML = '<div class="empty">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
+  if(notes.length===0){ el.innerHTML = '<div class="empty" onclick="addDomainNote()" style="cursor:pointer;">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
   el.innerHTML = notes.map(n=>{
     const isDrawing = drawingNoteId===n.id;
     const isMinimized = minimizedNoteIds.has(n.id);
