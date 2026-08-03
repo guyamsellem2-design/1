@@ -297,6 +297,8 @@
   button:active{ transform:scale(0.96); }
   @media (prefers-reduced-motion: reduce){ button{ transition:background .2s ease, border-color .2s ease, color .2s ease; } button:active{ transform:none; } }
   .add-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .view-controls{display:flex; flex-direction:column; gap:4px;}
+  .control-label{font-size:11.5px; color:var(--muted2); letter-spacing:.02em; padding-right:2px;}
   .section-divider{border-top:1px solid var(--border); margin:4px 0 16px;}
   .add-row input[type=text]{flex:1; min-width:160px; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:15px; font-family:inherit;}
   .add-row select{background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:14.5px; font-family:inherit;}
@@ -343,7 +345,8 @@
   .week-nav-label{font-size:15px; color:var(--muted); min-width:120px; text-align:center; direction:ltr;}
 
   /* schedule grid */
-  .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px;}
+  .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px; border-radius:16px; transition:box-shadow .35s ease, padding .35s ease;}
+  .schedule-grid.current-week{padding:10px; box-shadow:0 0 0 2px #6cf6ff, 0 0 20px 3px rgba(108,246,255,0.55);}
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
   .sched-date{color:var(--muted2); font-size:12.5px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:13px; font-style:italic; padding:4px 2px;}
@@ -514,12 +517,22 @@
         <input type="time" id="taskEndTime" placeholder="שעת סיום (רשות)">
       </div>
       <div class="section-divider"></div>
-      <div class="add-row" style="margin-bottom:10px;">
-        <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
-          <option value="manual" selected>מיון לפי: ידני (גרירה)</option>
-          <option value="time">מיון לפי: זמן</option>
-          <option value="topic">מיון לפי: נושא</option>
-        </select>
+      <div class="view-controls">
+        <span class="control-label">תצוגה</span>
+        <div class="add-row" style="margin-bottom:10px;">
+          <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
+            <option value="manual" selected>מיון לפי: ידני (גרירה)</option>
+            <option value="time">מיון לפי: זמן</option>
+            <option value="topic">מיון לפי: נושא</option>
+          </select>
+          <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
+          <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
+            <option value="all" selected>הכל</option>
+            <option value="today">היום</option>
+            <option value="week">השבוע</option>
+            <option value="month">החודש</option>
+          </select>
+        </div>
       </div>
       <div class="section-divider"></div>
       <ul class="tasks scroll-cap" id="taskList"></ul>
@@ -2072,6 +2085,31 @@ const expandedTasks = new Set();
 function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(); }
 let taskSortBy = 'manual';
 function setTaskSortBy(val){ taskSortBy = val; renderTasks(); }
+let taskFilterDomain = '';
+let taskFilterRange = 'all';
+function setTaskFilterDomain(val){ taskFilterDomain = val; renderTasks(); }
+function setTaskFilterRange(val){ taskFilterRange = val; renderTasks(); }
+function renderTaskFilterSelect(){
+  const el = document.getElementById('taskFilterDomain');
+  if(!el) return;
+  if(taskFilterDomain && !data.domains.some(d=>d.id===taskFilterDomain)) taskFilterDomain = '';
+  el.innerHTML = `<option value="">כל הנושאים</option>` + data.domains.map(d=>`<option value="${d.id}" ${d.id===taskFilterDomain?'selected':''}>${escapeHtml(d.name)}</option>`).join('');
+}
+function taskMatchesDateRange(t, range){
+  if(range==='all') return true;
+  if(!t.date) return false;
+  const today = new Date();
+  if(range==='today') return t.date===ymd(today);
+  if(range==='week'){
+    const weekDates = currentWeekDates();
+    return t.date >= ymd(weekDates[0]) && t.date <= ymd(weekDates[6]);
+  }
+  if(range==='month'){
+    const [y,m] = t.date.split('-').map(Number);
+    return y===today.getFullYear() && m===today.getMonth()+1;
+  }
+  return true;
+}
 function taskChronoCompare(a, b){
   const aHas = !!a.time, bHas = !!b.time;
   if(aHas && bHas && a.time!==b.time) return a.time < b.time ? -1 : 1;
@@ -2134,17 +2172,19 @@ function applyListCap(key, itemCount){
 }
 function renderTasks(){
   const el = document.getElementById('taskList');
+  renderTaskFilterSelect();
   let list = data.tasks;
   const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
   if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
+  if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain);
   const today = ymd(new Date());
   const isTucked = t => t.done || !!(t.date && t.date < today);
   const sorted = sortTasksForDisplay(list);
-  const regular = sorted.filter(t=>!isTucked(t));
+  const regular = sorted.filter(t=>!isTucked(t) && taskMatchesDateRange(t, taskFilterRange));
   const overdue = sorted.filter(isTucked);
   let html = notice;
   if(regular.length===0 && overdue.length===0){
-    html += `<li class="empty">${data.softMode ? 'אין כרגע משימות מטעינות — ואפשר גם פשוט לנוח' : 'אין עדיין משימות לשבוע — תוסיף/י את הדבר הכי קטן שאפשר להתחיל בו'}</li>`;
+    html += `<li class="empty">${data.softMode ? 'אין כרגע משימות מטעינות — ואפשר גם פשוט לנוח' : (taskFilterDomain || taskFilterRange!=='all') ? 'אין משימות שתואמות את הסינון הנוכחי' : 'אין עדיין משימות לשבוע — תוסיף/י את הדבר הכי קטן שאפשר להתחיל בו'}</li>`;
   } else {
     html += regular.map(t=>taskRowHtml(t)).join('');
   }
@@ -2544,6 +2584,7 @@ function renderScheduleGrid(){
   const el = document.getElementById('scheduleGrid');
   if(!el) return;
   renderWeekNav();
+  el.classList.toggle('current-week', weekOffset===0);
   const weekDates = viewedWeekDates();
   el.innerHTML = DAYS.map((dayName, dayIdx)=>{
     const dateObj = weekDates[dayIdx];
@@ -2719,7 +2760,6 @@ function somedayRowHtml(s){
     <span class="task-text" style="flex:1" onclick="openSomedayEdit('${s.id}')">${escapeHtml(s.text)}</span>
     <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${dom.name}</span>
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
-    <span class="promote" onclick="promoteToWeek('${s.id}')">להעביר לשבוע ←</span>
     <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
   </li>`;
   if(isExpanded) html += somedayDetailHtml(s);
@@ -2827,17 +2867,6 @@ function reorderSomeday(fromId, toId){
   saveData();
   renderSomeday();
 }
-function promoteToWeek(id){
-  const s = data.someday.find(s=>s.id===id);
-  if(!s) return;
-  data.someday = data.someday.filter(s=>s.id!==id);
-  data.tasks.push({id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()});
-  saveData();
-  renderSomeday();
-  renderTasks();
-  renderScheduleGrid();
-}
-
 /* ---------- others' suggestions ---------- */
 let editingSuggestionId = null;
 function renderSuggestions(){
