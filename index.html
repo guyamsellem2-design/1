@@ -359,7 +359,7 @@
 
   .expand-btn{color:var(--muted2); cursor:pointer; font-size:14.5px; padding:4px; flex-shrink:0;}
   .expand-btn:hover{color:var(--text);}
-  .expand-btn.has-content{color:var(--gold);}
+  .expand-btn.has-content{color:var(--gold); border-bottom:1.5px solid var(--gold);}
   .text-chevron{color:var(--muted2); font-size:12.5px; margin-left:5px; display:inline-block;}
   .task-text.has-content .text-chevron{color:var(--gold);}
   .sub-count{font-size:12px; color:var(--muted2); background:var(--surface3); border-radius:999px; padding:1px 6px; margin-right:4px;}
@@ -371,6 +371,7 @@
   .task-row-meta{display:flex; align-items:center; gap:9px; padding-right:28px; min-height:11px;}
   .subtask-toggle-btn{flex-shrink:0; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit; white-space:nowrap;}
   .subtask-toggle-btn:hover{color:var(--text); border-color:var(--muted);}
+  .subtask-toggle-btn.has-content{color:var(--gold); border-color:var(--gold); border-style:solid;}
   .edit-form-row{display:flex; gap:6px; min-width:0;}
   .edit-form-row select, .edit-form-row .field-label, .edit-form-row input[type=text]{flex:1; min-width:0;}
   .anchor-form{min-width:0;}
@@ -2414,6 +2415,7 @@ function taskRowHtml(t){
   const energy = t.energy||'';
   const subCount = (t.subtasks||[]).length;
   const isSubtasksOpen = expandedTasks.has(t.id);
+  const hasIncompleteSubtasks = subCount>0 && !(t.subtasks||[]).every(s=>s.done);
   const isOverdue = t.date && !t.done && t.date < ymd(new Date());
   const isDimmed = isOverdue || (data.softMode && !energy);
   const subBtnLabel = isSubtasksOpen ? `▾ תת-משימות${subCount?' ('+subCount+')':''}` : (subCount ? `▸ תת-משימות (${subCount})` : '+ תת-משימה');
@@ -2424,7 +2426,7 @@ function taskRowHtml(t){
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
       <span class="task-text ${t.done?'done':''}" onclick="taskTextClick('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
       <select class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
-      <button type="button" class="subtask-toggle-btn" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
+      <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
     </div>
     <div class="task-row-meta">
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
@@ -2972,7 +2974,8 @@ function somedayRowHtml(s){
   const dom = domainById(s.domain);
   const subCount = (s.subtasks||[]).length;
   const isExpanded = expandedSomeday.has(s.id);
-  const hasContent = subCount>0 || (s.description||'').trim();
+  const hasIncompleteSubtasks = subCount>0 && !(s.subtasks||[]).every(x=>x.done);
+  const hasContent = hasIncompleteSubtasks || (s.description||'').trim();
   const canDrag = somedaySortBy==='manual';
   let html = `<li class="someday-li" data-drag-id="${s.id}">
     ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${s.id}','.someday-li',reorderSomeday)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
