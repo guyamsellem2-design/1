@@ -16,6 +16,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#F8F3E6; --surface:rgba(255,255,255,0.72); --surface2:rgba(242,249,244,0.65); --surface3:rgba(231,242,236,0.65);
@@ -480,6 +483,7 @@
     </div>
   </header>
 
+  <div class="gcal-block" id="syncBlock"></div>
   <div class="gcal-block" id="gcalSyncRow"></div>
 
   <section>
@@ -780,6 +784,7 @@ function saveData(){
   }
   clearTimeout(saveTimer);
   saveIsPending = true;
+  scheduleCloudSync();
   saveTimer = setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -1926,6 +1931,201 @@ function renderGcalStatus(){
     ${pickerHtml}
   `;
 }
+
+/* ---------- cross-device cloud sync (Firebase) ----------
+   design: each device keeps a local "last synced" snapshot (syncBase). on every sync we compare
+   local vs syncBase vs remote, per item (by id): unchanged-on-one-side items simply take the side
+   that changed; if an item is missing on one side but was present in syncBase (i.e. it got deleted
+   there) AND unchanged on the other side, the deletion is respected. but if it was EDITED on the
+   other side since syncBase, the edit wins and the item comes back. this is the one rule the whole
+   engine follows, for every synced list: "if deleted, deleted — unless you edited it since your last
+   sync, in which case your edit wins." */
+const firebaseConfig = {
+  apiKey: "AIzaSyArOqx7eIzxIRra5NFYpdX8zKYdnvg0sjU",
+  authDomain: "weekly-map-ee92d.firebaseapp.com",
+  projectId: "weekly-map-ee92d",
+  storageBucket: "weekly-map-ee92d.firebasestorage.app",
+  messagingSenderId: "120353684566",
+  appId: "1:120353684566:web:d5e91774999a9fe4658ff7",
+  measurementId: "G-5271LC20CJ"
+};
+let fbAuth = null, fbDb = null, currentSyncUser = null, syncInProgress = false, applyingSyncedData = false, lastSyncAt = null, lastSyncError = null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  fbAuth = firebase.auth();
+  fbDb = firebase.firestore();
+}catch(e){ console.error('Firebase init failed', e); }
+
+const SYNC_BASE_KEY = 'planner-sync-base-v1';
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions'];
+function emptySyncSkeleton(){
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+}
+function loadSyncBase(){
+  try{ const raw = localStorage.getItem(SYNC_BASE_KEY); return raw ? JSON.parse(raw) : emptySyncSkeleton(); }
+  catch(e){ return emptySyncSkeleton(); }
+}
+function saveSyncBase(obj){
+  try{ localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(obj)); }catch(e){}
+}
+function deepEqual(a,b){ return JSON.stringify(a)===JSON.stringify(b); }
+function mergeArrayById(localArr, baseArr, remoteArr){
+  localArr = localArr||[]; baseArr = baseArr||[]; remoteArr = remoteArr||[];
+  const baseById = new Map(baseArr.map(x=>[x.id,x]));
+  const localById = new Map(localArr.map(x=>[x.id,x]));
+  const remoteById = new Map(remoteArr.map(x=>[x.id,x]));
+  const allIds = new Set([...localById.keys(), ...remoteById.keys()]);
+  const result = [];
+  allIds.forEach(id=>{
+    const inBase = baseById.has(id), inLocal = localById.has(id), inRemote = remoteById.has(id);
+    if(inLocal && inRemote){
+      const lv = localById.get(id), rv = remoteById.get(id);
+      if(deepEqual(lv, rv)){ result.push(lv); return; }
+      const bv = inBase ? baseById.get(id) : undefined;
+      const localChanged = !inBase || !deepEqual(lv, bv);
+      const remoteChanged = !inBase || !deepEqual(rv, bv);
+      if(localChanged && !remoteChanged) result.push(lv);
+      else if(remoteChanged && !localChanged) result.push(rv);
+      else result.push(lv); // both changed differently since base (rare for a single-user app) -> keep this device's own edit
+      return;
+    }
+    if(inLocal && !inRemote){
+      if(!inBase){ result.push(localById.get(id)); return; } // brand-new locally, not pushed yet
+      const lv = localById.get(id), bv = baseById.get(id);
+      if(!deepEqual(lv, bv)) result.push(lv); // edited here after it was deleted elsewhere -> edit wins, comes back
+      return; // deleted elsewhere, untouched here -> stays deleted
+    }
+    if(!inLocal && inRemote){
+      if(!inBase){ result.push(remoteById.get(id)); return; } // brand-new remotely, not pulled yet
+      const rv = remoteById.get(id), bv = baseById.get(id);
+      if(!deepEqual(rv, bv)) result.push(rv); // edited elsewhere after it was deleted here -> edit wins, comes back
+      return; // deleted here, untouched elsewhere -> stays deleted
+    }
+  });
+  return result;
+}
+function mergeDictOfArrays(localDict, baseDict, remoteDict){
+  localDict = localDict||{}; baseDict = baseDict||{}; remoteDict = remoteDict||{};
+  const keys = new Set([...Object.keys(localDict), ...Object.keys(baseDict), ...Object.keys(remoteDict)]);
+  const result = {};
+  keys.forEach(k=>{ result[k] = mergeArrayById(localDict[k], baseDict[k], remoteDict[k]); });
+  return result;
+}
+function mergeDictOfObjects(localDict, baseDict, remoteDict){
+  localDict = localDict||{}; baseDict = baseDict||{}; remoteDict = remoteDict||{};
+  const keys = new Set([...Object.keys(localDict), ...Object.keys(baseDict), ...Object.keys(remoteDict)]);
+  const result = {};
+  keys.forEach(k=>{
+    const inBase = Object.prototype.hasOwnProperty.call(baseDict,k);
+    const inLocal = Object.prototype.hasOwnProperty.call(localDict,k);
+    const inRemote = Object.prototype.hasOwnProperty.call(remoteDict,k);
+    if(inLocal && inRemote){
+      const lv = localDict[k], rv = remoteDict[k];
+      if(deepEqual(lv, rv)){ result[k] = lv; return; }
+      const bv = inBase ? baseDict[k] : undefined;
+      const localChanged = !inBase || !deepEqual(lv, bv);
+      const remoteChanged = !inBase || !deepEqual(rv, bv);
+      if(localChanged && !remoteChanged) result[k] = lv;
+      else if(remoteChanged && !localChanged) result[k] = rv;
+      else result[k] = lv;
+      return;
+    }
+    if(inLocal && !inRemote){
+      if(!inBase){ result[k] = localDict[k]; return; }
+      if(!deepEqual(localDict[k], baseDict[k])) result[k] = localDict[k];
+      return;
+    }
+    if(!inLocal && inRemote){
+      if(!inBase){ result[k] = remoteDict[k]; return; }
+      if(!deepEqual(remoteDict[k], baseDict[k])) result[k] = remoteDict[k];
+      return;
+    }
+  });
+  return result;
+}
+function mergePlannerData(local, base, remote){
+  local = local||{}; base = base||emptySyncSkeleton(); remote = remote||emptySyncSkeleton();
+  const merged = {};
+  SYNCED_LIST_FIELDS.forEach(f=>{ merged[f] = mergeArrayById(local[f], base[f], remote[f]); });
+  merged.notes = mergeDictOfObjects(local.notes, base.notes, remote.notes);
+  merged.domainNotes = mergeDictOfArrays(local.domainNotes, base.domainNotes, remote.domainNotes);
+  merged.reflectionBanks = mergeDictOfArrays(local.reflectionBanks, base.reflectionBanks, remote.reflectionBanks);
+  return merged;
+}
+function applySyncedFields(target, merged){
+  SYNCED_LIST_FIELDS.forEach(f=>{ target[f] = merged[f]; });
+  target.notes = merged.notes;
+  target.domainNotes = merged.domainNotes;
+  target.reflectionBanks = merged.reflectionBanks;
+}
+
+function syncDoc(){ return fbDb.collection('users').doc(currentSyncUser.uid); }
+async function runFullSync(){
+  if(!currentSyncUser || !fbDb || syncInProgress) return;
+  syncInProgress = true;
+  renderSyncBlock();
+  try{
+    const snap = await syncDoc().get();
+    const remote = snap.exists ? (snap.data().plannerData || emptySyncSkeleton()) : emptySyncSkeleton();
+    const base = loadSyncBase();
+    const merged = mergePlannerData(data, base, remote);
+    applyingSyncedData = true;
+    applySyncedFields(data, merged);
+    saveData();
+    render();
+    applyingSyncedData = false;
+    const mergedSnapshot = JSON.parse(JSON.stringify(merged));
+    saveSyncBase(mergedSnapshot);
+    await syncDoc().set({ plannerData: mergedSnapshot, updatedAt: Date.now() });
+    lastSyncAt = Date.now();
+    lastSyncError = null;
+  }catch(e){
+    console.error('sync failed', e);
+    lastSyncError = e;
+  } finally {
+    syncInProgress = false;
+    renderSyncBlock();
+  }
+}
+let cloudSyncTimer = null;
+function scheduleCloudSync(){
+  if(!currentSyncUser || applyingSyncedData) return;
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(()=>{ runFullSync(); }, 2500);
+}
+function syncSignIn(){
+  if(!fbAuth) return;
+  const provider = new firebase.auth.GoogleAuthProvider();
+  fbAuth.signInWithPopup(provider).catch(e=>{ console.error(e); flashStatus('ההתחברות לסנכרון נכשלה'); });
+}
+function syncSignOut(){ if(fbAuth) fbAuth.signOut(); }
+function renderSyncBlock(){
+  const el = document.getElementById('syncBlock');
+  if(!el) return;
+  if(!currentSyncUser){
+    el.innerHTML = `<div class="gcal-block-title">🔄 סנכרון בין מכשירים</div><div class="gcal-sync-row-inner"><button class="gcal-connect-btn" onclick="syncSignIn()">🔗 התחברות עם גוגל</button></div>`;
+    return;
+  }
+  const lastSyncStr = lastSyncAt ? `${pad(new Date(lastSyncAt).getHours())}:${pad(new Date(lastSyncAt).getMinutes())}` : '';
+  el.innerHTML = `
+    <div class="gcal-block-title">🔄 סנכרון בין מכשירים</div>
+    <div class="gcal-sync-row-inner">
+      <span class="gcal-status">${syncInProgress?'🔄 מסנכרן...':(lastSyncError?'⚠️ הסנכרון נכשל':'✅ מחוברת כ־'+escapeHtml(currentSyncUser.email))}${(lastSyncStr && !syncInProgress) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
+      <button class="reset-btn" onclick="runFullSync()" ${syncInProgress?'disabled':''}>🔄 סנכרן עכשיו</button>
+      <button class="reset-btn" onclick="syncSignOut()">✕ נתק</button>
+    </div>
+  `;
+}
+if(fbAuth){
+  fbAuth.onAuthStateChanged(user=>{
+    currentSyncUser = user;
+    renderSyncBlock();
+    if(user) runFullSync();
+  });
+}
+window.addEventListener('online', ()=>{ if(currentSyncUser) runFullSync(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && currentSyncUser) runFullSync(); });
+setInterval(()=>{ if(currentSyncUser && navigator.onLine) runFullSync(); }, 60000);
 
 /* ---------- week grid ---------- */
 function openAnchorForm(dayIdx){
@@ -3238,6 +3438,7 @@ function render(){
   renderTasks();
   renderScheduleGrid();
   renderGcalStatus();
+  renderSyncBlock();
   renderKeepGrid(activeNoteDomain);
   renderSomedayDomainSelect();
   renderSomeday();
