@@ -406,6 +406,7 @@
   .fav-star{cursor:pointer; font-size:17px; color:var(--muted2); flex-shrink:0; line-height:1;}
   .fav-star.active{color:var(--gold); text-shadow:0 0 7px var(--glow-gold);}
   .fav-star:hover{color:var(--gold);}
+  ul.tasks li.fav-divider{display:block; height:2px; padding:0; margin:8px 6px 12px; border:none; border-radius:2px; background:linear-gradient(to right, transparent, #6cf6ff 15%, #6cf6ff 85%, transparent); box-shadow:0 0 8px 1px rgba(108,246,255,0.5);}
   .promote:hover{background:rgba(212,162,76,0.12);}
 
   .suggestion-badge{font-size:12px; background:var(--surface3); color:var(--muted); padding:4px 9px; border-radius:999px; white-space:nowrap; font-weight:600; cursor:pointer; border:1px solid var(--border-strong);}
@@ -2421,7 +2422,7 @@ function taskRowHtml(t){
     <div class="task-row-main">
       ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
-      <span class="task-text ${t.done?'done':''}" onclick="openTaskEdit('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
+      <span class="task-text ${t.done?'done':''}" onclick="taskTextClick('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
       <select class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
       <button type="button" class="subtask-toggle-btn" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
     </div>
@@ -2546,6 +2547,11 @@ function quickChangeTaskDomain(id, domainId){
 function toggleTaskExpand(id){
   if(expandedTasks.has(id)){ expandedTasks.delete(id); } else { expandedTasks.add(id); ensureListExpanded('task'); }
   renderTasks();
+}
+function taskTextClick(id){
+  // if the subtasks panel is open, the first click just minimizes it — editing needs a second, deliberate click
+  if(expandedTasks.has(id)){ toggleTaskExpand(id); return; }
+  openTaskEdit(id);
 }
 function openTaskEdit(id){
   editingTaskId = (editingTaskId===id) ? null : id;
@@ -2948,7 +2954,16 @@ function renderSomeday(){
   if(list.length===0){
     el.innerHTML = `<li class="empty">${somedayFilterDomain ? 'אין רעיונות בנושא הזה כרגע' : 'כל רעיון שעדיין לא הגיע תורו — כותבים ומשחררים'}</li>`;
   } else {
-    el.innerHTML = list.map(s=>somedayRowHtml(s)).join('');
+    const parts = [];
+    let dividerInserted = false;
+    list.forEach((s,i)=>{
+      if(!dividerInserted && i>0 && list[i-1].favorite && !s.favorite){
+        parts.push('<li class="fav-divider"></li>');
+        dividerInserted = true;
+      }
+      parts.push(somedayRowHtml(s));
+    });
+    el.innerHTML = parts.join('');
   }
   applyListCap('someday', list.length);
 }
@@ -2962,7 +2977,7 @@ function somedayRowHtml(s){
   let html = `<li class="someday-li" data-drag-id="${s.id}">
     ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${s.id}','.someday-li',reorderSomeday)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
     <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSomedayFavorite('${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
-    <span class="task-text" style="flex:1" onclick="openSomedayEdit('${s.id}')">${escapeHtml(s.text)}</span>
+    <span class="task-text" style="flex:1" onclick="somedayTextClick('${s.id}')">${escapeHtml(s.text)}</span>
     <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${dom.name}</span>
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
     <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
@@ -2978,9 +2993,23 @@ function somedayEditFormHtml(s){
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSomedayEdit()">בטל</button>
+        <button class="cancel-btn" onclick="convertSomedayToTask('${s.id}')">→ הפוך למשימה</button>
       </div>
     </div>
   </li>`;
+}
+function convertSomedayToTask(id){
+  const s = data.someday.find(s=>s.id===id);
+  if(!s) return;
+  data.someday = data.someday.filter(x=>x.id!==id);
+  const newTask = {id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()};
+  data.tasks.push(newTask);
+  editingSomedayId = null;
+  saveData();
+  renderSomeday();
+  renderTasks();
+  renderScheduleGrid();
+  flashStatus('הפך למשימה');
 }
 function somedayDetailHtml(s){
   const subs = s.subtasks||[];
@@ -3004,6 +3033,11 @@ function somedayDetailHtml(s){
 function toggleSomedayExpand(id){
   if(expandedSomeday.has(id)){ expandedSomeday.delete(id); } else { expandedSomeday.add(id); ensureListExpanded('someday'); }
   renderSomeday();
+}
+function somedayTextClick(id){
+  // if the description/steps panel is open, the first click just minimizes it — editing needs a second, deliberate click
+  if(expandedSomeday.has(id)){ toggleSomedayExpand(id); return; }
+  openSomedayEdit(id);
 }
 function toggleSomedayFavorite(id){
   const s = data.someday.find(s=>s.id===id);
