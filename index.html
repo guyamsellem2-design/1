@@ -1566,6 +1566,7 @@ function connectGoogleCalendar(){
         renderGcalStatus();
         resolvePrimaryCalendarId();
         runGcalSync();
+        if(!currentSyncUser) syncSignIn(); // same click also signs in for cross-device sync, same Google account
       }
     }
   });
@@ -2103,7 +2104,7 @@ function renderSyncBlock(){
   const el = document.getElementById('syncBlock');
   if(!el) return;
   if(!currentSyncUser){
-    el.innerHTML = `<div class="gcal-block-title">🔄 סנכרון בין מכשירים</div><div class="gcal-sync-row-inner"><button class="gcal-connect-btn" onclick="syncSignIn()">🔗 התחברות עם גוגל</button></div>`;
+    el.innerHTML = `<div class="gcal-block-title">🔄 סנכרון בין מכשירים</div><div class="gcal-sync-row-inner"><button class="gcal-connect-btn" onclick="syncSignIn()">🔗 חיבור מייל לסנכרון בלבד</button></div><div class="hint" style="margin-top:8px;">מתחברת אוטומטית כשמחברים את היומן למעלה — הכפתור הזה בשביל להתחבר לסנכרון בלי לחבר יומן, או עם מייל אחר.</div>`;
     return;
   }
   const lastSyncStr = lastSyncAt ? `${pad(new Date(lastSyncAt).getHours())}:${pad(new Date(lastSyncAt).getMinutes())}` : '';
@@ -2114,6 +2115,7 @@ function renderSyncBlock(){
       <button class="reset-btn" onclick="runFullSync()" ${syncInProgress?'disabled':''}>🔄 סנכרן עכשיו</button>
       <button class="reset-btn" onclick="syncSignOut()">✕ נתק</button>
     </div>
+    <div class="hint" style="margin-top:8px;">רוצה לסנכרן עם מייל אחר? קודם ✕ נתק, ואז חיבור מייל לסנכרון בלבד עם החשבון הרצוי.</div>
   `;
 }
 if(fbAuth){
