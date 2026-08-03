@@ -117,7 +117,8 @@
   .list-expand-btn{background:var(--surface3); border:1px solid var(--border-strong); color:var(--muted); border-radius:999px; padding:9px 22px; font-size:14px; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:7px;}
   .list-expand-btn:hover{border-color:var(--gold); color:var(--text);}
   .list-expand-btn .chev{font-size:13px;}
-  .keep-note{background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:12px; break-inside:avoid; transition:background .3s ease;}
+  .keep-note{background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:12px; break-inside:avoid; transition:background .3s ease, box-shadow .3s ease, transform .3s ease;}
+  .keep-note:hover{box-shadow:0 8px 24px -12px var(--glow-teal); transform:translateY(-1px);}
   .keep-note-minimized{display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; padding:10px 12px; min-height:0;}
   .keep-note-minimized .keep-note-preview{font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;}
   .keep-note-minimized .chev{color:var(--muted2); font-size:13px; flex-shrink:0;}
@@ -192,13 +193,28 @@
   .main-tab-btn:hover{color:var(--text); border-color:var(--muted);}
   .main-tab-btn.active{background:var(--gold); color:#241a06; border-color:transparent; box-shadow:0 6px 18px -8px var(--glow-gold);}
 
-  section{margin-bottom:44px; padding-top:32px; border-top:1px solid var(--border);}
+  section{margin-bottom:44px; padding-top:32px; border-top:1px solid var(--border); animation:sectionRise .7s cubic-bezier(.22,1,.36,1) both;}
   section:first-of-type{padding-top:0; border-top:none;}
+  section:nth-of-type(1){animation-delay:.02s;}
+  section:nth-of-type(2){animation-delay:.08s;}
+  section:nth-of-type(3){animation-delay:.14s;}
+  section:nth-of-type(4){animation-delay:.20s;}
+  section:nth-of-type(5){animation-delay:.26s;}
+  section:nth-of-type(n+6){animation-delay:.30s;}
+  @keyframes sectionRise{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion: reduce){ section{animation:none;} }
   .section-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap;}
   h2{font-family:'Frank Ruhl Libre', serif; font-size:21px; font-weight:500; margin:0; display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; flex:1;}
-  h2 .chev{font-size:14px; color:var(--muted2); font-weight:400;}
+  h2 .chev{font-size:14px; color:var(--muted2); font-weight:400; display:inline-block; transition:transform .3s cubic-bezier(.22,1,.36,1);}
   h2 .num{color:var(--gold); font-size:15px; font-weight:400; opacity:.8;}
   .hint{font-size:14px; color:var(--muted2);}
+  #secbody-schedule, #secbody-tasks, #secbody-reflection, #secbody-someday, #secbody-suggestions{
+    transition:opacity .22s ease, transform .22s cubic-bezier(.22,1,.36,1); transform-origin:top; opacity:1; transform:translateY(0) scaleY(1);
+  }
+  .section-collapsing{opacity:0 !important; transform:translateY(-8px) scaleY(0.97) !important;}
+  @media (prefers-reduced-motion: reduce){
+    #secbody-schedule, #secbody-tasks, #secbody-reflection, #secbody-someday, #secbody-suggestions{transition:none;}
+  }
 
   /* domain editor */
   .domain-editor{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:30px;}
@@ -275,6 +291,11 @@
   .card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px; transition:box-shadow .3s ease;}
   .card:hover{box-shadow:0 10px 34px -16px var(--glow-gold);}
   input:focus, textarea:focus, select:focus, button:focus-visible{ outline:2px solid var(--glow-gold); outline-offset:2px; }
+
+  /* gentle, friendly micro-interactions */
+  button{ transition:transform .15s cubic-bezier(.34,1.56,.64,1), background .2s ease, box-shadow .2s ease, border-color .2s ease, color .2s ease; }
+  button:active{ transform:scale(0.96); }
+  @media (prefers-reduced-motion: reduce){ button{ transition:background .2s ease, border-color .2s ease, color .2s ease; } button:active{ transform:none; } }
   .add-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
   .section-divider{border-top:1px solid var(--border); margin:4px 0 16px;}
   .add-row input[type=text]{flex:1; min-width:160px; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:15px; font-family:inherit;}
@@ -283,8 +304,11 @@
   ul.tasks{list-style:none; margin:0; padding:0;}
   ul.tasks li{display:flex; align-items:center; gap:9px; padding:10px 4px; border-bottom:1px solid var(--border);}
   ul.tasks li:last-child{border-bottom:none;}
-  .chk{width:19px; height:19px; border-radius:50%; border:2px solid var(--border-strong); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:transparent;}
+  .chk{width:19px; height:19px; border-radius:50%; border:2px solid var(--border-strong); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:transparent; transition:background .25s ease, border-color .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1);}
   .chk.done{background:var(--gold); border-color:var(--gold);}
+  .chk.chk-pop{animation:chkPop .4s cubic-bezier(.34,1.56,.64,1);}
+  @keyframes chkPop{ 0%{transform:scale(1);} 45%{transform:scale(1.35);} 100%{transform:scale(1);} }
+  @media (prefers-reduced-motion: reduce){ .chk{transition:background .25s ease, border-color .25s ease;} .chk.chk-pop{animation:none;} }
   .energy-dot{width:11px; height:11px; border-radius:50%; flex-shrink:0; cursor:pointer; border:1px solid rgba(0,0,0,0.2);}
   .energy-dot.energy-dot-empty{background:transparent; border:1.5px dashed var(--muted2);}
   .task-text{flex:1; font-size:15.5px; cursor:pointer;}
@@ -2335,7 +2359,15 @@ function addTask(){
   renderScheduleGrid();
   applyGcalSyncForTask(newTask, true);
 }
-function toggleTask(id){ const t=data.tasks.find(t=>t.id===id); if(t){ t.done=!t.done; saveData(); renderTasks(); renderScheduleGrid(); } }
+function toggleTask(id){
+  const t=data.tasks.find(t=>t.id===id);
+  if(!t) return;
+  t.done=!t.done; saveData(); renderTasks(); renderScheduleGrid();
+  if(t.done) requestAnimationFrame(()=>{
+    const chk = document.querySelector(`.task-li[data-drag-id="${id}"] .chk`);
+    if(chk){ chk.classList.add('chk-pop'); setTimeout(()=>chk.classList.remove('chk-pop'), 400); }
+  });
+}
 function cycleEnergy(id){
   const t = data.tasks.find(t=>t.id===id);
   if(!t) return;
@@ -2386,9 +2418,9 @@ function renderWeekNav(){
   const el = document.getElementById('weekNav');
   if(!el) return;
   el.innerHTML = `
-    <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>›</button>
+    <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>‹</button>
     <span class="week-nav-label">${weekRangeLabel(weekOffset)}${weekOffset===0?' · השבוע':''}</span>
-    <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>‹</button>
+    <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>›</button>
   `;
 }
 let weekSwipeState = { startX:null, startY:null, active:false };
@@ -3124,8 +3156,18 @@ function applySectionCollapse(key){
   const collapsed = isSectionCollapsed(key);
   const body = document.getElementById('secbody-'+key);
   const chev = document.getElementById('chev-'+key);
-  if(body) body.style.display = collapsed ? 'none' : '';
   if(chev) chev.textContent = collapsed ? '▸' : '▾';
+  if(!body) return;
+  if(collapsed){
+    if(body.style.display==='none') return;
+    body.classList.add('section-collapsing');
+    setTimeout(()=>{ if(isSectionCollapsed(key)) body.style.display='none'; }, 200);
+  } else {
+    const wasHidden = body.style.display==='none';
+    body.style.display = '';
+    if(wasHidden){ body.classList.add('section-collapsing'); void body.offsetHeight; }
+    body.classList.remove('section-collapsing');
+  }
 }
 function applyAllSectionCollapse(){
   SECTION_KEYS.forEach(applySectionCollapse);
@@ -3419,10 +3461,21 @@ function weekCarouselEnd(g){
   const rawDx = g.dx || 0;
   const delta = rawDx > 0 ? -1 : 1; // drag right reveals the previous week, drag left reveals the next
   const canMove = (delta===-1 && weekOffset>WEEK_OFFSET_MIN) || (delta===1 && weekOffset<WEEK_OFFSET_MAX);
-  grid.style.transition = 'transform .22s ease';
+  grid.style.transition = 'transform .22s cubic-bezier(.22,1,.36,1)';
   if(canMove && Math.abs(rawDx) > g.width * 0.5){
-    grid.style.transform = `translateX(${rawDx>0?g.width:-g.width}px)`;
-    setTimeout(()=>{ grid.style.transition=''; grid.style.transform=''; changeWeek(delta); }, 220);
+    const dir = rawDx > 0 ? 1 : -1;
+    grid.style.transform = `translateX(${dir*g.width}px)`;
+    setTimeout(()=>{
+      // the outgoing week has slid fully off; bring the new one in from the opposite edge
+      // instead of just popping into place, so the motion reads as one continuous swipe
+      grid.style.transition = 'none';
+      changeWeek(delta);
+      grid.style.transform = `translateX(${-dir*g.width}px)`;
+      void grid.offsetHeight;
+      grid.style.transition = 'transform .22s cubic-bezier(.22,1,.36,1)';
+      grid.style.transform = '';
+      setTimeout(()=>{ grid.style.transition=''; }, 230);
+    }, 220);
   } else {
     grid.style.transform = '';
     setTimeout(()=>{ grid.style.transition=''; }, 220);
