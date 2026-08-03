@@ -3017,6 +3017,7 @@ function somedayDetailHtml(s){
     <div class="subtask-row" data-someday-id="${s.id}" data-drag-id="${sub.id}">
       <div class="chk ${sub.done?'done':''}" onclick="toggleSomedaySubtask('${s.id}','${sub.id}')"></div>
       <span class="subtask-text ${sub.done?'done':''}" onclick="editSomedaySubtaskText('${s.id}','${sub.id}')">${escapeHtml(sub.text)}</span>
+      <span class="promote" onclick="convertSomedaySubtaskToTask('${s.id}','${sub.id}')">→ משימה</span>
       <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')">✕</span>
     </div>`).join('') : '<div class="empty">אין עדיין צעדים קטנים</div>';
   return `<li class="detail-li">
@@ -3087,6 +3088,20 @@ function deleteSomedaySubtask(id, subId){
   s.subtasks = (s.subtasks||[]).filter(x=>x.id!==subId);
   saveData();
   renderSomeday();
+}
+function convertSomedaySubtaskToTask(id, subId){
+  const s = data.someday.find(s=>s.id===id);
+  if(!s) return;
+  const sub = (s.subtasks||[]).find(x=>x.id===subId);
+  if(!sub) return;
+  s.subtasks = (s.subtasks||[]).filter(x=>x.id!==subId);
+  const newTask = {id:uid(), text:sub.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:sub.done||false, energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
+  data.tasks.push(newTask);
+  saveData();
+  renderSomeday();
+  renderTasks();
+  renderScheduleGrid();
+  flashStatus('הפך למשימה');
 }
 function addSomeday(){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
