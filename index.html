@@ -346,7 +346,7 @@
 
   /* schedule grid */
   .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px; border-radius:16px; transition:box-shadow .35s ease, padding .35s ease;}
-  .schedule-grid.current-week{padding:10px; box-shadow:0 0 0 2px #6cf6ff, 0 0 20px 3px rgba(108,246,255,0.55);}
+  .schedule-grid.current-week{padding:10px; box-shadow:0 0 0 1px rgba(108,246,255,0.55), 0 0 12px 1px rgba(108,246,255,0.28);}
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
   .sched-date{color:var(--muted2); font-size:12.5px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:13px; font-style:italic; padding:4px 2px;}
@@ -3581,14 +3581,14 @@ function weekCarouselMove(g, dx){
   const grid = document.getElementById('scheduleGrid');
   const canPrev = weekOffset > WEEK_OFFSET_MIN, canNext = weekOffset < WEEK_OFFSET_MAX;
   let clamped = dx;
-  if(dx > 0 && !canPrev) clamped = dx * 0.25;
-  if(dx < 0 && !canNext) clamped = dx * 0.25;
+  if(dx > 0 && !canNext) clamped = dx * 0.25;
+  if(dx < 0 && !canPrev) clamped = dx * 0.25;
   grid.style.transform = `translateX(${clamped}px)`;
 }
 function weekCarouselEnd(g){
   const grid = document.getElementById('scheduleGrid');
   const rawDx = g.dx || 0;
-  const delta = rawDx > 0 ? -1 : 1; // drag right reveals the previous week, drag left reveals the next
+  const delta = rawDx > 0 ? 1 : -1; // drag right reveals the next week, drag left reveals the previous
   const canMove = (delta===-1 && weekOffset>WEEK_OFFSET_MIN) || (delta===1 && weekOffset<WEEK_OFFSET_MAX);
   grid.style.transition = 'transform .22s cubic-bezier(.22,1,.36,1)';
   if(canMove && Math.abs(rawDx) > g.width * 0.5){
