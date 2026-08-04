@@ -1652,6 +1652,9 @@ function connectGoogleCalendar(){
         gcalAccessToken = resp.access_token;
         data.gcalConnected = true;
         saveData();
+        // syncSignIn() below can navigate away immediately (signInWithRedirect) — flush the debounced
+        // write first so gcalConnected actually lands in localStorage before that happens
+        flushSaveData();
         renderGcalStatus();
         resolvePrimaryCalendarId();
         runGcalSync();
@@ -4064,6 +4067,20 @@ function pullRefreshMove(clientY){
   el.classList.toggle('ready', pullState.ready);
   el.style.transform = `translate(-50%, ${dampened - 60}px)`;
 }
+function waitForGcalSync(timeoutMs){
+  // runGcalSync() is a fire-and-forget chain of fetches, not a promise the caller can await directly —
+  // give it a moment to actually start (flip gcalSyncing to true), then wait for it to finish or time out,
+  // so a reload right after doesn't cut the in-flight request off before it's done
+  return new Promise(resolve=>{
+    setTimeout(()=>{
+      const start = Date.now();
+      (function check(){
+        if(!gcalSyncing || Date.now()-start > timeoutMs) resolve();
+        else setTimeout(check, 150);
+      })();
+    }, 300);
+  });
+}
 async function pullRefreshEnd(){
   const el = document.getElementById('pullRefresh');
   if(!pullState.pulling || !el) return;
@@ -4072,10 +4089,11 @@ async function pullRefreshEnd(){
     el.classList.add('spinning');
     el.style.transform = 'translate(-50%, 20px)';
     flushSaveData();
-    if(data.gcalConnected && mainView==='home') syncGoogleCalendar();
-    // pull-to-refresh should do exactly what the "סנכרן עכשיו" button does (sync + a full refresh),
-    // not just reload the page on its own
+    // pull-to-refresh should do exactly what the "סנכרן עכשיו" buttons do (both syncs), not just reload
+    const gcalWillSync = data.gcalConnected && mainView==='home';
+    if(gcalWillSync) syncGoogleCalendar();
     if(currentSyncUser) await runFullSync().catch(()=>{});
+    if(gcalWillSync) await waitForGcalSync(4000);
     setTimeout(()=>location.reload(), 150);
   } else {
     pullRefreshReset();
@@ -4312,6 +4330,10 @@ window.addEventListener('touchcancel', gestureCancel, {passive:true});
 
 setupPWA();
 loadData();
+// a plain page load/refresh (F5, reopening the app) should sync too, not just the pull-to-refresh
+// gesture and the manual buttons — cross-device sync already does this via onAuthStateChanged below,
+// this covers the calendar half of it
+if(data.gcalConnected) syncGoogleCalendar();
 </script>
 </body>
 </html>
