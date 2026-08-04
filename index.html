@@ -528,7 +528,7 @@
     <div class="card">
       <div class="add-row">
         <input type="text" id="taskInput" placeholder="משימה קטנה לשבוע הזה...">
-        <select id="taskDomain"></select>
+        <select id="taskDomain" onchange="onTaskDomainChange(this.value)"></select>
         <select id="taskEnergy">
           <option value="low">🟢 מטעין</option>
           <option value="mid" selected>🟡 בינוני</option>
@@ -587,7 +587,7 @@
     <div class="card">
       <div class="add-row">
         <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
-        <select id="somedayDomain"></select>
+        <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
         <button onclick="addSomeday()">הוסף</button>
       </div>
       <div class="add-row" style="margin-bottom:10px;">
@@ -2320,12 +2320,21 @@ function unscheduleTaskFromWeek(id){
   renderTasks();
 }
 const expandedTasks = new Set();
-function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(); }
+function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(taskFilterDomain || undefined); }
 let taskSortBy = 'time';
 function setTaskSortBy(val){ taskSortBy = val; renderTasks(); }
 let taskFilterDomain = '';
 let taskFilterRange = 'week';
-function setTaskFilterDomain(val){ taskFilterDomain = val; renderTasks(); }
+function setTaskFilterDomain(val){
+  taskFilterDomain = val;
+  renderTasks();
+  // single-topic view mode: keep the "new task" topic selector in sync with what's being viewed
+  if(val){ const sel = document.getElementById('taskDomain'); if(sel) sel.value = val; }
+}
+function onTaskDomainChange(val){
+  // already viewing a single topic — switching the new-task topic switches the view to match
+  if(taskFilterDomain && taskFilterDomain!==val) setTaskFilterDomain(val);
+}
 function setTaskFilterRange(val){ taskFilterRange = val; renderTasks(); }
 function renderTaskFilterSelect(){
   const el = document.getElementById('taskFilterDomain');
@@ -2991,11 +3000,20 @@ function updateAddNoteBtnColor(){
 /* ---------- someday ---------- */
 let editingSomedayId = null;
 const expandedSomeday = new Set();
-function renderSomedayDomainSelect(){ const el=document.getElementById('somedayDomain'); if(el) el.innerHTML = domainOptions(); }
+function renderSomedayDomainSelect(){ const el=document.getElementById('somedayDomain'); if(el) el.innerHTML = domainOptions(somedayFilterDomain || undefined); }
 let somedaySortBy = 'domain';
 let somedayFilterDomain = '';
 function setSomedaySortBy(val){ somedaySortBy = val; renderSomeday(); }
-function setSomedayFilterDomain(val){ somedayFilterDomain = val; renderSomeday(); }
+function setSomedayFilterDomain(val){
+  somedayFilterDomain = val;
+  renderSomeday();
+  // single-topic view mode: keep the "new idea" topic selector in sync with what's being viewed
+  if(val){ const sel = document.getElementById('somedayDomain'); if(sel) sel.value = val; }
+}
+function onSomedayDomainChange(val){
+  // already viewing a single topic — switching the new-idea topic switches the view to match
+  if(somedayFilterDomain && somedayFilterDomain!==val) setSomedayFilterDomain(val);
+}
 function renderSomedayFilterSelect(){
   const el = document.getElementById('somedayFilterDomain');
   if(!el) return;
