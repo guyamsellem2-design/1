@@ -2027,7 +2027,6 @@ function renderGcalStatus(){
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
-    ${(fbAuth && !currentSyncUser) ? `<div class="gcal-sync-row-inner"><span class="gcal-status">⚠️ עדיין לא מחובר לסנכרון בין מכשירים</span><button class="reset-btn" onclick="syncSignIn()">🔄 חיבור לסנכרון</button></div>` : ''}
     ${pickerHtml}
   `;
 }
@@ -2226,7 +2225,6 @@ if(fbAuth){
   fbAuth.onAuthStateChanged(user=>{
     currentSyncUser = user;
     renderSyncBlock();
-    renderGcalStatus();
     if(user) runFullSync();
   });
   fbAuth.getRedirectResult().catch(e=>{ console.error('sync redirect sign-in failed', e); flashStatus('ההתחברות לסנכרון נכשלה'); });
