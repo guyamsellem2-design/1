@@ -2027,6 +2027,7 @@ function renderGcalStatus(){
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
+    ${(fbAuth && !currentSyncUser) ? `<div class="gcal-sync-row-inner"><span class="gcal-status">⚠️ עדיין לא מחובר לסנכרון בין מכשירים</span><button class="reset-btn" onclick="syncSignIn()">🔄 חיבור לסנכרון</button></div>` : ''}
     ${pickerHtml}
   `;
 }
@@ -2195,7 +2196,10 @@ function scheduleCloudSync(){
 function syncSignIn(){
   if(!fbAuth) return;
   const provider = new firebase.auth.GoogleAuthProvider();
-  fbAuth.signInWithPopup(provider).catch(e=>{ console.error(e); flashStatus('ההתחברות לסנכרון נכשלה'); });
+  // a popup triggered from inside an async callback (the calendar-connect response, not the raw click
+  // itself) gets silently blocked by many mobile browsers — a full-page redirect isn't subject to that,
+  // so sync sign-in reliably completes even when it's chained after the calendar connection
+  fbAuth.signInWithRedirect(provider).catch(e=>{ console.error(e); flashStatus('ההתחברות לסנכרון נכשלה'); });
 }
 function syncSignOut(){ if(fbAuth) fbAuth.signOut(); }
 function renderSyncBlock(){
@@ -2222,8 +2226,10 @@ if(fbAuth){
   fbAuth.onAuthStateChanged(user=>{
     currentSyncUser = user;
     renderSyncBlock();
+    renderGcalStatus();
     if(user) runFullSync();
   });
+  fbAuth.getRedirectResult().catch(e=>{ console.error('sync redirect sign-in failed', e); flashStatus('ההתחברות לסנכרון נכשלה'); });
 }
 window.addEventListener('online', ()=>{ if(currentSyncUser) runFullSync(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && currentSyncUser) runFullSync(); });
