@@ -356,15 +356,24 @@
   .task-date-badge{font-size:12px; color:var(--muted2); white-space:nowrap;}
 
   .feel-block{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:16px 18px; margin-bottom:22px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
+  .feel-block-header{cursor:pointer; font-size:15px; font-weight:700; color:var(--text); user-select:none; margin-bottom:10px;}
   .feel-energy-row{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
   .feel-energy-label{font-size:14.5px; font-weight:600; color:var(--text); white-space:nowrap;}
   .feel-energy-row input[type=range]{flex:1; accent-color:var(--gold);}
   .feel-energy-value{font-size:14px; color:var(--muted); min-width:38px; text-align:left; direction:ltr;}
   .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
-  .feel-chip-grid{display:flex; flex-wrap:wrap; gap:7px; padding:6px 2px 4px;}
-  .feel-chip{display:inline-block; font-size:13.5px; padding:6px 13px; border-radius:999px; border:1.5px solid var(--border); cursor:pointer; background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
+  .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:6px 2px 4px;}
+  .feel-chip{display:inline-flex; align-items:center; gap:6px; font-size:13.5px; padding:6px 13px; border-radius:999px; border:1.5px solid var(--border); cursor:pointer; background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
   .feel-chip.active{color:#fff; font-weight:600;}
+  .feel-chip-del{font-size:11px; opacity:.65;}
+  .feel-chip-del:hover{opacity:1;}
+  .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2);}
+  .feel-chip-add-row{display:inline-flex; align-items:center; gap:4px;}
+  .feel-chip-add-input{font-family:inherit; font-size:13.5px; padding:5px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); width:110px;}
+  .feel-chip-add-confirm, .feel-chip-add-cancel{cursor:pointer; font-size:15px; padding:2px 4px; color:var(--muted2);}
+  .feel-chip-add-confirm:hover{color:var(--safe, var(--text));}
+  .feel-chip-add-cancel:hover{color:var(--text);}
   .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:vertical; padding:8px 10px; line-height:1.5;}
   .sync-menu{position:fixed; top:12px; left:12px; z-index:90;}
   .sync-menu-btn{background:var(--surface); border:1px solid var(--border-strong); border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:0 4px 14px -6px rgba(0,0,0,0.4);}
@@ -780,7 +789,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], feelNote: '' };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], feelNote: '', customEmotions: [], customNeeds: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -841,6 +850,8 @@ function loadData(){
       data.activeEmotions = parsed.activeEmotions || [];
       data.activeNeeds = parsed.activeNeeds || [];
       data.feelNote = parsed.feelNote || '';
+      data.customEmotions = parsed.customEmotions || [];
+      data.customNeeds = parsed.customNeeds || [];
       mainView = parsed.mainView === 'topics' ? 'topics' : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -4040,7 +4051,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], feelNote:''};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], feelNote:'', customEmotions:[], customNeeds:[]};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4093,7 +4104,9 @@ const NEEDS_LIST = [
   {id:'creativity',label:'יצירה'}, {id:'meaning',label:'משמעות'}, {id:'space',label:'מרחב אישי'}, {id:'support',label:'תמיכה'},
   {id:'play',label:'הנאה/משחק'}, {id:'nourishment',label:'הזנה'}
 ];
-let emotionsBankOpen = false, needsBankOpen = false, feelNoteOpen = false;
+let feelBlockOpen = true, emotionsBankOpen = false, needsBankOpen = false, feelNoteOpen = false;
+let addingFeelChipBank = null;
+function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
 function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
 function toggleFeelNote(){ feelNoteOpen = !feelNoteOpen; renderFeelBar(); }
@@ -4111,10 +4124,54 @@ function setHomeEnergy(val){
   if(label) label.textContent = data.homeEnergy + '%';
 }
 function onFeelNoteInput(val){ data.feelNote = val; saveData(); }
-function feelChipHtml(bank, item, i){
+function customFeelListKey(bank){ return bank==='activeEmotions' ? 'customEmotions' : 'customNeeds'; }
+function startAddFeelChip(bank){
+  addingFeelChipBank = bank;
+  renderFeelBar();
+  requestAnimationFrame(()=>{ const el = document.getElementById('feelChipAddInput'); if(el) el.focus(); });
+}
+function cancelAddFeelChip(){ addingFeelChipBank = null; renderFeelBar(); }
+function commitAddFeelChip(bank){
+  const input = document.getElementById('feelChipAddInput');
+  const text = input ? input.value.trim() : '';
+  addingFeelChipBank = null;
+  if(!text){ renderFeelBar(); return; }
+  const listKey = customFeelListKey(bank);
+  if(!data[listKey]) data[listKey] = [];
+  data[listKey].push({id: uid(), label: text});
+  saveData();
+  renderFeelBar();
+}
+function deleteCustomFeelChip(bank, id){
+  const listKey = customFeelListKey(bank);
+  data[listKey] = (data[listKey]||[]).filter(x=>x.id!==id);
+  data[bank] = (data[bank]||[]).filter(x=>x!==id);
+  saveData();
+  renderFeelBar();
+}
+function feelChipHtml(bank, item, i, isCustom){
   const active = (data[bank]||[]).includes(item.id);
   const color = FEEL_PALETTE[i % FEEL_PALETTE.length];
-  return `<span class="feel-chip ${active?'active':''}" style="${active?`background:${color}; border-color:${color};`:`border-color:${color}; color:${color};`}" onclick="toggleFeelChip('${bank}','${item.id}')">${escapeHtml(item.label)}</span>`;
+  const delBtn = isCustom ? `<span class="feel-chip-del" onclick="event.stopPropagation(); deleteCustomFeelChip('${bank}','${item.id}')" title="מחיקה">✕</span>` : '';
+  return `<span class="feel-chip ${active?'active':''}" style="${active?`background:${color}; border-color:${color};`:`border-color:${color}; color:${color};`}" onclick="toggleFeelChip('${bank}','${item.id}')">${escapeHtml(item.label)}${delBtn}</span>`;
+}
+function feelAddRowHtml(bank){
+  if(addingFeelChipBank===bank){
+    return `<span class="feel-chip-add-row">
+      <input type="text" id="feelChipAddInput" class="feel-chip-add-input" placeholder="שם חדש..." onkeydown="if(event.key==='Enter') commitAddFeelChip('${bank}'); if(event.key==='Escape') cancelAddFeelChip();">
+      <span class="feel-chip-add-confirm" onclick="commitAddFeelChip('${bank}')" title="הוספה">✓</span>
+      <span class="feel-chip-add-cancel" onclick="cancelAddFeelChip()" title="ביטול">✕</span>
+    </span>`;
+  }
+  return `<span class="feel-chip feel-chip-add" onclick="startAddFeelChip('${bank}')">+ הוספה</span>`;
+}
+function feelChipGridHtml(bank, builtIn){
+  const custom = data[customFeelListKey(bank)] || [];
+  return `<div class="feel-chip-grid">
+    ${builtIn.map((item,i)=>feelChipHtml(bank, item, i, false)).join('')}
+    ${custom.map((item,i)=>feelChipHtml(bank, item, builtIn.length+i, true)).join('')}
+    ${feelAddRowHtml(bank)}
+  </div>`;
 }
 function renderFeelBar(){
   const el = document.getElementById('feelBar');
@@ -4122,6 +4179,8 @@ function renderFeelBar(){
   const emotionsCount = (data.activeEmotions||[]).length;
   const needsCount = (data.activeNeeds||[]).length;
   el.innerHTML = `
+    <div class="feel-block-header" onclick="toggleFeelBlock()">${feelBlockOpen?'▾':'▸'} 🌤️ איך אני מרגיש/ה עכשיו</div>
+    ${feelBlockOpen ? `
     <div class="feel-energy-row">
       <span class="feel-energy-label">🔋 רמת אנרגיה</span>
       <input type="range" min="0" max="100" value="${data.homeEnergy}" oninput="setHomeEnergy(this.value)">
@@ -4129,16 +4188,17 @@ function renderFeelBar(){
     </div>
     <div class="feel-bank">
       <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
-      ${emotionsBankOpen ? `<div class="feel-chip-grid">${EMOTIONS_LIST.map((e,i)=>feelChipHtml('activeEmotions', e, i)).join('')}</div>` : ''}
+      ${emotionsBankOpen ? feelChipGridHtml('activeEmotions', EMOTIONS_LIST) : ''}
     </div>
     <div class="feel-bank">
       <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} צרכים${needsCount?' ('+needsCount+')':''}</div>
-      ${needsBankOpen ? `<div class="feel-chip-grid">${NEEDS_LIST.map((n,i)=>feelChipHtml('activeNeeds', n, i)).join('')}</div>` : ''}
+      ${needsBankOpen ? feelChipGridHtml('activeNeeds', NEEDS_LIST) : ''}
     </div>
     <div class="feel-note-block">
       <div class="feel-bank-header" onclick="toggleFeelNote()">${feelNoteOpen?'▾':'▸'} כתיבה חופשית</div>
       ${feelNoteOpen ? `<textarea class="feel-note-textarea" oninput="onFeelNoteInput(this.value)" placeholder="מה עובר עליך עכשיו...">${escapeHtml(data.feelNote||'')}</textarea>` : ''}
     </div>
+    ` : ''}
   `;
 }
 
