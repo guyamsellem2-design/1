@@ -4262,6 +4262,8 @@ function renderFeelBar(){
    like "דברים לעשות" but scoped to today and starting fresh each day -- no calendar, no times, just
    text + a checkbox. starts at 3 slots (never overwhelming) with room to add more if she wants.
    an idea can be promoted into a real task, which is the only way it gains a date/time. */
+let todayIdeasOpen = true;
+function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; renderTodayIdeas(); }
 function ensureTodayIdeas(){
   const today = ymd(new Date());
   if(data.todayIdeasDate !== today){
@@ -4281,7 +4283,7 @@ function onTodayIdeaInput(id, inputEl){
     promoteBtn = document.createElement('span');
     promoteBtn.className = 'today-idea-promote';
     promoteBtn.title = 'הפיכה למשימה/עוגן עם זמן';
-    promoteBtn.textContent = '➜';
+    promoteBtn.textContent = '➜ משימה';
     promoteBtn.onclick = () => promoteTodayIdeaToTask(id);
     row.insertBefore(promoteBtn, row.querySelector('.today-idea-del'));
   } else if(!val.trim() && promoteBtn){
@@ -4325,19 +4327,21 @@ function renderTodayIdeas(){
   if(!el) return;
   ensureTodayIdeas();
   el.innerHTML = `
-    <div class="feel-block-header" style="cursor:default;">✨ מה בא לי לעשות היום?</div>
+    <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה בא לי לעשות היום?</div>
+    ${todayIdeasOpen ? `
     <p class="hint" style="margin:2px 0 8px;">מומלץ לבחור שלושה דברים — בלי יומן ובלי זמנים, מקסימום לא יקרו. תמיד אפשר להפוך רעיון למשימה/עוגן עם זמן.</p>
     <div class="today-idea-list" id="todayIdeasList">
       ${data.todayIdeas.map(item=>`
         <div class="today-idea-row">
           <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
           <input type="text" class="today-idea-input ${item.done?'done':''}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)">
-          ${item.text.trim() ? `<span class="today-idea-promote" title="הפיכה למשימה/עוגן עם זמן" onclick="promoteTodayIdeaToTask('${item.id}')">➜</span>` : ''}
+          ${item.text.trim() ? `<span class="today-idea-promote" title="הפיכה למשימה/עוגן עם זמן" onclick="promoteTodayIdeaToTask('${item.id}')">➜ משימה</span>` : ''}
           <span class="today-idea-del" onclick="deleteTodayIdea('${item.id}')" title="מחיקה">✕</span>
         </div>
       `).join('')}
     </div>
     <button type="button" class="feel-chip feel-chip-add" style="margin-top:8px;" onclick="addTodayIdeaSlot()">+ הוספה</button>
+    ` : ''}
   `;
 }
 
