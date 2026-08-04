@@ -304,7 +304,7 @@
   .anchor-form-spaced{gap:11px; padding:12px 10px;}
   .anchor-form input, .anchor-form select{background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:14px; font-family:inherit;}
   .anchor-form label.buf-label{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted);}
-  .anchor-form-actions{display:flex; gap:6px;}
+  .anchor-form-actions{display:flex; gap:6px; flex-wrap:wrap;}
   .anchor-form-actions button{flex:1; font-size:13.5px; padding:5px; border-radius:6px; border:none; cursor:pointer; font-family:inherit;}
   .save-btn{background:var(--gold); color:#1a1206; font-weight:600;}
   .cancel-btn{background:var(--gold); color:#1a1206; font-weight:600;}
@@ -320,6 +320,8 @@
   @media (prefers-reduced-motion: reduce){ button{ transition:background .2s ease, border-color .2s ease, color .2s ease; } button:active{ transform:none; } }
   .add-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
   .view-controls{display:flex; flex-direction:column; gap:4px;}
+  .view-controls-row{display:flex; gap:5px; flex-wrap:nowrap;}
+  .view-controls-row select{flex:1; min-width:0; padding:7px 5px; font-size:12.5px;}
   .control-label{font-size:11.5px; color:var(--muted2); letter-spacing:.02em; padding-right:2px;}
   .section-divider{border-top:1px solid var(--border); margin:4px 0 16px;}
   .add-row input[type=text]{flex:1; min-width:160px; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:15px; font-family:inherit;}
@@ -428,6 +430,17 @@
   .anchor-form input, .anchor-form select, .anchor-form textarea, .anchor-form button{min-width:0; box-sizing:border-box; max-width:100%;}
   .field-label{display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted2);}
   .field-label input{width:100%; box-sizing:border-box;}
+  .time-picker-wrap{position:relative; min-width:0; flex:1;}
+  .time-picker-btn{width:100%; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:6px 8px; border-radius:6px; font-size:14px; font-family:inherit; cursor:pointer; text-align:right; box-sizing:border-box;}
+  .time-picker-btn.time-picker-empty{color:var(--muted2);}
+  .time-picker-btn:hover{border-color:var(--gold);}
+  .time-picker-panel{position:absolute; z-index:20; top:calc(100% + 4px); right:0; left:0; min-width:180px; background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; box-shadow:0 10px 28px -10px rgba(0,0,0,0.4); padding:8px; max-height:220px; display:flex; flex-direction:column; gap:6px;}
+  .time-picker-clear{background:var(--surface3); border:1px solid var(--border-strong); color:var(--muted); border-radius:6px; padding:6px; font-size:12.5px; cursor:pointer; font-family:inherit; flex-shrink:0;}
+  .time-picker-clear:hover{color:var(--text); border-color:var(--gold);}
+  .time-picker-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:4px; overflow-y:auto;}
+  .time-picker-opt{background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:5px 2px; font-size:12px; cursor:pointer; font-family:inherit;}
+  .time-picker-opt:hover{border-color:var(--gold);}
+  .time-picker-opt.active{background:var(--gold); color:#1a1206; border-color:transparent; font-weight:600;}
   .anchor-form input[type="date"]::-webkit-calendar-picker-indicator,
   .anchor-form input[type="time"]::-webkit-calendar-picker-indicator{display:none;}
   .anchor-form input[type="date"], .anchor-form input[type="time"]{padding-left:6px;}
@@ -480,13 +493,14 @@
   .reflect-q:last-child{margin-bottom:0;}
   .reflect-q label{display:flex; align-items:center; gap:7px; font-size:15px; color:var(--text); margin-bottom:7px; font-weight:500;}
   .reflect-q textarea{width:100%; min-height:60px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:10px 12px; font-size:15px; font-family:inherit; resize:vertical; line-height:1.5; margin-bottom:8px;}
-  .reflect-actions{display:flex; justify-content:flex-end; margin-bottom:8px;}
+  .reflect-actions{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; cursor:pointer; padding:4px 0;}
   .reflect-add-btn{background:var(--gold); color:#1a1206; font-weight:600; border:none; padding:7px 16px; border-radius:999px; font-size:14px; cursor:pointer; font-family:inherit;}
   .reflect-add-btn:hover{filter:brightness(1.06);}
   .bank-toggle{font-size:13.5px; color:var(--muted2); cursor:pointer; display:inline-block;}
   .bank-toggle:hover{color:var(--text);}
   .bank-list{margin-top:8px; display:flex; flex-direction:column; gap:6px;}
   .bank-entry{background:var(--surface2); border-radius:8px; padding:8px 10px; font-size:14.5px; line-height:1.5; display:flex; align-items:flex-start; gap:8px;}
+  .bank-entry textarea.inline-text-edit{min-height:50px; resize:vertical; line-height:1.5;}
   .bank-entry > span:nth-child(2){flex:1; cursor:pointer;}
   .bank-entry .bank-date{color:var(--muted2); font-size:12.5px; flex-shrink:0; white-space:nowrap; padding-top:1px;}
 
@@ -560,6 +574,8 @@
     </div>
     <div id="secbody-tasks">
     <div class="card">
+      <button type="button" class="list-expand-btn" id="taskAddToggleBtn" onclick="toggleTaskAddOpen()" style="margin-bottom:10px;"><span class="chev">▸</span> הוספת משימה</button>
+      <div id="taskAddBody" style="display:none;">
       <div class="add-row">
         <input type="text" id="taskInput" placeholder="משימה קטנה לשבוע הזה...">
         <select id="taskDomain" onchange="onTaskDomainChange(this.value)"></select>
@@ -573,17 +589,24 @@
       </div>
       <div class="add-row" id="taskSchedFields" style="display:none;">
         <input type="date" id="taskDate">
-        <input type="time" id="taskTime" placeholder="שעת התחלה">
-        <input type="time" id="taskEndTime" placeholder="שעת סיום (רשות)">
+        <div class="time-picker-wrap">
+          <input type="hidden" id="taskTime" value="">
+          <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת התחלה" onclick="toggleTimePicker('taskTime', event)">🕐 <span dir="ltr">שעת התחלה</span></button>
+        </div>
+        <div class="time-picker-wrap">
+          <input type="hidden" id="taskEndTime" value="">
+          <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת סיום (רשות)" onclick="toggleTimePicker('taskEndTime', event)">🕐 <span dir="ltr">שעת סיום (רשות)</span></button>
+        </div>
+      </div>
       </div>
       <div class="section-divider"></div>
       <div class="view-controls">
         <span class="control-label">תצוגה</span>
-        <div class="add-row" style="margin-bottom:10px;">
+        <div class="add-row view-controls-row" style="margin-bottom:10px;">
           <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
-            <option value="manual">מיון לפי: ידני (גרירה)</option>
-            <option value="time" selected>מיון לפי: זמן</option>
-            <option value="topic">מיון לפי: נושא</option>
+            <option value="manual">ידני (גרירה)</option>
+            <option value="time" selected>לפי זמן</option>
+            <option value="topic">לפי נושא</option>
           </select>
           <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
           <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
@@ -797,6 +820,7 @@ function loadData(){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
   }
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
+  taskAddOpen = !data.softMode;
   migrateOldNotesToDomainNotes();
   lastSnapshotJSON = JSON.stringify(data);
   render();
@@ -924,6 +948,8 @@ function toggleSoftMode(){
   saveData();
   renderTasks();
   renderScheduleGrid();
+  taskAddOpen = !data.softMode;
+  renderTaskAddState();
 }
 function toggleNightMode(){
   data.nightMode = !data.nightMode;
@@ -2238,7 +2264,7 @@ function addTaskFormHtml(dayIdx, dateStr){
         <option value="mid" selected>🟡 בינוני</option>
         <option value="high">🔴 מרוקן</option>
       </select>
-      <input type="time" id="newTaskTime-${dayIdx}" placeholder="שעה (רשות)">
+      ${timePickerHtml('newTaskTime-'+dayIdx, '', 'שעה (רשות)')}
     </div>
     <div class="anchor-form-actions">
       <button class="save-btn" onclick="saveNewTaskFromSchedule(${dayIdx}, '${dateStr}')">שמור</button>
@@ -2269,6 +2295,7 @@ function toggleAnchorDateField(dayIdx){
 function anchorAppliesToDate(a, dateObj, dayIdx){
   const repeatType = a.repeatType || 'weekly';
   const dateStr = ymd(dateObj);
+  if((a.skippedDates||[]).includes(dateStr)) return false;
   if(repeatType==='daily') return true;
   if(repeatType==='monthly') return !!a.date && Number(a.date.split('-')[2])===dateObj.getDate();
   if(repeatType==='yearly') return !!a.date && a.date.slice(5)===dateStr.slice(5);
@@ -2317,6 +2344,15 @@ function deleteAnchor(id){
   saveData();
   renderScheduleGrid();
   if(data.gcalConnected && removed && removed.googleRecurringEventId) deleteEventFromGcal(removed.googleRecurringEventId, ()=>{});
+}
+function deleteAnchorOccurrence(id, dateStr){
+  const a = data.anchors.find(a=>a.id===id);
+  if(!a) return;
+  if(!a.skippedDates) a.skippedDates = [];
+  if(!a.skippedDates.includes(dateStr)) a.skippedDates.push(dateStr);
+  openForm = null; editingAnchorId = null;
+  saveData();
+  renderScheduleGrid();
 }
 
 /* ---------- tasks ---------- */
@@ -2561,8 +2597,8 @@ function taskEditFormInner(t){
       ${dateOpen ? `
       <label class="field-label">תאריך<input type="date" id="taskEditDate-${t.id}" value="${t.date||''}"></label>
       <div class="edit-form-row">
-        <label class="field-label">התחלה<input type="time" id="taskEditTime-${t.id}" value="${t.time||''}"></label>
-        <label class="field-label">סיום<input type="time" id="taskEditEnd-${t.id}" value="${t.endTime||''}"></label>
+        <label class="field-label">התחלה${timePickerHtml('taskEditTime-'+t.id, t.time||'', 'שעה')}</label>
+        <label class="field-label">סיום${timePickerHtml('taskEditEnd-'+t.id, t.endTime||'', 'שעה')}</label>
       </div>
       ${data.gcalConnected
         ? `<label class="buf-label"><input type="checkbox" id="taskEditGcalSync-${t.id}" ${t.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
@@ -2595,8 +2631,8 @@ function subtaskScheduleFormHtml(t, s){
   return `<div class="subtask-schedule-form">
     <div class="edit-form-row">
       <label class="field-label">תאריך<input type="date" id="subtaskDate-${t.id}-${s.id}" value="${s.date||''}"></label>
-      <label class="field-label">התחלה<input type="time" id="subtaskTime-${t.id}-${s.id}" value="${s.time||''}"></label>
-      <label class="field-label">סיום<input type="time" id="subtaskEnd-${t.id}-${s.id}" value="${s.endTime||''}"></label>
+      <label class="field-label">התחלה${timePickerHtml('subtaskTime-'+t.id+'-'+s.id, s.time||'', 'שעה')}</label>
+      <label class="field-label">סיום${timePickerHtml('subtaskEnd-'+t.id+'-'+s.id, s.endTime||'', 'שעה')}</label>
     </div>
     ${gcalRow}
     <div class="anchor-form-actions">
@@ -2820,6 +2856,15 @@ function toggleTaskSchedule(){
   const fields = document.getElementById('taskSchedFields');
   fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
 }
+let taskAddOpen = true;
+function toggleTaskAddOpen(){ taskAddOpen = !taskAddOpen; renderTaskAddState(); }
+function renderTaskAddState(){
+  const btn = document.getElementById('taskAddToggleBtn');
+  const body = document.getElementById('taskAddBody');
+  if(!btn || !body) return;
+  btn.querySelector('.chev').textContent = taskAddOpen ? '▾' : '▸';
+  body.style.display = taskAddOpen ? '' : 'none';
+}
 function addTask(){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
   const input = document.getElementById('taskInput');
@@ -2834,8 +2879,8 @@ function addTask(){
   data.tasks.push(newTask);
   input.value='';
   document.getElementById('taskDate').value='';
-  document.getElementById('taskTime').value='';
-  document.getElementById('taskEndTime').value='';
+  setTimePickerValue('taskTime', '');
+  setTimePickerValue('taskEndTime', '');
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -2951,8 +2996,8 @@ function renderScheduleGrid(){
           <input type="date" id="anchorDate-${dayIdx}" value="${defaultDateVal}">
         </div>
         <div class="edit-form-row">
-          <input type="time" id="anchorTime-${dayIdx}" value="${isEditingThisDay?editingHere.time||'':''}">
-          <input type="time" id="anchorEnd-${dayIdx}" placeholder="שעת סיום (ברירת מחדל: שעה)" value="${isEditingThisDay?editingHere.endTime||'':''}">
+          ${timePickerHtml('anchorTime-'+dayIdx, isEditingThisDay?editingHere.time||'':'', 'שעה')}
+          ${timePickerHtml('anchorEnd-'+dayIdx, isEditingThisDay?editingHere.endTime||'':'', 'שעת סיום')}
         </div>
         <label class="buf-label"><input type="checkbox" id="anchorBuffer-${dayIdx}" ${isEditingThisDay&&editingHere.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
         <div class="anchor-form-actions">
@@ -2964,7 +3009,10 @@ function renderScheduleGrid(){
           ? `<label class="buf-label"><input type="checkbox" id="anchorGcalSync-${dayIdx}" ${editingHere.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
           : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>`}
         <div class="anchor-form-actions">
-          <button class="delete-btn" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>
+          ${currentRepeatType==='once'
+            ? `<button class="delete-btn" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>`
+            : `<button class="delete-btn" onclick="deleteAnchorOccurrence('${editingHere.id}','${dateStr}')">🗑 מחיקה חד-פעמית</button>
+               <button class="delete-btn" onclick="deleteAnchor('${editingHere.id}')">🗑 מחיקה לתמיד</button>`}
         </div>` : ''}
       </div>`;
 
@@ -3506,18 +3554,17 @@ function renderReflection(){
         <div class="bank-entry" data-bank-key="${q.key}" data-entry-id="${e.id}">
           <span class="bank-date">${e.weekKey}</span>
           ${inlineEditIds.has('bank:'+q.key+':'+e.id)
-            ? `<input type="text" class="inline-text-edit" value="${escapeAttr(e.text)}" data-inline-key="bank:${q.key}:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('bank:${q.key}:${e.id}', renderReflection) : saveBankEntryEdit('${q.key}','${e.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+            ? `<textarea class="inline-text-edit" data-inline-key="bank:${q.key}:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('bank:${q.key}:${e.id}', renderReflection) : saveBankEntryEdit('${q.key}','${e.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(e.text)}</textarea>`
             : `<span data-inline-key="bank:${q.key}:${e.id}" onclick="inlineEditToggle('bank:${q.key}:${e.id}', renderReflection)">${escapeHtml(e.text)}</span>`}
           <span class="del-task" onclick="deleteBankEntry('${q.key}','${e.id}')">✕</span>
         </div>`).join('')}</div>` : '<div class="empty">עוד אין תובנות בבנק הזה</div>') : '';
     return `<div class="reflect-q">
       <label>${q.icon} ${q.label}</label>
       <textarea id="reflect-${q.key}" placeholder="מה עולה לך?"></textarea>
-      <div class="reflect-actions">
-        <button class="reflect-add-btn" onclick="addReflectionEntry('${q.key}')">+ הוסף תובנה</button>
-        ${q.key==='insights' ? `<label class="buf-label"><input type="checkbox" id="reflect-insights-also-reminder"> גם לתזכורות לבחור בעצמי</label>` : ''}
+      <div class="reflect-actions" onclick="toggleBank('${q.key}')">
+        <button class="reflect-add-btn" onclick="event.stopPropagation(); addReflectionEntry('${q.key}')">+ הוסף תובנה</button>
+        <span class="bank-toggle">${isOpen?'▾':'▸'} בנק תובנות (${entries.length})</span>
       </div>
-      <span class="bank-toggle" onclick="toggleBank('${q.key}')">${isOpen?'▾':'▸'} בנק תובנות (${entries.length})</span>
       ${historyHtml}
     </div>`;
   }).join('') + renderSelfChoiceRemindersSection();
@@ -3529,18 +3576,9 @@ function addReflectionEntry(bankKey){
   if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], insights:[]};
   if(!data.reflectionBanks[bankKey]) data.reflectionBanks[bankKey] = [];
   data.reflectionBanks[bankKey].push({id:uid(), weekKey:weekKey(), text});
-  let alsoReminder = false;
-  if(bankKey==='insights'){
-    const box = document.getElementById('reflect-insights-also-reminder');
-    if(box && box.checked){
-      if(!data.selfChoiceReminders) data.selfChoiceReminders = [];
-      data.selfChoiceReminders.push({id:uid(), text, createdAt:Date.now()});
-      alsoReminder = true;
-    }
-  }
   saveData();
   renderReflection();
-  flashStatus(alsoReminder ? 'התובנה נשמרה בבנק + נוספה לתזכורות לבחור בעצמי' : 'התובנה נשמרה בבנק');
+  flashStatus('התובנה נשמרה בבנק');
 }
 function toggleBank(bankKey){
   if(expandedBanks.has(bankKey)) expandedBanks.delete(bankKey); else expandedBanks.add(bankKey);
@@ -3564,7 +3602,7 @@ function renderSelfChoiceRemindersSection(){
   const historyHtml = isOpen ? (entries.length ? `<div class="bank-list">${entries.map(e=>`
       <div class="bank-entry" data-bank-key="selfChoice" data-entry-id="${e.id}">
         ${inlineEditIds.has('selfchoice:'+e.id)
-          ? `<input type="text" class="inline-text-edit" value="${escapeAttr(e.text)}" data-inline-key="selfchoice:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('selfchoice:${e.id}', renderReflection) : saveSelfChoiceReminderEdit('${e.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+          ? `<textarea class="inline-text-edit" data-inline-key="selfchoice:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('selfchoice:${e.id}', renderReflection) : saveSelfChoiceReminderEdit('${e.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(e.text)}</textarea>`
           : `<span data-inline-key="selfchoice:${e.id}" onclick="inlineEditToggle('selfchoice:${e.id}', renderReflection)">${escapeHtml(e.text)}</span>`}
         <span class="del-task" onclick="deleteSelfChoiceReminder('${e.id}')">✕</span>
       </div>`).join('')}</div>` : '<div class="empty">עוד אין תזכורות בבנק הזה</div>') : '';
@@ -3572,8 +3610,10 @@ function renderSelfChoiceRemindersSection(){
     <label>❤️‍🩹 תזכורות לבחור בעצמי</label>
     <div class="hint" style="margin:-2px 0 8px;">משפטים שכותבים לעצמכם ברגע רגוע, כדי שיהיו זמינים ברגע שקשה לבחור בעצמכם — הכלי מוצע כשבדיקת גוף מראה שמשהו מכווץ או שאין אנרגיה</div>
     <textarea id="reflect-selfChoice" placeholder="מה הייתי רוצה להזכיר לעצמי?"></textarea>
-    <div class="reflect-actions"><button class="reflect-add-btn" onclick="addSelfChoiceReminder()">+ הוסף תזכורת</button></div>
-    <span class="bank-toggle" onclick="toggleBank('selfChoice')">${isOpen?'▾':'▸'} בנק תזכורות (${entries.length})</span>
+    <div class="reflect-actions" onclick="toggleBank('selfChoice')">
+      <button class="reflect-add-btn" onclick="event.stopPropagation(); addSelfChoiceReminder()">+ הוסף תזכורת</button>
+      <span class="bank-toggle">${isOpen?'▾':'▸'} בנק תזכורות (${entries.length})</span>
+    </div>
     ${historyHtml}
   </div>`;
 }
@@ -3765,6 +3805,68 @@ function inlineEditToggle(key, render){
   }
 }
 function cancelInlineEdit(key, render){ inlineEditIds.delete(key); render(); }
+
+/* ---------- inline time picker — replaces native <input type="time">, which opens an OS-level
+   picker window; this keeps time selection in-page like every other menu in the app ---------- */
+let openTimePickerId = null;
+const TIME_PICKER_OPTIONS = (() => {
+  const opts = [];
+  for(let h=0; h<24; h++) for(let m=0; m<60; m+=15) opts.push(String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'));
+  return opts;
+})();
+function timePickerHtml(id, value, placeholder){
+  const label = value || placeholder || 'שעה';
+  return `<div class="time-picker-wrap">
+    <input type="hidden" id="${id}" value="${value||''}">
+    <button type="button" class="time-picker-btn ${value?'':'time-picker-empty'}" data-placeholder="${escapeAttr(placeholder||'שעה')}" onclick="toggleTimePicker('${id}', event)">🕐 <span dir="ltr">${escapeHtml(label)}</span></button>
+  </div>`;
+}
+function toggleTimePicker(id, evt){
+  if(evt) evt.stopPropagation();
+  const wasOpenForThis = openTimePickerId===id;
+  closeTimePicker();
+  if(wasOpenForThis) return;
+  const hidden = document.getElementById(id);
+  const wrap = hidden ? hidden.closest('.time-picker-wrap') : null;
+  if(!wrap) return;
+  const current = hidden.value;
+  const panel = document.createElement('div');
+  panel.className = 'time-picker-panel';
+  panel.innerHTML = `
+    <button type="button" class="time-picker-clear" onclick="setTimePickerValue('${id}', '')">✕ ללא שעה</button>
+    <div class="time-picker-grid">${TIME_PICKER_OPTIONS.map(t=>`<button type="button" class="time-picker-opt ${t===current?'active':''}" onclick="setTimePickerValue('${id}', '${t}')">${t}</button>`).join('')}</div>
+  `;
+  wrap.appendChild(panel);
+  openTimePickerId = id;
+  const activeBtn = panel.querySelector('.time-picker-opt.active');
+  if(activeBtn) activeBtn.scrollIntoView({block:'center'});
+}
+function closeTimePicker(){
+  if(!openTimePickerId) return;
+  openTimePickerId = null;
+  // removing the panel synchronously (while its own click handler is still mid-dispatch) can make the
+  // browser re-hit-test at the same coordinates and fire a phantom click on whatever is revealed
+  // underneath (e.g. the toggle button right above it) — deferring the actual removal avoids that
+  const toRemove = document.querySelectorAll('.time-picker-panel');
+  setTimeout(()=>{ toRemove.forEach(p=>p.remove()); }, 0);
+}
+function setTimePickerValue(id, val){
+  const hidden = document.getElementById(id);
+  if(!hidden) return;
+  hidden.value = val;
+  const wrap = hidden.closest('.time-picker-wrap');
+  const btn = wrap ? wrap.querySelector('.time-picker-btn') : null;
+  if(btn){
+    const labelEl = btn.querySelector('span');
+    if(labelEl) labelEl.textContent = val || btn.dataset.placeholder || 'שעה';
+    btn.classList.toggle('time-picker-empty', !val);
+  }
+  closeTimePicker();
+  hidden.dispatchEvent(new Event('change', {bubbles:true}));
+}
+document.addEventListener('click', (e)=>{
+  if(openTimePickerId && !e.target.closest('.time-picker-wrap')) closeTimePicker();
+});
 function renderAllDependent(){
   renderTaskDomainSelect(); renderTasks(); renderScheduleGrid();
   renderDomainEditor(); renderKeepGrid(activeNoteDomain); updateAddNoteBtnColor(); renderSomedayDomainSelect(); renderSomeday();
@@ -3819,6 +3921,7 @@ function render(){
   document.body.classList.toggle('soft', data.softMode);
   document.body.classList.toggle('night-mode', data.nightMode);
   renderModeButtons();
+  renderTaskAddState();
   renderDomainEditor();
   renderTaskDomainSelect();
   renderTasks();
