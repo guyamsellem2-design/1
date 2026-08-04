@@ -2193,6 +2193,31 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
   });
   return result;
 }
+// manual drag-reorder (topics, tasks, someday, suggestions) only changes an array's ORDER, not any
+// single item's own content -- mergeArrayById above only ever compares item content, so a pure reorder
+// with no content changes looks like "nothing changed" per item, and the id-merge above just produces
+// whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
+// two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
+// then reapply it on top of the already content-merged arrays.
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions'];
+function mergeOrderList(localOrder, baseOrder, remoteOrder){
+  localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
+  if(deepEqual(localOrder, remoteOrder)) return localOrder;
+  const localChanged = !deepEqual(localOrder, baseOrder);
+  const remoteChanged = !deepEqual(remoteOrder, baseOrder);
+  if(localChanged && !remoteChanged) return localOrder;
+  if(remoteChanged && !localChanged) return remoteOrder;
+  return localOrder; // both reordered differently since base -> same simple tie-break used everywhere else here
+}
+function applyOrderList(items, orderList){
+  if(!orderList || !orderList.length) return items;
+  const pos = new Map(orderList.map((id,i)=>[id,i]));
+  return items.slice().sort((a,b)=>{
+    const ai = pos.has(a.id) ? pos.get(a.id) : Infinity;
+    const bi = pos.has(b.id) ? pos.get(b.id) : Infinity;
+    return ai - bi;
+  });
+}
 function mergePlannerData(local, base, remote){
   local = local||{}; base = base||emptySyncSkeleton(); remote = remote||emptySyncSkeleton();
   const merged = {};
@@ -2200,6 +2225,10 @@ function mergePlannerData(local, base, remote){
   merged.notes = mergeDictOfObjects(local.notes, base.notes, remote.notes);
   merged.domainNotes = mergeDictOfArrays(local.domainNotes, base.domainNotes, remote.domainNotes);
   merged.reflectionBanks = mergeDictOfArrays(local.reflectionBanks, base.reflectionBanks, remote.reflectionBanks);
+  ORDERED_LIST_FIELDS.forEach(f=>{
+    const mergedOrder = mergeOrderList((local[f]||[]).map(x=>x.id), (base[f]||[]).map(x=>x.id), (remote[f]||[]).map(x=>x.id));
+    merged[f] = applyOrderList(merged[f], mergedOrder);
+  });
   return merged;
 }
 function applySyncedFields(target, merged){
