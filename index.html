@@ -2066,6 +2066,9 @@ function renderGcalStatus(){
       </div>
     </div>`;
   }
+  const syncErrorHtml = (!currentSyncUser && lastSyncSignInError)
+    ? `<div class="gcal-status" style="color:#e06060; margin-top:4px;">⚠️ סנכרון בין מכשירים נכשל: ${escapeHtml(lastSyncSignInError)}</div>`
+    : '';
   el.innerHTML = `
     <div class="gcal-block-title">📅 יומן גוגל</div>
     <div class="gcal-sync-row-inner">
@@ -2074,6 +2077,7 @@ function renderGcalStatus(){
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
+    ${syncErrorHtml}
     ${pickerHtml}
   `;
 }
@@ -2239,15 +2243,27 @@ function scheduleCloudSync(){
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(()=>{ runFullSync(); }, 2500);
 }
+let lastSyncSignInError = null;
 function signInToSyncWithAccessToken(accessToken){
   // signs into Firebase directly from the Google access token we already have (its scope now includes
   // email/profile, see GCAL_SCOPE) instead of a popup or a full-page redirect. both of those navigate
   // the browser away from the app, which is exactly what breaks inside an installed/home-screen app —
   // the redirect result can get lost when the OS hands the round trip to a different browser context.
   // this way sign-in is just a normal background request, no navigation, no second Google window at all.
-  if(!fbAuth) return;
+  if(!fbAuth){ lastSyncSignInError = 'שירות הסנכרון לא נטען בדף הזה'; renderGcalStatus(); return; }
   const credential = firebase.auth.GoogleAuthProvider.credential(null, accessToken);
-  fbAuth.signInWithCredential(credential).catch(e=>{ console.error('sync sign-in failed', e); flashStatus('ההתחברות לסנכרון נכשלה'); });
+  fbAuth.signInWithCredential(credential)
+    .then(()=>{ lastSyncSignInError = null; renderGcalStatus(); })
+    .catch(e=>{
+      // the calendar sync above also flashes its own "no new events" toast around the same time, on
+      // the same shared status line — a failure here can get silently overwritten by that before it's
+      // even read. so on top of the toast, keep the real error message pinned next to the calendar
+      // block (which stays visible either way) until sign-in actually succeeds.
+      console.error('sync sign-in failed', e);
+      lastSyncSignInError = (e && e.message) ? e.message : String(e);
+      flashStatus('ההתחברות לסנכרון נכשלה');
+      renderGcalStatus();
+    });
 }
 function syncSignOut(){ if(fbAuth) fbAuth.signOut(); }
 function renderSyncBlock(){
