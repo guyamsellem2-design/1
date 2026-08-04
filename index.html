@@ -364,11 +364,13 @@
   .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
   .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:6px 2px 4px;}
-  .feel-chip{display:inline-flex; align-items:center; gap:6px; font-size:13.5px; padding:6px 13px; border-radius:999px; border:1.5px solid var(--border); cursor:pointer; background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
+  .feel-chip{display:inline-flex; align-items:center; gap:5px; font-size:13.5px; padding:5px 11px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
   .feel-chip.active{color:#fff; font-weight:600;}
-  .feel-chip-del{font-size:11px; opacity:.65;}
-  .feel-chip-del:hover{opacity:1;}
-  .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2);}
+  .feel-chip-label{cursor:pointer;}
+  .feel-chip-edit, .feel-chip-del{font-size:11px; opacity:.65; cursor:pointer;}
+  .feel-chip-edit:hover, .feel-chip-del:hover{opacity:1;}
+  .feel-chip .grip{font-size:12px; padding:0;}
+  .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2); cursor:pointer;}
   .feel-chip-add-row{display:inline-flex; align-items:center; gap:4px;}
   .feel-chip-add-input{font-family:inherit; font-size:13.5px; padding:5px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); width:110px;}
   .feel-chip-add-confirm, .feel-chip-add-cancel{cursor:pointer; font-size:15px; padding:2px 4px; color:var(--muted2);}
@@ -394,9 +396,6 @@
   .breathing-circle-wrap{display:flex; flex-direction:column; align-items:center; padding:16px 0 6px;}
   .breathing-circle{width:120px; height:120px; border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--gold), var(--surface3)); transform:scale(1); transition:transform 5s linear; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:#1a1a1a;}
   .breathing-controls{display:flex; gap:10px; align-items:center; margin-top:16px;}
-  .good-things-list{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
-  .good-thing-row{display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; background:var(--surface2);}
-  .good-thing-row .gt-text{flex:1;}
   .sync-menu{position:fixed; top:12px; left:12px; z-index:90;}
   .sync-menu-btn{background:var(--surface); border:1px solid var(--border-strong); border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:0 4px 14px -6px rgba(0,0,0,0.4);}
   .sync-menu-panel{display:none; position:absolute; top:calc(100% + 8px); left:0; width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 70px); overflow-y:auto; background:transparent;}
@@ -822,7 +821,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], emotionNote: '', needNote: '', customEmotions: [], customNeeds: [], myGoodThings: [], breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '' };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '' };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -882,11 +881,21 @@ function loadData(){
       data.homeEnergy = (typeof parsed.homeEnergy === 'number') ? parsed.homeEnergy : 60;
       data.activeEmotions = parsed.activeEmotions || [];
       data.activeNeeds = parsed.activeNeeds || [];
+      data.activeGoodThings = parsed.activeGoodThings || [];
       data.emotionNote = parsed.emotionNote || parsed.feelNote || '';
       data.needNote = parsed.needNote || '';
-      data.customEmotions = parsed.customEmotions || [];
-      data.customNeeds = parsed.customNeeds || [];
-      data.myGoodThings = parsed.myGoodThings || [];
+      data.chipBanksSeeded = !!parsed.chipBanksSeeded;
+      data.emotionsList = parsed.emotionsList || [];
+      data.needsList = parsed.needsList || [];
+      data.goodThingsList = parsed.goodThingsList || [];
+      if(!data.chipBanksSeeded){
+        // one-time migration: fold the old fixed built-in lists + separately-tracked custom
+        // additions into a single fully editable/deletable/reorderable list per bank
+        if(data.emotionsList.length===0) data.emotionsList = seedChipList(SEED_EMOTIONS, parsed.customEmotions);
+        if(data.needsList.length===0) data.needsList = seedChipList(SEED_NEEDS, parsed.customNeeds);
+        if(data.goodThingsList.length===0) data.goodThingsList = seedChipList(SEED_GOOD_THINGS, (parsed.myGoodThings||[]).map(g=>({id:g.id, label:g.text})));
+        data.chipBanksSeeded = true;
+      }
       data.todayIdeasDate = parsed.todayIdeasDate || '';
       data.todayIdeas = parsed.todayIdeas || [];
       data.breathIn = (typeof parsed.breathIn === 'number') ? parsed.breathIn : 5;
@@ -896,6 +905,10 @@ function loadData(){
       mainView = (parsed.mainView === 'topics' || parsed.mainView === 'tools') ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
+      data.emotionsList = seedChipList(SEED_EMOTIONS, []);
+      data.needsList = seedChipList(SEED_NEEDS, []);
+      data.goodThingsList = seedChipList(SEED_GOOD_THINGS, []);
+      data.chipBanksSeeded = true;
     }
   }catch(e){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -4099,13 +4112,13 @@ function resetAll(){
   if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ורעיונות ומשימות לעתיד? בנק התובנות ובנק התזכורות לבחור בעצמי יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
-  const keepGoodThings = data.myGoodThings;
+  const keepGoodThings = data.goodThingsList;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], emotionNote:'', needNote:'', customEmotions:[], customNeeds:[], myGoodThings:keepGoodThings, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:''};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:''};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4146,29 +4159,48 @@ function pushTaskToNextWeek(id){
    task. emotions/needs are toggle chips (not a picker you choose one from) -- several can be true at
    once, and each stays lit until tapped again, whenever the feeling passes or the need gets met. */
 const FEEL_PALETTE = ['#e2a34c','#3aa9a0','#e08a72','#b98fc4','#4fb4d6','#7fb069','#d68fb0','#c9a227','#6a8caf','#e0785a','#8d9c6b','#c47a8f','#5fa8a0','#d9a441'];
-const EMOTIONS_LIST = [
+const SEED_EMOTIONS = [
   {id:'joy',label:'שמחה'}, {id:'calm',label:'רוגע'}, {id:'curious',label:'סקרנות'}, {id:'excited',label:'התלהבות'},
   {id:'proud',label:'גאווה'}, {id:'love',label:'אהבה'}, {id:'sad',label:'עצב'}, {id:'angry',label:'כעס'},
   {id:'afraid',label:'פחד'}, {id:'lonely',label:'בדידות'}, {id:'ashamed',label:'בושה'}, {id:'jealous',label:'קנאה'},
   {id:'frustrated',label:'תסכול'}, {id:'numb',label:'קהות'}
 ];
-const NEEDS_LIST = [
+const SEED_NEEDS = [
   {id:'rest',label:'מנוחה'}, {id:'quiet',label:'שקט'}, {id:'safety',label:'ביטחון'}, {id:'connection',label:'חיבור'},
   {id:'seen',label:'להיראות'}, {id:'heard',label:'להישמע'}, {id:'autonomy',label:'עצמאות'}, {id:'movement',label:'תנועה'},
   {id:'creativity',label:'יצירה'}, {id:'meaning',label:'משמעות'}, {id:'space',label:'מרחב אישי'}, {id:'support',label:'תמיכה'},
   {id:'play',label:'הנאה/משחק'}, {id:'nourishment',label:'הזנה'}
 ];
+const SEED_GOOD_THINGS = [
+  {id:'gt1',label:'הליכה קצרה בחוץ'}, {id:'gt2',label:'כוס מים קרה'}, {id:'gt3',label:'מקלחת'}, {id:'gt4',label:'לשכב 10 דקות בלי מסך'},
+  {id:'gt5',label:'להקשיב לשיר אהוב'}, {id:'gt6',label:'לגעת במשהו רך'}, {id:'gt7',label:'לכתוב 3 משפטים על מה שקורה'}, {id:'gt8',label:'למתוח את הגוף'}
+];
+function seedChipList(seed, legacyItems){
+  const list = seed.map(x=>({...x}));
+  (legacyItems||[]).forEach(c=>{ if(c && c.label && c.label.trim()) list.push({id:c.id||uid(), label:c.label}); });
+  return list;
+}
 let feelBlockOpen = true, emotionsBankOpen = false, needsBankOpen = false;
+
+/* ---------- chip banks: emotions / needs / good-things share one system ----------
+   every chip -- built-in or custom, doesn't matter, there's no distinction anymore -- can be renamed
+   (like a topic), deleted, dragged into any order, and toggled on/off ("I'm feeling/choosing this
+   right now") independently of the others. */
+function chipListKey(bank){ return bank==='activeEmotions'?'emotionsList':bank==='activeNeeds'?'needsList':'goodThingsList'; }
+function rerenderChipBank(bank){ if(bank==='activeGoodThings') renderToolsView(); else renderFeelBar(); }
+function hashChipColor(id){
+  let h=0;
+  for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))|0;
+  return FEEL_PALETTE[Math.abs(h)%FEEL_PALETTE.length];
+}
 let addingFeelChipBank = null;
-function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
-function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
-function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
+let editingChipBank = null, editingChipId = null;
 function toggleFeelChip(bank, id){
   const arr = data[bank] || (data[bank] = []);
   const idx = arr.indexOf(id);
   if(idx>-1) arr.splice(idx,1); else arr.push(id);
   saveData();
-  renderFeelBar();
+  rerenderChipBank(bank);
 }
 function setHomeEnergy(val){
   data.homeEnergy = +val;
@@ -4178,55 +4210,88 @@ function setHomeEnergy(val){
 }
 function onEmotionNoteInput(val){ data.emotionNote = val; saveData(); }
 function onNeedNoteInput(val){ data.needNote = val; saveData(); }
-function customFeelListKey(bank){ return bank==='activeEmotions' ? 'customEmotions' : 'customNeeds'; }
 function startAddFeelChip(bank){
   addingFeelChipBank = bank;
-  renderFeelBar();
+  rerenderChipBank(bank);
   requestAnimationFrame(()=>{ const el = document.getElementById('feelChipAddInput'); if(el) el.focus(); });
 }
-function cancelAddFeelChip(){ addingFeelChipBank = null; renderFeelBar(); }
+function cancelAddFeelChip(bank){ addingFeelChipBank = null; rerenderChipBank(bank); }
 function commitAddFeelChip(bank){
   const input = document.getElementById('feelChipAddInput');
   const text = input ? input.value.trim() : '';
   addingFeelChipBank = null;
-  if(!text){ renderFeelBar(); return; }
-  const listKey = customFeelListKey(bank);
-  if(!data[listKey]) data[listKey] = [];
-  data[listKey].push({id: uid(), label: text});
-  saveData();
-  renderFeelBar();
+  if(text){
+    data[chipListKey(bank)].push({id: uid(), label: text});
+    saveData();
+  }
+  rerenderChipBank(bank);
 }
-function deleteCustomFeelChip(bank, id){
-  const listKey = customFeelListKey(bank);
-  data[listKey] = (data[listKey]||[]).filter(x=>x.id!==id);
+function startEditChip(bank, id){
+  editingChipBank = bank; editingChipId = id;
+  rerenderChipBank(bank);
+  requestAnimationFrame(()=>{ const el = document.getElementById('chipEditInput'); if(el){ el.focus(); el.select(); } });
+}
+function cancelEditChip(bank){ editingChipBank = null; editingChipId = null; rerenderChipBank(bank); }
+function commitEditChip(bank, id){
+  const input = document.getElementById('chipEditInput');
+  const text = input ? input.value.trim() : '';
+  editingChipBank = null; editingChipId = null;
+  if(text){
+    const item = data[chipListKey(bank)].find(x=>x.id===id);
+    if(item) item.label = text;
+    saveData();
+  }
+  rerenderChipBank(bank);
+}
+function deleteFeelChip(bank, id){
+  data[chipListKey(bank)] = data[chipListKey(bank)].filter(x=>x.id!==id);
   data[bank] = (data[bank]||[]).filter(x=>x!==id);
   saveData();
-  renderFeelBar();
+  rerenderChipBank(bank);
 }
-function feelChipHtml(bank, item, i, isCustom){
+function reorderChipBank(bank, fromId, toId){
+  reorderArrayById(data[chipListKey(bank)], fromId, toId);
+  saveData();
+  rerenderChipBank(bank);
+}
+function feelChipHtml(bank, item){
+  if(editingChipBank===bank && editingChipId===item.id){
+    return `<span class="feel-chip-add-row">
+      <input type="text" id="chipEditInput" class="feel-chip-add-input" value="${escapeAttr(item.label)}"
+        onkeydown="if(event.key==='Enter') commitEditChip('${bank}','${item.id}'); if(event.key==='Escape') cancelEditChip('${bank}');">
+      <span class="feel-chip-add-confirm" onclick="commitEditChip('${bank}','${item.id}')" title="שמירה">✓</span>
+      <span class="feel-chip-add-cancel" onclick="cancelEditChip('${bank}')" title="ביטול">✕</span>
+    </span>`;
+  }
   const active = (data[bank]||[]).includes(item.id);
-  const color = FEEL_PALETTE[i % FEEL_PALETTE.length];
-  const delBtn = isCustom ? `<span class="feel-chip-del" onclick="event.stopPropagation(); deleteCustomFeelChip('${bank}','${item.id}')" title="מחיקה">✕</span>` : '';
-  return `<span class="feel-chip ${active?'active':''}" style="${active?`background:${color}; border-color:${color};`:`border-color:${color}; color:${color};`}" onclick="toggleFeelChip('${bank}','${item.id}')">${escapeHtml(item.label)}${delBtn}</span>`;
+  const color = hashChipColor(item.id);
+  return `<span class="feel-chip ${active?'active':''}" data-drag-id="${item.id}" style="${active?`background:${color}; border-color:${color};`:`border-color:${color}; color:${color};`}">
+    <span class="grip" onpointerdown="startListDrag(event,'${item.id}','.feel-chip',(f,t)=>reorderChipBank('${bank}',f,t))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
+    <span class="feel-chip-label" onclick="toggleFeelChip('${bank}','${item.id}')">${escapeHtml(item.label)}</span>
+    <span class="feel-chip-edit" onclick="event.stopPropagation(); startEditChip('${bank}','${item.id}')" title="עריכה">✎</span>
+    <span class="feel-chip-del" onclick="event.stopPropagation(); deleteFeelChip('${bank}','${item.id}')" title="מחיקה">✕</span>
+  </span>`;
 }
 function feelAddRowHtml(bank){
   if(addingFeelChipBank===bank){
     return `<span class="feel-chip-add-row">
-      <input type="text" id="feelChipAddInput" class="feel-chip-add-input" placeholder="שם חדש..." onkeydown="if(event.key==='Enter') commitAddFeelChip('${bank}'); if(event.key==='Escape') cancelAddFeelChip();">
+      <input type="text" id="feelChipAddInput" class="feel-chip-add-input" placeholder="שם חדש..." onkeydown="if(event.key==='Enter') commitAddFeelChip('${bank}'); if(event.key==='Escape') cancelAddFeelChip('${bank}');">
       <span class="feel-chip-add-confirm" onclick="commitAddFeelChip('${bank}')" title="הוספה">✓</span>
-      <span class="feel-chip-add-cancel" onclick="cancelAddFeelChip()" title="ביטול">✕</span>
+      <span class="feel-chip-add-cancel" onclick="cancelAddFeelChip('${bank}')" title="ביטול">✕</span>
     </span>`;
   }
   return `<span class="feel-chip feel-chip-add" onclick="startAddFeelChip('${bank}')">+ הוספה</span>`;
 }
-function feelChipGridHtml(bank, builtIn){
-  const custom = data[customFeelListKey(bank)] || [];
+function feelChipGridHtml(bank){
+  const list = data[chipListKey(bank)] || [];
   return `<div class="feel-chip-grid">
-    ${builtIn.map((item,i)=>feelChipHtml(bank, item, i, false)).join('')}
-    ${custom.map((item,i)=>feelChipHtml(bank, item, builtIn.length+i, true)).join('')}
+    ${list.map(item=>feelChipHtml(bank, item)).join('')}
     ${feelAddRowHtml(bank)}
   </div>`;
 }
+function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
+function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
+function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
 function renderFeelBar(){
   const el = document.getElementById('feelBar');
   if(!el) return;
@@ -4243,14 +4308,14 @@ function renderFeelBar(){
     <div class="feel-bank">
       <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
       ${emotionsBankOpen ? `
-        ${feelChipGridHtml('activeEmotions', EMOTIONS_LIST)}
+        ${feelChipGridHtml('activeEmotions')}
         <textarea class="feel-note-textarea" oninput="onEmotionNoteInput(this.value)" placeholder="מה עובר עלי עכשיו...">${escapeHtml(data.emotionNote||'')}</textarea>
       ` : ''}
     </div>
     <div class="feel-bank">
       <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''}</div>
       ${needsBankOpen ? `
-        ${feelChipGridHtml('activeNeeds', NEEDS_LIST)}
+        ${feelChipGridHtml('activeNeeds')}
         <textarea class="feel-note-textarea" oninput="onNeedNoteInput(this.value)" placeholder="מה אני צריך/ה עכשיו...">${escapeHtml(data.needNote||'')}</textarea>
       ` : ''}
     </div>
@@ -4442,26 +4507,6 @@ function runBreathingPhase(phase, chainId){
   }, dur*1000);
 }
 
-const GOOD_THINGS_SUGGESTED = [
-  'הליכה קצרה בחוץ', 'כוס מים קרה', 'מקלחת', 'לשכב 10 דקות בלי מסך',
-  'להקשיב לשיר אהוב', 'לגעת במשהו רך', 'לכתוב 3 משפטים על מה שקורה', 'למתוח את הגוף'
-];
-function addGoodThing(){
-  const input = document.getElementById('goodThingInput');
-  const text = input ? input.value.trim() : '';
-  if(!text) return;
-  if(!data.myGoodThings) data.myGoodThings = [];
-  data.myGoodThings.push({id: uid(), text});
-  saveData();
-  renderToolsView();
-  requestAnimationFrame(()=>{ const el = document.getElementById('goodThingInput'); if(el) el.focus(); });
-}
-function deleteGoodThing(id){
-  data.myGoodThings = (data.myGoodThings||[]).filter(g=>g.id!==id);
-  saveData();
-  renderToolsView();
-}
-
 function renderToolsView(){
   const el = document.getElementById('toolsContent');
   if(!el) return;
@@ -4499,20 +4544,8 @@ function renderToolsView(){
 
     <div class="tools-card">
       <h3>💛 מה שעושה לי טוב</h3>
-      <p class="hint" style="margin:0 0 10px;">תחביבים, דברים מרגיעים, דברים שמטעינים אותי.</p>
-      <div class="feel-bank-header" style="margin-bottom:4px; cursor:default;">כמה הצעות</div>
-      <div class="feel-chip-grid">${GOOD_THINGS_SUGGESTED.map((t,i)=>`<span class="feel-chip" style="cursor:default; border-color:${FEEL_PALETTE[i%FEEL_PALETTE.length]}; color:${FEEL_PALETTE[i%FEEL_PALETTE.length]};">${escapeHtml(t)}</span>`).join('')}</div>
-      <div class="feel-bank-header" style="margin-top:14px; margin-bottom:4px; cursor:default;">הרשימה שלי</div>
-      <div class="good-things-list">${(data.myGoodThings||[]).length ? (data.myGoodThings||[]).map(g=>`
-        <div class="good-thing-row">
-          <span class="gt-text">${escapeHtml(g.text)}</span>
-          <span class="del-task" onclick="deleteGoodThing('${g.id}')">✕</span>
-        </div>`).join('') : '<div class="empty">עוד לא הוספת כלום — אפשר להוסיף למטה</div>'}
-      </div>
-      <div class="add-row" style="margin-top:10px;">
-        <input type="text" id="goodThingInput" placeholder="דבר חדש שעושה לי טוב..." onkeydown="if(event.key==='Enter') addGoodThing();">
-        <button onclick="addGoodThing()">+ הוספה</button>
-      </div>
+      <p class="hint" style="margin:0 0 10px;">תחביבים, דברים מרגיעים, דברים שמטעינים אותי. מסמנים מה בוחרים לעשות עכשיו — נשאר מסומן עד שלוחצים שוב.</p>
+      ${feelChipGridHtml('activeGoodThings')}
     </div>
   `;
 }
