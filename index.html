@@ -375,6 +375,21 @@
   .feel-chip-add-confirm:hover{color:var(--safe, var(--text));}
   .feel-chip-add-cancel:hover{color:var(--text);}
   .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:vertical; padding:8px 10px; line-height:1.5;}
+  .tools-card{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px; margin-bottom:20px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
+  .tools-card h3{margin:0 0 6px; font-size:16px;}
+  .timer-presets{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .timer-preset-btn{padding:8px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; font-size:13.5px; font-family:inherit;}
+  .timer-preset-btn.active{background:var(--gold); color:#1a1a1a; border-color:var(--gold);}
+  .timer-display{text-align:center; font-size:44px; font-weight:700; font-variant-numeric:tabular-nums; margin:8px 0; color:var(--text); direction:ltr;}
+  .timer-controls{display:flex; gap:10px; justify-content:center;}
+  .breathing-config{display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:13px; color:var(--muted); margin-bottom:6px;}
+  .breathing-config input[type=number]{width:44px; padding:4px 6px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); text-align:center; font-family:inherit;}
+  .breathing-circle-wrap{display:flex; flex-direction:column; align-items:center; padding:16px 0 6px;}
+  .breathing-circle{width:120px; height:120px; border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--gold), var(--surface3)); transform:scale(1); transition:transform 5s linear; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:#1a1a1a;}
+  .breathing-controls{display:flex; gap:10px; align-items:center; margin-top:16px;}
+  .good-things-list{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
+  .good-thing-row{display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; background:var(--surface2);}
+  .good-thing-row .gt-text{flex:1;}
   .sync-menu{position:fixed; top:12px; left:12px; z-index:90;}
   .sync-menu-btn{background:var(--surface); border:1px solid var(--border-strong); border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:0 4px 14px -6px rgba(0,0,0,0.4);}
   .sync-menu-panel{display:none; position:absolute; top:calc(100% + 8px); left:0; width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 70px); overflow-y:auto; background:transparent;}
@@ -563,6 +578,7 @@
 <div class="main-tab-bar">
   <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 בית</button>
   <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 נושאים</button>
+  <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
 </div>
 
 <div id="homeView">
@@ -758,6 +774,14 @@
   </div>
 </div>
 
+<div id="toolsView" style="display:none;">
+  <div class="domain-page-topbar">
+    <div class="domain-page-header"><h1>🧰 כלים</h1></div>
+    <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+  </div>
+  <div id="toolsContent"></div>
+</div>
+
 </div>
 
 <div class="status" id="status">נשמר</div>
@@ -789,7 +813,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], feelNote: '', customEmotions: [], customNeeds: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], feelNote: '', customEmotions: [], customNeeds: [], myGoodThings: [], breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -852,7 +876,12 @@ function loadData(){
       data.feelNote = parsed.feelNote || '';
       data.customEmotions = parsed.customEmotions || [];
       data.customNeeds = parsed.customNeeds || [];
-      mainView = parsed.mainView === 'topics' ? 'topics' : 'home';
+      data.myGoodThings = parsed.myGoodThings || [];
+      data.breathIn = (typeof parsed.breathIn === 'number') ? parsed.breathIn : 5;
+      data.breathHold = (typeof parsed.breathHold === 'number') ? parsed.breathHold : 5;
+      data.breathOut = (typeof parsed.breathOut === 'number') ? parsed.breathOut : 5;
+      data.breathSoundOn = parsed.breathSoundOn !== false;
+      mainView = (parsed.mainView === 'topics' || parsed.mainView === 'tools') ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
     }
@@ -1268,19 +1297,31 @@ function switchMainView(view){
 function applyMainViewState(){
   const home = document.getElementById('homeView');
   const topicsView = document.getElementById('domainPageView');
+  const toolsView = document.getElementById('toolsView');
   const homeBtn = document.getElementById('mainTabHomeBtn');
   const topicsBtn = document.getElementById('mainTabTopicsBtn');
-  const showTopics = mainView==='topics';
-  home.style.display = showTopics ? 'none' : '';
-  topicsView.style.display = showTopics ? '' : 'none';
-  if(homeBtn) homeBtn.classList.toggle('active', !showTopics);
-  if(topicsBtn) topicsBtn.classList.toggle('active', showTopics);
-  if(showTopics){
+  const toolsBtn = document.getElementById('mainTabToolsBtn');
+  home.style.display = mainView==='home' ? '' : 'none';
+  topicsView.style.display = mainView==='topics' ? '' : 'none';
+  if(toolsView) toolsView.style.display = mainView==='tools' ? '' : 'none';
+  if(homeBtn) homeBtn.classList.toggle('active', mainView==='home');
+  if(topicsBtn) topicsBtn.classList.toggle('active', mainView==='topics');
+  if(toolsBtn) toolsBtn.classList.toggle('active', mainView==='tools');
+  if(mainView==='topics'){
     if(!activeNoteDomain || !domainById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
     renderDomainEditor();
     renderKeepGrid(activeNoteDomain);
     updateAddNoteBtnColor();
     window.scrollTo(0,0);
+  }
+  if(mainView==='tools'){
+    renderToolsView();
+    window.scrollTo(0,0);
+  } else {
+    // leaving the tools tab: don't let the breathing animation or its sound cues, or a running
+    // countdown timer, keep going silently in the background once they're no longer on screen
+    stopBreathing();
+    stopToolsTimer();
   }
 }
 
@@ -4046,12 +4087,13 @@ function resetAll(){
   if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ורעיונות ומשימות לעתיד? בנק התובנות ובנק התזכורות לבחור בעצמי יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
+  const keepGoodThings = data.myGoodThings;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], feelNote:'', customEmotions:[], customNeeds:[]};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], feelNote:'', customEmotions:[], customNeeds:[], myGoodThings:keepGoodThings, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4199,6 +4241,178 @@ function renderFeelBar(){
       ${feelNoteOpen ? `<textarea class="feel-note-textarea" oninput="onFeelNoteInput(this.value)" placeholder="מה עובר עליך עכשיו...">${escapeHtml(data.feelNote||'')}</textarea>` : ''}
     </div>
     ` : ''}
+  `;
+}
+
+/* ---------- כלים (tools): a fast, wordless response for overwhelm/urges ----------
+   deliberately no written breathing/imagery instructions -- eyes are usually closed anyway. just a
+   timer, a silent breathing shape with an optional tone, and a place for what actually helps. */
+function formatTimerClock(sec){ const m = Math.floor(sec/60), s = sec%60; return pad(m)+':'+pad(s); }
+const TOOLS_TIMER_PRESETS = [60, 180, 300, 600];
+let toolsTimerRemaining = 0, toolsTimerInterval = null, toolsTimerPreset = null;
+function startToolsTimer(seconds){
+  stopToolsTimer();
+  toolsTimerRemaining = seconds;
+  toolsTimerPreset = seconds;
+  renderToolsView();
+  toolsTimerInterval = setInterval(()=>{
+    toolsTimerRemaining--;
+    if(toolsTimerRemaining <= 0){
+      stopToolsTimer();
+      flashStatus('הזמן נגמר — איך את/ה מרגיש/ה עכשיו?');
+      renderToolsView();
+      return;
+    }
+    const el = document.getElementById('toolsTimerDisplay');
+    if(el) el.textContent = formatTimerClock(toolsTimerRemaining);
+  }, 1000);
+}
+function stopToolsTimer(){
+  if(toolsTimerInterval){ clearInterval(toolsTimerInterval); toolsTimerInterval = null; }
+  toolsTimerRemaining = 0; toolsTimerPreset = null;
+}
+
+let breathingActive = false, breathingChainId = 0;
+function breathingConfig(){
+  const inEl = document.getElementById('breathIn'), holdEl = document.getElementById('breathHold'), outEl = document.getElementById('breathOut');
+  return {
+    inSec: Math.max(1, +(inEl ? inEl.value : data.breathIn) || 5),
+    holdSec: Math.max(0, +(holdEl ? holdEl.value : data.breathHold) || 0),
+    outSec: Math.max(1, +(outEl ? outEl.value : data.breathOut) || 5)
+  };
+}
+function playBreathTone(freq){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.frequency.value = freq;
+    osc.connect(gain); gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.35);
+    osc.start(); osc.stop(ctx.currentTime+0.35);
+  }catch(e){}
+}
+function toggleBreathSound(){
+  data.breathSoundOn = data.breathSoundOn===false ? true : false;
+  saveData();
+}
+function startBreathing(){
+  const cfg = breathingConfig();
+  data.breathIn = cfg.inSec; data.breathHold = cfg.holdSec; data.breathOut = cfg.outSec;
+  saveData();
+  breathingActive = true;
+  breathingChainId++;
+  const chainId = breathingChainId;
+  renderToolsView();
+  // wait a frame so the circle's resting scale actually paints before animating away from it --
+  // changing the transform in the very same tick the element is created can skip the transition
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ runBreathingPhase('in', chainId); }); });
+}
+function stopBreathing(){
+  if(!breathingActive && !breathingChainId) return;
+  breathingActive = false;
+  breathingChainId++; // invalidates any pending phase timeout from the old chain
+  const circle = document.getElementById('breathingCircle');
+  if(circle){ circle.style.transition = 'none'; circle.style.transform = 'scale(1)'; }
+  const label = document.getElementById('breathingLabel');
+  if(label) label.textContent = '';
+}
+function runBreathingPhase(phase, chainId){
+  if(!breathingActive || chainId !== breathingChainId) return;
+  const cfg = breathingConfig();
+  const durations = {in: cfg.inSec, hold: cfg.holdSec, out: cfg.outSec};
+  const labels = {in:'פנימה', hold:'עצור', out:'החוצה'};
+  const dur = durations[phase];
+  const circle = document.getElementById('breathingCircle');
+  const label = document.getElementById('breathingLabel');
+  if(circle){
+    if(phase==='hold'){ circle.style.transition = 'none'; }
+    else{
+      circle.style.transition = `transform ${dur}s linear`;
+      circle.style.transform = phase==='in' ? 'scale(1.5)' : 'scale(1)';
+    }
+  }
+  if(label) label.textContent = labels[phase];
+  if((phase==='in' || phase==='out') && data.breathSoundOn !== false) playBreathTone(phase==='in' ? 440 : 300);
+  setTimeout(()=>{
+    if(!breathingActive || chainId !== breathingChainId) return;
+    const next = phase==='in' ? (cfg.holdSec>0 ? 'hold' : 'out') : (phase==='hold' ? 'out' : 'in');
+    runBreathingPhase(next, chainId);
+  }, dur*1000);
+}
+
+const GOOD_THINGS_SUGGESTED = [
+  'הליכה קצרה בחוץ', 'כוס מים קרה', 'מקלחת', 'לשכב 10 דקות בלי מסך',
+  'להקשיב לשיר אהוב', 'לגעת במשהו רך', 'לכתוב 3 משפטים על מה שקורה', 'למתוח את הגוף'
+];
+function addGoodThing(){
+  const input = document.getElementById('goodThingInput');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  if(!data.myGoodThings) data.myGoodThings = [];
+  data.myGoodThings.push({id: uid(), text});
+  saveData();
+  renderToolsView();
+  requestAnimationFrame(()=>{ const el = document.getElementById('goodThingInput'); if(el) el.focus(); });
+}
+function deleteGoodThing(id){
+  data.myGoodThings = (data.myGoodThings||[]).filter(g=>g.id!==id);
+  saveData();
+  renderToolsView();
+}
+
+function renderToolsView(){
+  const el = document.getElementById('toolsContent');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="tools-card">
+      <h3>⏱ רגע עצירה</h3>
+      <p class="hint" style="margin:0 0 10px;">טיימר פשוט לקחת רגע, בלי לחשוב על כלום אחר.</p>
+      <div class="timer-presets">
+        ${TOOLS_TIMER_PRESETS.map(s=>`<button type="button" class="timer-preset-btn ${toolsTimerPreset===s?'active':''}" onclick="startToolsTimer(${s})">${formatTimerClock(s)}</button>`).join('')}
+      </div>
+      ${toolsTimerPreset!==null ? `
+        <div class="timer-display" id="toolsTimerDisplay">${formatTimerClock(toolsTimerRemaining)}</div>
+        <div class="timer-controls"><button type="button" class="reset-btn" onclick="stopToolsTimer(); renderToolsView();">⏹ עצירה</button></div>
+      ` : ''}
+    </div>
+
+    <div class="tools-card">
+      <h3>🌬 נשימה</h3>
+      <p class="hint" style="margin:0 0 6px;">עיגול שמתרחב ומתכווץ בקצב שאת/ה קובע/ת. בלי מילים.</p>
+      <div class="breathing-config">
+        <span>פנימה</span><input type="number" id="breathIn" min="1" max="30" value="${data.breathIn||5}">
+        <span>עצור</span><input type="number" id="breathHold" min="0" max="30" value="${data.breathHold||5}">
+        <span>החוצה</span><input type="number" id="breathOut" min="1" max="30" value="${data.breathOut||5}">
+        <label style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" ${data.breathSoundOn!==false?'checked':''} onchange="toggleBreathSound()"> 🔊 צליל</label>
+      </div>
+      <div class="breathing-circle-wrap">
+        <div class="breathing-circle" id="breathingCircle"><span id="breathingLabel"></span></div>
+        <div class="breathing-controls">
+          ${breathingActive
+            ? `<button type="button" class="reset-btn" onclick="stopBreathing(); renderToolsView();">⏹ עצירה</button>`
+            : `<button type="button" class="gcal-connect-btn" onclick="startBreathing()">▶ התחלה</button>`}
+        </div>
+      </div>
+    </div>
+
+    <div class="tools-card">
+      <h3>💛 מה שעושה לי טוב</h3>
+      <p class="hint" style="margin:0 0 10px;">תחביבים, דברים מרגיעים, דברים שמטעינים אותי.</p>
+      <div class="feel-bank-header" style="margin-bottom:4px; cursor:default;">כמה הצעות</div>
+      <div class="feel-chip-grid">${GOOD_THINGS_SUGGESTED.map((t,i)=>`<span class="feel-chip" style="cursor:default; border-color:${FEEL_PALETTE[i%FEEL_PALETTE.length]}; color:${FEEL_PALETTE[i%FEEL_PALETTE.length]};">${escapeHtml(t)}</span>`).join('')}</div>
+      <div class="feel-bank-header" style="margin-top:14px; margin-bottom:4px; cursor:default;">הרשימה שלי</div>
+      <div class="good-things-list">${(data.myGoodThings||[]).length ? (data.myGoodThings||[]).map(g=>`
+        <div class="good-thing-row">
+          <span class="gt-text">${escapeHtml(g.text)}</span>
+          <span class="del-task" onclick="deleteGoodThing('${g.id}')">✕</span>
+        </div>`).join('') : '<div class="empty">עוד לא הוספת כלום — אפשר להוסיף למטה</div>'}
+      </div>
+      <div class="add-row" style="margin-top:10px;">
+        <input type="text" id="goodThingInput" placeholder="דבר חדש שעושה לי טוב..." onkeydown="if(event.key==='Enter') addGoodThing();">
+        <button onclick="addGoodThing()">+ הוספה</button>
+      </div>
+    </div>
   `;
 }
 
@@ -4444,7 +4658,7 @@ function gestureStart(clientX, clientY, target){
     return;
   }
 
-  if(clientX <= EDGE_ZONE){
+  if(clientX <= EDGE_ZONE && (mainView==='home' || mainView==='topics')){
     gesture = { kind:'tab-carousel', startX:clientX, startY:clientY, locked:null, dx:0 };
   }
 }
