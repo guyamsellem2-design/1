@@ -2366,6 +2366,13 @@ function reorderTasks(fromId, toId){
   saveData();
   renderTasks();
 }
+function reorderTaskSubtasks(taskId, fromId, toId){
+  const t = data.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  reorderArrayById(t.subtasks||[], fromId, toId);
+  saveData();
+  renderTasks();
+}
 let overdueSectionOpen = false;
 function toggleOverdueSection(){ overdueSectionOpen = !overdueSectionOpen; renderTasks(); }
 const LIST_CAP_THRESHOLD = 5;
@@ -2552,6 +2559,7 @@ function taskDetailHtml(t){
       const isOpen = subtaskDateOpenIds.has(t.id+':'+s.id);
       const hasSchedule = !!(s.date || s.time);
       let html = `<div class="subtask-row" data-task-id="${t.id}" data-drag-id="${s.id}">
+        <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.subtask-row',(fromId,toId)=>reorderTaskSubtasks('${t.id}',fromId,toId))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
         <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSubtaskFavorite('${t.id}','${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
         <div class="chk ${s.done?'done':''}" onclick="toggleSubtask('${t.id}','${s.id}')"></div>
         <span class="subtask-text ${s.done?'done':''}" onclick="editSubtaskText('${t.id}','${s.id}')">${escapeHtml(s.text)}</span>
@@ -3075,6 +3083,7 @@ function somedayDetailHtml(s){
       }
       parts.push(`
     <div class="subtask-row" data-someday-id="${s.id}" data-drag-id="${sub.id}">
+      <span class="grip" onpointerdown="startListDrag(event,'${sub.id}','.subtask-row',(fromId,toId)=>reorderSomedaySubtasks('${s.id}',fromId,toId))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <span class="fav-star ${sub.favorite?'active':''}" onclick="toggleSomedaySubtaskFavorite('${s.id}','${sub.id}')" title="${sub.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${sub.favorite?'★':'☆'}</span>
       <div class="chk ${sub.done?'done':''}" onclick="toggleSomedaySubtask('${s.id}','${sub.id}')"></div>
       <span class="subtask-text ${sub.done?'done':''}" onclick="editSomedaySubtaskText('${s.id}','${sub.id}')">${escapeHtml(sub.text)}</span>
@@ -3197,6 +3206,13 @@ function addSomeday(){
 function deleteSomeday(id){ data.someday = data.someday.filter(s=>s.id!==id); expandedSomeday.delete(id); saveData(); renderSomeday(); }
 function reorderSomeday(fromId, toId){
   reorderArrayById(data.someday, fromId, toId);
+  saveData();
+  renderSomeday();
+}
+function reorderSomedaySubtasks(somedayId, fromId, toId){
+  const s = data.someday.find(s=>s.id===somedayId);
+  if(!s) return;
+  reorderArrayById(s.subtasks||[], fromId, toId);
   saveData();
   renderSomeday();
 }
