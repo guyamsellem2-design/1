@@ -355,6 +355,17 @@
   .sched-link.active{color:var(--gold);}
   .task-date-badge{font-size:12px; color:var(--muted2); white-space:nowrap;}
 
+  .feel-block{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:16px 18px; margin-bottom:22px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
+  .feel-energy-row{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
+  .feel-energy-label{font-size:14.5px; font-weight:600; color:var(--text); white-space:nowrap;}
+  .feel-energy-row input[type=range]{flex:1; accent-color:var(--gold);}
+  .feel-energy-value{font-size:14px; color:var(--muted); min-width:38px; text-align:left; direction:ltr;}
+  .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
+  .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
+  .feel-chip-grid{display:flex; flex-wrap:wrap; gap:7px; padding:6px 2px 4px;}
+  .feel-chip{display:inline-block; font-size:13.5px; padding:6px 13px; border-radius:999px; border:1.5px solid var(--border); cursor:pointer; background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
+  .feel-chip.active{color:#fff; font-weight:600;}
+  .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:vertical; padding:8px 10px; line-height:1.5;}
   .sync-menu{position:fixed; top:12px; left:12px; z-index:90;}
   .sync-menu-btn{background:var(--surface); border:1px solid var(--border-strong); border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:0 4px 14px -6px rgba(0,0,0,0.4);}
   .sync-menu-panel{display:none; position:absolute; top:calc(100% + 8px); left:0; width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 70px); overflow-y:auto; background:transparent;}
@@ -559,6 +570,8 @@
       <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </header>
+
+  <div class="feel-block" id="feelBar"></div>
 
   <div class="sync-menu" id="syncMenu">
     <button type="button" class="sync-menu-btn" onclick="toggleSyncMenu()">🔄 סנכרון</button>
@@ -767,7 +780,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], feelNote: '' };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -824,6 +837,10 @@ function loadData(){
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
+      data.homeEnergy = (typeof parsed.homeEnergy === 'number') ? parsed.homeEnergy : 60;
+      data.activeEmotions = parsed.activeEmotions || [];
+      data.activeNeeds = parsed.activeNeeds || [];
+      data.feelNote = parsed.feelNote || '';
       mainView = parsed.mainView === 'topics' ? 'topics' : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -4023,7 +4040,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], feelNote:''};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4059,6 +4076,72 @@ function pushTaskToNextWeek(id){
   flashStatus('הועבר לשבוע הבא');
 }
 
+/* ---------- home page: energy + emotions/needs banks ----------
+   presence over process: these sit at the top of the home page, always visible, not tucked inside a
+   task. emotions/needs are toggle chips (not a picker you choose one from) -- several can be true at
+   once, and each stays lit until tapped again, whenever the feeling passes or the need gets met. */
+const FEEL_PALETTE = ['#e2a34c','#3aa9a0','#e08a72','#b98fc4','#4fb4d6','#7fb069','#d68fb0','#c9a227','#6a8caf','#e0785a','#8d9c6b','#c47a8f','#5fa8a0','#d9a441'];
+const EMOTIONS_LIST = [
+  {id:'joy',label:'שמחה'}, {id:'calm',label:'רוגע'}, {id:'curious',label:'סקרנות'}, {id:'excited',label:'התלהבות'},
+  {id:'proud',label:'גאווה'}, {id:'love',label:'אהבה'}, {id:'sad',label:'עצב'}, {id:'angry',label:'כעס'},
+  {id:'afraid',label:'פחד'}, {id:'lonely',label:'בדידות'}, {id:'ashamed',label:'בושה'}, {id:'jealous',label:'קנאה'},
+  {id:'frustrated',label:'תסכול'}, {id:'numb',label:'קהות'}
+];
+const NEEDS_LIST = [
+  {id:'rest',label:'מנוחה'}, {id:'quiet',label:'שקט'}, {id:'safety',label:'ביטחון'}, {id:'connection',label:'חיבור'},
+  {id:'seen',label:'להיראות'}, {id:'heard',label:'להישמע'}, {id:'autonomy',label:'עצמאות'}, {id:'movement',label:'תנועה'},
+  {id:'creativity',label:'יצירה'}, {id:'meaning',label:'משמעות'}, {id:'space',label:'מרחב אישי'}, {id:'support',label:'תמיכה'},
+  {id:'play',label:'הנאה/משחק'}, {id:'nourishment',label:'הזנה'}
+];
+let emotionsBankOpen = false, needsBankOpen = false, feelNoteOpen = false;
+function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
+function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
+function toggleFeelNote(){ feelNoteOpen = !feelNoteOpen; renderFeelBar(); }
+function toggleFeelChip(bank, id){
+  const arr = data[bank] || (data[bank] = []);
+  const idx = arr.indexOf(id);
+  if(idx>-1) arr.splice(idx,1); else arr.push(id);
+  saveData();
+  renderFeelBar();
+}
+function setHomeEnergy(val){
+  data.homeEnergy = +val;
+  saveData();
+  const label = document.getElementById('feelEnergyValue');
+  if(label) label.textContent = data.homeEnergy + '%';
+}
+function onFeelNoteInput(val){ data.feelNote = val; saveData(); }
+function feelChipHtml(bank, item, i){
+  const active = (data[bank]||[]).includes(item.id);
+  const color = FEEL_PALETTE[i % FEEL_PALETTE.length];
+  return `<span class="feel-chip ${active?'active':''}" style="${active?`background:${color}; border-color:${color};`:`border-color:${color}; color:${color};`}" onclick="toggleFeelChip('${bank}','${item.id}')">${escapeHtml(item.label)}</span>`;
+}
+function renderFeelBar(){
+  const el = document.getElementById('feelBar');
+  if(!el) return;
+  const emotionsCount = (data.activeEmotions||[]).length;
+  const needsCount = (data.activeNeeds||[]).length;
+  el.innerHTML = `
+    <div class="feel-energy-row">
+      <span class="feel-energy-label">🔋 רמת אנרגיה</span>
+      <input type="range" min="0" max="100" value="${data.homeEnergy}" oninput="setHomeEnergy(this.value)">
+      <span class="feel-energy-value" id="feelEnergyValue">${data.homeEnergy}%</span>
+    </div>
+    <div class="feel-bank">
+      <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
+      ${emotionsBankOpen ? `<div class="feel-chip-grid">${EMOTIONS_LIST.map((e,i)=>feelChipHtml('activeEmotions', e, i)).join('')}</div>` : ''}
+    </div>
+    <div class="feel-bank">
+      <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} צרכים${needsCount?' ('+needsCount+')':''}</div>
+      ${needsBankOpen ? `<div class="feel-chip-grid">${NEEDS_LIST.map((n,i)=>feelChipHtml('activeNeeds', n, i)).join('')}</div>` : ''}
+    </div>
+    <div class="feel-note-block">
+      <div class="feel-bank-header" onclick="toggleFeelNote()">${feelNoteOpen?'▾':'▸'} כתיבה חופשית</div>
+      ${feelNoteOpen ? `<textarea class="feel-note-textarea" oninput="onFeelNoteInput(this.value)" placeholder="מה עובר עליך עכשיו...">${escapeHtml(data.feelNote||'')}</textarea>` : ''}
+    </div>
+  `;
+}
+
 function render(){
   document.body.classList.toggle('soft', data.softMode);
   document.body.classList.toggle('night-mode', data.nightMode);
@@ -4070,6 +4153,7 @@ function render(){
   renderScheduleGrid();
   renderGcalStatus();
   renderSyncBlock();
+  renderFeelBar();
   renderKeepGrid(activeNoteDomain);
   renderSomedayDomainSelect();
   renderSomeday();
