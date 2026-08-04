@@ -1612,6 +1612,25 @@ let gcalAccessToken = null;
 let gcalSyncing = false;
 let gcalPickerOpen = false;
 
+// the access token itself was living only in a JS variable, so every page load/refresh wiped it even
+// though it's actually still valid for ~1 hour — that forced a full reconnect (and often a visible
+// Google screen) far more often than necessary. persisting it (with its real expiry) means most F5s
+// and reloads within that hour just keep working silently, with no re-auth at all.
+const GCAL_TOKEN_KEY = 'planner-gcal-token-v1';
+function persistGcalToken(token, expiresInSec){
+  try{ localStorage.setItem(GCAL_TOKEN_KEY, JSON.stringify({ token, expiresAt: Date.now() + ((expiresInSec||3600)*1000) })); }catch(e){}
+}
+function clearPersistedGcalToken(){ try{ localStorage.removeItem(GCAL_TOKEN_KEY); }catch(e){} }
+function restoreGcalToken(){
+  try{
+    const raw = localStorage.getItem(GCAL_TOKEN_KEY);
+    if(!raw) return;
+    const saved = JSON.parse(raw);
+    if(saved && saved.token && saved.expiresAt && Date.now() < saved.expiresAt - 60000){ gcalAccessToken = saved.token; }
+    else { clearPersistedGcalToken(); }
+  }catch(e){}
+}
+
 function gcalReady(){ return !!(window.google && google.accounts && google.accounts.oauth2); }
 function waitForGcalReady(onReady, timeoutMs){
   // the Google sign-in script loads asynchronously in the background (<script async defer>) — clicking
@@ -1662,6 +1681,7 @@ function connectGoogleCalendar(){
       callback: (resp)=>{
         if(resp && resp.access_token){
           gcalAccessToken = resp.access_token;
+          persistGcalToken(resp.access_token, resp.expires_in);
           data.gcalConnected = true;
           saveData();
           // syncSignIn() below can navigate away immediately (signInWithRedirect) — flush the debounced
@@ -1683,6 +1703,7 @@ function disconnectGoogleCalendar(){
     try{ google.accounts.oauth2.revoke(gcalAccessToken, ()=>{}); }catch(e){}
   }
   gcalAccessToken = null;
+  clearPersistedGcalToken();
   data.gcalConnected = false;
   saveData();
   renderGcalStatus();
@@ -1714,7 +1735,7 @@ function ensureGcalWriteToken(onReady){
       scope: GCAL_SCOPE,
       ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
       callback: (resp)=>{
-        if(resp && resp.access_token){ gcalAccessToken = resp.access_token; onReady(); }
+        if(resp && resp.access_token){ gcalAccessToken = resp.access_token; persistGcalToken(resp.access_token, resp.expires_in); onReady(); }
         else { flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
       },
       error_callback: ()=>{ flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
@@ -1732,7 +1753,11 @@ function pushEventToGcal(eventBody, existingEventId, onSuccess){
     .then(r=>{
       if(r.status===401 || r.status===403){
         gcalAccessToken = null;
-        if(confirm('צריך לחדש את ההרשאה ליומן גוגל (כולל הרשאת כתיבה) כדי לעדכן שם. לחבר עכשיו?')) connectGoogleCalendar();
+        clearPersistedGcalToken();
+        // no confirm() here on purpose (same reasoning as everywhere else in the app) -- just say what
+        // happened and let the user reconnect via the button whenever they're ready, instead of a
+        // blocking dialog that can hang/fail silently on mobile and forces an immediate decision
+        flashStatus('ההרשאה ליומן גוגל פגה — לחיצה על "חיבור ליומן גוגל" תחדש אותה');
         return null;
       }
       if(!r.ok) throw new Error('http_'+r.status);
@@ -1845,6 +1870,7 @@ function syncGoogleCalendar(){
         callback: (resp)=>{
           if(resp && resp.access_token){
             gcalAccessToken = resp.access_token;
+            persistGcalToken(resp.access_token, resp.expires_in);
             resolvePrimaryCalendarId();
             runGcalSync();
           } else {
@@ -4348,6 +4374,7 @@ loadData();
 // a plain page load/refresh (F5, reopening the app) should sync too, not just the pull-to-refresh
 // gesture and the manual buttons — cross-device sync already does this via onAuthStateChanged below,
 // this covers the calendar half of it
+restoreGcalToken(); // reuse the still-valid token from before this reload instead of asking Google again
 if(data.gcalConnected) syncGoogleCalendar();
 </script>
 </body>
