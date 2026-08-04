@@ -528,15 +528,15 @@
         <span class="control-label">תצוגה</span>
         <div class="add-row" style="margin-bottom:10px;">
           <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
-            <option value="manual" selected>מיון לפי: ידני (גרירה)</option>
-            <option value="time">מיון לפי: זמן</option>
+            <option value="manual">מיון לפי: ידני (גרירה)</option>
+            <option value="time" selected>מיון לפי: זמן</option>
             <option value="topic">מיון לפי: נושא</option>
           </select>
           <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
           <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
-            <option value="all" selected>הכל</option>
+            <option value="all">הכל</option>
             <option value="today">היום</option>
-            <option value="week">השבוע</option>
+            <option value="week" selected>השבוע</option>
             <option value="month">החודש</option>
           </select>
         </div>
@@ -573,9 +573,9 @@
       </div>
       <div class="add-row" style="margin-bottom:10px;">
         <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
-          <option value="manual" selected>מיון לפי: ידני (גרירה)</option>
+          <option value="manual">מיון לפי: ידני (גרירה)</option>
           <option value="date">מיון לפי: תאריך הוספה</option>
-          <option value="domain">מיון לפי: נושא</option>
+          <option value="domain" selected>מיון לפי: נושא</option>
         </select>
         <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
       </div>
@@ -2290,10 +2290,10 @@ function unscheduleTaskFromWeek(id){
 }
 const expandedTasks = new Set();
 function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(); }
-let taskSortBy = 'manual';
+let taskSortBy = 'time';
 function setTaskSortBy(val){ taskSortBy = val; renderTasks(); }
 let taskFilterDomain = '';
-let taskFilterRange = 'all';
+let taskFilterRange = 'week';
 function setTaskFilterDomain(val){ taskFilterDomain = val; renderTasks(); }
 function setTaskFilterRange(val){ taskFilterRange = val; renderTasks(); }
 function renderTaskFilterSelect(){
@@ -2942,7 +2942,7 @@ function updateAddNoteBtnColor(){
 let editingSomedayId = null;
 const expandedSomeday = new Set();
 function renderSomedayDomainSelect(){ const el=document.getElementById('somedayDomain'); if(el) el.innerHTML = domainOptions(); }
-let somedaySortBy = 'manual';
+let somedaySortBy = 'domain';
 let somedayFilterDomain = '';
 function setSomedaySortBy(val){ somedaySortBy = val; renderSomeday(); }
 function setSomedayFilterDomain(val){ somedayFilterDomain = val; renderSomeday(); }
@@ -3871,14 +3871,14 @@ function weekCarouselMove(g, dx){
   const grid = document.getElementById('scheduleGrid');
   const canPrev = weekOffset > WEEK_OFFSET_MIN, canNext = weekOffset < WEEK_OFFSET_MAX;
   let clamped = dx;
-  if(dx > 0 && !canNext) clamped = dx * 0.25;
-  if(dx < 0 && !canPrev) clamped = dx * 0.25;
+  if(dx > 0 && !canPrev) clamped = dx * 0.25;
+  if(dx < 0 && !canNext) clamped = dx * 0.25;
   grid.style.transform = `translateX(${clamped}px)`;
 }
 function weekCarouselEnd(g){
   const grid = document.getElementById('scheduleGrid');
   const rawDx = g.dx || 0;
-  const delta = rawDx > 0 ? 1 : -1; // drag right reveals the next week, drag left reveals the previous
+  const delta = rawDx > 0 ? -1 : 1; // drag right reveals the previous week, drag left reveals the next
   const canMove = (delta===-1 && weekOffset>WEEK_OFFSET_MIN) || (delta===1 && weekOffset<WEEK_OFFSET_MAX);
   grid.style.transition = 'transform .22s cubic-bezier(.22,1,.36,1)';
   if(canMove && Math.abs(rawDx) > g.width * 0.5){
