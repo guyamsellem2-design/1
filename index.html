@@ -442,6 +442,7 @@
   .subtask-row .chk{width:15px; height:15px;}
   .subtask-text{flex:1; cursor:pointer;}
   .subtask-text.done{text-decoration:line-through; color:var(--muted2);}
+  .inline-text-edit{flex:1; min-width:0; background:var(--surface3); border:1px solid var(--gold); color:var(--text); border-radius:6px; padding:3px 7px; font-size:inherit; font-family:inherit;}
   .subtask-schedule-form{background:var(--surface3); border-radius:9px; padding:8px; margin:-2px 0 8px; display:flex; flex-direction:column; gap:6px;}
   .subtask-schedule-form .edit-form-row{display:flex; gap:6px;}
   .subtask-add-row{display:flex; gap:6px; margin-top:6px;}
@@ -2621,7 +2622,9 @@ function taskDetailHtml(t){
         <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.subtask-row',(fromId,toId)=>reorderTaskSubtasks('${t.id}',fromId,toId))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
         <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSubtaskFavorite('${t.id}','${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
         <div class="chk ${s.done?'done':''}" onclick="toggleSubtask('${t.id}','${s.id}')"></div>
-        <span class="subtask-text ${s.done?'done':''}" onclick="editSubtaskText('${t.id}','${s.id}')">${escapeHtml(s.text)}</span>
+        ${inlineEditIds.has('subtask:'+t.id+':'+s.id)
+          ? `<input type="text" class="inline-text-edit" value="${escapeAttr(s.text)}" data-inline-key="subtask:${t.id}:${s.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('subtask:${t.id}:${s.id}', renderTasks) : saveSubtaskTextEdit('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+          : `<span class="subtask-text ${s.done?'done':''}" data-inline-key="subtask:${t.id}:${s.id}" onclick="inlineEditToggle('subtask:${t.id}:${s.id}', renderTasks)">${escapeHtml(s.text)}</span>`}
         ${s.date ? `<span class="task-date-badge"><span dir="ltr">${s.date.slice(5)}${s.time?' '+s.time:''}</span></span>` : ''}
         <span class="sched-link ${hasSchedule?'active':''}" onclick="toggleSubtaskDateOpen('${t.id}','${s.id}')" title="תזמון">🕐</span>
         <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
@@ -2733,12 +2736,13 @@ function toggleSubtask(taskId, subId){
   const s = t && (t.subtasks||[]).find(s=>s.id===subId);
   if(s){ s.done = !s.done; saveData(); renderTasks(); }
 }
-function editSubtaskText(taskId, subId){
+function saveSubtaskTextEdit(taskId, subId, val){
+  const key = 'subtask:'+taskId+':'+subId;
+  inlineEditIds.delete(key);
   const t = data.tasks.find(t=>t.id===taskId);
   const s = t && (t.subtasks||[]).find(s=>s.id===subId);
-  if(!s) return;
-  const val = prompt('עריכת תת-משימה:', s.text);
-  if(val!==null && val.trim()){ s.text=val.trim(); saveData(); renderTasks(); }
+  if(s && val.trim()) { s.text = val.trim(); saveData(); }
+  renderTasks();
 }
 function pushSubtaskToGcal(taskId, s){
   if(!s.date) return;
@@ -3160,7 +3164,9 @@ function somedayDetailHtml(s){
       <span class="grip" onpointerdown="startListDrag(event,'${sub.id}','.subtask-row',(fromId,toId)=>reorderSomedaySubtasks('${s.id}',fromId,toId))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <span class="fav-star ${sub.favorite?'active':''}" onclick="toggleSomedaySubtaskFavorite('${s.id}','${sub.id}')" title="${sub.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${sub.favorite?'★':'☆'}</span>
       <div class="chk ${sub.done?'done':''}" onclick="toggleSomedaySubtask('${s.id}','${sub.id}')"></div>
-      <span class="subtask-text ${sub.done?'done':''}" onclick="editSomedaySubtaskText('${s.id}','${sub.id}')">${escapeHtml(sub.text)}</span>
+      ${inlineEditIds.has('somedaystep:'+s.id+':'+sub.id)
+        ? `<input type="text" class="inline-text-edit" value="${escapeAttr(sub.text)}" data-inline-key="somedaystep:${s.id}:${sub.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('somedaystep:${s.id}:${sub.id}', renderSomeday) : saveSomedaySubtaskTextEdit('${s.id}','${sub.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+        : `<span class="subtask-text ${sub.done?'done':''}" data-inline-key="somedaystep:${s.id}:${sub.id}" onclick="inlineEditToggle('somedaystep:${s.id}:${sub.id}', renderSomeday)">${escapeHtml(sub.text)}</span>`}
       <span class="promote" onclick="convertSomedaySubtaskToTask('${s.id}','${sub.id}')">→ משימה</span>
       <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')">✕</span>
     </div>`);
@@ -3234,12 +3240,13 @@ function toggleSomedaySubtask(id, subId){
   const sub = s && (s.subtasks||[]).find(x=>x.id===subId);
   if(sub){ sub.done=!sub.done; saveData(); renderSomeday(); }
 }
-function editSomedaySubtaskText(id, subId){
+function saveSomedaySubtaskTextEdit(id, subId, val){
+  const key = 'somedaystep:'+id+':'+subId;
+  inlineEditIds.delete(key);
   const s = data.someday.find(s=>s.id===id);
   const sub = s && (s.subtasks||[]).find(x=>x.id===subId);
-  if(!sub) return;
-  const val = prompt('עריכת צעד קטן:', sub.text);
-  if(val!==null && val.trim()){ sub.text=val.trim(); saveData(); renderSomeday(); }
+  if(sub && val.trim()) { sub.text = val.trim(); saveData(); }
+  renderSomeday();
 }
 function deleteSomedaySubtask(id, subId){
   const s = data.someday.find(s=>s.id===id);
@@ -3498,7 +3505,9 @@ function renderReflection(){
     const historyHtml = isOpen ? (entries.length ? `<div class="bank-list">${entries.map(e=>`
         <div class="bank-entry" data-bank-key="${q.key}" data-entry-id="${e.id}">
           <span class="bank-date">${e.weekKey}</span>
-          <span onclick="editBankEntry('${q.key}','${e.id}')">${escapeHtml(e.text)}</span>
+          ${inlineEditIds.has('bank:'+q.key+':'+e.id)
+            ? `<input type="text" class="inline-text-edit" value="${escapeAttr(e.text)}" data-inline-key="bank:${q.key}:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('bank:${q.key}:${e.id}', renderReflection) : saveBankEntryEdit('${q.key}','${e.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+            : `<span data-inline-key="bank:${q.key}:${e.id}" onclick="inlineEditToggle('bank:${q.key}:${e.id}', renderReflection)">${escapeHtml(e.text)}</span>`}
           <span class="del-task" onclick="deleteBankEntry('${q.key}','${e.id}')">✕</span>
         </div>`).join('')}</div>` : '<div class="empty">עוד אין תובנות בבנק הזה</div>') : '';
     return `<div class="reflect-q">
@@ -3537,11 +3546,12 @@ function toggleBank(bankKey){
   if(expandedBanks.has(bankKey)) expandedBanks.delete(bankKey); else expandedBanks.add(bankKey);
   renderReflection();
 }
-function editBankEntry(bankKey, entryId){
+function saveBankEntryEdit(bankKey, entryId, val){
+  const key = 'bank:'+bankKey+':'+entryId;
+  inlineEditIds.delete(key);
   const entry = (data.reflectionBanks[bankKey]||[]).find(e=>e.id===entryId);
-  if(!entry) return;
-  const val = prompt(`עריכת תובנה משבוע ${entry.weekKey}:`, entry.text);
-  if(val!==null && val.trim()){ entry.text=val.trim(); saveData(); renderReflection(); }
+  if(entry && val.trim()) { entry.text = val.trim(); saveData(); }
+  renderReflection();
 }
 function deleteBankEntry(bankKey, entryId){
   data.reflectionBanks[bankKey] = (data.reflectionBanks[bankKey]||[]).filter(e=>e.id!==entryId);
@@ -3553,7 +3563,9 @@ function renderSelfChoiceRemindersSection(){
   const isOpen = expandedBanks.has('selfChoice');
   const historyHtml = isOpen ? (entries.length ? `<div class="bank-list">${entries.map(e=>`
       <div class="bank-entry" data-bank-key="selfChoice" data-entry-id="${e.id}">
-        <span onclick="editSelfChoiceReminder('${e.id}')">${escapeHtml(e.text)}</span>
+        ${inlineEditIds.has('selfchoice:'+e.id)
+          ? `<input type="text" class="inline-text-edit" value="${escapeAttr(e.text)}" data-inline-key="selfchoice:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('selfchoice:${e.id}', renderReflection) : saveSelfChoiceReminderEdit('${e.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+          : `<span data-inline-key="selfchoice:${e.id}" onclick="inlineEditToggle('selfchoice:${e.id}', renderReflection)">${escapeHtml(e.text)}</span>`}
         <span class="del-task" onclick="deleteSelfChoiceReminder('${e.id}')">✕</span>
       </div>`).join('')}</div>` : '<div class="empty">עוד אין תזכורות בבנק הזה</div>') : '';
   return `<div class="reflect-q">
@@ -3575,11 +3587,12 @@ function addSelfChoiceReminder(){
   renderReflection();
   flashStatus('התזכורת נשמרה בבנק');
 }
-function editSelfChoiceReminder(id){
+function saveSelfChoiceReminderEdit(id, val){
+  const key = 'selfchoice:'+id;
+  inlineEditIds.delete(key);
   const entry = (data.selfChoiceReminders||[]).find(e=>e.id===id);
-  if(!entry) return;
-  const val = prompt('עריכת תזכורת:', entry.text);
-  if(val!==null && val.trim()){ entry.text=val.trim(); saveData(); renderReflection(); }
+  if(entry && val.trim()) { entry.text = val.trim(); saveData(); }
+  renderReflection();
 }
 function deleteSelfChoiceReminder(id){
   data.selfChoiceReminders = (data.selfChoiceReminders||[]).filter(e=>e.id!==id);
@@ -3741,6 +3754,17 @@ function importDataMerge(e){
 /* ---------- utils ---------- */
 function escapeHtml(str){ const div=document.createElement('div'); div.textContent=str; return div.innerHTML; }
 function escapeAttr(str){ return String(str).replace(/"/g,'&quot;'); }
+/* ---------- generic inline text edit — replaces native prompt(), which can hang/never resolve
+   in some mobile/PWA browser contexts, freezing the whole page until a manual refresh ---------- */
+const inlineEditIds = new Set();
+function inlineEditToggle(key, render){
+  if(inlineEditIds.has(key)) inlineEditIds.delete(key); else inlineEditIds.add(key);
+  render();
+  if(inlineEditIds.has(key)){
+    requestAnimationFrame(()=>{ const el=document.querySelector(`[data-inline-key="${key}"]`); if(el){ el.focus(); el.select(); } });
+  }
+}
+function cancelInlineEdit(key, render){ inlineEditIds.delete(key); render(); }
 function renderAllDependent(){
   renderTaskDomainSelect(); renderTasks(); renderScheduleGrid();
   renderDomainEditor(); renderKeepGrid(activeNoteDomain); updateAddNoteBtnColor(); renderSomedayDomainSelect(); renderSomeday();
@@ -4103,9 +4127,12 @@ function swipeDeleteSettle(g){
   }, 210);
 }
 function swipeDeleteEnd(g){
+  // deletes immediately, same as every other delete button in the app (✕ icons, quick-delete) —
+  // no confirm() dialog, since those can hang/never resolve in some mobile/PWA contexts and freeze
+  // the whole page until a manual refresh. Undo is the safety net instead.
   const dx = Math.max(0, g.dx||0);
   swipeDeleteSettle(g);
-  if(dx > SWIPE_DELETE_THRESHOLD){ if(confirm('למחוק?')) g.action(); }
+  if(dx > SWIPE_DELETE_THRESHOLD) g.action();
 }
 function swipeDeleteCancel(g){ swipeDeleteSettle(g); }
 
