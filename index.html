@@ -389,6 +389,21 @@
   .subtask-toggle-btn{flex-shrink:0; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit; white-space:nowrap;}
   .subtask-toggle-btn:hover{color:var(--text); border-color:var(--muted);}
   .subtask-toggle-btn.has-content{color:var(--gold); border-color:var(--gold); border-style:solid;}
+  .body-check-panel{background:var(--surface3); border-radius:9px; padding:10px 10px 8px; margin:2px 0 0; display:flex; flex-direction:column; gap:9px;}
+  .bc-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .bc-row-label{font-size:13px; color:var(--muted); flex-shrink:0;}
+  .bc-btn-group{display:flex; gap:6px; flex-wrap:wrap;}
+  .bc-toggle-btn{background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit; white-space:nowrap;}
+  .bc-toggle-btn:hover{color:var(--text); border-color:var(--muted);}
+  .bc-toggle-btn.active{border-style:solid; font-weight:600; color:var(--gold); border-color:var(--gold);}
+  .bc-toggle-btn.bc-expand.active{color:var(--energy-low); border-color:var(--energy-low);}
+  .bc-toggle-btn.bc-neutral.active{color:var(--gold); border-color:var(--gold);}
+  .bc-toggle-btn.bc-contract.active{color:var(--energy-high); border-color:var(--energy-high);}
+  .bc-reminder-btn{align-self:flex-start; background:transparent; border:1px solid var(--energy-high); color:var(--energy-high); border-radius:999px; padding:5px 13px; font-size:13px; cursor:pointer; font-family:inherit;}
+  .bc-reminder-shown{font-size:13.5px; color:var(--text); background:var(--surface); border-radius:8px; padding:8px 10px; line-height:1.5;}
+  .bc-glow-expand{box-shadow:0 0 0 1.5px var(--energy-low), 0 0 8px 0 var(--energy-low);}
+  .bc-glow-neutral{box-shadow:0 0 0 1px var(--gold);}
+  .bc-glow-contract{box-shadow:0 0 0 1.5px var(--energy-high), 0 0 8px 0 var(--energy-high);}
   .edit-form-row{display:flex; gap:6px; min-width:0;}
   .edit-form-row select, .edit-form-row .field-label, .edit-form-row input[type=text]{flex:1; min-width:0;}
   .anchor-form{min-width:0;}
@@ -698,7 +713,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false, scheduleViewMode:'grid' };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -753,6 +768,7 @@ function loadData(){
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
+      data.selfChoiceReminders = parsed.selfChoiceReminders || [];
       mainView = parsed.mainView === 'topics' ? 'topics' : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -1987,9 +2003,9 @@ try{
 }catch(e){ console.error('Firebase init failed', e); }
 
 const SYNC_BASE_KEY = 'planner-sync-base-v1';
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 function loadSyncBase(){
   try{ const raw = localStorage.getItem(SYNC_BASE_KEY); return raw ? JSON.parse(raw) : emptySyncSkeleton(); }
@@ -2469,7 +2485,7 @@ function taskRowHtml(t){
   const isDimmed = isOverdue || (data.softMode && !energy);
   const subBtnLabel = isSubtasksOpen ? `▾ תת-משימות${subCount?' ('+subCount+')':''}` : (subCount ? `▸ תת-משימות (${subCount})` : '+ תת-משימה');
   const canDrag = taskSortBy==='manual';
-  let html = `<li class="task-li ${isDimmed?'dimmed-item':''}" data-drag-id="${t.id}">
+  let html = `<li class="task-li ${isDimmed?'dimmed-item':''} ${bodyCheckGlowClass(t)}" data-drag-id="${t.id}">
     <div class="task-row-main">
       ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
@@ -2527,6 +2543,8 @@ function taskEditFormInner(t){
       ` : ''}
       <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDescOpen('${t.id}')">${descOpen?'▾ תיאור':'▸ תיאור'}</button>
       ${descOpen ? `<textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>` : ''}
+      ${bodyCheckToggleBtnHtml('task', t.id)}
+      ${bodyCheckOpenIds.has('task:'+t.id) ? bodyCheckPanelHtml('task', t.id, {urgencyOptions:['objective','other','relief'], showEnergy:true}) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveTaskEdit('${t.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeTaskEdit()">בטל</button>
@@ -3060,7 +3078,7 @@ function somedayRowHtml(s){
   const hasIncompleteSubtasks = subCount>0 && !(s.subtasks||[]).every(x=>x.done);
   const hasContent = hasIncompleteSubtasks || (s.description||'').trim();
   const canDrag = somedaySortBy==='manual';
-  let html = `<li class="someday-li" data-drag-id="${s.id}">
+  let html = `<li class="someday-li ${bodyCheckGlowClass(s)}" data-drag-id="${s.id}">
     ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${s.id}','.someday-li',reorderSomeday)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
     <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSomedayFavorite('${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
     <span class="task-text" style="flex:1" onclick="somedayTextClick('${s.id}')">${escapeHtml(s.text)}</span>
@@ -3076,6 +3094,8 @@ function somedayEditFormHtml(s){
     <div class="anchor-form">
       <input type="text" id="somedayEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="הרעיון">
       <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
+      ${bodyCheckToggleBtnHtml('someday', s.id)}
+      ${bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {}) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSomedayEdit()">בטל</button>
@@ -3259,7 +3279,7 @@ function renderSuggestions(){
   el.innerHTML = sorted.map(s=>{
     if(editingSuggestionId===s.id) return suggestionEditFormHtml(s);
     return `
-    <li class="suggestion-li ${s.done?'suggestion-done':''}" data-drag-id="${s.id}">
+    <li class="suggestion-li ${s.done?'suggestion-done':''} ${bodyCheckGlowClass(s)}" data-drag-id="${s.id}">
       <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
       <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
@@ -3279,6 +3299,8 @@ function suggestionEditFormHtml(s){
         <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע? (רשות)">
         <label class="field-label">יודע/ת מתי תחזיר/י תשובה?<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}"></label>
       </div>
+      ${bodyCheckToggleBtnHtml('suggestion', s.id)}
+      ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other'], showEnergy:true}) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSuggestionEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSuggestionEdit()">בטל</button>
@@ -3354,6 +3376,83 @@ function reorderSuggestions(fromId, toId){
   renderSuggestions();
 }
 
+/* ---------- body check (בדיקת גוף) ---------- */
+const bodyCheckOpenIds = new Set();
+const bodyCheckShownReminder = new Map(); // "kind:id" -> reminder text, or '' if the bank is empty
+const URGENCY_LABELS = { objective:'אובייקטיבית', other:'כי זו העדפה של מישהו אחר', relief:'כי משהו בי רוצה הקלה/בריחה' };
+function bodyCheckSection(kind){
+  if(kind==='task') return {arr:data.tasks, render:renderTasks};
+  if(kind==='someday') return {arr:data.someday, render:renderSomeday};
+  return {arr:data.suggestions, render:renderSuggestions};
+}
+function bodyCheckItem(kind, id){ return bodyCheckSection(kind).arr.find(x=>x.id===id); }
+function toggleBodyCheck(kind, id){
+  const key = kind+':'+id;
+  if(bodyCheckOpenIds.has(key)) bodyCheckOpenIds.delete(key); else bodyCheckOpenIds.add(key);
+  bodyCheckSection(kind).render();
+}
+function setBodyCheckField(kind, id, field, value){
+  const item = bodyCheckItem(kind, id);
+  if(!item) return;
+  if(!item.bodyCheck) item.bodyCheck = {};
+  item.bodyCheck[field] = (item.bodyCheck[field]===value) ? '' : value;
+  saveData();
+  bodyCheckSection(kind).render();
+}
+function showSelfChoiceReminder(kind, id){
+  const key = kind+':'+id;
+  const bank = data.selfChoiceReminders || [];
+  bodyCheckShownReminder.set(key, bank.length ? bank[Math.floor(Math.random()*bank.length)].text : '');
+  bodyCheckSection(kind).render();
+}
+function bodyCheckPanelHtml(kind, id, opts){
+  const item = bodyCheckItem(kind, id);
+  if(!item) return '';
+  const bc = item.bodyCheck || {};
+  const expandBtn = (val, cls, label) => `<button type="button" class="bc-toggle-btn ${cls} ${bc.expand===val?'active':''}" onclick="setBodyCheckField('${kind}','${id}','expand','${val}')">${label}</button>`;
+  const urgencyBtn = val => `<button type="button" class="bc-toggle-btn ${bc.urgency===val?'active':''}" onclick="setBodyCheckField('${kind}','${id}','urgency','${val}')">${URGENCY_LABELS[val]}</button>`;
+  const energyBtn = (val, label) => `<button type="button" class="bc-toggle-btn ${bc.energy===val?'active':''}" onclick="setBodyCheckField('${kind}','${id}','energy','${val}')">${label}</button>`;
+  const showReminderBtn = bc.expand==='contract' || bc.energy==='no';
+  const shownKey = kind+':'+id;
+  const shown = bodyCheckShownReminder.has(shownKey) ? bodyCheckShownReminder.get(shownKey) : null;
+  return `<div class="body-check-panel">
+    <div class="bc-row">
+      <span class="bc-row-label">מה קורה בגוף?</span>
+      <div class="bc-btn-group">
+        ${expandBtn('expand','bc-expand','🌱 מרחיב')}
+        ${expandBtn('neutral','bc-neutral','◦ ניטרלי')}
+        ${expandBtn('contract','bc-contract','🥀 מכווץ')}
+      </div>
+    </div>
+    ${opts.urgencyOptions ? `<div class="bc-row">
+      <span class="bc-row-label">דחוף?</span>
+      <div class="bc-btn-group">${opts.urgencyOptions.map(urgencyBtn).join('')}</div>
+    </div>` : ''}
+    ${opts.showEnergy ? `<div class="bc-row">
+      <span class="bc-row-label">יש לי אנרגיה לזה כרגע?</span>
+      <div class="bc-btn-group">
+        ${energyBtn('yes','יש אנרגיה')}
+        ${energyBtn('no','אין אנרגיה')}
+      </div>
+    </div>` : ''}
+    ${showReminderBtn ? `
+      <button type="button" class="bc-reminder-btn" onclick="showSelfChoiceReminder('${kind}','${id}')">❤️‍🩹 תזכורת לבחור בעצמי</button>
+      ${shown!==null ? `<div class="bc-reminder-shown">${shown ? escapeHtml(shown) : 'עוד אין תזכורות בבנק — אפשר להוסיף אחת בסקירה השבועית (03).'}</div>` : ''}
+    ` : ''}
+  </div>`;
+}
+function bodyCheckToggleBtnHtml(kind, id){
+  const item = bodyCheckItem(kind, id);
+  const bc = (item && item.bodyCheck) || {};
+  const hasContent = !!(bc.expand || bc.urgency || bc.energy);
+  const isOpen = bodyCheckOpenIds.has(kind+':'+id);
+  return `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="toggleBodyCheck('${kind}','${id}')">❤️‍🩹 בדיקת גוף${isOpen?' ▴':''}</button>`;
+}
+function bodyCheckGlowClass(item){
+  const val = (item.bodyCheck||{}).expand;
+  return val ? `bc-glow-${val}` : '';
+}
+
 /* ---------- reflection (insight banks) ---------- */
 const REFLECT_QUESTIONS = [
   {key:'fed', icon:'🟢', label:'מה הזין אותי השבוע?'},
@@ -3378,11 +3477,14 @@ function renderReflection(){
     return `<div class="reflect-q">
       <label>${q.icon} ${q.label}</label>
       <textarea id="reflect-${q.key}" placeholder="מה עולה לך?"></textarea>
-      <div class="reflect-actions"><button class="reflect-add-btn" onclick="addReflectionEntry('${q.key}')">+ הוסף תובנה</button></div>
+      <div class="reflect-actions">
+        <button class="reflect-add-btn" onclick="addReflectionEntry('${q.key}')">+ הוסף תובנה</button>
+        ${q.key==='insights' ? `<label class="buf-label"><input type="checkbox" id="reflect-insights-also-reminder"> גם לתזכורות לבחור בעצמי</label>` : ''}
+      </div>
       <span class="bank-toggle" onclick="toggleBank('${q.key}')">${isOpen?'▾':'▸'} בנק תובנות (${entries.length})</span>
       ${historyHtml}
     </div>`;
-  }).join('');
+  }).join('') + renderSelfChoiceRemindersSection();
 }
 function addReflectionEntry(bankKey){
   const ta = document.getElementById(`reflect-${bankKey}`);
@@ -3391,9 +3493,18 @@ function addReflectionEntry(bankKey){
   if(!data.reflectionBanks) data.reflectionBanks = {fed:[], hard:[], insights:[]};
   if(!data.reflectionBanks[bankKey]) data.reflectionBanks[bankKey] = [];
   data.reflectionBanks[bankKey].push({id:uid(), weekKey:weekKey(), text});
+  let alsoReminder = false;
+  if(bankKey==='insights'){
+    const box = document.getElementById('reflect-insights-also-reminder');
+    if(box && box.checked){
+      if(!data.selfChoiceReminders) data.selfChoiceReminders = [];
+      data.selfChoiceReminders.push({id:uid(), text, createdAt:Date.now()});
+      alsoReminder = true;
+    }
+  }
   saveData();
   renderReflection();
-  flashStatus('התובנה נשמרה בבנק');
+  flashStatus(alsoReminder ? 'התובנה נשמרה בבנק + נוספה לתזכורות לבחור בעצמי' : 'התובנה נשמרה בבנק');
 }
 function toggleBank(bankKey){
   if(expandedBanks.has(bankKey)) expandedBanks.delete(bankKey); else expandedBanks.add(bankKey);
@@ -3407,6 +3518,44 @@ function editBankEntry(bankKey, entryId){
 }
 function deleteBankEntry(bankKey, entryId){
   data.reflectionBanks[bankKey] = (data.reflectionBanks[bankKey]||[]).filter(e=>e.id!==entryId);
+  saveData();
+  renderReflection();
+}
+function renderSelfChoiceRemindersSection(){
+  const entries = (data.selfChoiceReminders||[]).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const isOpen = expandedBanks.has('selfChoice');
+  const historyHtml = isOpen ? (entries.length ? `<div class="bank-list">${entries.map(e=>`
+      <div class="bank-entry" data-bank-key="selfChoice" data-entry-id="${e.id}">
+        <span onclick="editSelfChoiceReminder('${e.id}')">${escapeHtml(e.text)}</span>
+        <span class="del-task" onclick="deleteSelfChoiceReminder('${e.id}')">✕</span>
+      </div>`).join('')}</div>` : '<div class="empty">עוד אין תזכורות בבנק הזה</div>') : '';
+  return `<div class="reflect-q">
+    <label>❤️‍🩹 תזכורות לבחור בעצמי</label>
+    <div class="hint" style="margin:-2px 0 8px;">משפטים שכותבים לעצמכם ברגע רגוע, כדי שיהיו זמינים ברגע שקשה לבחור בעצמכם — הכלי מוצע כשבדיקת גוף מראה שמשהו מכווץ או שאין אנרגיה</div>
+    <textarea id="reflect-selfChoice" placeholder="מה הייתי רוצה להזכיר לעצמי?"></textarea>
+    <div class="reflect-actions"><button class="reflect-add-btn" onclick="addSelfChoiceReminder()">+ הוסף תזכורת</button></div>
+    <span class="bank-toggle" onclick="toggleBank('selfChoice')">${isOpen?'▾':'▸'} בנק תזכורות (${entries.length})</span>
+    ${historyHtml}
+  </div>`;
+}
+function addSelfChoiceReminder(){
+  const ta = document.getElementById('reflect-selfChoice');
+  const text = ta.value.trim();
+  if(!text) return;
+  if(!data.selfChoiceReminders) data.selfChoiceReminders = [];
+  data.selfChoiceReminders.push({id:uid(), text, createdAt:Date.now()});
+  saveData();
+  renderReflection();
+  flashStatus('התזכורת נשמרה בבנק');
+}
+function editSelfChoiceReminder(id){
+  const entry = (data.selfChoiceReminders||[]).find(e=>e.id===id);
+  if(!entry) return;
+  const val = prompt('עריכת תזכורת:', entry.text);
+  if(val!==null && val.trim()){ entry.text=val.trim(); saveData(); renderReflection(); }
+}
+function deleteSelfChoiceReminder(id){
+  data.selfChoiceReminders = (data.selfChoiceReminders||[]).filter(e=>e.id!==id);
   saveData();
   renderReflection();
 }
@@ -3476,6 +3625,7 @@ function importData(e){
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.notesMigrated = !!parsed.notesMigrated;
+      data.selfChoiceReminders = parsed.selfChoiceReminders || [];
       activeNoteDomain = data.domains[0].id;
       migrateOldNotesToDomainNotes();
       saveData();
@@ -3569,13 +3719,14 @@ function renderAllDependent(){
 }
 
 function resetAll(){
-  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ורעיונות ומשימות לעתיד? בנק התובנות יישאר שמור. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
+  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ורעיונות ומשימות לעתיד? בנק התובנות ובנק התזכורות לבחור בעצמי יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
+  const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, selfChoiceReminders:keepSelfChoiceReminders};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
