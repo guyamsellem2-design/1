@@ -141,8 +141,11 @@
   .keep-note-minimized{display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; padding:10px 12px; min-height:0;}
   .keep-note-minimized .keep-note-preview{font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;}
   .keep-note-minimized .chev{color:var(--muted2); font-size:13px; flex-shrink:0;}
-  .keep-note textarea{width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; resize:vertical; line-height:1.55; padding:0;}
+  .keep-note textarea{width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; resize:none; overflow:hidden; line-height:1.55; padding:0;}
   .keep-note textarea:focus{outline:none;}
+  .keep-note textarea.note-clip{max-height:110px;}
+  .note-size-btn{cursor:pointer; font-size:13px; color:var(--muted2); padding:3px 6px; border-radius:6px;}
+  .note-size-btn:hover{background:var(--surface3);}
   .keep-note-actions{display:flex; justify-content:space-between; align-items:center; margin-top:8px;}
   .keep-colors{display:flex; gap:5px;}
   .keep-colors span{width:14px; height:14px; border-radius:50%; cursor:pointer; border:1.5px solid rgba(128,128,128,0.25); flex-shrink:0;}
@@ -352,6 +355,10 @@
   .sched-link.active{color:var(--gold);}
   .task-date-badge{font-size:12px; color:var(--muted2); white-space:nowrap;}
 
+  .sync-menu{position:fixed; top:12px; left:12px; z-index:90;}
+  .sync-menu-btn{background:var(--surface); border:1px solid var(--border-strong); border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:0 4px 14px -6px rgba(0,0,0,0.4);}
+  .sync-menu-panel{display:none; position:absolute; top:calc(100% + 8px); left:0; width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 70px); overflow-y:auto; background:transparent;}
+  .sync-menu-panel.open{display:block;}
   .gcal-block{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px; margin-bottom:28px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
   .gcal-block-title{font-size:15px; font-weight:700; color:var(--text); margin-bottom:10px; display:flex; align-items:center; gap:8px;}
   .gcal-sync-row-inner{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
@@ -553,8 +560,13 @@
     </div>
   </header>
 
-  <div class="gcal-block" id="syncBlock" style="display:none;"></div>
-  <div class="gcal-block" id="gcalSyncRow"></div>
+  <div class="sync-menu" id="syncMenu">
+    <button type="button" class="sync-menu-btn" onclick="toggleSyncMenu()">🔄 סנכרון</button>
+    <div class="sync-menu-panel" id="syncMenuPanel">
+      <div class="gcal-block" id="syncBlock" style="display:none;"></div>
+      <div class="gcal-block" id="gcalSyncRow"></div>
+    </div>
+  </div>
 
   <section>
     <div class="section-head">
@@ -1250,17 +1262,25 @@ const DRAW_SIZES = [3, 7, 13];
 let drawingNoteId = null;
 let drawColor = '#1a1a1a';
 let drawSize = 5;
-const minimizedNoteIds = new Set();
+// three sizes per note: 0 (full, default) = grows with the text as you type, no cap, no scrollbar,
+// the page scrolls instead -- 1 (medium) = a short clipped preview you can still edit -- 2 (small) =
+// the single-line collapsed preview. minimizing/expanding steps one size at a time in either direction.
+const noteSizeLevel = new Map();
 const expandedMemoNoteIds = new Set();
 let openMemoId = null;
 let recordingNoteId = null;
 let mediaRecorder = null;
 let recordedChunks = [];
 let recordingStream = null;
-function toggleNoteMinimize(domainId, noteId){
-  if(minimizedNoteIds.has(noteId)) minimizedNoteIds.delete(noteId); else minimizedNoteIds.add(noteId);
+function getNoteLevel(noteId){ return noteSizeLevel.get(noteId) || 0; }
+function setNoteLevel(domainId, noteId, level){
+  level = Math.max(0, Math.min(2, level));
+  if(level===0) noteSizeLevel.delete(noteId); else noteSizeLevel.set(noteId, level);
   renderKeepGrid(domainId);
 }
+function minimizeNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(noteId)+1); }
+function expandNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(noteId)-1); }
+function autoGrowNoteTextarea(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
 function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(!data.domainNotes[id]) data.domainNotes[id] = []; return data.domainNotes[id]; }
 function renderKeepGrid(id){
   const el = document.getElementById('keepGrid');
@@ -1269,18 +1289,19 @@ function renderKeepGrid(id){
   if(notes.length===0){ el.innerHTML = '<div class="empty" onclick="addDomainNote()" style="cursor:pointer;">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
   el.innerHTML = notes.map(n=>{
     const isDrawing = drawingNoteId===n.id;
-    const isMinimized = minimizedNoteIds.has(n.id);
-    if(isMinimized){
+    const level = getNoteLevel(n.id);
+    if(level===2){
       const preview = (n.text||'').trim().slice(0,70) || 'פתק ריק';
       return `
-      <div class="keep-note keep-note-minimized" style="background:${n.color||'var(--surface2)'}" onclick="toggleNoteMinimize('${id}','${n.id}')" title="לחיצה להרחבה">
+      <div class="keep-note keep-note-minimized" style="background:${n.color||'var(--surface2)'}" onclick="expandNoteStep('${id}','${n.id}')" title="לחיצה להרחבה">
         <span class="keep-note-preview">${escapeHtml(preview)}${n.drawing?' 🎨':''}</span>
         <span class="chev">▸</span>
       </div>`;
     }
+    const isMedium = level===1;
     return `
     <div class="keep-note" style="background:${n.color||'var(--surface2)'}">
-      <textarea oninput="onKeepNoteInput('${id}','${n.id}', this.value)" placeholder="כתוב כאן...">${escapeHtml(n.text)}</textarea>
+      <textarea class="${isMedium?'note-clip':''}" oninput="onKeepNoteInput('${id}','${n.id}', this.value); autoGrowNoteTextarea(this);" placeholder="כתוב כאן...">${escapeHtml(n.text)}</textarea>
       ${(n.drawing && !isDrawing) ? `<img class="keep-note-drawing-preview" src="${n.drawing}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="לחיצה לעריכת הציור">` : ''}
       ${isDrawing ? `
         <div class="draw-toolbar">
@@ -1298,7 +1319,9 @@ function renderKeepGrid(id){
         <div class="keep-colors">
           ${KEEP_COLORS.map(c=>`<span class="${(n.color||'')===c?'active':''}" style="background:${c||'var(--surface3)'}" onclick="setKeepNoteColor('${id}','${n.id}','${c}')"></span>`).join('')}
         </div>
-        <span class="pencil-btn" onclick="toggleNoteMinimize('${id}','${n.id}')" title="מזער פתק">⌄</span>
+        ${isMedium
+          ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
+          : `<span class="pencil-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄</span>`}
         <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
         <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
       </div>
@@ -1309,6 +1332,11 @@ function renderKeepGrid(id){
     const canvas = document.getElementById('canvas-'+drawingNoteId);
     if(canvas) initDrawCanvas(canvas);
   }
+  // full-size (level 0) textareas grow to fit whatever content they already have as soon as they're
+  // placed in the DOM, so a long note doesn't start clipped until the next keystroke re-triggers it
+  requestAnimationFrame(()=>{
+    el.querySelectorAll('.keep-note textarea:not(.note-clip)').forEach(autoGrowNoteTextarea);
+  });
 }
 
 /* ---------- voice memos, per note ---------- */
@@ -1445,7 +1473,7 @@ function setKeepNoteColor(domainId, noteId, color){
 function deleteDomainNote(domainId, noteId){
   data.domainNotes[domainId] = ensureDomainNotes(domainId).filter(n=>n.id!==noteId);
   if(drawingNoteId===noteId) drawingNoteId = null;
-  minimizedNoteIds.delete(noteId);
+  noteSizeLevel.delete(noteId);
   saveData();
   renderKeepGrid(domainId);
 }
@@ -2042,6 +2070,19 @@ function runGcalSync(){
   });
 }
 
+let syncMenuOpen = false;
+function toggleSyncMenu(){
+  syncMenuOpen = !syncMenuOpen;
+  document.getElementById('syncMenuPanel').classList.toggle('open', syncMenuOpen);
+}
+function closeSyncMenu(){
+  if(!syncMenuOpen) return;
+  syncMenuOpen = false;
+  document.getElementById('syncMenuPanel').classList.remove('open');
+}
+document.addEventListener('click', (e)=>{
+  if(syncMenuOpen && !e.target.closest('#syncMenu')) closeSyncMenu();
+});
 function renderGcalStatus(){
   const el = document.getElementById('gcalSyncRow');
   if(!el) return;
