@@ -375,6 +375,12 @@
   .feel-chip-add-confirm:hover{color:var(--safe, var(--text));}
   .feel-chip-add-cancel:hover{color:var(--text);}
   .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:vertical; padding:8px 10px; line-height:1.5;}
+  .today-picks-list{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
+  .today-pick-row{display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; background:var(--surface2); cursor:pointer;}
+  .today-pick-row:hover{background:var(--surface3);}
+  .today-pick-source{flex-shrink:0;}
+  .today-pick-text{flex:1;}
+  .today-pick-meta{font-size:12.5px; color:var(--muted2); direction:ltr;}
   .tools-card{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px; margin-bottom:20px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
   .tools-card h3{margin:0 0 6px; font-size:16px;}
   .timer-presets{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
@@ -606,14 +612,32 @@
     </div>
   </div>
 
+  <div class="feel-block" id="todayPicksBlock"></div>
+
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('schedule')"><span class="num">01</span> לוח השבוע <span class="chev" id="chev-schedule">▾</span></h2>
-      <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
+      <h2 onclick="toggleSection('someday')"><span class="num">01</span> דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
+      <div class="hint">רעיונות ומשימות ללא מועד, לא מחייבות — כל דבר שאפשר לגעת בו מתי שבא לך, בלי לחץ</div>
+      <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
     </div>
-    <div id="secbody-schedule">
-      <div class="week-nav" id="weekNav"></div>
-      <div class="schedule-grid" id="scheduleGrid"></div>
+    <div id="secbody-someday">
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
+        <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
+        <button onclick="addSomeday()">הוסף</button>
+      </div>
+      <div class="add-row" style="margin-bottom:10px;">
+        <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
+          <option value="manual">מיון לפי: ידני (גרירה)</option>
+          <option value="date">מיון לפי: תאריך הוספה</option>
+          <option value="domain" selected>מיון לפי: נושא</option>
+        </select>
+        <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
+      </div>
+      <ul class="tasks scroll-cap" id="somedayList"></ul>
+      <div class="list-expand-row" id="somedayListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('someday')"></button></div>
+    </div>
     </div>
   </section>
 
@@ -676,38 +700,22 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('reflection')"><span class="num">03</span> סקירה שבועית <span class="chev" id="chev-reflection">▾</span></h2>
-      <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת בשבוע הבא</div>
+      <h2 onclick="toggleSection('schedule')"><span class="num">03</span> לוח השבוע <span class="chev" id="chev-schedule">▾</span></h2>
+      <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
     </div>
-    <div id="secbody-reflection">
-      <div class="card" id="reflectionCard"></div>
+    <div id="secbody-schedule">
+      <div class="week-nav" id="weekNav"></div>
+      <div class="schedule-grid" id="scheduleGrid"></div>
     </div>
   </section>
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('someday')"><span class="num">04</span> רעיונות ומשימות לעתיד <span class="chev" id="chev-someday">▾</span></h2>
-      <div class="hint">כל רעיון גדול, בלי לגעת בו כל יום</div>
-      <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
+      <h2 onclick="toggleSection('reflection')"><span class="num">04</span> סקירה שבועית <span class="chev" id="chev-reflection">▾</span></h2>
+      <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת בשבוע הבא</div>
     </div>
-    <div id="secbody-someday">
-    <div class="card">
-      <div class="add-row">
-        <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
-        <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
-        <button onclick="addSomeday()">הוסף</button>
-      </div>
-      <div class="add-row" style="margin-bottom:10px;">
-        <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
-          <option value="manual">מיון לפי: ידני (גרירה)</option>
-          <option value="date">מיון לפי: תאריך הוספה</option>
-          <option value="domain" selected>מיון לפי: נושא</option>
-        </select>
-        <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
-      </div>
-      <ul class="tasks scroll-cap" id="somedayList"></ul>
-      <div class="list-expand-row" id="somedayListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('someday')"></button></div>
-    </div>
+    <div id="secbody-reflection">
+      <div class="card" id="reflectionCard"></div>
     </div>
   </section>
 
@@ -4232,15 +4240,55 @@ function renderFeelBar(){
       <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
       ${emotionsBankOpen ? feelChipGridHtml('activeEmotions', EMOTIONS_LIST) : ''}
     </div>
-    <div class="feel-bank">
-      <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} צרכים${needsCount?' ('+needsCount+')':''}</div>
-      ${needsBankOpen ? feelChipGridHtml('activeNeeds', NEEDS_LIST) : ''}
-    </div>
     <div class="feel-note-block">
       <div class="feel-bank-header" onclick="toggleFeelNote()">${feelNoteOpen?'▾':'▸'} כתיבה חופשית</div>
       ${feelNoteOpen ? `<textarea class="feel-note-textarea" oninput="onFeelNoteInput(this.value)" placeholder="מה עובר עליך עכשיו...">${escapeHtml(data.feelNote||'')}</textarea>` : ''}
     </div>
+    <div class="feel-bank">
+      <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''}</div>
+      ${needsBankOpen ? feelChipGridHtml('activeNeeds', NEEDS_LIST) : ''}
+    </div>
     ` : ''}
+  `;
+}
+
+/* ---------- today's picks: a short, non-demanding "what could I do today" nudge ----------
+   already-scheduled-for-today tasks come first (real commitments), and if there are fewer than 3,
+   the rest are filled in from "דברים לעשות" (no-deadline, non-obligating ideas) -- favorites first --
+   so the list stays a gentle suggestion, never a full to-do dump. */
+function pickTodayRecommendations(){
+  const today = ymd(new Date());
+  const picks = data.tasks
+    .filter(t=>!t.done && t.date===today)
+    .sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'))
+    .slice(0,3)
+    .map(t=>({kind:'task', id:t.id, text:t.text, meta:t.time||''}));
+  if(picks.length<3){
+    const pool = data.someday.filter(s=>s.favorite).concat(data.someday.filter(s=>!s.favorite));
+    for(const s of pool){
+      if(picks.length>=3) break;
+      picks.push({kind:'someday', id:s.id, text:s.text, meta:''});
+    }
+  }
+  return picks;
+}
+function openTodayPick(kind, id){
+  if(kind==='task'){ openSection('tasks'); openTaskEdit(id); }
+  else{ openSection('someday'); openSomedayEdit(id); }
+}
+function renderTodayPicks(){
+  const el = document.getElementById('todayPicksBlock');
+  if(!el) return;
+  const picks = pickTodayRecommendations();
+  el.innerHTML = `
+    <div class="feel-block-header" style="cursor:default;">✨ מה כדאי לעשות היום?</div>
+    ${picks.length ? `<div class="today-picks-list">${picks.map(p=>`
+      <div class="today-pick-row" onclick="openTodayPick('${p.kind}','${p.id}')">
+        <span class="today-pick-source" title="${p.kind==='task'?'מתוזמן להיום':'מתוך דברים לעשות'}">${p.kind==='task'?'📅':'💭'}</span>
+        <span class="today-pick-text">${escapeHtml(p.text)}</span>
+        ${p.meta ? `<span class="today-pick-meta">${escapeHtml(p.meta)}</span>` : ''}
+      </div>`).join('')}</div>`
+      : `<div class="empty">אין עדיין כלום להציע — אפשר להוסיף משהו ל"דברים לעשות" למטה</div>`}
   `;
 }
 
@@ -4428,6 +4476,7 @@ function render(){
   renderGcalStatus();
   renderSyncBlock();
   renderFeelBar();
+  renderTodayPicks();
   renderKeepGrid(activeNoteDomain);
   renderSomedayDomainSelect();
   renderSomeday();
