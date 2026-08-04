@@ -2553,9 +2553,15 @@ function quickChangeSomedayDomain(id, domainId){
   saveData();
   renderSomeday();
 }
+function scrollElIntoView(el){
+  if(!el) return;
+  requestAnimationFrame(()=>{ el.scrollIntoView({behavior:'smooth', block:'center'}); });
+}
 function toggleTaskExpand(id){
+  const opening = !expandedTasks.has(id);
   if(expandedTasks.has(id)){ expandedTasks.delete(id); } else { expandedTasks.add(id); ensureListExpanded('task'); }
   renderTasks();
+  if(opening) scrollElIntoView(document.querySelector(`.task-li[data-drag-id="${id}"]`));
 }
 function taskTextClick(id){
   // if the subtasks panel is open, the first click just minimizes it — editing needs a second, deliberate click
@@ -2563,9 +2569,11 @@ function taskTextClick(id){
   openTaskEdit(id);
 }
 function openTaskEdit(id){
+  const opening = editingTaskId!==id;
   editingTaskId = (editingTaskId===id) ? null : id;
   if(editingTaskId) ensureListExpanded('task');
   renderTasks();
+  if(opening){ const input = document.getElementById(`taskEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
 }
 function closeTaskEdit(){ editingTaskId = null; scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid(); }
 function saveTaskEdit(id){
@@ -3042,8 +3050,10 @@ function somedayDetailHtml(s){
   </li>`;
 }
 function toggleSomedayExpand(id){
+  const opening = !expandedSomeday.has(id);
   if(expandedSomeday.has(id)){ expandedSomeday.delete(id); } else { expandedSomeday.add(id); ensureListExpanded('someday'); }
   renderSomeday();
+  if(opening) scrollElIntoView(document.querySelector(`.someday-li[data-drag-id="${id}"]`));
 }
 function somedayTextClick(id){
   // if the description/steps panel is open, the first click just minimizes it — editing needs a second, deliberate click
@@ -3054,7 +3064,13 @@ function toggleSomedayFavorite(id){
   const s = data.someday.find(s=>s.id===id);
   if(s){ s.favorite = !s.favorite; saveData(); renderSomeday(); }
 }
-function openSomedayEdit(id){ editingSomedayId = id; ensureListExpanded('someday'); renderSomeday(); }
+function openSomedayEdit(id){
+  editingSomedayId = id;
+  ensureListExpanded('someday');
+  renderSomeday();
+  const input = document.getElementById(`somedayEditText-${id}`);
+  scrollElIntoView(input && input.closest('li'));
+}
 function closeSomedayEdit(){ editingSomedayId = null; renderSomeday(); }
 function saveSomedayEdit(id){
   const s = data.someday.find(s=>s.id===id);
@@ -3173,9 +3189,11 @@ function suggestionEditFormHtml(s){
   </li>`;
 }
 function openSuggestionEdit(id){
+  const opening = editingSuggestionId!==id;
   editingSuggestionId = (editingSuggestionId===id) ? null : id;
   if(editingSuggestionId) ensureListExpanded('suggestion');
   renderSuggestions();
+  if(opening){ const input = document.getElementById(`suggEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
 }
 function closeSuggestionEdit(){ editingSuggestionId = null; renderSuggestions(); }
 function saveSuggestionEdit(id){
