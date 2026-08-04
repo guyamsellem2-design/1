@@ -1613,6 +1613,18 @@ let gcalSyncing = false;
 let gcalPickerOpen = false;
 
 function gcalReady(){ return !!(window.google && google.accounts && google.accounts.oauth2); }
+function waitForGcalReady(onReady, timeoutMs){
+  // the Google sign-in script loads asynchronously in the background (<script async defer>) — clicking
+  // connect/sync right after the page loads can easily race ahead of it. instead of a dead-end alert
+  // telling the user to manually refresh, wait a bit for it to finish loading and then just proceed
+  if(gcalReady()){ onReady(); return; }
+  const start = Date.now();
+  (function poll(){
+    if(gcalReady()){ onReady(); return; }
+    if(Date.now()-start > (timeoutMs||6000)){ flashStatus('שירות ההתחברות של גוגל לא נטען — בדוק/י חיבור לאינטרנט ונסה/י שוב'); return; }
+    setTimeout(poll, 200);
+  })();
+}
 function gcalSelectedCalendarIds(){ return (data.gcalCalendarIds && data.gcalCalendarIds.length) ? data.gcalCalendarIds : ['primary']; }
 function gcalCalendarLabel(calId){ return calId; }
 
@@ -1640,29 +1652,30 @@ function addGcalCalendarId(){
 }
 
 function connectGoogleCalendar(){
-  if(!gcalReady()){ alert('שירות ההתחברות של גוגל עוד לא נטען — נסה/י לרענן את הדף.'); return; }
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: GCAL_CLIENT_ID,
-    scope: GCAL_SCOPE,
-    // once we know which Google account this is (see resolvePrimaryCalendarId), pass it as a hint so
-    // reconnecting always jumps straight back to that account instead of showing the account chooser
-    ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
-    callback: (resp)=>{
-      if(resp && resp.access_token){
-        gcalAccessToken = resp.access_token;
-        data.gcalConnected = true;
-        saveData();
-        // syncSignIn() below can navigate away immediately (signInWithRedirect) — flush the debounced
-        // write first so gcalConnected actually lands in localStorage before that happens
-        flushSaveData();
-        renderGcalStatus();
-        resolvePrimaryCalendarId();
-        runGcalSync();
-        if(!currentSyncUser) syncSignIn(); // same click also signs in for cross-device sync, same Google account
+  waitForGcalReady(()=>{
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope: GCAL_SCOPE,
+      // once we know which Google account this is (see resolvePrimaryCalendarId), pass it as a hint so
+      // reconnecting always jumps straight back to that account instead of showing the account chooser
+      ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
+      callback: (resp)=>{
+        if(resp && resp.access_token){
+          gcalAccessToken = resp.access_token;
+          data.gcalConnected = true;
+          saveData();
+          // syncSignIn() below can navigate away immediately (signInWithRedirect) — flush the debounced
+          // write first so gcalConnected actually lands in localStorage before that happens
+          flushSaveData();
+          renderGcalStatus();
+          resolvePrimaryCalendarId();
+          runGcalSync();
+          if(!currentSyncUser) syncSignIn(); // same click also signs in for cross-device sync, same Google account
+        }
       }
-    }
+    });
+    client.requestAccessToken();
   });
-  client.requestAccessToken();
 }
 
 function disconnectGoogleCalendar(){
@@ -1695,18 +1708,19 @@ function resolvePrimaryCalendarId(){
 /* ---------- two-way sync: push local date/time changes to Google Calendar ---------- */
 function ensureGcalWriteToken(onReady){
   if(gcalAccessToken){ onReady(); return; }
-  if(!gcalReady()){ alert('שירות ההתחברות של גוגל עוד לא נטען — נסה/י לרענן את הדף.'); return; }
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: GCAL_CLIENT_ID,
-    scope: GCAL_SCOPE,
-    ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
-    callback: (resp)=>{
-      if(resp && resp.access_token){ gcalAccessToken = resp.access_token; onReady(); }
-      else { flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
-    },
-    error_callback: ()=>{ flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
+  waitForGcalReady(()=>{
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope: GCAL_SCOPE,
+      ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
+      callback: (resp)=>{
+        if(resp && resp.access_token){ gcalAccessToken = resp.access_token; onReady(); }
+        else { flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
+      },
+      error_callback: ()=>{ flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
+    });
+    client.requestAccessToken({prompt:''});
   });
-  client.requestAccessToken({prompt:''});
 }
 function pushEventToGcal(eventBody, existingEventId, onSuccess){
   const calId = gcalSelectedCalendarIds()[0] || 'primary';
@@ -1823,25 +1837,26 @@ function syncGoogleCalendar(){
   if(gcalSyncing) return;
   if(data.domains.length===0){ flashStatus('קודם צריך להוסיף נושא אחד לפחות'); return; }
   if(!gcalAccessToken){
-    if(!gcalReady()){ alert('שירות ההתחברות של גוגל עוד לא נטען — נסה/י לרענן את הדף.'); return; }
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: GCAL_CLIENT_ID,
-      scope: GCAL_SCOPE,
-      ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
-      callback: (resp)=>{
-        if(resp && resp.access_token){
-          gcalAccessToken = resp.access_token;
-          resolvePrimaryCalendarId();
-          runGcalSync();
-        } else {
+    waitForGcalReady(()=>{
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: GCAL_CLIENT_ID,
+        scope: GCAL_SCOPE,
+        ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
+        callback: (resp)=>{
+          if(resp && resp.access_token){
+            gcalAccessToken = resp.access_token;
+            resolvePrimaryCalendarId();
+            runGcalSync();
+          } else {
+            flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו');
+          }
+        },
+        error_callback: ()=>{
           flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו');
         }
-      },
-      error_callback: ()=>{
-        flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו');
-      }
+      });
+      client.requestAccessToken({prompt:''}); // silent-only: renews the token quietly, never shows a sign-in page
     });
-    client.requestAccessToken({prompt:''}); // silent-only: renews the token quietly, never shows a sign-in page
     return;
   }
   runGcalSync();
