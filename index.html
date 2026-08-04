@@ -573,9 +573,9 @@
       </div>
       <div class="add-row" style="margin-bottom:10px;">
         <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
-          <option value="date">מיון לפי: תאריך</option>
+          <option value="manual" selected>מיון לפי: ידני (גרירה)</option>
+          <option value="date">מיון לפי: תאריך הוספה</option>
           <option value="domain">מיון לפי: נושא</option>
-          <option value="manual">מיון לפי: ידני (גרירה)</option>
         </select>
         <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
       </div>
@@ -2546,6 +2546,13 @@ function quickChangeTaskDomain(id, domainId){
   renderTasks();
   renderScheduleGrid();
 }
+function quickChangeSomedayDomain(id, domainId){
+  const s = data.someday.find(s=>s.id===id);
+  if(!s) return;
+  s.domain = domainId;
+  saveData();
+  renderSomeday();
+}
 function toggleTaskExpand(id){
   if(expandedTasks.has(id)){ expandedTasks.delete(id); } else { expandedTasks.add(id); ensureListExpanded('task'); }
   renderTasks();
@@ -2927,7 +2934,7 @@ function updateAddNoteBtnColor(){
 let editingSomedayId = null;
 const expandedSomeday = new Set();
 function renderSomedayDomainSelect(){ const el=document.getElementById('somedayDomain'); if(el) el.innerHTML = domainOptions(); }
-let somedaySortBy = 'date';
+let somedaySortBy = 'manual';
 let somedayFilterDomain = '';
 function setSomedaySortBy(val){ somedaySortBy = val; renderSomeday(); }
 function setSomedayFilterDomain(val){ somedayFilterDomain = val; renderSomeday(); }
@@ -2981,7 +2988,7 @@ function somedayRowHtml(s){
     ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${s.id}','.someday-li',reorderSomeday)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
     <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSomedayFavorite('${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
     <span class="task-text" style="flex:1" onclick="somedayTextClick('${s.id}')">${escapeHtml(s.text)}</span>
-    <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${dom.name}</span>
+    <select class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};" onclick="event.stopPropagation()" onchange="quickChangeSomedayDomain('${s.id}', this.value)" title="שינוי נושא">${domainOptions(s.domain)}</select>
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
     <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
   </li>`;
@@ -3628,7 +3635,7 @@ function pullRefreshMove(clientY){
   el.classList.toggle('ready', pullState.ready);
   el.style.transform = `translate(-50%, ${dampened - 60}px)`;
 }
-function pullRefreshEnd(){
+async function pullRefreshEnd(){
   const el = document.getElementById('pullRefresh');
   if(!pullState.pulling || !el) return;
   el.classList.remove('dragging');
@@ -3636,12 +3643,11 @@ function pullRefreshEnd(){
     el.classList.add('spinning');
     el.style.transform = 'translate(-50%, 20px)';
     flushSaveData();
-    if(data.gcalConnected && mainView==='home'){
-      syncGoogleCalendar();
-      setTimeout(pullRefreshReset, 500);
-    } else {
-      setTimeout(()=>location.reload(), 150);
-    }
+    if(data.gcalConnected && mainView==='home') syncGoogleCalendar();
+    // pull-to-refresh should do exactly what the "סנכרן עכשיו" button does (sync + a full refresh),
+    // not just reload the page on its own
+    if(currentSyncUser) await runFullSync().catch(()=>{});
+    setTimeout(()=>location.reload(), 150);
   } else {
     pullRefreshReset();
   }
@@ -3692,14 +3698,22 @@ function gestureStart(clientX, clientY, target){
   if(gesture || !target || !target.closest) return;
   if(target.closest('textarea, input, select, .keep-note-canvas')) return;
 
+  // starting right at the physical edge always opens the drawer, even if a swipeable row's
+  // content happens to reach that far (otherwise on narrow screens the row swallows the touch
+  // and the drawer can only ever be closed, never opened, from the edge)
+  const w = window.innerWidth;
+  if(!navOpen && clientX >= w - EDGE_ZONE){
+    gesture = { kind:'nav-drawer', startX:clientX, startY:clientY, locked:null, width:0 };
+    return;
+  }
+
   const swipeRow = target.closest(SWIPE_ROW_SELECTOR);
   if(swipeRow && !target.closest('.grip, button, a')){
     const action = resolveSwipeDeleteAction(swipeRow);
     if(action){ gesture = { kind:'swipe-delete', row:swipeRow, action, startX:clientX, startY:clientY, locked:null, dx:0 }; return; }
   }
 
-  const w = window.innerWidth;
-  if(navOpen || clientX >= w - EDGE_ZONE){
+  if(navOpen){
     gesture = { kind:'nav-drawer', startX:clientX, startY:clientY, locked:null, width:0 };
     return;
   }
