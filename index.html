@@ -1607,7 +1607,9 @@ function taskCalendarUrl(t){
 
 /* ---------- google calendar sync (import-only, additive) ---------- */
 const GCAL_CLIENT_ID = '205912988147-1nd655pslkb8temou2oonfueep3lhvs4.apps.googleusercontent.com';
-const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+// includes email/profile alongside calendar access so the same one consent screen also carries enough
+// identity info to sign into cross-device sync directly from this token -- no separate Google window
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 let gcalAccessToken = null;
 let gcalSyncing = false;
 let gcalPickerOpen = false;
@@ -1684,13 +1686,14 @@ function connectGoogleCalendar(){
           persistGcalToken(resp.access_token, resp.expires_in);
           data.gcalConnected = true;
           saveData();
-          // syncSignIn() below can navigate away immediately (signInWithRedirect) — flush the debounced
-          // write first so gcalConnected actually lands in localStorage before that happens
           flushSaveData();
           renderGcalStatus();
           resolvePrimaryCalendarId();
           runGcalSync();
-          if(!currentSyncUser) syncSignIn(); // same click also signs in for cross-device sync, same Google account
+          // same click also signs in for cross-device sync, same Google account -- reuses this token
+          // directly instead of opening a second Google window or navigating away, which is what makes
+          // this reliable inside an installed/home-screen app too, not just a regular browser tab
+          if(!currentSyncUser) signInToSyncWithAccessToken(resp.access_token);
         }
       }
     });
@@ -2236,13 +2239,15 @@ function scheduleCloudSync(){
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(()=>{ runFullSync(); }, 2500);
 }
-function syncSignIn(){
+function signInToSyncWithAccessToken(accessToken){
+  // signs into Firebase directly from the Google access token we already have (its scope now includes
+  // email/profile, see GCAL_SCOPE) instead of a popup or a full-page redirect. both of those navigate
+  // the browser away from the app, which is exactly what breaks inside an installed/home-screen app —
+  // the redirect result can get lost when the OS hands the round trip to a different browser context.
+  // this way sign-in is just a normal background request, no navigation, no second Google window at all.
   if(!fbAuth) return;
-  const provider = new firebase.auth.GoogleAuthProvider();
-  // a popup triggered from inside an async callback (the calendar-connect response, not the raw click
-  // itself) gets silently blocked by many mobile browsers — a full-page redirect isn't subject to that,
-  // so sync sign-in reliably completes even when it's chained after the calendar connection
-  fbAuth.signInWithRedirect(provider).catch(e=>{ console.error(e); flashStatus('ההתחברות לסנכרון נכשלה'); });
+  const credential = firebase.auth.GoogleAuthProvider.credential(null, accessToken);
+  fbAuth.signInWithCredential(credential).catch(e=>{ console.error('sync sign-in failed', e); flashStatus('ההתחברות לסנכרון נכשלה'); });
 }
 function syncSignOut(){ if(fbAuth) fbAuth.signOut(); }
 function renderSyncBlock(){
@@ -2271,7 +2276,6 @@ if(fbAuth){
     renderSyncBlock();
     if(user) runFullSync();
   });
-  fbAuth.getRedirectResult().catch(e=>{ console.error('sync redirect sign-in failed', e); flashStatus('ההתחברות לסנכרון נכשלה'); });
 }
 window.addEventListener('online', ()=>{ if(currentSyncUser) runFullSync(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && currentSyncUser) runFullSync(); });
