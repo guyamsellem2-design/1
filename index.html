@@ -346,12 +346,29 @@
   .week-nav-btn:disabled{opacity:.35; cursor:default;}
   .week-nav-btn:disabled:hover{border-color:var(--border-strong);}
   .week-nav-label{font-size:15px; color:var(--muted); min-width:120px; text-align:center; direction:ltr;}
+  .view-mode-btn{background:var(--surface3); border:1px solid var(--border-strong); color:var(--muted); border-radius:999px; padding:6px 13px; font-size:12.5px; cursor:pointer; font-family:inherit; flex-shrink:0;}
+  .view-mode-btn:hover{color:var(--text); border-color:var(--gold);}
 
   /* schedule grid */
   .schedule-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px; border-radius:16px; transition:box-shadow .35s ease, padding .35s ease;}
   .schedule-grid.current-week{padding:10px; box-shadow:0 0 0 1.5px rgba(15,165,182,0.7), 0 0 14px 2px rgba(15,165,182,0.38);}
   body.night-mode .schedule-grid.current-week{box-shadow:0 0 0 1px rgba(108,246,255,0.55), 0 0 12px 1px rgba(108,246,255,0.28);}
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
+
+  /* schedule grid: compact list view (alternative to the day-card grid above) */
+  .schedule-grid.list-mode{display:flex; flex-direction:column; gap:2px;}
+  .schedule-grid.list-mode .day-col{background:transparent; border:none; border-bottom:1px solid var(--border); border-radius:0; padding:8px 4px; min-height:0; box-shadow:none; transform:none;}
+  .schedule-grid.list-mode .day-col:last-child{border-bottom:none;}
+  .schedule-grid.list-mode .day-col:hover{box-shadow:none; transform:none;}
+  .schedule-grid.list-mode .day-col.expanded{border-color:var(--border); box-shadow:none;}
+  .schedule-grid.list-mode .day-col.minimized{opacity:1;}
+  .schedule-grid.list-mode .day-name{font-size:14px; margin-bottom:4px; padding-bottom:4px;}
+  .schedule-grid.list-mode .anchor-chip{background:transparent; border-radius:0; padding:3px 2px; margin-bottom:0; border-right:none; display:flex; align-items:baseline; gap:7px; font-size:13.5px; line-height:1.6;}
+  .schedule-grid.list-mode .anchor-chip::before{content:'•'; color:var(--muted2); flex-shrink:0;}
+  .schedule-grid.list-mode .anchor-chip:hover{background:var(--surface2); border-radius:6px;}
+  .schedule-grid.list-mode .anchor-chip .time{display:inline; margin:0; order:2; color:var(--muted); font-size:12.5px; white-space:nowrap;}
+  .schedule-grid.list-mode .anchor-chip .buf{display:inline; margin:0; font-size:11px;}
+  .schedule-grid.list-mode .add-anchor-btn{margin-top:4px; padding:3px 8px; font-size:12px; display:inline-block; width:auto;}
   .sched-date{color:var(--muted2); font-size:12.5px; font-weight:400;}
   .sched-empty{color:var(--muted2); font-size:13px; font-style:italic; padding:4px 2px;}
   .day-more{display:block; width:100%; background:transparent; border:none; color:var(--muted2); font-size:12.5px; padding:6px 2px 2px; text-align:center; cursor:pointer; font-family:inherit;}
@@ -679,7 +696,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false, scheduleViewMode:'grid' };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -733,6 +750,7 @@ function loadData(){
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.notesMigrated = !!parsed.notesMigrated;
+      data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
       mainView = parsed.mainView === 'topics' ? 'topics' : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -2780,11 +2798,18 @@ function weekRangeLabel(offset){
 function renderWeekNav(){
   const el = document.getElementById('weekNav');
   if(!el) return;
+  const isList = data.scheduleViewMode==='list';
   el.innerHTML = `
     <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>‹</button>
     <span class="week-nav-label">${weekRangeLabel(weekOffset)}${weekOffset===0?' · השבוע':''}</span>
     <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>›</button>
+    <button class="view-mode-btn" onclick="toggleScheduleViewMode()" title="${isList?'עבור לתצוגת לוח':'עבור לתצוגת רשימה'}">${isList?'▦ לוח':'☰ רשימה'}</button>
   `;
+}
+function toggleScheduleViewMode(){
+  data.scheduleViewMode = data.scheduleViewMode==='list' ? 'grid' : 'list';
+  saveData();
+  renderScheduleGrid();
 }
 let weekSwipeState = { startX:null, startY:null, active:false };
 document.addEventListener('touchstart', (e)=>{
@@ -2813,6 +2838,7 @@ function renderScheduleGrid(){
   if(!el) return;
   renderWeekNav();
   el.classList.toggle('current-week', weekOffset===0);
+  el.classList.toggle('list-mode', data.scheduleViewMode==='list');
   const weekDates = viewedWeekDates();
   el.innerHTML = DAYS.map((dayName, dayIdx)=>{
     const dateObj = weekDates[dayIdx];
