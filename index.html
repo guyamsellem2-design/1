@@ -2277,6 +2277,9 @@ function renderSyncBlock(){
   }
   el.style.display = '';
   const lastSyncStr = lastSyncAt ? `${pad(new Date(lastSyncAt).getHours())}:${pad(new Date(lastSyncAt).getMinutes())}` : '';
+  const errDetailHtml = (lastSyncError && !syncInProgress)
+    ? `<div class="gcal-status" style="color:#e06060; margin-top:4px;">⚠️ ${escapeHtml(lastSyncError.message || String(lastSyncError))}</div>`
+    : '';
   el.innerHTML = `
     <div class="gcal-block-title">🔄 סנכרון בין מכשירים</div>
     <div class="gcal-sync-row-inner">
@@ -2284,6 +2287,7 @@ function renderSyncBlock(){
       <button class="reset-btn" onclick="runFullSync()" ${syncInProgress?'disabled':''}>🔄 סנכרן עכשיו</button>
       <button class="reset-btn" onclick="syncSignOut()">✕ נתק</button>
     </div>
+    ${errDetailHtml}
   `;
 }
 if(fbAuth){
