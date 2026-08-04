@@ -289,7 +289,8 @@
   .anchor-form-actions{display:flex; gap:6px;}
   .anchor-form-actions button{flex:1; font-size:13.5px; padding:5px; border-radius:6px; border:none; cursor:pointer; font-family:inherit;}
   .save-btn{background:var(--gold); color:#1a1206; font-weight:600;}
-  .cancel-btn{background:var(--surface3); color:var(--muted);}
+  .cancel-btn{background:var(--gold); color:#1a1206; font-weight:600;}
+  .delete-btn{background:#7d1f2e; color:#fbe6e6; font-weight:600;}
 
   .card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px; transition:box-shadow .3s ease;}
   .card:hover{box-shadow:0 10px 34px -16px var(--glow-gold);}
@@ -2160,20 +2161,25 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 setInterval(()=>{ if(currentSyncUser && navigator.onLine) runFullSync(); }, 60000);
 
 /* ---------- week grid ---------- */
+function closeAllScheduleForms(){ openForm = null; editingAnchorId = null; addingTaskDayIdx = null; renderScheduleGrid(); }
 function openAnchorForm(dayIdx){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
+  // something else is already open — first click just closes it, matching task/someday behavior
+  if(openForm!==null || addingTaskDayIdx!==null){ closeAllScheduleForms(); return; }
   openForm = dayIdx; editingAnchorId = null; renderScheduleGrid();
 }
 function editAnchor(id, dayIdx){
   if(openForm===dayIdx && editingAnchorId===id){ closeForm(); return; }
+  if(openForm!==null || addingTaskDayIdx!==null){ closeAllScheduleForms(); return; }
   openForm = dayIdx; editingAnchorId = id; renderScheduleGrid();
 }
 function closeForm(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
 let addingTaskDayIdx = null;
 function openAddTaskForm(dayIdx){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
-  addingTaskDayIdx = (addingTaskDayIdx===dayIdx) ? null : dayIdx;
-  renderScheduleGrid();
+  if(addingTaskDayIdx===dayIdx){ closeAddTaskForm(); return; }
+  if(addingTaskDayIdx!==null || openForm!==null){ closeAllScheduleForms(); return; }
+  addingTaskDayIdx = dayIdx; renderScheduleGrid();
 }
 function closeAddTaskForm(){ addingTaskDayIdx = null; renderScheduleGrid(); }
 function addTaskFormHtml(dayIdx, dateStr){
@@ -2515,7 +2521,7 @@ function taskEditFormInner(t){
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveTaskEdit('${t.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeTaskEdit()">בטל</button>
-        <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteTask('${t.id}')">🗑 מחק</button>
+        <button class="delete-btn" onclick="deleteTask('${t.id}')">🗑 מחק</button>
       </div>
     </div>`;
 }
@@ -2614,6 +2620,9 @@ function toggleTaskExpand(id){
 function taskTextClick(id){
   // if the subtasks panel is open, the first click just minimizes it — editing needs a second, deliberate click
   if(expandedTasks.has(id)){ toggleTaskExpand(id); return; }
+  // editing a different task is already open — first click just closes it (no data lost, nothing
+  // saved without pressing שמור), so switching between tasks never happens by accident in one click
+  if(editingTaskId && editingTaskId!==id){ closeTaskEdit(); return; }
   openTaskEdit(id);
 }
 function openTaskEdit(id){
@@ -2898,7 +2907,7 @@ function renderScheduleGrid(){
           ? `<label class="buf-label"><input type="checkbox" id="anchorGcalSync-${dayIdx}" ${editingHere.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
           : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>`}
         <div class="anchor-form-actions">
-          <button class="cancel-btn" style="color:var(--energy-high)" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>
+          <button class="delete-btn" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>
         </div>` : ''}
       </div>`;
 
@@ -3115,6 +3124,8 @@ function toggleSomedayExpand(id){
 function somedayTextClick(id){
   // if the description/steps panel is open, the first click just minimizes it — editing needs a second, deliberate click
   if(expandedSomeday.has(id)){ toggleSomedayExpand(id); return; }
+  // editing a different idea is already open — first click just closes it, matching the task-side behavior
+  if(editingSomedayId && editingSomedayId!==id){ closeSomedayEdit(); return; }
   openSomedayEdit(id);
 }
 function toggleSomedayFavorite(id){
@@ -3258,6 +3269,8 @@ function suggestionEditFormHtml(s){
   </li>`;
 }
 function openSuggestionEdit(id){
+  // editing a different suggestion is already open — first click just closes it, matching task/someday behavior
+  if(editingSuggestionId && editingSuggestionId!==id){ closeSuggestionEdit(); return; }
   const opening = editingSuggestionId!==id;
   editingSuggestionId = (editingSuggestionId===id) ? null : id;
   if(editingSuggestionId) ensureListExpanded('suggestion');
