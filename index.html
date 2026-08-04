@@ -356,9 +356,8 @@
   @media (max-width:760px){.schedule-grid{grid-template-columns:1fr 1fr;}}
 
   /* schedule grid: compact list view (alternative to the day-card grid above) */
-  .schedule-grid.list-mode{display:flex; flex-direction:column; gap:2px;}
+  .schedule-grid.list-mode{display:grid; grid-template-columns:repeat(2,1fr); gap:2px 16px;}
   .schedule-grid.list-mode .day-col{background:transparent; border:none; border-bottom:1px solid var(--border); border-radius:0; padding:8px 4px; min-height:0; box-shadow:none; transform:none;}
-  .schedule-grid.list-mode .day-col:last-child{border-bottom:none;}
   .schedule-grid.list-mode .day-col:hover{box-shadow:none; transform:none;}
   .schedule-grid.list-mode .day-col.expanded{border-color:var(--border); box-shadow:none;}
   .schedule-grid.list-mode .day-col.minimized{opacity:1;}
@@ -425,6 +424,8 @@
   .fav-star.active{color:var(--gold); text-shadow:0 0 7px var(--glow-gold);}
   .fav-star:hover{color:var(--gold);}
   ul.tasks li.fav-divider{display:block; height:1px; padding:0; margin:8px 6px 12px; border:none; border-radius:2px; background:linear-gradient(to right, transparent, #a8fbff 15%, #a8fbff 85%, transparent); box-shadow:0 0 6px 1px rgba(168,251,255,0.4);}
+  .sub-fav-divider{height:1px; margin:2px 18px 4px 4px; background:linear-gradient(to right, transparent, #a8fbff 25%, #a8fbff 75%, transparent); opacity:.55;}
+  .subtask-row .fav-star{font-size:13.5px; padding:2px;}
   .promote:hover{background:rgba(212,162,76,0.12);}
 
   .suggestion-badge{font-size:12px; background:var(--surface3); color:var(--muted); padding:4px 9px; border-radius:999px; white-space:nowrap; font-weight:600; cursor:pointer; border:1px solid var(--border-strong);}
@@ -2538,20 +2539,33 @@ function subtaskScheduleFormHtml(t, s){
   </div>`;
 }
 function taskDetailHtml(t){
-  const subs = t.subtasks||[];
-  const subsHtml = subs.length ? subs.map(s=>{
-    const isOpen = subtaskDateOpenIds.has(t.id+':'+s.id);
-    const hasSchedule = !!(s.date || s.time);
-    let html = `<div class="subtask-row" data-task-id="${t.id}" data-drag-id="${s.id}">
-      <div class="chk ${s.done?'done':''}" onclick="toggleSubtask('${t.id}','${s.id}')"></div>
-      <span class="subtask-text ${s.done?'done':''}" onclick="editSubtaskText('${t.id}','${s.id}')">${escapeHtml(s.text)}</span>
-      ${s.date ? `<span class="task-date-badge"><span dir="ltr">${s.date.slice(5)}${s.time?' '+s.time:''}</span></span>` : ''}
-      <span class="sched-link ${hasSchedule?'active':''}" onclick="toggleSubtaskDateOpen('${t.id}','${s.id}')" title="תזמון">🕐</span>
-      <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
-    </div>`;
-    if(isOpen) html += subtaskScheduleFormHtml(t, s);
-    return html;
-  }).join('') : '<div class="empty">אין עדיין תת-משימות</div>';
+  const subs = (t.subtasks||[]).slice().sort((a,b)=>(b.favorite?1:0)-(a.favorite?1:0));
+  let subsHtml;
+  if(subs.length){
+    const parts = [];
+    let dividerInserted = false;
+    subs.forEach((s,i)=>{
+      if(!dividerInserted && i>0 && subs[i-1].favorite && !s.favorite){
+        parts.push('<div class="sub-fav-divider"></div>');
+        dividerInserted = true;
+      }
+      const isOpen = subtaskDateOpenIds.has(t.id+':'+s.id);
+      const hasSchedule = !!(s.date || s.time);
+      let html = `<div class="subtask-row" data-task-id="${t.id}" data-drag-id="${s.id}">
+        <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSubtaskFavorite('${t.id}','${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
+        <div class="chk ${s.done?'done':''}" onclick="toggleSubtask('${t.id}','${s.id}')"></div>
+        <span class="subtask-text ${s.done?'done':''}" onclick="editSubtaskText('${t.id}','${s.id}')">${escapeHtml(s.text)}</span>
+        ${s.date ? `<span class="task-date-badge"><span dir="ltr">${s.date.slice(5)}${s.time?' '+s.time:''}</span></span>` : ''}
+        <span class="sched-link ${hasSchedule?'active':''}" onclick="toggleSubtaskDateOpen('${t.id}','${s.id}')" title="תזמון">🕐</span>
+        <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
+      </div>`;
+      if(isOpen) html += subtaskScheduleFormHtml(t, s);
+      parts.push(html);
+    });
+    subsHtml = parts.join('');
+  } else {
+    subsHtml = '<div class="empty">אין עדיין תת-משימות</div>';
+  }
   return `<li class="detail-li">
     <div class="detail-label-row" onclick="toggleTaskExpand('${t.id}')">
       <span class="detail-label">תת-משימות</span>
@@ -2722,6 +2736,11 @@ function deleteSubtask(taskId, subId){
   saveData();
   renderTasks();
   if(data.gcalConnected && removed && removed.googleEventId) deleteEventFromGcal(removed.googleEventId, ()=>{});
+}
+function toggleSubtaskFavorite(taskId, subId){
+  const t = data.tasks.find(t=>t.id===taskId);
+  const s = t && (t.subtasks||[]).find(s=>s.id===subId);
+  if(s){ s.favorite = !s.favorite; saveData(); renderTasks(); }
 }
 function toggleTaskSchedule(){
   const fields = document.getElementById('taskSchedFields');
@@ -3044,14 +3063,29 @@ function convertSomedayToTask(id){
   flashStatus('הפך למשימה');
 }
 function somedayDetailHtml(s){
-  const subs = s.subtasks||[];
-  const subsHtml = subs.length ? subs.map(sub=>`
+  const subs = (s.subtasks||[]).slice().sort((a,b)=>(b.favorite?1:0)-(a.favorite?1:0));
+  let subsHtml;
+  if(subs.length){
+    const parts = [];
+    let dividerInserted = false;
+    subs.forEach((sub,i)=>{
+      if(!dividerInserted && i>0 && subs[i-1].favorite && !sub.favorite){
+        parts.push('<div class="sub-fav-divider"></div>');
+        dividerInserted = true;
+      }
+      parts.push(`
     <div class="subtask-row" data-someday-id="${s.id}" data-drag-id="${sub.id}">
+      <span class="fav-star ${sub.favorite?'active':''}" onclick="toggleSomedaySubtaskFavorite('${s.id}','${sub.id}')" title="${sub.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${sub.favorite?'★':'☆'}</span>
       <div class="chk ${sub.done?'done':''}" onclick="toggleSomedaySubtask('${s.id}','${sub.id}')"></div>
       <span class="subtask-text ${sub.done?'done':''}" onclick="editSomedaySubtaskText('${s.id}','${sub.id}')">${escapeHtml(sub.text)}</span>
       <span class="promote" onclick="convertSomedaySubtaskToTask('${s.id}','${sub.id}')">→ משימה</span>
       <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')">✕</span>
-    </div>`).join('') : '<div class="empty">אין עדיין צעדים קטנים</div>';
+    </div>`);
+    });
+    subsHtml = parts.join('');
+  } else {
+    subsHtml = '<div class="empty">אין עדיין צעדים קטנים</div>';
+  }
   return `<li class="detail-li">
     <span class="detail-label">תיאור</span>
     <textarea class="detail-desc" oninput="onSomedayDescInput('${s.id}', this.value)" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(s.description||'')}</textarea>
@@ -3128,6 +3162,11 @@ function deleteSomedaySubtask(id, subId){
   s.subtasks = (s.subtasks||[]).filter(x=>x.id!==subId);
   saveData();
   renderSomeday();
+}
+function toggleSomedaySubtaskFavorite(id, subId){
+  const s = data.someday.find(s=>s.id===id);
+  const sub = s && (s.subtasks||[]).find(x=>x.id===subId);
+  if(sub){ sub.favorite = !sub.favorite; saveData(); renderSomeday(); }
 }
 function convertSomedaySubtaskToTask(id, subId){
   const s = data.someday.find(s=>s.id===id);
