@@ -34,6 +34,22 @@
     --energy-low:#70ac7e; --energy-mid:#e4c04f; --energy-high:#c3746b;
     --glow-gold:rgba(244,196,48,0.24); --glow-rose:rgba(224,120,190,0.18); --glow-teal:rgba(0,210,211,0.20);
   }
+  /* soft/calm mode: not just greyed-out — lighter, more pastel. Light theme keeps text dark for legibility;
+     dark theme's accents lighten toward pastel rather than staying neon-bright. */
+  body.soft{
+    --bg:#F5F1E7; --surface:rgba(255,255,255,0.78); --surface2:rgba(238,243,236,0.7); --surface3:rgba(229,238,231,0.7);
+    --text:#16281c; --muted:#5c7568; --muted2:#8aa398; --gold:#cbb08c;
+    --border:rgba(110,157,108,0.16); --border-strong:rgba(110,157,108,0.26);
+    --energy-low:#9dbb9a; --energy-mid:#cbb08c; --energy-high:#c99f92;
+    --glow-gold:rgba(203,176,140,0.14); --glow-rose:rgba(201,159,146,0.1); --glow-teal:rgba(141,171,158,0.12);
+  }
+  body.night-mode.soft{
+    --bg:#101E33; --surface:rgba(38,68,102,0.7); --surface2:rgba(45,82,118,0.66); --surface3:rgba(52,96,132,0.58);
+    --text:#E9E2F2; --muted:#96A0BD; --muted2:#7D84AC; --gold:#E8D9A3;
+    --border:rgba(120,200,201,0.14); --border-strong:rgba(120,200,201,0.24);
+    --energy-low:#A3C9AC; --energy-mid:#E8D9A3; --energy-high:#D9A89F;
+    --glow-gold:rgba(232,217,163,0.16); --glow-rose:rgba(217,168,159,0.12); --glow-teal:rgba(120,200,201,0.14);
+  }
   *{box-sizing:border-box;}
   body{
     margin:0; position:relative; isolation:isolate;
@@ -47,6 +63,7 @@
       radial-gradient(ellipse 700px 500px at 100% 10%, rgba(0,210,211,0.16), transparent),
       var(--bg);
   }
+  body.soft:not(.night-mode){ background: linear-gradient(180deg, #F2EDE1, #FAF7EF 55%); }
   body::before{
     content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
@@ -68,7 +85,6 @@
     100%{ transform:translate(1.5%,-2%) scale(1.04); }
   }
   @media (prefers-reduced-motion: reduce){ body::before{ animation:none; } }
-  body.soft{ filter:saturate(0.55) brightness(0.94); }
   .wrap{max-width:980px;margin:0 auto; position:relative;}
   .carousel-dragging{position:absolute; top:0; left:0; right:0; width:100%;}
   .nav-drawer.dragging, .nav-overlay.dragging{transition:none;}
@@ -274,6 +290,8 @@
   .anchor-chip .time{color:var(--muted); font-size:12.5px; display:block; margin-bottom:1px;}
   .anchor-chip .buf{color:var(--muted2); font-size:11.5px; display:block; margin-top:2px;}
   .anchor-chip.chip-editing{box-shadow:0 0 0 2px #6cf6ff, 0 0 14px 2px rgba(108,246,255,0.75); background:var(--surface3);}
+  .anchor-chip.soft-emphasize{border-right-width:4px; box-shadow:0 0 0 1px var(--energy-low), 0 0 9px 0 var(--energy-low); font-weight:600;}
+  .anchor-chip.soft-dim{opacity:.5; filter:saturate(.65);}
 
   /* swipe-to-delete: drag a row right to reveal a trash panel, past a threshold asks to confirm */
   .task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip{touch-action:pan-y;}
@@ -713,7 +731,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -766,6 +784,7 @@ function loadData(){
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
+      data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
@@ -903,6 +922,7 @@ function toggleSoftMode(){
   renderModeButtons();
   saveData();
   renderTasks();
+  renderScheduleGrid();
 }
 function toggleNightMode(){
   data.nightMode = !data.nightMode;
@@ -1597,6 +1617,9 @@ function connectGoogleCalendar(){
   const client = google.accounts.oauth2.initTokenClient({
     client_id: GCAL_CLIENT_ID,
     scope: GCAL_SCOPE,
+    // once we know which Google account this is (see resolvePrimaryCalendarId), pass it as a hint so
+    // reconnecting always jumps straight back to that account instead of showing the account chooser
+    ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
     callback: (resp)=>{
       if(resp && resp.access_token){
         gcalAccessToken = resp.access_token;
@@ -1632,6 +1655,7 @@ function resolvePrimaryCalendarId(){
     .then(cal=>{
       if(cal && cal.id && cal.id!=='primary'){
         data.gcalCalendarIds = gcalSelectedCalendarIds().map(id=>id==='primary'?cal.id:id);
+        data.gcalAccountEmail = cal.id; // personal calendar id is the account's email — used as a hint so future connects skip the account chooser
         saveData();
         renderGcalStatus();
       }
@@ -1645,6 +1669,7 @@ function ensureGcalWriteToken(onReady){
   const client = google.accounts.oauth2.initTokenClient({
     client_id: GCAL_CLIENT_ID,
     scope: GCAL_SCOPE,
+    ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
     callback: (resp)=>{
       if(resp && resp.access_token){ gcalAccessToken = resp.access_token; onReady(); }
       else { flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו'); }
@@ -1772,6 +1797,7 @@ function syncGoogleCalendar(){
     const client = google.accounts.oauth2.initTokenClient({
       client_id: GCAL_CLIENT_ID,
       scope: GCAL_SCOPE,
+      ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
       callback: (resp)=>{
         if(resp && resp.access_token){
           gcalAccessToken = resp.access_token;
@@ -2952,7 +2978,7 @@ function renderScheduleGrid(){
         const a = it.data;
         const dom = domainById(a.domain);
         const isEditingThisAnchor = isEditingThisDay && editingHere.id===a.id;
-        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''} ${data.softMode?'soft-dim':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
             ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
             ${escapeHtml(a.label)}
             ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
@@ -2964,7 +2990,8 @@ function renderScheduleGrid(){
       const isTaskOverdue = t.date && !t.done && t.date < ymd(new Date());
       const showTrash = longPressedTaskId===t.id;
       const isEditingThisTask = scheduleEditingTaskId===t.id;
-      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
+      const softClass = data.softMode ? (t.energy==='low' ? 'soft-emphasize' : 'soft-dim') : '';
+      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''} ${softClass}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
           ${showTrash ? `<span class="task-chip-trash" onclick="event.stopPropagation(); unscheduleTaskFromWeek('${t.id}')" title="הסרה מתצוגת השבוע">🗑</span>` : ''}
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
@@ -3624,6 +3651,7 @@ function importData(e){
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
+      data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
       activeNoteDomain = data.domains[0].id;
@@ -3726,7 +3754,8 @@ function resetAll(){
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, selfChoiceReminders:keepSelfChoiceReminders};
+  const keepGcalAccountEmail = data.gcalAccountEmail;
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
