@@ -1821,7 +1821,13 @@ function runGcalSync(){
     data.tasks.forEach(t=>{
       if(!t.googleEventId) return;
       existingTaskIds.add(t.googleEventId);
-      if(t.googleEventId.indexOf(':')===-1) existingTaskIds.add('primary:'+t.googleEventId);
+      // tasks pushed from the app store the raw event id with no calendar prefix, but incoming
+      // events here are keyed "calId:eventId" — without this, a task we ourselves pushed to gcal
+      // would look "new" on the very next pull and get duplicated into the weekly board
+      if(t.googleEventId.indexOf(':')===-1){
+        calIds.forEach(calId=>existingTaskIds.add(calId+':'+t.googleEventId));
+        existingTaskIds.add('primary:'+t.googleEventId);
+      }
     });
     const existingAnchorRecIds = new Set(data.anchors.filter(a=>a.googleRecurringEventId).map(a=>a.googleRecurringEventId));
 
@@ -2401,11 +2407,13 @@ function renderTasks(){
   let list = data.tasks;
   const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
   if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
-  if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain);
+  // a task currently open for editing must never disappear mid-edit just because the active
+  // filters no longer match it (e.g. she reschedules it out of the current week's range)
+  if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain || t.id===editingTaskId);
   const today = ymd(new Date());
   const isTucked = t => t.done || !!(t.date && t.date < today);
   const sorted = sortTasksForDisplay(list);
-  const regular = sorted.filter(t=>!isTucked(t) && taskMatchesDateRange(t, taskFilterRange));
+  const regular = sorted.filter(t=>!isTucked(t) && (t.id===editingTaskId || taskMatchesDateRange(t, taskFilterRange)));
   const overdue = sorted.filter(isTucked);
   let html = notice;
   if(regular.length===0 && overdue.length===0){
@@ -2811,26 +2819,6 @@ function toggleScheduleViewMode(){
   saveData();
   renderScheduleGrid();
 }
-let weekSwipeState = { startX:null, startY:null, active:false };
-document.addEventListener('touchstart', (e)=>{
-  const grid = e.target.closest && e.target.closest('#scheduleGrid');
-  if(!grid || !e.touches || e.touches.length!==1) return;
-  weekSwipeState.active = true;
-  weekSwipeState.startX = e.touches[0].clientX;
-  weekSwipeState.startY = e.touches[0].clientY;
-}, {passive:true});
-document.addEventListener('touchend', (e)=>{
-  if(!weekSwipeState.active) return;
-  weekSwipeState.active = false;
-  const touch = e.changedTouches && e.changedTouches[0];
-  if(!touch || weekSwipeState.startX===null) return;
-  const dx = touch.clientX - weekSwipeState.startX;
-  const dy = touch.clientY - weekSwipeState.startY;
-  weekSwipeState.startX = null;
-  if(Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)*1.5){
-    changeWeek(dx < 0 ? 1 : -1);
-  }
-}, {passive:true});
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 
 function renderScheduleGrid(){
@@ -3762,12 +3750,6 @@ function gestureStart(clientX, clientY, target){
     return;
   }
 
-  const scheduleGridEl = target.closest('#scheduleGrid');
-  if(scheduleGridEl && mainView==='home' && !target.closest('button, select, input, textarea, a')){
-    gesture = { kind:'week-carousel', startX:clientX, startY:clientY, locked:null, dx:0 };
-    return;
-  }
-
   if(clientX <= EDGE_ZONE){
     gesture = { kind:'tab-carousel', startX:clientX, startY:clientY, locked:null, dx:0 };
   }
@@ -3795,10 +3777,6 @@ function gestureEngage(g){
     g.width = Math.min(drawer.getBoundingClientRect().width || 280, window.innerWidth*0.82);
     drawer.classList.add('dragging');
     document.getElementById('navOverlay').classList.add('dragging');
-  } else if(g.kind==='week-carousel'){
-    const grid = document.getElementById('scheduleGrid');
-    grid.style.transition = 'none';
-    g.width = grid.clientWidth || window.innerWidth;
   } else if(g.kind==='tab-carousel'){
     g.width = document.querySelector('.wrap').clientWidth || window.innerWidth;
     const home = document.getElementById('homeView'), topics = document.getElementById('domainPageView');
@@ -3820,7 +3798,6 @@ function gestureMove(clientX, clientY){
   gesture.dx = dx;
   if(gesture.kind==='swipe-delete') swipeDeleteMove(gesture, dx);
   else if(gesture.kind==='nav-drawer') navDrawerDragMove(gesture, dx);
-  else if(gesture.kind==='week-carousel') weekCarouselMove(gesture, dx);
   else if(gesture.kind==='tab-carousel') tabCarouselMove(gesture, dx);
 }
 function gestureEnd(){
@@ -3828,7 +3805,6 @@ function gestureEnd(){
   if(gesture.locked==='x'){
     if(gesture.kind==='swipe-delete') swipeDeleteEnd(gesture);
     else if(gesture.kind==='nav-drawer') navDrawerDragEnd(gesture);
-    else if(gesture.kind==='week-carousel') weekCarouselEnd(gesture);
     else if(gesture.kind==='tab-carousel') tabCarouselEnd(gesture);
   }
   gesture = null;
@@ -3837,7 +3813,6 @@ function gestureCancel(){
   if(gesture && gesture.locked==='x'){
     if(gesture.kind==='swipe-delete') swipeDeleteCancel(gesture);
     else if(gesture.kind==='nav-drawer') navDrawerDragCancel(gesture);
-    else if(gesture.kind==='week-carousel') weekCarouselCancel(gesture);
     else if(gesture.kind==='tab-carousel') tabCarouselCancel(gesture);
   }
   gesture = null;
@@ -3891,47 +3866,6 @@ function navDrawerDragSettle(g, willOpen){
 }
 function navDrawerDragEnd(g){ navDrawerDragSettle(g, ((g.openPx||0)/g.width) > 0.5); }
 function navDrawerDragCancel(g){ navDrawerDragSettle(g, navOpen); }
-
-/* week carousel */
-function weekCarouselMove(g, dx){
-  const grid = document.getElementById('scheduleGrid');
-  const canPrev = weekOffset > WEEK_OFFSET_MIN, canNext = weekOffset < WEEK_OFFSET_MAX;
-  let clamped = dx;
-  if(dx > 0 && !canPrev) clamped = dx * 0.25;
-  if(dx < 0 && !canNext) clamped = dx * 0.25;
-  grid.style.transform = `translateX(${clamped}px)`;
-}
-function weekCarouselEnd(g){
-  const grid = document.getElementById('scheduleGrid');
-  const rawDx = g.dx || 0;
-  const delta = rawDx > 0 ? -1 : 1; // drag right reveals the previous week, drag left reveals the next
-  const canMove = (delta===-1 && weekOffset>WEEK_OFFSET_MIN) || (delta===1 && weekOffset<WEEK_OFFSET_MAX);
-  grid.style.transition = 'transform .22s cubic-bezier(.22,1,.36,1)';
-  if(canMove && Math.abs(rawDx) > g.width * 0.5){
-    const dir = rawDx > 0 ? 1 : -1;
-    grid.style.transform = `translateX(${dir*g.width}px)`;
-    setTimeout(()=>{
-      // the outgoing week has slid fully off; bring the new one in from the opposite edge
-      // instead of just popping into place, so the motion reads as one continuous swipe
-      grid.style.transition = 'none';
-      changeWeek(delta);
-      grid.style.transform = `translateX(${-dir*g.width}px)`;
-      void grid.offsetHeight;
-      grid.style.transition = 'transform .22s cubic-bezier(.22,1,.36,1)';
-      grid.style.transform = '';
-      setTimeout(()=>{ grid.style.transition=''; }, 230);
-    }, 220);
-  } else {
-    grid.style.transform = '';
-    setTimeout(()=>{ grid.style.transition=''; }, 220);
-  }
-}
-function weekCarouselCancel(g){
-  const grid = document.getElementById('scheduleGrid');
-  grid.style.transition = 'transform .2s ease';
-  grid.style.transform = '';
-  setTimeout(()=>{ grid.style.transition=''; }, 210);
-}
 
 /* tab carousel: home <-> topics */
 function tabCarouselMove(g, dx){
