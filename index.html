@@ -375,12 +375,13 @@
   .feel-chip-add-confirm:hover{color:var(--safe, var(--text));}
   .feel-chip-add-cancel:hover{color:var(--text);}
   .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:vertical; padding:8px 10px; line-height:1.5;}
-  .today-picks-list{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
-  .today-pick-row{display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; background:var(--surface2); cursor:pointer;}
-  .today-pick-row:hover{background:var(--surface3);}
-  .today-pick-source{flex-shrink:0;}
-  .today-pick-text{flex:1;}
-  .today-pick-meta{font-size:12.5px; color:var(--muted2); direction:ltr;}
+  .today-idea-list{display:flex; flex-direction:column; gap:6px; margin-top:4px;}
+  .today-idea-row{display:flex; align-items:center; gap:8px;}
+  .today-idea-check{width:18px; height:18px; flex-shrink:0; cursor:pointer; accent-color:var(--gold);}
+  .today-idea-input{flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-family:inherit; font-size:14.5px;}
+  .today-idea-input.done{text-decoration:line-through; color:var(--muted2);}
+  .today-idea-promote, .today-idea-del{cursor:pointer; font-size:14px; color:var(--muted2); padding:2px 4px; flex-shrink:0;}
+  .today-idea-promote:hover, .today-idea-del:hover{color:var(--text);}
   .tools-card{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:18px 20px; margin-bottom:20px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
   .tools-card h3{margin:0 0 6px; font-size:16px;}
   .timer-presets{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
@@ -821,7 +822,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], feelNote: '', customEmotions: [], customNeeds: [], myGoodThings: [], breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], emotionNote: '', needNote: '', customEmotions: [], customNeeds: [], myGoodThings: [], breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '' };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -881,10 +882,13 @@ function loadData(){
       data.homeEnergy = (typeof parsed.homeEnergy === 'number') ? parsed.homeEnergy : 60;
       data.activeEmotions = parsed.activeEmotions || [];
       data.activeNeeds = parsed.activeNeeds || [];
-      data.feelNote = parsed.feelNote || '';
+      data.emotionNote = parsed.emotionNote || parsed.feelNote || '';
+      data.needNote = parsed.needNote || '';
       data.customEmotions = parsed.customEmotions || [];
       data.customNeeds = parsed.customNeeds || [];
       data.myGoodThings = parsed.myGoodThings || [];
+      data.todayIdeasDate = parsed.todayIdeasDate || '';
+      data.todayIdeas = parsed.todayIdeas || [];
       data.breathIn = (typeof parsed.breathIn === 'number') ? parsed.breathIn : 5;
       data.breathHold = (typeof parsed.breathHold === 'number') ? parsed.breathHold : 5;
       data.breathOut = (typeof parsed.breathOut === 'number') ? parsed.breathOut : 5;
@@ -4101,7 +4105,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], feelNote:'', customEmotions:[], customNeeds:[], myGoodThings:keepGoodThings, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], emotionNote:'', needNote:'', customEmotions:[], customNeeds:[], myGoodThings:keepGoodThings, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:''};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4154,12 +4158,11 @@ const NEEDS_LIST = [
   {id:'creativity',label:'יצירה'}, {id:'meaning',label:'משמעות'}, {id:'space',label:'מרחב אישי'}, {id:'support',label:'תמיכה'},
   {id:'play',label:'הנאה/משחק'}, {id:'nourishment',label:'הזנה'}
 ];
-let feelBlockOpen = true, emotionsBankOpen = false, needsBankOpen = false, feelNoteOpen = false;
+let feelBlockOpen = true, emotionsBankOpen = false, needsBankOpen = false;
 let addingFeelChipBank = null;
 function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
 function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
-function toggleFeelNote(){ feelNoteOpen = !feelNoteOpen; renderFeelBar(); }
 function toggleFeelChip(bank, id){
   const arr = data[bank] || (data[bank] = []);
   const idx = arr.indexOf(id);
@@ -4173,7 +4176,8 @@ function setHomeEnergy(val){
   const label = document.getElementById('feelEnergyValue');
   if(label) label.textContent = data.homeEnergy + '%';
 }
-function onFeelNoteInput(val){ data.feelNote = val; saveData(); }
+function onEmotionNoteInput(val){ data.emotionNote = val; saveData(); }
+function onNeedNoteInput(val){ data.needNote = val; saveData(); }
 function customFeelListKey(bank){ return bank==='activeEmotions' ? 'customEmotions' : 'customNeeds'; }
 function startAddFeelChip(bank){
   addingFeelChipBank = bank;
@@ -4238,57 +4242,102 @@ function renderFeelBar(){
     </div>
     <div class="feel-bank">
       <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
-      ${emotionsBankOpen ? feelChipGridHtml('activeEmotions', EMOTIONS_LIST) : ''}
-    </div>
-    <div class="feel-note-block">
-      <div class="feel-bank-header" onclick="toggleFeelNote()">${feelNoteOpen?'▾':'▸'} כתיבה חופשית</div>
-      ${feelNoteOpen ? `<textarea class="feel-note-textarea" oninput="onFeelNoteInput(this.value)" placeholder="מה עובר עליך עכשיו...">${escapeHtml(data.feelNote||'')}</textarea>` : ''}
+      ${emotionsBankOpen ? `
+        ${feelChipGridHtml('activeEmotions', EMOTIONS_LIST)}
+        <textarea class="feel-note-textarea" oninput="onEmotionNoteInput(this.value)" placeholder="מה עובר עלי עכשיו...">${escapeHtml(data.emotionNote||'')}</textarea>
+      ` : ''}
     </div>
     <div class="feel-bank">
       <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''}</div>
-      ${needsBankOpen ? feelChipGridHtml('activeNeeds', NEEDS_LIST) : ''}
+      ${needsBankOpen ? `
+        ${feelChipGridHtml('activeNeeds', NEEDS_LIST)}
+        <textarea class="feel-note-textarea" oninput="onNeedNoteInput(this.value)" placeholder="מה אני צריך/ה עכשיו...">${escapeHtml(data.needNote||'')}</textarea>
+      ` : ''}
     </div>
     ` : ''}
   `;
 }
 
-/* ---------- today's picks: a short, non-demanding "what could I do today" nudge ----------
-   already-scheduled-for-today tasks come first (real commitments), and if there are fewer than 3,
-   the rest are filled in from "דברים לעשות" (no-deadline, non-obligating ideas) -- favorites first --
-   so the list stays a gentle suggestion, never a full to-do dump. */
-function pickTodayRecommendations(){
+/* ---------- today's ideas: a self-authored, low-pressure "what do I feel like today" spot ----------
+   like "דברים לעשות" but scoped to today and starting fresh each day -- no calendar, no times, just
+   text + a checkbox. starts at 3 slots (never overwhelming) with room to add more if she wants.
+   an idea can be promoted into a real task, which is the only way it gains a date/time. */
+function ensureTodayIdeas(){
   const today = ymd(new Date());
-  const picks = data.tasks
-    .filter(t=>!t.done && t.date===today)
-    .sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'))
-    .slice(0,3)
-    .map(t=>({kind:'task', id:t.id, text:t.text, meta:t.time||''}));
-  if(picks.length<3){
-    const pool = data.someday.filter(s=>s.favorite).concat(data.someday.filter(s=>!s.favorite));
-    for(const s of pool){
-      if(picks.length>=3) break;
-      picks.push({kind:'someday', id:s.id, text:s.text, meta:''});
-    }
+  if(data.todayIdeasDate !== today){
+    data.todayIdeasDate = today;
+    data.todayIdeas = [];
   }
-  return picks;
+  while(data.todayIdeas.length < 3) data.todayIdeas.push({id: uid(), text:'', done:false});
 }
-function openTodayPick(kind, id){
-  if(kind==='task'){ openSection('tasks'); openTaskEdit(id); }
-  else{ openSection('someday'); openSomedayEdit(id); }
+function onTodayIdeaInput(id, inputEl){
+  const val = inputEl.value;
+  const item = data.todayIdeas.find(x=>x.id===id);
+  if(item){ item.text = val; saveData(); }
+  // toggle the promote arrow directly instead of a full re-render, which would drop focus mid-typing
+  const row = inputEl.closest('.today-idea-row');
+  let promoteBtn = row.querySelector('.today-idea-promote');
+  if(val.trim() && !promoteBtn){
+    promoteBtn = document.createElement('span');
+    promoteBtn.className = 'today-idea-promote';
+    promoteBtn.title = 'הפיכה למשימה/עוגן עם זמן';
+    promoteBtn.textContent = '➜';
+    promoteBtn.onclick = () => promoteTodayIdeaToTask(id);
+    row.insertBefore(promoteBtn, row.querySelector('.today-idea-del'));
+  } else if(!val.trim() && promoteBtn){
+    promoteBtn.remove();
+  }
 }
-function renderTodayPicks(){
+function toggleTodayIdeaDone(id){
+  const item = data.todayIdeas.find(x=>x.id===id);
+  if(item){ item.done = !item.done; saveData(); renderTodayIdeas(); }
+}
+function addTodayIdeaSlot(){
+  data.todayIdeas.push({id: uid(), text:'', done:false});
+  saveData();
+  renderTodayIdeas();
+  requestAnimationFrame(()=>{
+    const inputs = document.querySelectorAll('#todayIdeasList .today-idea-input');
+    const last = inputs[inputs.length-1];
+    if(last) last.focus();
+  });
+}
+function deleteTodayIdea(id){
+  if(data.todayIdeas.length>3) data.todayIdeas = data.todayIdeas.filter(x=>x.id!==id);
+  else{ const item = data.todayIdeas.find(x=>x.id===id); if(item){ item.text=''; item.done=false; } }
+  saveData();
+  renderTodayIdeas();
+}
+function promoteTodayIdeaToTask(id){
+  const item = data.todayIdeas.find(x=>x.id===id);
+  if(!item || !item.text.trim()) return;
+  const text = item.text.trim();
+  item.text = ''; item.done = false;
+  const task = {id: uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false};
+  data.tasks.push(task);
+  saveData();
+  renderTodayIdeas();
+  openSection('tasks');
+  openTaskEdit(task.id);
+}
+function renderTodayIdeas(){
   const el = document.getElementById('todayPicksBlock');
   if(!el) return;
-  const picks = pickTodayRecommendations();
+  ensureTodayIdeas();
   el.innerHTML = `
-    <div class="feel-block-header" style="cursor:default;">✨ מה כדאי לעשות היום?</div>
-    ${picks.length ? `<div class="today-picks-list">${picks.map(p=>`
-      <div class="today-pick-row" onclick="openTodayPick('${p.kind}','${p.id}')">
-        <span class="today-pick-source" title="${p.kind==='task'?'מתוזמן להיום':'מתוך דברים לעשות'}">${p.kind==='task'?'📅':'💭'}</span>
-        <span class="today-pick-text">${escapeHtml(p.text)}</span>
-        ${p.meta ? `<span class="today-pick-meta">${escapeHtml(p.meta)}</span>` : ''}
-      </div>`).join('')}</div>`
-      : `<div class="empty">אין עדיין כלום להציע — אפשר להוסיף משהו ל"דברים לעשות" למטה</div>`}
+    <div class="feel-block-header" style="cursor:default;">✨ מה בא לי לעשות היום?</div>
+    <p class="hint" style="margin:2px 0 8px;">מומלץ לבחור שלושה דברים — בלי יומן ובלי זמנים, מקסימום לא יקרו. תמיד אפשר להפוך רעיון למשימה/עוגן עם זמן.</p>
+    <div class="today-idea-list" id="todayIdeasList">
+      ${data.todayIdeas.map(item=>`
+        <div class="today-idea-row">
+          <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
+          <input type="text" class="today-idea-input ${item.done?'done':''}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)">
+          ${item.text.trim() ? `<span class="today-idea-promote" title="הפיכה למשימה/עוגן עם זמן" onclick="promoteTodayIdeaToTask('${item.id}')">➜</span>` : ''}
+          <span class="today-idea-del" onclick="deleteTodayIdea('${item.id}')" title="מחיקה">✕</span>
+        </div>
+      `).join('')}
+    </div>
+    <button type="button" class="feel-chip feel-chip-add" style="margin-top:8px;" onclick="addTodayIdeaSlot()">+ הוספה</button>
   `;
 }
 
@@ -4476,7 +4525,7 @@ function render(){
   renderGcalStatus();
   renderSyncBlock();
   renderFeelBar();
-  renderTodayPicks();
+  renderTodayIdeas();
   renderKeepGrid(activeNoteDomain);
   renderSomedayDomainSelect();
   renderSomeday();
