@@ -365,7 +365,7 @@
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
   .feel-gesture-hint{font-size:10px; font-weight:400; color:var(--muted2);}
   .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 2px 4px;}
-  .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:none; user-select:none;}
+  .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:pan-y; user-select:none;}
   .feel-chip.dragging{box-shadow:0 10px 24px -6px rgba(0,0,0,0.45); position:relative; z-index:5;}
   .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2);}
   .feel-chip.feel-chip-delmode{background:transparent; border-style:dashed; color:var(--muted2); touch-action:auto;}
@@ -4419,30 +4419,32 @@ function renderFeelBar(){
   if(!el) return;
   const emotionsCount = (data.activeEmotions||[]).length;
   const needsCount = (data.activeNeeds||[]).length;
-  el.innerHTML = `
-    <div class="feel-block-header" onclick="toggleFeelBlock()">${feelBlockOpen?'▾':'▸'} 🌤️ איך אני מרגיש/ה עכשיו</div>
-    ${feelBlockOpen ? `
-    <div class="feel-energy-row">
-      <span class="feel-energy-label">🔋 רמת אנרגיה</span>
-      <input type="range" min="0" max="100" value="${data.homeEnergy}" oninput="setHomeEnergy(this.value)">
-      <span class="feel-energy-value" id="feelEnergyValue">${data.homeEnergy}%</span>
-    </div>
-    <div class="feel-bank">
-      <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
-      ${emotionsBankOpen ? `
-        ${feelChipGridHtml('activeEmotions')}
-        <textarea class="feel-note-textarea" oninput="onEmotionNoteInput(this.value)" placeholder="מה עובר עלי עכשיו...">${escapeHtml(data.emotionNote||'')}</textarea>
+  withFocusPreserved('feelBar', ()=>{
+    el.innerHTML = `
+      <div class="feel-block-header" onclick="toggleFeelBlock()">${feelBlockOpen?'▾':'▸'} 🌤️ איך אני מרגיש/ה עכשיו</div>
+      ${feelBlockOpen ? `
+      <div class="feel-energy-row">
+        <span class="feel-energy-label">🔋 רמת אנרגיה</span>
+        <input type="range" min="0" max="100" value="${data.homeEnergy}" oninput="setHomeEnergy(this.value)">
+        <span class="feel-energy-value" id="feelEnergyValue">${data.homeEnergy}%</span>
+      </div>
+      <div class="feel-bank">
+        <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
+        ${emotionsBankOpen ? `
+          ${feelChipGridHtml('activeEmotions')}
+          <textarea class="feel-note-textarea" data-field-key="emotion-note" oninput="onEmotionNoteInput(this.value)" placeholder="מה עובר עלי עכשיו...">${escapeHtml(data.emotionNote||'')}</textarea>
+        ` : ''}
+      </div>
+      <div class="feel-bank">
+        <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''} <span class="feel-gesture-hint">· הקשה=סימון · החזקה+הזזה=גרירה · לחיצה ארוכה=עריכה</span></div>
+        ${needsBankOpen ? `
+          ${feelChipGridHtml('activeNeeds')}
+          <textarea class="feel-note-textarea" data-field-key="need-note" oninput="onNeedNoteInput(this.value)" placeholder="מה אני צריך/ה עכשיו...">${escapeHtml(data.needNote||'')}</textarea>
+        ` : ''}
+      </div>
       ` : ''}
-    </div>
-    <div class="feel-bank">
-      <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''} <span class="feel-gesture-hint">· הקשה=סימון · החזקה+הזזה=גרירה · לחיצה ארוכה=עריכה</span></div>
-      ${needsBankOpen ? `
-        ${feelChipGridHtml('activeNeeds')}
-        <textarea class="feel-note-textarea" oninput="onNeedNoteInput(this.value)" placeholder="מה אני צריך/ה עכשיו...">${escapeHtml(data.needNote||'')}</textarea>
-      ` : ''}
-    </div>
-    ` : ''}
-  `;
+    `;
+  });
 }
 
 /* ---------- today's ideas: brain dump, then choose ----------
@@ -4522,12 +4524,35 @@ function promoteTodayIdeaToTask(id){
   openSection('tasks');
   openTaskEdit(task.id);
 }
+// belt-and-suspenders alongside the cloud-sync defer above: if a render of this container ever
+// does happen to run while its own field is focused (any trigger, found or not), put the cursor
+// back where it was instead of just losing it -- identified by data-field-key, not by position,
+// since the list can reorder/filter between renders.
+function withFocusPreserved(containerId, renderFn){
+  const container = document.getElementById(containerId);
+  const active = document.activeElement;
+  let restore = null;
+  if(container && active && container.contains(active) && (active.tagName==='INPUT' || active.tagName==='TEXTAREA')){
+    const key = active.getAttribute('data-field-key');
+    if(key) restore = { key, selStart: active.selectionStart, selEnd: active.selectionEnd };
+  }
+  renderFn();
+  if(restore){
+    const el = container.querySelector(`[data-field-key="${restore.key}"]`);
+    if(el){
+      el.focus();
+      if(typeof restore.selStart === 'number' && el.setSelectionRange){
+        try{ el.setSelectionRange(restore.selStart, restore.selEnd); }catch(e){}
+      }
+    }
+  }
+}
 function todayIdeaRowHtml(item){
   return `
     <div class="today-idea-row">
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleTodayIdeaFavorite('${item.id}')" title="${item.favorite?'הסרה מהנבחרים':'סימון כנבחר להיום'}">${item.favorite?'★':'☆'}</span>
       <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
-      <input type="text" class="today-idea-input ${item.done?'done':''}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)">
+      <input type="text" class="today-idea-input ${item.done?'done':''}" data-field-key="idea-${item.id}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)">
       ${item.text.trim() ? `<span class="today-idea-promote" title="הפיכה למשימה/עוגן עם זמן" onclick="promoteTodayIdeaToTask('${item.id}')">➜ משימה</span>` : ''}
       <span class="today-idea-del" onclick="deleteTodayIdea('${item.id}')" title="מחיקה">✕</span>
     </div>
@@ -4540,20 +4565,22 @@ function renderTodayIdeas(){
   const favCount = data.todayIdeas.filter(x=>x.favorite).length;
   const showFavOnly = !!data.todayIdeasShowFavOnly;
   const list = showFavOnly ? data.todayIdeas.filter(x=>x.favorite) : data.todayIdeas;
-  el.innerHTML = `
-    <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה בא לי לעשות היום?</div>
-    ${todayIdeasOpen ? `
-    <p class="hint" style="margin:2px 0 8px;">כתבי/כתוב טיוטה חופשית של כל מה שבא לך היום, בלי סדר ובלי לחשוב יותר מדי. אחר כך סמני/סמן ⭐ על מה שאת/ה באמת בוחר/ת היום — נגיד שלושה — ואפשר לעבור לתצוגת "נבחרים" ולראות רק אותם. בלי יומן ובלי זמנים; מקסימום לא יקרו.</p>
-    <div class="timer-presets">
-      <button type="button" class="timer-preset-btn ${!showFavOnly?'active':''}" onclick="setTodayIdeasFavView(false)">☰ הכל (${data.todayIdeas.length})</button>
-      <button type="button" class="timer-preset-btn ${showFavOnly?'active':''}" onclick="setTodayIdeasFavView(true)">⭐ נבחרים (${favCount})</button>
-    </div>
-    <div class="today-idea-list" id="todayIdeasList">
-      ${list.length ? list.map(todayIdeaRowHtml).join('') : '<div class="empty">עוד לא סימנת נבחרים — עברי/עבור לתצוגת "הכל" ותני/תן כוכב ⭐ למה שבוחרים בו היום</div>'}
-    </div>
-    ${!showFavOnly ? `<button type="button" class="feel-chip feel-chip-add" style="margin-top:8px;" onclick="addTodayIdeaSlot()">+ הוספה</button>` : ''}
-    ` : ''}
-  `;
+  withFocusPreserved('todayPicksBlock', ()=>{
+    el.innerHTML = `
+      <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה בא לי לעשות היום?</div>
+      ${todayIdeasOpen ? `
+      <p class="hint" style="margin:2px 0 8px;">כתבי/כתוב טיוטה חופשית של כל מה שבא לך היום, בלי סדר ובלי לחשוב יותר מדי. אחר כך סמני/סמן ⭐ על מה שאת/ה באמת בוחר/ת היום — נגיד שלושה — ואפשר לעבור לתצוגת "נבחרים" ולראות רק אותם. בלי יומן ובלי זמנים; מקסימום לא יקרו.</p>
+      <div class="timer-presets">
+        <button type="button" class="timer-preset-btn ${!showFavOnly?'active':''}" onclick="setTodayIdeasFavView(false)">☰ הכל (${data.todayIdeas.length})</button>
+        <button type="button" class="timer-preset-btn ${showFavOnly?'active':''}" onclick="setTodayIdeasFavView(true)">⭐ נבחרים (${favCount})</button>
+      </div>
+      <div class="today-idea-list" id="todayIdeasList">
+        ${list.length ? list.map(todayIdeaRowHtml).join('') : '<div class="empty">עוד לא סימנת נבחרים — עברי/עבור לתצוגת "הכל" ותני/תן כוכב ⭐ למה שבוחרים בו היום</div>'}
+      </div>
+      ${!showFavOnly ? `<button type="button" class="feel-chip feel-chip-add" style="margin-top:8px;" onclick="addTodayIdeaSlot()">+ הוספה</button>` : ''}
+      ` : ''}
+    `;
+  });
 }
 
 /* ---------- כלים (tools): a fast, wordless response for overwhelm/urges ----------
