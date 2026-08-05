@@ -1951,6 +1951,24 @@ function connectGoogleCalendar(){
     client.requestAccessToken();
   });
 }
+// connecting sync used to only happen as a side effect of connecting Google Calendar (same click,
+// same token) -- but that means a device that never connects Calendar never gets cross-device sync
+// either, which is exactly what left her phone's edits invisible on her computer. this is the same
+// sign-in, just reachable on its own so a device only needs THIS to start pulling in what other
+// devices already saved, with no calendar import required.
+function connectSyncOnly(){
+  waitForGcalReady(()=>{
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope: GCAL_SCOPE,
+      ...(data.gcalAccountEmail ? {hint: data.gcalAccountEmail} : {}),
+      callback: (resp)=>{
+        if(resp && resp.access_token) signInToSyncWithAccessToken(resp.access_token);
+      }
+    });
+    client.requestAccessToken();
+  });
+}
 
 function disconnectGoogleCalendar(){
   if(gcalAccessToken && gcalReady()){
@@ -2371,9 +2389,13 @@ try{
 }catch(e){ console.error('Firebase init failed', e); }
 
 const SYNC_BASE_KEY = 'planner-sync-base-v1';
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders'];
+// todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
+// never got wired into it -- they lived only in this device's localStorage, which is exactly why
+// things typed on the phone never showed up on the computer even once sync was connected there.
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList'];
+const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 function loadSyncBase(){
   try{ const raw = localStorage.getItem(SYNC_BASE_KEY); return raw ? JSON.parse(raw) : emptySyncSkeleton(); }
@@ -2463,7 +2485,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -2472,6 +2494,16 @@ function mergeOrderList(localOrder, baseOrder, remoteOrder){
   if(localChanged && !remoteChanged) return localOrder;
   if(remoteChanged && !localChanged) return remoteOrder;
   return localOrder; // both reordered differently since base -> same simple tie-break used everywhere else here
+}
+// same 3-way "who changed since base" logic as everywhere else here, but for a single value
+// (a toggle set, a note string, a number) instead of a list of id-able records
+function mergeScalar(localVal, baseVal, remoteVal){
+  if(deepEqual(localVal, remoteVal)) return localVal;
+  const localChanged = !deepEqual(localVal, baseVal);
+  const remoteChanged = !deepEqual(remoteVal, baseVal);
+  if(localChanged && !remoteChanged) return localVal;
+  if(remoteChanged && !localChanged) return remoteVal;
+  return localVal;
 }
 function applyOrderList(items, orderList){
   if(!orderList || !orderList.length) return items;
@@ -2486,6 +2518,7 @@ function mergePlannerData(local, base, remote){
   local = local||{}; base = base||emptySyncSkeleton(); remote = remote||emptySyncSkeleton();
   const merged = {};
   SYNCED_LIST_FIELDS.forEach(f=>{ merged[f] = mergeArrayById(local[f], base[f], remote[f]); });
+  SYNCED_SCALAR_FIELDS.forEach(f=>{ merged[f] = mergeScalar(local[f], base[f], remote[f]); });
   merged.notes = mergeDictOfObjects(local.notes, base.notes, remote.notes);
   merged.domainNotes = mergeDictOfArrays(local.domainNotes, base.domainNotes, remote.domainNotes);
   merged.reflectionBanks = mergeDictOfArrays(local.reflectionBanks, base.reflectionBanks, remote.reflectionBanks);
@@ -2497,6 +2530,7 @@ function mergePlannerData(local, base, remote){
 }
 function applySyncedFields(target, merged){
   SYNCED_LIST_FIELDS.forEach(f=>{ target[f] = merged[f]; });
+  SYNCED_SCALAR_FIELDS.forEach(f=>{ target[f] = merged[f]; });
   target.notes = merged.notes;
   target.domainNotes = merged.domainNotes;
   target.reflectionBanks = merged.reflectionBanks;
@@ -2597,9 +2631,18 @@ function renderSyncBlock(){
   const el = document.getElementById('syncBlock');
   if(!el) return;
   if(!currentSyncUser){
-    // no button of its own here on purpose: the calendar connect button above handles both, in one click
-    el.style.display = 'none';
-    el.innerHTML = '';
+    // this device hasn't connected sync yet -- until it does, nothing entered on other devices
+    // shows up here, and nothing entered here reaches them either. connecting Google Calendar
+    // also does this as a side effect (same token), but this button gets just the sync without
+    // needing calendar import too.
+    el.style.display = '';
+    el.innerHTML = `
+      <div class="gcal-block-title">🔄 סנכרון בין מכשירים</div>
+      <p class="hint" style="margin:0 0 8px;">המכשיר הזה עדיין לא מחובר לסנכרון — מה שנכתב במכשירים אחרים לא יופיע כאן עד שמתחברים, ולהפך.</p>
+      <div class="gcal-sync-row-inner">
+        <button class="gcal-connect-btn" onclick="connectSyncOnly()">🔗 חיבור סנכרון בין מכשירים</button>
+      </div>
+    `;
     return;
   }
   el.style.display = '';
