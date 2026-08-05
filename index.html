@@ -144,6 +144,14 @@
   .keep-note textarea{width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; resize:none; overflow:hidden; line-height:1.55; padding:0;}
   .keep-note textarea:focus{outline:none;}
   .keep-note textarea.note-clip{max-height:110px;}
+  .keep-note-toolbar{display:flex; gap:4px; margin-bottom:6px;}
+  .keep-note-fmt-btn{cursor:pointer; font-size:13px; padding:3px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface3); color:var(--text); user-select:none;}
+  .keep-note-fmt-btn.fmt-bold{font-weight:700;}
+  .keep-note-fmt-btn.fmt-underline{text-decoration:underline;}
+  .keep-note-editor{width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; line-height:1.55; padding:0; white-space:pre-wrap; overflow-wrap:break-word; overflow:hidden;}
+  .keep-note-editor:focus{outline:none;}
+  .keep-note-editor.note-clip{max-height:110px;}
+  .keep-note-editor:empty::before{content:attr(data-placeholder); color:var(--muted2);}
   .note-size-btn{cursor:pointer; font-size:13px; color:var(--muted2); padding:3px 6px; border-radius:6px;}
   .note-size-btn:hover{background:var(--surface3);}
   .keep-note-actions{display:flex; justify-content:space-between; align-items:center; margin-top:8px;}
@@ -1419,7 +1427,13 @@ function renderKeepGrid(id){
     const isMedium = level===1;
     return `
     <div class="keep-note" style="background:${n.color||'var(--surface2)'}">
-      <textarea class="${isMedium?'note-clip':''}" oninput="onKeepNoteInput('${id}','${n.id}', this.value); autoGrowNoteTextarea(this);" placeholder="כתוב כאן...">${escapeHtml(n.text)}</textarea>
+      <div class="keep-note-toolbar">
+        <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
+        <span class="keep-note-fmt-btn fmt-underline" onmousedown="event.preventDefault()" onclick="execNoteFormat('underline')" title="קו תחתון">U</span>
+      </div>
+      <div class="keep-note-editor ${isMedium?'note-clip':''}" contenteditable="true" dir="auto" data-placeholder="כתוב כאן..."
+        oninput="onKeepNoteRichInput('${id}','${n.id}', this)" onkeydown="onKeepNoteEditorKeydown(event)" onpaste="onKeepNoteEditorPaste(event)"
+      >${noteEditorHtml(n)}</div>
       ${(n.drawing && !isDrawing) ? `<img class="keep-note-drawing-preview" src="${n.drawing}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="לחיצה לעריכת הציור">` : ''}
       ${isDrawing ? `
         <div class="draw-toolbar">
@@ -1453,7 +1467,7 @@ function renderKeepGrid(id){
   // full-size (level 0) textareas grow to fit whatever content they already have as soon as they're
   // placed in the DOM, so a long note doesn't start clipped until the next keystroke re-triggers it
   requestAnimationFrame(()=>{
-    el.querySelectorAll('.keep-note textarea:not(.note-clip)').forEach(autoGrowNoteTextarea);
+    el.querySelectorAll('.keep-note-editor:not(.note-clip)').forEach(autoGrowNoteTextarea);
   });
 }
 
@@ -1578,11 +1592,98 @@ function addDomainNote(){
   notes.unshift({id:uid(), text:'', color:'', drawing:'', memos:[]});
   saveData();
   renderKeepGrid(activeNoteDomain);
-  requestAnimationFrame(()=>{ const ta = document.querySelector('#keepGrid textarea'); if(ta) ta.focus(); });
+  requestAnimationFrame(()=>{ const ta = document.querySelector('#keepGrid .keep-note-editor'); if(ta) ta.focus(); });
 }
 function onKeepNoteInput(domainId, noteId, val){
   const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
   if(n){ n.text = val; saveData(); }
+}
+
+/* ---------- rich text for topic notes: bold/underline + "* " -> bullet at line start ----------
+   paste is forced to plain text on purpose -- pasted HTML is unsanitized and this note's .html is
+   re-inserted verbatim on every render, so only formatting WE apply (bold/underline/bullets via
+   execCommand) is ever allowed into it. */
+function noteEditorHtml(n){ return n.html!=null ? n.html : escapeHtml(n.text||'').replace(/\n/g,'<br>'); }
+const NOTE_ZWSP = '\u200b';
+const NOTE_BULLET = '\u2022 ';
+// text from the start of the caret's current line (the nearest preceding <br>, or the
+// start of the editor) up to the caret, via Range comparison -- avoids innerText's <br>-as-\n
+// vs Range.toString()'s <br>-is-ignored mismatch entirely by never mixing the two
+function textBeforeCaretOnLine(el){
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount) return null;
+  const caretRange = sel.getRangeAt(0);
+  if(!el.contains(caretRange.startContainer)) return null;
+  let lineStartNode = el, lineStartOffset = 0;
+  const brs = el.querySelectorAll('br');
+  for(const br of brs){
+    const brRange = document.createRange();
+    brRange.selectNode(br);
+    if(brRange.compareBoundaryPoints(Range.END_TO_START, caretRange) <= 0){
+      lineStartNode = br.parentNode;
+      lineStartOffset = Array.prototype.indexOf.call(br.parentNode.childNodes, br) + 1;
+    }
+  }
+  const lineRange = document.createRange();
+  lineRange.setStart(lineStartNode, lineStartOffset);
+  lineRange.setEnd(caretRange.startContainer, caretRange.startOffset);
+  return lineRange.toString().replace(new RegExp(NOTE_ZWSP,'g'), '');
+}
+// inserting a bare <br> leaves the caret positioned BEFORE it (a known contenteditable quirk),
+// so typing right after Enter gets swallowed back into the previous line's bold/underline run;
+// anchoring a real (invisible) zero-width text node right after the <br> in the SAME insertHTML
+// call, then placing the caret inside that real node, keeps new typing on the new line
+function insertLineBreak(el, linePrefix){
+  document.execCommand('insertHTML', false, '<br>'+NOTE_ZWSP+(linePrefix||''));
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let lastText = null, node;
+  while(node = walker.nextNode()) lastText = node;
+  if(lastText){
+    const range = document.createRange();
+    range.setStart(lastText, lastText.length);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+function execNoteFormat(cmd){ document.execCommand(cmd, false, null); }
+function onKeepNoteEditorPaste(e){
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  document.execCommand('insertText', false, text);
+}
+function onKeepNoteEditorKeydown(e){
+  const el = e.currentTarget;
+  if(e.key===' '){
+    const currentLine = textBeforeCaretOnLine(el);
+    if(currentLine==='*'){
+      e.preventDefault();
+      document.execCommand('delete', false, null);
+      document.execCommand('insertText', false, NOTE_BULLET);
+    }
+    return;
+  }
+  if(e.key==='Enter' && !e.shiftKey){
+    // always intercept: the browser's default paragraph behavior wraps each Enter in a
+    // nested <div>, which breaks our line detection above -- force a plain <br> instead
+    e.preventDefault();
+    const currentLine = textBeforeCaretOnLine(el);
+    if(currentLine===null) return;
+    if(currentLine.trim()===NOTE_BULLET.trim()){
+      for(let i=0;i<NOTE_BULLET.length;i++) document.execCommand('delete', false, null);
+      insertLineBreak(el, '');
+    } else if(currentLine.startsWith(NOTE_BULLET)){
+      insertLineBreak(el, NOTE_BULLET);
+    } else {
+      insertLineBreak(el, '');
+    }
+  }
+}
+function onKeepNoteRichInput(domainId, noteId, el){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(n){ n.html = el.innerHTML; n.text = (el.innerText || '').replace(new RegExp(NOTE_ZWSP,'g'), ''); saveData(); }
+  autoGrowNoteTextarea(el);
 }
 function setKeepNoteColor(domainId, noteId, color){
   const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
