@@ -363,6 +363,7 @@
   .feel-energy-value{font-size:14px; color:var(--muted); min-width:38px; text-align:left; direction:ltr;}
   .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
+  .feel-gesture-hint{font-size:10px; font-weight:400; color:var(--muted2);}
   .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 2px 4px;}
   .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:none; user-select:none;}
   .feel-chip.dragging{box-shadow:0 10px 24px -6px rgba(0,0,0,0.45); position:relative; z-index:5;}
@@ -4409,7 +4410,7 @@ function renderFeelBar(){
       ` : ''}
     </div>
     <div class="feel-bank">
-      <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''}</div>
+      <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''} <span class="feel-gesture-hint">· הקשה=סימון · החזקה+הזזה=גרירה · לחיצה ארוכה=עריכה</span></div>
       ${needsBankOpen ? `
         ${feelChipGridHtml('activeNeeds')}
         <textarea class="feel-note-textarea" oninput="onNeedNoteInput(this.value)" placeholder="מה אני צריך/ה עכשיו...">${escapeHtml(data.needNote||'')}</textarea>
