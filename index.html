@@ -2413,15 +2413,23 @@ function isTypingNow(){
   }
   return false;
 }
+function renderKeepingScrollPosition(){
+  // a background sync's render can add/remove content anywhere on the page (a merged task, a
+  // longer note...), which reflows everything below it -- pin the viewport back so the page never
+  // visibly drifts on its own while she's just sitting there reading or has paused typing
+  const scrollY = window.scrollY;
+  render();
+  window.scrollTo(0, scrollY);
+}
 function renderOrDeferIfTyping(){
   if(isTypingNow()){ pendingRenderAfterTyping = true; return; }
-  render();
+  renderKeepingScrollPosition();
 }
 document.addEventListener('focusout', (e)=>{
   if(!pendingRenderAfterTyping) return;
   if(e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') return;
   pendingRenderAfterTyping = false;
-  render();
+  renderKeepingScrollPosition();
 });
 async function runFullSync(){
   if(!currentSyncUser || !fbDb || syncInProgress) return;
