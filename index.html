@@ -560,6 +560,7 @@
   .reset-btn:disabled{opacity:.4; cursor:default;}
   .reset-btn:disabled:hover{color:var(--muted2); border-color:var(--border-strong);}
   .reset-btn:hover{color:var(--text); border-color:var(--muted);}
+  #undoBtn:not(:disabled), #redoBtn:not(:disabled){color:var(--text); border-color:var(--muted);}
 
   /* glass effect for surface-based components */
   .card, .day-col, .keep-note, .nav-drawer, .domain-chip,
@@ -981,7 +982,9 @@ function saveData(){
   saveTimer = setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      flashStatus('נשמר');
+      // no "נשמר" toast here on purpose: this fires on every routine autosave, including mid-typing,
+      // and the DOM update it causes was dismissing the on-screen keyboard while someone was still
+      // writing. saving is expected/implicit; only surface it when it fails.
     }catch(e){
       flashStatus('שגיאה בשמירה');
     } finally {
