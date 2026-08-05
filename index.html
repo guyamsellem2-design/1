@@ -388,7 +388,9 @@
   .feel-chip-add-cancel:hover{color:var(--text);}
   .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:vertical; padding:8px 10px; line-height:1.5;}
   .today-idea-list{display:flex; flex-direction:column; gap:6px; margin-top:4px;}
-  .today-idea-row{display:flex; align-items:center; gap:8px;}
+  .today-idea-row{display:flex; align-items:center; gap:8px; touch-action:pan-y;}
+  .today-idea-row.dragging{z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; background:var(--surface2); border-radius:8px;}
+  .today-idea-row.list-drag-over{outline:2px dashed var(--gold); outline-offset:-2px; border-radius:8px;}
   .today-idea-check{width:18px; height:18px; flex-shrink:0; cursor:pointer; accent-color:var(--gold);}
   .today-idea-input{flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-family:inherit; font-size:14.5px;}
   .today-idea-input.done{text-decoration:line-through; color:var(--muted2);}
@@ -4737,9 +4739,68 @@ function withFocusPreserved(containerId, renderFn){
     }
   }
 }
+/* drag-to-reorder for today-idea rows, same hold-and-drag gesture as the feel-chip banks:
+   no dedicated grip icon -- press and hold anywhere on the row, then drag. a quick tap never
+   triggers it (nothing is prevented until the hold armed AND real movement happens), so the
+   star/checkbox/input/buttons inside the row keep working exactly as before. */
+let todayIdeaPressState = null;
+function startTodayIdeaPress(e, id){
+  e.stopPropagation();
+  const row = e.currentTarget;
+  todayIdeaPressState = {
+    id, row, active:false, everMoved:false, targetId:null,
+    startX:e.clientX, startY:e.clientY,
+    timer: setTimeout(()=>{
+      if(!todayIdeaPressState) return;
+      todayIdeaPressState.active = true;
+      row.classList.add('dragging');
+      if(navigator.vibrate) navigator.vibrate(15);
+    }, 280)
+  };
+}
+function onTodayIdeaPressMove(e){
+  if(!todayIdeaPressState) return;
+  const dx = e.clientX-todayIdeaPressState.startX, dy = e.clientY-todayIdeaPressState.startY;
+  if(!todayIdeaPressState.active){
+    if(Math.hypot(dx,dy) > 10){ clearTimeout(todayIdeaPressState.timer); todayIdeaPressState = null; }
+    return;
+  }
+  if(Math.hypot(dx,dy) > 6) todayIdeaPressState.everMoved = true;
+  e.preventDefault();
+  todayIdeaPressState.row.style.transform = `translateY(${dy}px) scale(1.02)`;
+  todayIdeaPressState.row.style.pointerEvents = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  todayIdeaPressState.row.style.pointerEvents = '';
+  const targetRow = under ? under.closest('.today-idea-row[data-drag-id]') : null;
+  document.querySelectorAll('.today-idea-row.list-drag-over').forEach(r=>r.classList.remove('list-drag-over'));
+  if(targetRow && targetRow!==todayIdeaPressState.row){
+    targetRow.classList.add('list-drag-over');
+    todayIdeaPressState.targetId = targetRow.dataset.dragId;
+  } else {
+    todayIdeaPressState.targetId = null;
+  }
+}
+function onTodayIdeaPressUp(){
+  if(!todayIdeaPressState) return;
+  clearTimeout(todayIdeaPressState.timer);
+  if(todayIdeaPressState.active){
+    todayIdeaPressState.row.style.transform = '';
+    todayIdeaPressState.row.classList.remove('dragging');
+    document.querySelectorAll('.today-idea-row.list-drag-over').forEach(r=>r.classList.remove('list-drag-over'));
+    if(todayIdeaPressState.targetId && todayIdeaPressState.targetId!==todayIdeaPressState.id){
+      reorderArrayById(data.todayIdeas, todayIdeaPressState.id, todayIdeaPressState.targetId);
+      saveData();
+      renderTodayIdeas();
+    }
+  }
+  todayIdeaPressState = null;
+}
+document.addEventListener('pointermove', onTodayIdeaPressMove);
+document.addEventListener('pointerup', onTodayIdeaPressUp);
+document.addEventListener('pointercancel', onTodayIdeaPressUp);
 function todayIdeaRowHtml(item){
   return `
-    <div class="today-idea-row">
+    <div class="today-idea-row" data-drag-id="${item.id}" onpointerdown="startTodayIdeaPress(event,'${item.id}')">
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleTodayIdeaFavorite('${item.id}')" title="${item.favorite?'הסרה מהנבחרים':'סימון כנבחר להיום'}">${item.favorite?'★':'☆'}</span>
       <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
       <input type="text" class="today-idea-input ${item.done?'done':''}" data-field-key="idea-${item.id}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)">
