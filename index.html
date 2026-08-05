@@ -363,14 +363,15 @@
   .feel-energy-value{font-size:14px; color:var(--muted); min-width:38px; text-align:left; direction:ltr;}
   .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
-  .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:6px 2px 4px;}
-  .feel-chip{display:inline-flex; align-items:center; gap:5px; font-size:13.5px; padding:5px 11px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
+  .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:6px 2px 4px;}
+  .feel-chip{display:inline-flex; align-items:center; gap:0; font-size:13.5px; padding:2px 3px 2px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
   .feel-chip.active{color:#fff; font-weight:600;}
-  .feel-chip-label{cursor:pointer;}
-  .feel-chip-edit, .feel-chip-del{font-size:11px; opacity:.65; cursor:pointer;}
-  .feel-chip-edit:hover, .feel-chip-del:hover{opacity:1;}
-  .feel-chip .grip{font-size:12px; padding:0;}
-  .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2); cursor:pointer;}
+  .feel-chip-label{cursor:pointer; padding:6px 4px;}
+  .feel-chip-edit, .feel-chip-del{font-size:15px; opacity:.7; cursor:pointer; padding:7px 8px; border-radius:50%;}
+  .feel-chip-edit:hover, .feel-chip-del:hover{opacity:1; background:rgba(127,127,127,0.2);}
+  .feel-chip .grip{font-size:17px; padding:7px 8px; cursor:grab; border-radius:50%;}
+  .feel-chip .grip:hover{background:rgba(127,127,127,0.2);}
+  .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2); cursor:pointer; padding:6px 13px;}
   .feel-chip-add-row{display:inline-flex; align-items:center; gap:4px;}
   .feel-chip-add-input{font-family:inherit; font-size:13.5px; padding:5px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); width:110px;}
   .feel-chip-add-confirm, .feel-chip-add-cancel{cursor:pointer; font-size:15px; padding:2px 4px; color:var(--muted2);}
@@ -396,6 +397,7 @@
   .breathing-circle-wrap{display:flex; flex-direction:column; align-items:center; padding:16px 0 6px;}
   .breathing-circle{width:120px; height:120px; border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--gold), var(--surface3)); transform:scale(1); transition:transform 5s linear; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:#1a1a1a;}
   .breathing-controls{display:flex; gap:10px; align-items:center; margin-top:16px;}
+  .undo-redo-bar{position:fixed; bottom:12px; left:12px; z-index:90; display:flex; gap:8px;}
   .sync-menu{position:fixed; top:12px; left:12px; z-index:90;}
   .sync-menu-btn{background:var(--surface); border:1px solid var(--border-strong); border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:0 4px 14px -6px rgba(0,0,0,0.4);}
   .sync-menu-panel{display:none; position:absolute; top:calc(100% + 8px); left:0; width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 70px); overflow-y:auto; background:transparent;}
@@ -587,6 +589,11 @@
   <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
 </div>
 
+<div class="undo-redo-bar">
+  <button class="reset-btn" id="undoBtn" onclick="performUndo()" disabled title="בטל">↶ בטל</button>
+  <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled title="בצע שוב">↷ בצע שוב</button>
+</div>
+
 <div id="homeView">
 
   <header class="top">
@@ -759,8 +766,6 @@
 
   <footer>
     <span>סקירה שבועית של 15 דקות מספיקה. זה כל התהליך.</span>
-    <button class="reset-btn" id="undoBtn" onclick="performUndo()" disabled>↶ בטל</button>
-    <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled>↷ בצע שוב</button>
     <button class="reset-btn" onclick="clearDoneTasks()">🧹 ניקוי משימות שבוצעו</button>
     <button class="reset-btn" onclick="resetAll()">איפוס הכל</button>
   </footer>
