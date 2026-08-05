@@ -519,6 +519,7 @@
 
   .promote{font-size:13px; color:var(--gold); cursor:pointer; white-space:nowrap; border:1px solid rgba(212,162,76,0.35); padding:4px 9px; border-radius:999px;}
   .fav-star{cursor:pointer; font-size:17px; color:var(--muted2); flex-shrink:0; line-height:1;}
+  .today-idea-row .fav-star{padding:7px; font-size:19px;}
   .fav-star.active{color:var(--gold); text-shadow:0 0 7px var(--glow-gold);}
   .fav-star:hover{color:var(--gold);}
   ul.tasks li.fav-divider{display:block; height:1px; padding:0; margin:8px 6px 12px; border:none; border-radius:2px; background:linear-gradient(to right, transparent, #a8fbff 15%, #a8fbff 85%, transparent); box-shadow:0 0 6px 1px rgba(168,251,255,0.4);}
@@ -826,7 +827,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '' };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -901,7 +902,16 @@ function loadData(){
         if(data.goodThingsList.length===0) data.goodThingsList = seedChipList(SEED_GOOD_THINGS, (parsed.myGoodThings||[]).map(g=>({id:g.id, label:g.text})));
         data.chipBanksSeeded = true;
       }
+      data.goodThingsRestoredOnce = !!parsed.goodThingsRestoredOnce;
+      if(!data.goodThingsRestoredOnce){
+        // one-time fix: an early version made the built-in "מה שעושה לי טוב" suggestions just as
+        // deletable as anything else, before the icons had real touch targets, and one got deleted
+        // by accident before any personal ones were added -- put the original 8 back once
+        data.goodThingsList = SEED_GOOD_THINGS.map(x=>({...x}));
+        data.goodThingsRestoredOnce = true;
+      }
       data.todayIdeasDate = parsed.todayIdeasDate || '';
+      data.todayIdeasShowFavOnly = !!parsed.todayIdeasShowFavOnly;
       data.todayIdeas = parsed.todayIdeas || [];
       data.breathIn = (typeof parsed.breathIn === 'number') ? parsed.breathIn : 5;
       data.breathHold = (typeof parsed.breathHold === 'number') ? parsed.breathHold : 5;
@@ -914,6 +924,7 @@ function loadData(){
       data.needsList = seedChipList(SEED_NEEDS, []);
       data.goodThingsList = seedChipList(SEED_GOOD_THINGS, []);
       data.chipBanksSeeded = true;
+      data.goodThingsRestoredOnce = true;
     }
   }catch(e){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -997,6 +1008,9 @@ function updateUndoRedoButtons(){
 }
 function restoreSnapshot(json){
   isRestoringHistory = true;
+  // closing whatever was open mid-edit can shrink the page (or grow it back), which shifts the
+  // viewport up/down on its own even though the reader didn't ask to scroll -- pin it back afterward
+  const scrollY = window.scrollY;
   data = JSON.parse(json);
   lastSnapshotJSON = json;
   try{ localStorage.setItem(STORAGE_KEY, json); }catch(e){}
@@ -1004,6 +1018,7 @@ function restoreSnapshot(json){
   editingAnchorId = null; openForm = null; drawingNoteId = null; colorPickerForId = null;
   longPressedTaskId = null;
   render();
+  window.scrollTo(0, scrollY);
   updateUndoRedoButtons();
   isRestoringHistory = false;
 }
@@ -4123,7 +4138,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:''};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4328,10 +4343,12 @@ function renderFeelBar(){
   `;
 }
 
-/* ---------- today's ideas: a self-authored, low-pressure "what do I feel like today" spot ----------
-   like "דברים לעשות" but scoped to today and starting fresh each day -- no calendar, no times, just
-   text + a checkbox. starts at 3 slots (never overwhelming) with room to add more if she wants.
-   an idea can be promoted into a real task, which is the only way it gains a date/time. */
+/* ---------- today's ideas: brain dump, then choose ----------
+   the confusion this answers isn't "what should I do" -- it's "I don't even know what's in my head
+   right now." so first she dumps everything, unfiltered, no cap. then she stars a few (⭐) as what
+   she's actually choosing for today, and can switch to a filtered view that shows only those --
+   the noise of the full dump doesn't have to stay in front of her once she's decided. no calendar,
+   no times, ever, in this list -- promoting to a task is the only way something gets a time. */
 let todayIdeasOpen = true;
 function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; renderTodayIdeas(); }
 function ensureTodayIdeas(){
@@ -4339,8 +4356,11 @@ function ensureTodayIdeas(){
   if(data.todayIdeasDate !== today){
     data.todayIdeasDate = today;
     data.todayIdeas = [];
+    data.todayIdeasShowFavOnly = false;
   }
-  while(data.todayIdeas.length < 3) data.todayIdeas.push({id: uid(), text:'', done:false});
+  if(data.todayIdeas.length===0){
+    for(let i=0;i<3;i++) data.todayIdeas.push({id: uid(), text:'', done:false, favorite:false});
+  }
 }
 function onTodayIdeaInput(id, inputEl){
   const val = inputEl.value;
@@ -4364,8 +4384,17 @@ function toggleTodayIdeaDone(id){
   const item = data.todayIdeas.find(x=>x.id===id);
   if(item){ item.done = !item.done; saveData(); renderTodayIdeas(); }
 }
+function toggleTodayIdeaFavorite(id){
+  const item = data.todayIdeas.find(x=>x.id===id);
+  if(item){ item.favorite = !item.favorite; saveData(); renderTodayIdeas(); }
+}
+function setTodayIdeasFavView(showFavOnly){
+  data.todayIdeasShowFavOnly = showFavOnly;
+  saveData();
+  renderTodayIdeas();
+}
 function addTodayIdeaSlot(){
-  data.todayIdeas.push({id: uid(), text:'', done:false});
+  data.todayIdeas.push({id: uid(), text:'', done:false, favorite:false});
   saveData();
   renderTodayIdeas();
   requestAnimationFrame(()=>{
@@ -4375,8 +4404,7 @@ function addTodayIdeaSlot(){
   });
 }
 function deleteTodayIdea(id){
-  if(data.todayIdeas.length>3) data.todayIdeas = data.todayIdeas.filter(x=>x.id!==id);
-  else{ const item = data.todayIdeas.find(x=>x.id===id); if(item){ item.text=''; item.done=false; } }
+  data.todayIdeas = data.todayIdeas.filter(x=>x.id!==id);
   saveData();
   renderTodayIdeas();
 }
@@ -4384,7 +4412,7 @@ function promoteTodayIdeaToTask(id){
   const item = data.todayIdeas.find(x=>x.id===id);
   if(!item || !item.text.trim()) return;
   const text = item.text.trim();
-  item.text = ''; item.done = false;
+  item.text = ''; item.done = false; item.favorite = false;
   const task = {id: uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false};
   data.tasks.push(task);
   saveData();
@@ -4392,25 +4420,36 @@ function promoteTodayIdeaToTask(id){
   openSection('tasks');
   openTaskEdit(task.id);
 }
+function todayIdeaRowHtml(item){
+  return `
+    <div class="today-idea-row">
+      <span class="fav-star ${item.favorite?'active':''}" onclick="toggleTodayIdeaFavorite('${item.id}')" title="${item.favorite?'הסרה מהנבחרים':'סימון כנבחר להיום'}">${item.favorite?'★':'☆'}</span>
+      <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
+      <input type="text" class="today-idea-input ${item.done?'done':''}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)">
+      ${item.text.trim() ? `<span class="today-idea-promote" title="הפיכה למשימה/עוגן עם זמן" onclick="promoteTodayIdeaToTask('${item.id}')">➜ משימה</span>` : ''}
+      <span class="today-idea-del" onclick="deleteTodayIdea('${item.id}')" title="מחיקה">✕</span>
+    </div>
+  `;
+}
 function renderTodayIdeas(){
   const el = document.getElementById('todayPicksBlock');
   if(!el) return;
   ensureTodayIdeas();
+  const favCount = data.todayIdeas.filter(x=>x.favorite).length;
+  const showFavOnly = !!data.todayIdeasShowFavOnly;
+  const list = showFavOnly ? data.todayIdeas.filter(x=>x.favorite) : data.todayIdeas;
   el.innerHTML = `
     <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה בא לי לעשות היום?</div>
     ${todayIdeasOpen ? `
-    <p class="hint" style="margin:2px 0 8px;">מומלץ לבחור שלושה דברים — בלי יומן ובלי זמנים, מקסימום לא יקרו. תמיד אפשר להפוך רעיון למשימה/עוגן עם זמן.</p>
-    <div class="today-idea-list" id="todayIdeasList">
-      ${data.todayIdeas.map(item=>`
-        <div class="today-idea-row">
-          <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
-          <input type="text" class="today-idea-input ${item.done?'done':''}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)">
-          ${item.text.trim() ? `<span class="today-idea-promote" title="הפיכה למשימה/עוגן עם זמן" onclick="promoteTodayIdeaToTask('${item.id}')">➜ משימה</span>` : ''}
-          <span class="today-idea-del" onclick="deleteTodayIdea('${item.id}')" title="מחיקה">✕</span>
-        </div>
-      `).join('')}
+    <p class="hint" style="margin:2px 0 8px;">כתבי/כתוב טיוטה חופשית של כל מה שבא לך היום, בלי סדר ובלי לחשוב יותר מדי. אחר כך סמני/סמן ⭐ על מה שאת/ה באמת בוחר/ת היום — נגיד שלושה — ואפשר לעבור לתצוגת "נבחרים" ולראות רק אותם. בלי יומן ובלי זמנים; מקסימום לא יקרו.</p>
+    <div class="timer-presets">
+      <button type="button" class="timer-preset-btn ${!showFavOnly?'active':''}" onclick="setTodayIdeasFavView(false)">☰ הכל (${data.todayIdeas.length})</button>
+      <button type="button" class="timer-preset-btn ${showFavOnly?'active':''}" onclick="setTodayIdeasFavView(true)">⭐ נבחרים (${favCount})</button>
     </div>
-    <button type="button" class="feel-chip feel-chip-add" style="margin-top:8px;" onclick="addTodayIdeaSlot()">+ הוספה</button>
+    <div class="today-idea-list" id="todayIdeasList">
+      ${list.length ? list.map(todayIdeaRowHtml).join('') : '<div class="empty">עוד לא סימנת נבחרים — עברי/עבור לתצוגת "הכל" ותני/תן כוכב ⭐ למה שבוחרים בו היום</div>'}
+    </div>
+    ${!showFavOnly ? `<button type="button" class="feel-chip feel-chip-add" style="margin-top:8px;" onclick="addTodayIdeaSlot()">+ הוספה</button>` : ''}
     ` : ''}
   `;
 }
