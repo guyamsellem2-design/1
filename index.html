@@ -363,15 +363,15 @@
   .feel-energy-value{font-size:14px; color:var(--muted); min-width:38px; text-align:left; direction:ltr;}
   .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
-  .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:6px 2px 4px;}
-  .feel-chip{display:inline-flex; align-items:center; gap:0; font-size:13.5px; padding:2px 3px 2px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); transition:background .15s ease, color .15s ease, border-color .15s ease;}
-  .feel-chip.active{color:#fff; font-weight:600;}
-  .feel-chip-label{cursor:pointer; padding:6px 4px;}
-  .feel-chip-edit, .feel-chip-del{font-size:15px; opacity:.7; cursor:pointer; padding:7px 8px; border-radius:50%;}
-  .feel-chip-edit:hover, .feel-chip-del:hover{opacity:1; background:rgba(127,127,127,0.2);}
-  .feel-chip .grip{font-size:17px; padding:7px 8px; cursor:grab; border-radius:50%;}
-  .feel-chip .grip:hover{background:rgba(127,127,127,0.2);}
-  .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2); cursor:pointer; padding:6px 13px;}
+  .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 2px 4px;}
+  .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:none; user-select:none;}
+  .feel-chip.dragging{box-shadow:0 10px 24px -6px rgba(0,0,0,0.45); position:relative; z-index:5;}
+  .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2);}
+  .feel-chip.feel-chip-delmode{background:transparent; border-style:dashed; color:var(--muted2); touch-action:auto;}
+  .feel-chip.feel-chip-delmode.active{background:#c0453f; border-color:#c0453f; color:#fff;}
+  .feel-chip-grid.delete-mode .feel-chip:not(.feel-chip-delmode){box-shadow:inset 0 0 0 1.5px #c0453f; animation:chipShake .35s ease;}
+  @keyframes chipShake{0%,100%{transform:rotate(0);} 25%{transform:rotate(-1.5deg);} 75%{transform:rotate(1.5deg);}}
+  @media (prefers-reduced-motion: reduce){ .feel-chip-grid.delete-mode .feel-chip:not(.feel-chip-delmode){animation:none;} }
   .feel-chip-add-row{display:inline-flex; align-items:center; gap:4px;}
   .feel-chip-add-input{font-family:inherit; font-size:13.5px; padding:5px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); width:110px;}
   .feel-chip-add-confirm, .feel-chip-add-cancel{cursor:pointer; font-size:15px; padding:2px 4px; color:var(--muted2);}
@@ -4274,6 +4274,75 @@ function reorderChipBank(bank, fromId, toId){
   saveData();
   rerenderChipBank(bank);
 }
+/* chip gestures: tap = toggle active. hold the chip in place and let go = rename. hold and drag =
+   reorder. the whole chip is the target for all three -- no more tiny separate icons to miss.
+   deleting is a short-lived "מחיקה" mode (toggle button per bank) so it never happens by accident
+   and doesn't need its own always-visible icon either. */
+let chipPressState = null;
+let deleteModeBank = null;
+function startChipPress(e, bank, id){
+  if(deleteModeBank===bank) return; // tapping deletes directly while in delete mode, no hold needed
+  e.stopPropagation();
+  const chip = e.currentTarget;
+  chipPressState = {
+    bank, id, chip, active:false, everMoved:false, targetId:null,
+    startX:e.clientX, startY:e.clientY,
+    timer: setTimeout(()=>{
+      if(!chipPressState) return;
+      chipPressState.active = true;
+      chip.classList.add('dragging');
+      if(navigator.vibrate) navigator.vibrate(15);
+    }, 280)
+  };
+}
+function onChipPressMove(e){
+  if(!chipPressState) return;
+  const dx = e.clientX-chipPressState.startX, dy = e.clientY-chipPressState.startY;
+  if(!chipPressState.active){
+    if(Math.hypot(dx,dy) > 10){ clearTimeout(chipPressState.timer); chipPressState = null; }
+    return;
+  }
+  if(Math.hypot(dx,dy) > 6) chipPressState.everMoved = true;
+  e.preventDefault();
+  chipPressState.chip.style.transform = `translate(${dx}px, ${dy}px) scale(1.04)`;
+  chipPressState.chip.style.pointerEvents = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  chipPressState.chip.style.pointerEvents = '';
+  const targetChip = under ? under.closest('.feel-chip[data-drag-id]') : null;
+  document.querySelectorAll('.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+  if(targetChip && targetChip!==chipPressState.chip){
+    targetChip.classList.add('list-drag-over');
+    chipPressState.targetId = targetChip.dataset.dragId;
+  } else {
+    chipPressState.targetId = null;
+  }
+}
+function onChipPressUp(){
+  if(!chipPressState) return;
+  clearTimeout(chipPressState.timer);
+  if(chipPressState.active){
+    chipPressState.chip.style.transform = '';
+    chipPressState.chip.classList.remove('dragging');
+    document.querySelectorAll('.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+    if(chipPressState.targetId && chipPressState.targetId!==chipPressState.id){
+      reorderChipBank(chipPressState.bank, chipPressState.id, chipPressState.targetId);
+    } else if(!chipPressState.everMoved){
+      startEditChip(chipPressState.bank, chipPressState.id);
+    }
+  }
+  chipPressState = null;
+}
+document.addEventListener('pointermove', onChipPressMove);
+document.addEventListener('pointerup', onChipPressUp);
+document.addEventListener('pointercancel', onChipPressUp);
+function onChipTap(bank, id){
+  if(deleteModeBank===bank){ deleteFeelChip(bank, id); return; }
+  toggleFeelChip(bank, id);
+}
+function toggleDeleteMode(bank){
+  deleteModeBank = (deleteModeBank===bank) ? null : bank;
+  rerenderChipBank(bank);
+}
 function feelChipHtml(bank, item){
   if(editingChipBank===bank && editingChipId===item.id){
     return `<span class="feel-chip-add-row">
@@ -4285,12 +4354,10 @@ function feelChipHtml(bank, item){
   }
   const active = (data[bank]||[]).includes(item.id);
   const color = hashChipColor(item.id);
-  return `<span class="feel-chip ${active?'active':''}" data-drag-id="${item.id}" style="${active?`background:${color}; border-color:${color};`:`border-color:${color}; color:${color};`}">
-    <span class="grip" onpointerdown="startListDrag(event,'${item.id}','.feel-chip',(f,t)=>reorderChipBank('${bank}',f,t))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
-    <span class="feel-chip-label" onclick="toggleFeelChip('${bank}','${item.id}')">${escapeHtml(item.label)}</span>
-    <span class="feel-chip-edit" onclick="event.stopPropagation(); startEditChip('${bank}','${item.id}')" title="עריכה">✎</span>
-    <span class="feel-chip-del" onclick="event.stopPropagation(); deleteFeelChip('${bank}','${item.id}')" title="מחיקה">✕</span>
-  </span>`;
+  return `<span class="feel-chip" data-drag-id="${item.id}"
+    style="${active?`background:${color}; border-color:${color}; color:#fff; font-weight:600;`:`border-color:${color}; color:${color};`}"
+    onpointerdown="startChipPress(event,'${bank}','${item.id}')"
+    onclick="onChipTap('${bank}','${item.id}')" title="הקשה: סימון · החזקה בלי הזזה: עריכה · החזקה וגרירה: סידור">${escapeHtml(item.label)}</span>`;
 }
 function feelAddRowHtml(bank){
   if(addingFeelChipBank===bank){
@@ -4302,11 +4369,17 @@ function feelAddRowHtml(bank){
   }
   return `<span class="feel-chip feel-chip-add" onclick="startAddFeelChip('${bank}')">+ הוספה</span>`;
 }
+function deleteModeToggleHtml(bank){
+  const active = deleteModeBank===bank;
+  return `<span class="feel-chip feel-chip-delmode ${active?'active':''}" onclick="toggleDeleteMode('${bank}')">${active?'✓ סיום מחיקה':'🗑 מחיקה'}</span>`;
+}
 function feelChipGridHtml(bank){
   const list = data[chipListKey(bank)] || [];
-  return `<div class="feel-chip-grid">
+  const inDeleteMode = deleteModeBank===bank;
+  return `<div class="feel-chip-grid ${inDeleteMode?'delete-mode':''}">
     ${list.map(item=>feelChipHtml(bank, item)).join('')}
-    ${feelAddRowHtml(bank)}
+    ${!inDeleteMode ? feelAddRowHtml(bank) : ''}
+    ${deleteModeToggleHtml(bank)}
   </div>`;
 }
 function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
