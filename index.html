@@ -2398,6 +2398,31 @@ function applySyncedFields(target, merged){
 }
 
 function syncDoc(){ return fbDb.collection('users').doc(currentSyncUser.uid); }
+// cloud sync runs on its own timer (a few seconds after an edit, and again every minute in the
+// background) and its render() rebuilds the whole page from scratch -- fine most of the time, but
+// if it lands while she's mid-sentence in a text field, recreating that field kills its focus and
+// the on-screen keyboard closes on her. hold off until she's actually done with that field.
+let pendingRenderAfterTyping = false;
+function isTypingNow(){
+  const el = document.activeElement;
+  if(!el) return false;
+  if(el.tagName==='TEXTAREA') return true;
+  if(el.tagName==='INPUT'){
+    const skip = ['checkbox','radio','range','date','file','color'];
+    return !skip.includes(el.type);
+  }
+  return false;
+}
+function renderOrDeferIfTyping(){
+  if(isTypingNow()){ pendingRenderAfterTyping = true; return; }
+  render();
+}
+document.addEventListener('focusout', (e)=>{
+  if(!pendingRenderAfterTyping) return;
+  if(e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') return;
+  pendingRenderAfterTyping = false;
+  render();
+});
 async function runFullSync(){
   if(!currentSyncUser || !fbDb || syncInProgress) return;
   syncInProgress = true;
@@ -2410,7 +2435,7 @@ async function runFullSync(){
     applyingSyncedData = true;
     applySyncedFields(data, merged);
     saveData();
-    render();
+    renderOrDeferIfTyping();
     applyingSyncedData = false;
     const mergedSnapshot = JSON.parse(JSON.stringify(merged));
     saveSyncBase(mergedSnapshot);
