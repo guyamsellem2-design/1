@@ -1413,6 +1413,7 @@ function renderKeepGrid(id){
   if(!el) return;
   const notes = ensureDomainNotes(id);
   if(notes.length===0){ el.innerHTML = '<div class="empty" onclick="addDomainNote()" style="cursor:pointer;">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
+  withFocusPreserved('keepGrid', ()=>{
   el.innerHTML = notes.map(n=>{
     const isDrawing = drawingNoteId===n.id;
     const level = getNoteLevel(n.id);
@@ -1431,7 +1432,7 @@ function renderKeepGrid(id){
         <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
         <span class="keep-note-fmt-btn fmt-underline" onmousedown="event.preventDefault()" onclick="execNoteFormat('underline')" title="קו תחתון">U</span>
       </div>
-      <div class="keep-note-editor ${isMedium?'note-clip':''}" contenteditable="true" dir="auto" data-placeholder="כתוב כאן..."
+      <div class="keep-note-editor ${isMedium?'note-clip':''}" contenteditable="true" dir="auto" data-placeholder="כתוב כאן..." data-field-key="note-${n.id}"
         oninput="onKeepNoteRichInput('${id}','${n.id}', this)" onkeydown="onKeepNoteEditorKeydown(event)" onpaste="onKeepNoteEditorPaste(event)"
       >${noteEditorHtml(n)}</div>
       ${(n.drawing && !isDrawing) ? `<img class="keep-note-drawing-preview" src="${n.drawing}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="לחיצה לעריכת הציור">` : ''}
@@ -1443,6 +1444,7 @@ function renderKeepGrid(id){
           <div class="draw-sizes">
             ${DRAW_SIZES.map(s=>`<span class="draw-size-dot ${drawSize===s?'active':''}" data-size="${s}" onclick="setDrawSize(${s})"><span style="width:${s}px;height:${s}px;"></span></span>`).join('')}
           </div>
+          <span class="note-size-btn" onclick="toggleNoteDrawing('${id}','${n.id}')" title="מיזעור הציור">🗕 מזער ציור</span>
           <span class="del-task" onclick="clearNoteDrawing('${id}','${n.id}')" title="נקה ציור">🗑</span>
         </div>
         <canvas class="keep-note-canvas" id="canvas-${n.id}" data-domain="${id}" data-note="${n.id}"></canvas>
@@ -1453,13 +1455,14 @@ function renderKeepGrid(id){
         </div>
         ${isMedium
           ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
-          : `<span class="pencil-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄</span>`}
+          : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
         <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
         <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
       </div>
       ${renderMemoSection(id, n)}
     </div>`;
   }).join('');
+  });
   if(drawingNoteId){
     const canvas = document.getElementById('canvas-'+drawingNoteId);
     if(canvas) initDrawCanvas(canvas);
@@ -2508,6 +2511,7 @@ function isTypingNow(){
   const el = document.activeElement;
   if(!el) return false;
   if(el.tagName==='TEXTAREA') return true;
+  if(el.isContentEditable) return true;
   if(el.tagName==='INPUT'){
     const skip = ['checkbox','radio','range','date','file','color'];
     return !skip.includes(el.type);
@@ -4595,7 +4599,14 @@ function onTodayIdeaInput(id, inputEl){
 }
 function toggleTodayIdeaDone(id){
   const item = data.todayIdeas.find(x=>x.id===id);
-  if(item){ item.done = !item.done; saveData(); renderTodayIdeas(); }
+  if(!item) return;
+  item.done = !item.done;
+  if(item.done){
+    data.todayIdeas = data.todayIdeas.filter(x=>x.id!==id);
+    data.todayIdeas.push(item);
+  }
+  saveData();
+  renderTodayIdeas();
 }
 function toggleTodayIdeaFavorite(id){
   const item = data.todayIdeas.find(x=>x.id===id);
@@ -4644,21 +4655,84 @@ function promoteTodayIdeaToTask(id){
 // does happen to run while its own field is focused (any trigger, found or not), put the cursor
 // back where it was instead of just losing it -- identified by data-field-key, not by position,
 // since the list can reorder/filter between renders.
+// caret offset for a contenteditable element, counting text-node characters and <br> as 1
+// (matching how el.innerText represents a <br> as '\n') -- used only to save/restore the
+// caret across a re-render, not for the more delicate mid-edit insertions in onKeepNoteEditorKeydown
+function getCaretOffset(el){
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  if(!el.contains(range.endContainer)) return null;
+  let offset = 0, done = false;
+  (function walk(node){
+    if(done) return;
+    const children = node.childNodes;
+    for(let i=0; i<children.length; i++){
+      if(node===range.endContainer && i===range.endOffset){ done = true; return; }
+      const child = children[i];
+      if(child.nodeType===3){
+        if(child===range.endContainer){ offset += range.endOffset; done = true; return; }
+        offset += child.length;
+      } else if(child.nodeName==='BR'){
+        offset += 1;
+        if(child===range.endContainer){ done = true; return; }
+      } else {
+        walk(child);
+        if(done) return;
+      }
+    }
+    if(!done && node===range.endContainer && range.endOffset===children.length) done = true;
+  })(el);
+  return offset;
+}
+function setCaretOffset(el, offset){
+  const sel = window.getSelection();
+  const range = document.createRange();
+  let remaining = offset, placed = false;
+  (function walk(node){
+    if(placed) return;
+    const children = node.childNodes;
+    for(let i=0; i<children.length; i++){
+      if(placed) return;
+      const child = children[i];
+      if(child.nodeType===3){
+        if(remaining <= child.length){ range.setStart(child, Math.max(0,remaining)); range.setEnd(child, Math.max(0,remaining)); placed = true; return; }
+        remaining -= child.length;
+      } else if(child.nodeName==='BR'){
+        if(remaining <= 0){ range.setStart(node, i); range.setEnd(node, i); placed = true; return; }
+        remaining -= 1;
+        if(remaining <= 0){ range.setStart(node, i+1); range.setEnd(node, i+1); placed = true; return; }
+      } else {
+        walk(child);
+      }
+    }
+  })(el);
+  if(!placed){ range.selectNodeContents(el); range.collapse(false); }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
 function withFocusPreserved(containerId, renderFn){
   const container = document.getElementById(containerId);
   const active = document.activeElement;
   let restore = null;
-  if(container && active && container.contains(active) && (active.tagName==='INPUT' || active.tagName==='TEXTAREA')){
-    const key = active.getAttribute('data-field-key');
-    if(key) restore = { key, selStart: active.selectionStart, selEnd: active.selectionEnd };
+  if(container && active && container.contains(active)){
+    if(active.tagName==='INPUT' || active.tagName==='TEXTAREA'){
+      const key = active.getAttribute('data-field-key');
+      if(key) restore = { key, kind:'input', selStart: active.selectionStart, selEnd: active.selectionEnd };
+    } else if(active.isContentEditable){
+      const key = active.getAttribute('data-field-key');
+      if(key) restore = { key, kind:'rich', caretOffset: getCaretOffset(active) };
+    }
   }
   renderFn();
   if(restore){
     const el = container.querySelector(`[data-field-key="${restore.key}"]`);
     if(el){
       el.focus();
-      if(typeof restore.selStart === 'number' && el.setSelectionRange){
+      if(restore.kind==='input' && typeof restore.selStart === 'number' && el.setSelectionRange){
         try{ el.setSelectionRange(restore.selStart, restore.selEnd); }catch(e){}
+      } else if(restore.kind==='rich' && restore.caretOffset!==null){
+        try{ setCaretOffset(el, restore.caretOffset); }catch(e){}
       }
     }
   }
