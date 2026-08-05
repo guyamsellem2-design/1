@@ -4498,7 +4498,14 @@ function toggleTodayIdeaDone(id){
 }
 function toggleTodayIdeaFavorite(id){
   const item = data.todayIdeas.find(x=>x.id===id);
-  if(item){ item.favorite = !item.favorite; saveData(); renderTodayIdeas(); }
+  if(!item) return;
+  item.favorite = !item.favorite;
+  if(item.favorite){
+    data.todayIdeas = data.todayIdeas.filter(x=>x.id!==id);
+    data.todayIdeas.unshift(item);
+  }
+  saveData();
+  renderTodayIdeas();
 }
 function setTodayIdeasFavView(showFavOnly){
   data.todayIdeasShowFavOnly = showFavOnly;
