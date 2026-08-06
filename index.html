@@ -178,6 +178,20 @@
   .draw-size-dot span{display:block; border-radius:50%; background:var(--text);}
   .keep-note-canvas{width:100%; height:180px; border-radius:10px; margin-top:8px; touch-action:none; cursor:crosshair; background:#fff; border:1px solid var(--border); display:block;}
 
+  /* auto-contrast text/icons against a chosen note background color (--note-fg/--note-fg-muted set inline per note) */
+  .keep-note-minimized .keep-note-preview{color:var(--note-fg, var(--text));}
+  .keep-note-minimized .chev{color:var(--note-fg-muted, var(--muted2));}
+  .keep-note-editor{color:var(--note-fg, var(--text));}
+  .keep-note-editor:empty::before{color:var(--note-fg-muted, var(--muted2));}
+  .keep-note .note-size-btn{color:var(--note-fg-muted, var(--muted2));}
+  .keep-note .pencil-btn{color:var(--note-fg, var(--text));}
+  .keep-note .del-task{color:var(--note-fg-muted, var(--muted2));}
+  .keep-note .keep-colors span{border-color:var(--note-fg-muted, rgba(128,128,128,0.25));}
+  .keep-note .keep-colors span.active{border-color:var(--note-fg, var(--text));}
+  .keep-note .memo-section{border-top-color:var(--note-fg-muted, var(--border));}
+  .keep-note .memo-toggle{color:var(--note-fg-muted, var(--muted));}
+  .keep-note .memo-toggle .chev{color:var(--note-fg-muted, var(--muted2));}
+
   /* voice memos */
   .memo-section{margin-top:10px; padding-top:9px; border-top:1px solid var(--border);}
   .memo-toggle{font-size:13px; color:var(--muted); cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none;}
@@ -892,6 +906,9 @@ function contrastTextColor(hex){
   const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
   return luminance > 0.55 ? '#141a16' : '#ffffff';
 }
+function contrastMutedColor(hex){
+  return contrastTextColor(hex)==='#ffffff' ? 'rgba(255,255,255,0.72)' : 'rgba(20,26,22,0.62)';
+}
 function ensureNotes(id){ if(!data.notes[id]) data.notes[id] = {text:'', sparks:[]}; return data.notes[id]; }
 
 function loadData(){
@@ -1533,17 +1550,18 @@ function renderKeepGrid(id){
   el.innerHTML = notes.map(n=>{
     const isDrawing = drawingNoteId===n.id;
     const level = getNoteLevel(n.id);
+    const noteStyle = `background:${n.color||'var(--surface2)'};${n.color?` --note-fg:${contrastTextColor(n.color)}; --note-fg-muted:${contrastMutedColor(n.color)};`:''}`;
     if(level===2){
       const preview = (n.text||'').trim().slice(0,70) || 'פתק ריק';
       return `
-      <div class="keep-note keep-note-minimized" style="background:${n.color||'var(--surface2)'}" onclick="expandNoteStep('${id}','${n.id}')" title="לחיצה להרחבה">
+      <div class="keep-note keep-note-minimized" style="${noteStyle}" onclick="expandNoteStep('${id}','${n.id}')" title="לחיצה להרחבה">
         <span class="keep-note-preview">${escapeHtml(preview)}${n.drawing?' 🎨':''}</span>
         <span class="chev">▸</span>
       </div>`;
     }
     const isMedium = level===1;
     return `
-    <div class="keep-note" style="background:${n.color||'var(--surface2)'}">
+    <div class="keep-note" style="${noteStyle}">
       <div class="keep-note-toolbar">
         <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
         <span class="keep-note-fmt-btn fmt-underline" onmousedown="event.preventDefault()" onclick="execNoteFormat('underline')" title="קו תחתון">U</span>
