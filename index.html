@@ -377,6 +377,7 @@
   .energy-dot{width:11px; height:11px; border-radius:50%; flex-shrink:0; cursor:pointer; border:1px solid rgba(0,0,0,0.2);}
   .energy-dot.energy-dot-empty{background:transparent; border:1.5px dashed var(--muted2);}
   .task-text{flex:1; font-size:15.5px; cursor:pointer;}
+  .task-text.task-text-energizing{font-weight:700; color:var(--energy-low);}
   .task-text.done{text-decoration:line-through; color:var(--muted2);}
   .tag{font-size:12.5px; padding:3px 9px; border-radius:999px; color:#141a16; font-weight:600; white-space:nowrap;}
   select.tag{appearance:none; -webkit-appearance:none; border:none; cursor:pointer; font-family:inherit; background-image:none; max-width:110px; text-overflow:ellipsis;}
@@ -809,9 +810,9 @@
           </select>
           <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
           <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
-            <option value="all">הכל</option>
+            <option value="all" selected>הכל</option>
             <option value="today">היום</option>
-            <option value="week" selected>השבוע</option>
+            <option value="week">השבוע</option>
             <option value="month">החודש</option>
           </select>
         </div>
@@ -3129,7 +3130,7 @@ function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHT
 let taskSortBy = 'time';
 function setTaskSortBy(val){ taskSortBy = val; renderTasks(); }
 let taskFilterDomain = '';
-let taskFilterRange = 'week';
+let taskFilterRange = 'all';
 function setTaskFilterDomain(val){
   taskFilterDomain = val;
   renderTasks();
@@ -3277,21 +3278,22 @@ function taskRowHtml(t){
   const isSubtasksOpen = expandedTasks.has(t.id);
   const hasIncompleteSubtasks = subCount>0 && !(t.subtasks||[]).every(s=>s.done);
   const isOverdue = t.date && !t.done && t.date < ymd(new Date());
-  const isDimmed = isOverdue || (data.softMode && !energy);
+  const isFarFuture = t.date && !t.done && !isOverdue && t.date > ymd(currentWeekDates()[6]);
+  const isDimmed = isOverdue || isFarFuture || (data.softMode && !energy);
   const subBtnLabel = isSubtasksOpen ? `▾ תת-משימות${subCount?' ('+subCount+')':''}` : (subCount ? `▸ תת-משימות (${subCount})` : '+ תת-משימה');
   const canDrag = taskSortBy==='manual';
   let html = `<li class="task-li ${isDimmed?'dimmed-item':''} ${bodyCheckGlowClass(t)}" data-drag-id="${t.id}">
     <div class="task-row-main">
       ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
-      <span class="task-text ${t.done?'done':''}" onclick="taskTextClick('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
+      <span class="task-text ${t.done?'done':''} ${(!t.done && energy==='low')?'task-text-energizing':''}" onclick="taskTextClick('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
       <select class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
       <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
     </div>
     <div class="task-row-meta">
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
       ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
-      ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
+      ${isOverdue ? `<span class="promote" onclick="pushTaskToTomorrow('${t.id}')">→ מחר</span>` : ''}
       <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
   </li>`;
@@ -3348,7 +3350,7 @@ function taskEditFormInner(t){
     </div>`;
 }
 function taskEditFormHtml(t){
-  return `<li class="edit-li">${taskEditFormInner(t)}</li>`;
+  return `<li class="edit-li" data-drag-id="${t.id}">${taskEditFormInner(t)}</li>`;
 }
 const subtaskDateOpenIds = new Set();
 function toggleSubtaskDateOpen(taskId, subId){
@@ -3831,7 +3833,7 @@ function renderScheduleGrid(){
 
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
-    return `<div class="day-col ${isMinimized?'minimized':'expanded'}">
+    return `<div class="day-col ${isMinimized?'minimized':'expanded'}" data-day-idx="${dayIdx}">
       <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
       ${emptyNote}${itemsHtml}
       ${addAnchorHtml}
@@ -3932,7 +3934,7 @@ function somedayRowHtml(s){
   return html;
 }
 function somedayEditFormHtml(s){
-  return `<li class="edit-li">
+  return `<li class="edit-li" data-drag-id="${s.id}">
     <div class="anchor-form">
       <input type="text" id="somedayEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="הרעיון">
       <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
@@ -4159,7 +4161,7 @@ function renderSuggestions(){
   applyListCap('suggestion', data.suggestions.length);
 }
 function suggestionEditFormHtml(s){
-  return `<li class="edit-li">
+  return `<li class="edit-li" data-drag-id="${s.id}">
     <div class="anchor-form">
       <input type="text" id="suggEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="מה ההצעה...">
       <div class="edit-form-row">
@@ -4794,16 +4796,16 @@ function clearSomeday(){
   renderSomeday();
   flashStatus('הרשימה נוקתה');
 }
-function pushTaskToNextWeek(id){
+function pushTaskToTomorrow(id){
   const t = data.tasks.find(t=>t.id===id);
   if(!t || !t.date) return;
   const [y,m,d] = t.date.split('-').map(Number);
-  const nd = new Date(y, m-1, d+7);
+  const nd = new Date(y, m-1, d+1);
   t.date = ymd(nd);
   saveData();
   renderTasks();
   renderScheduleGrid();
-  flashStatus('הועבר לשבוע הבא');
+  flashStatus('הועבר למחר');
 }
 
 /* ---------- home page: energy + emotions/needs banks ----------
@@ -4999,6 +5001,43 @@ document.addEventListener('pointerdown', (e)=>{
   if(wrapper && wrapper.contains(e.target)) return;
   commitEditChip(editingChipBank, editingChipId);
 });
+/* ---------- click anywhere else closes whatever "big form" edit is open ----------
+   task edit (list + schedule grid), anchor edit/add, add-task-in-schedule, someday edit, and
+   suggestion edit all stay open until an explicit save/cancel today -- she wants them to also
+   close the moment she clicks literally anywhere else (another item, the background, a totally
+   different part of the site), so an old edit never lingers open by accident. feel-notes (emotion/
+   need/body/the "עוד" open questions) are deliberately NOT touched here -- those only minimize via
+   their own button, since it's nice to keep them visible while working elsewhere on the page.
+   this runs in the CAPTURE phase, before the actually-clicked element's own onclick fires, so the
+   "is this click outside the open edit's container" check reads the DOM/state as it stood before
+   that click did anything -- otherwise, the very click that OPENS an edit (e.g. a first tap on a
+   task, which sets editingTaskId and re-renders that row into its edit form) would immediately
+   read back as "outside" against its own freshly-rebuilt container and undo itself. the actual
+   closing is then deferred a tick (matching the fix already used for the sync-render/focusout
+   race elsewhere in this file) so it runs only after the click's own handler -- which might itself
+   already be closing things, or opening something else entirely -- has fully finished; the
+   still-equals-snapshot guard skips closing anything that already moved on by then. */
+function clickIsOutsideEl(el, target){ return !el || !el.contains(target); }
+document.addEventListener('click', (e)=>{
+  const target = e.target;
+  const prevTask = editingTaskId, prevSchedTask = scheduleEditingTaskId;
+  const prevSomeday = editingSomedayId, prevSuggestion = editingSuggestionId;
+  const prevOpenForm = openForm, prevAddTask = addingTaskDayIdx;
+  const outsideTask = prevTask !== null && clickIsOutsideEl(document.querySelector(`#taskList [data-drag-id="${prevTask}"]`), target);
+  const outsideSchedTask = prevSchedTask !== null && clickIsOutsideEl(document.getElementById('scheduleGrid'), target);
+  const outsideSomeday = prevSomeday !== null && clickIsOutsideEl(document.querySelector(`#somedayList [data-drag-id="${prevSomeday}"]`), target);
+  const outsideSuggestion = prevSuggestion !== null && clickIsOutsideEl(document.querySelector(`#suggestionList [data-drag-id="${prevSuggestion}"]`), target);
+  const scheduleFormDayIdx = prevOpenForm !== null ? prevOpenForm : prevAddTask;
+  const outsideScheduleForm = scheduleFormDayIdx !== null && clickIsOutsideEl(document.querySelector(`.day-col[data-day-idx="${scheduleFormDayIdx}"]`), target);
+  if(!outsideTask && !outsideSchedTask && !outsideSomeday && !outsideSuggestion && !outsideScheduleForm) return;
+  setTimeout(()=>{
+    if(outsideTask && editingTaskId===prevTask) closeTaskEdit();
+    else if(outsideSchedTask && scheduleEditingTaskId===prevSchedTask) closeTaskEdit();
+    if(outsideSomeday && editingSomedayId===prevSomeday) closeSomedayEdit();
+    if(outsideSuggestion && editingSuggestionId===prevSuggestion) closeSuggestionEdit();
+    if(outsideScheduleForm && (openForm===prevOpenForm && addingTaskDayIdx===prevAddTask)) closeAllScheduleForms();
+  }, 0);
+}, true);
 function toggleDeleteMode(bank){
   deleteModeBank = (deleteModeBank===bank) ? null : bank;
   if(deleteModeBank===bank) editModeBank = null;
