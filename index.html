@@ -395,7 +395,13 @@
   .feel-chip-add-confirm, .feel-chip-add-cancel{cursor:pointer; font-size:15px; padding:2px 4px; color:var(--muted2);}
   .feel-chip-add-confirm:hover{color:var(--safe, var(--text));}
   .feel-chip-add-cancel:hover{color:var(--text);}
-  .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:vertical; padding:8px 10px; line-height:1.5;}
+  .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:none; overflow:hidden; padding:8px 10px; line-height:1.5;}
+  .feel-note-wrap{margin-top:4px;}
+  .feel-note-min-btn{display:inline-block; margin-top:4px; cursor:pointer; font-size:12px; color:var(--muted2); padding:3px 8px; border-radius:6px;}
+  .feel-note-min-btn:hover{background:var(--surface3); color:var(--text);}
+  .feel-note-minimized{display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; margin-top:4px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface2);}
+  .feel-note-minimized .feel-note-preview{font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;}
+  .feel-note-minimized .chev{color:var(--muted2); font-size:13px; flex-shrink:0;}
   .today-idea-list{display:flex; flex-direction:column; gap:6px; margin-top:4px;}
   .today-idea-row{display:flex; align-items:center; gap:8px; touch-action:pan-y;}
   .today-idea-row.dragging{z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; background:var(--surface2); border-radius:8px;}
@@ -553,6 +559,12 @@
   .suggestion-badge:hover{color:var(--text);}
   li.suggestion-done{opacity:.55;}
   li.suggestion-done .task-text, li.suggestion-done .suggestion-badge{text-decoration:line-through;}
+  li.suggestion-li{flex-wrap:wrap;}
+  .sugg-reply-due{flex-basis:100%; font-size:15px; font-weight:700; color:var(--gold); margin-top:2px;}
+  .sugg-status-row{flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;}
+  .sugg-status-badge{font-size:12px; background:var(--surface3); color:var(--muted); padding:3px 8px; border-radius:999px; white-space:nowrap;}
+  .sugg-status-badge.sugg-status-contract{background:rgba(192,69,63,0.15); color:#c0453f;}
+  .sugg-status-badge.sugg-status-expand{background:rgba(63,174,122,0.15); color:#3fae7a;}
 
   /* notes */
   textarea.note-area{width:100%; min-height:110px; background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:12px; font-size:15px; font-family:inherit; resize:vertical; line-height:1.6; margin-bottom:14px;}
@@ -770,6 +782,10 @@
       </div>
       <div class="add-row" id="suggDetailsFields" style="display:none;">
         <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
+        <div class="time-picker-wrap">
+          <input type="hidden" id="suggReplyTime" value="">
+          <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעה" onclick="toggleTimePicker('suggReplyTime', event)">🕐 <span dir="ltr">שעה</span></button>
+        </div>
       </div>
       <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
       <ul class="tasks scroll-cap" id="suggestionList"></ul>
@@ -1735,19 +1751,37 @@ function textBeforeCaretOnLine(el){
 // inserting a bare <br> leaves the caret positioned BEFORE it (a known contenteditable quirk),
 // so typing right after Enter gets swallowed back into the previous line's bold/underline run;
 // anchoring a real (invisible) zero-width text node right after the <br> in the SAME insertHTML
-// call, then placing the caret inside that real node, keeps new typing on the new line
+// call, then placing the caret inside that real node, keeps new typing on the new line.
+// finding that node afterward has to be exact, not "the last text node in the whole note" --
+// pressing Enter in the MIDDLE of a longer note (not at the very end) would otherwise always snap
+// the caret down to the note's actual last line instead of staying where she was. a one-time random
+// suffix on the marker makes it unambiguous to locate regardless of where in the note this happened,
+// then gets stripped back down to just the zero-width space once the caret is correctly placed.
 function insertLineBreak(el, linePrefix){
-  document.execCommand('insertHTML', false, '<br>'+NOTE_ZWSP+(linePrefix||''));
+  const suffix = Math.random().toString(36).slice(2, 10);
+  const marker = NOTE_ZWSP + suffix;
+  document.execCommand('insertHTML', false, '<br>'+marker+(linePrefix||''));
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let lastText = null, node;
-  while(node = walker.nextNode()) lastText = node;
-  if(lastText){
+  let target = null, node;
+  while(node = walker.nextNode()){
+    if(node.textContent.includes(marker)){ target = node; break; }
+  }
+  if(target){
+    const markerOffset = target.textContent.indexOf(marker);
+    target.textContent = target.textContent.slice(0, markerOffset) + NOTE_ZWSP + target.textContent.slice(markerOffset + marker.length);
     const range = document.createRange();
-    range.setStart(lastText, lastText.length);
+    // the caret needs to land after the ZWSP AND the line prefix (e.g. the bullet "• "), not
+    // right after the ZWSP alone -- otherwise typed content lands before the bullet instead of
+    // after it, which then also breaks every later line-start check that expects it to be there
+    range.setStart(target, markerOffset + NOTE_ZWSP.length + (linePrefix||'').length);
     range.collapse(true);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
+    // execCommand already fired its own (synchronous) input event the moment it inserted the marker
+    // above, which saved the random suffix into n.text/n.html a beat before this cleanup ran. a
+    // synthetic input event re-fires the oninput handler now that the DOM is actually clean.
+    el.dispatchEvent(new Event('input', {bubbles:true}));
   }
 }
 function execNoteFormat(cmd){ document.execCommand(cmd, false, null); }
@@ -3129,7 +3163,7 @@ function taskRowHtml(t){
     </div>
     <div class="task-row-meta">
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
-      ${t.date ? `<span class="task-date-badge"><span dir="ltr">${t.date.slice(5)}${t.time?' '+t.time:''}${t.endTime?'–'+t.endTime:''}</span></span>` : ''}
+      ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
       ${isOverdue ? `<span class="promote" onclick="pushTaskToNextWeek('${t.id}')">→ שבוע הבא</span>` : ''}
       <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
@@ -3150,7 +3184,7 @@ function toggleTaskDateOpen(id){
 function taskEditFormInner(t){
   const descOpen = taskDescOpenIds.has(t.id);
   const dateOpen = taskDateOpenIds.has(t.id) || !!t.date || !!t.time;
-  const dateBtnLabel = (t.date || t.time) ? `📅 ${t.date?t.date.slice(5):''}${t.time?' '+t.time:''}` : '📅 תזמון';
+  const dateBtnLabel = (t.date || t.time) ? `📅 ${t.date?formatDateHe(t.date):''}${t.time?' · '+t.time:''}` : '📅 תזמון';
   return `<div class="anchor-form">
       <div class="edit-form-row">
         <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
@@ -3232,7 +3266,7 @@ function taskDetailHtml(t){
         ${inlineEditIds.has('subtask:'+t.id+':'+s.id)
           ? `<input type="text" class="inline-text-edit" value="${escapeAttr(s.text)}" data-inline-key="subtask:${t.id}:${s.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('subtask:${t.id}:${s.id}', renderTasks) : saveSubtaskTextEdit('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
           : `<span class="subtask-text ${s.done?'done':''}" data-inline-key="subtask:${t.id}:${s.id}" onclick="inlineEditToggle('subtask:${t.id}:${s.id}', renderTasks)">${escapeHtml(s.text)}</span>`}
-        ${s.date ? `<span class="task-date-badge"><span dir="ltr">${s.date.slice(5)}${s.time?' '+s.time:''}</span></span>` : ''}
+        ${s.date ? `<span class="task-date-badge">${formatDateHe(s.date)}${s.time?' · '+s.time:''}</span>` : ''}
         <span class="sched-link ${hasSchedule?'active':''}" onclick="toggleSubtaskDateOpen('${t.id}','${s.id}')" title="תזמון">🕐</span>
         <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
       </div>`;
@@ -3540,6 +3574,26 @@ function toggleScheduleViewMode(){
   renderScheduleGrid();
 }
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+// israeli date convention everywhere a date shows up: day.month(.year, optional), with the day of
+// week spelled out in hebrew -- "יום ג' 06.08" instead of a bare ISO-ish "08-06" that says nothing
+// about which day of the week it actually is
+const HE_WEEKDAY_SHORT = ["יום א'","יום ב'","יום ג'","יום ד'","יום ה'","יום ו'","שבת"];
+function formatDateHe(dateStr, opts){
+  if(!dateStr) return '';
+  opts = opts || {};
+  const d = new Date(dateStr+'T00:00:00');
+  if(isNaN(d.getTime())) return '';
+  const dow = HE_WEEKDAY_SHORT[d.getDay()];
+  const dd = pad(d.getDate());
+  const mm = pad(d.getMonth()+1);
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dow} ${dd}.${mm}${opts.withYear ? '.'+yy : ''}`;
+}
+function formatDateTimeHe(dateStr, timeStr, opts){
+  const datePart = formatDateHe(dateStr, opts);
+  if(!datePart) return timeStr||'';
+  return timeStr ? `${datePart} · ${timeStr}` : datePart;
+}
 
 function renderScheduleGrid(){
   const el = document.getElementById('scheduleGrid');
@@ -3933,6 +3987,25 @@ function reorderSomedaySubtasks(somedayId, fromId, toId){
 }
 /* ---------- others' suggestions ---------- */
 let editingSuggestionId = null;
+// done sinks all the way to the bottom (fully resolved); marked "contract" sinks below the regular
+// items too but stays above anything done, since it's a "not now" signal, not a "finished" one --
+// and it's fully reactive to the CURRENT bodyCheck value, so switching back to neutral/expand moves
+// it back up on its own, no separate "undo the sink" action needed anywhere
+function suggestionSortWeight(s){
+  if(s.done) return 2;
+  if((s.bodyCheck||{}).expand==='contract') return 1;
+  return 0;
+}
+function suggestionStatusBadgesHtml(s){
+  const bc = s.bodyCheck || {};
+  const badges = [];
+  if(bc.expand==='contract') badges.push('<span class="sugg-status-badge sugg-status-contract">🥀 מכווץ</span>');
+  if(bc.expand==='expand') badges.push('<span class="sugg-status-badge sugg-status-expand">🌱 מרחיב</span>');
+  if(bc.urgency==='objective') badges.push('<span class="sugg-status-badge">⚠️ דחוף אובייקטיבית</span>');
+  if(bc.urgency==='other') badges.push('<span class="sugg-status-badge">⚠️ דחוף כי זו העדפה של מישהו אחר</span>');
+  if(bc.energy==='no') badges.push('<span class="sugg-status-badge">🔋 אין לי אנרגיה לזה</span>');
+  return badges.length ? `<div class="sugg-status-row">${badges.join('')}</div>` : '';
+}
 function renderSuggestions(){
   const el = document.getElementById('suggestionList');
   if(!el) return;
@@ -3941,7 +4014,7 @@ function renderSuggestions(){
     applyListCap('suggestion', 0);
     return;
   }
-  const sorted = data.suggestions.slice().sort((a,b)=>(a.done?1:0)-(b.done?1:0));
+  const sorted = data.suggestions.slice().sort((a,b)=>suggestionSortWeight(a)-suggestionSortWeight(b));
   el.innerHTML = sorted.map(s=>{
     if(editingSuggestionId===s.id) return suggestionEditFormHtml(s);
     return `
@@ -3949,10 +4022,11 @@ function renderSuggestions(){
       <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
       <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
-      ${s.replyDate ? `<span class="task-date-badge">עד <span dir="ltr">${s.replyDate.slice(5)}</span></span>` : ''}
       <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
+      ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}</div>` : ''}
+      ${suggestionStatusBadgesHtml(s)}
     </li>`;
   }).join('');
   applyListCap('suggestion', data.suggestions.length);
@@ -3963,7 +4037,10 @@ function suggestionEditFormHtml(s){
       <input type="text" id="suggEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="מה ההצעה...">
       <div class="edit-form-row">
         <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע? (רשות)">
+      </div>
+      <div class="edit-form-row">
         <label class="field-label">יודע/ת מתי תחזיר/י תשובה?<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}"></label>
+        ${timePickerHtml('suggEditTime-'+s.id, s.replyTime||'', 'שעה')}
       </div>
       ${bodyCheckToggleBtnHtml('suggestion', s.id)}
       ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other'], showEnergy:true}) : ''}
@@ -3992,6 +4069,8 @@ function saveSuggestionEdit(id){
   s.text = text;
   s.who = document.getElementById(`suggEditWho-${id}`).value.trim();
   s.replyDate = document.getElementById(`suggEditDate-${id}`).value || '';
+  const timeInput = document.getElementById(`suggEditTime-${id}`);
+  s.replyTime = timeInput ? timeInput.value : '';
   editingSuggestionId = null;
   saveData();
   renderSuggestions();
@@ -4004,11 +4083,13 @@ function addSuggestion(){
   const whoInput = document.getElementById('suggWho');
   const textInput = document.getElementById('suggText');
   const dateInput = document.getElementById('suggReplyDate');
+  const timeInput = document.getElementById('suggReplyTime');
   const text = textInput.value.trim();
   if(!text) return;
   const bodyCheck = {...pendingBodyCheck.suggestion};
-  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : '', bodyCheck});
+  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : '', replyTime: timeInput ? timeInput.value : '', bodyCheck});
   whoInput.value=''; textInput.value=''; if(dateInput) dateInput.value='';
+  if(timeInput) setTimePickerValue('suggReplyTime', '');
   resetPendingBodyCheck('suggestion');
   saveData();
   renderSuggestions();
@@ -4824,6 +4905,24 @@ function feelChipGridHtml(bank){
 function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
 function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
+const feelNoteMinimized = new Set();
+function toggleFeelNoteMinimize(key){
+  if(feelNoteMinimized.has(key)) feelNoteMinimized.delete(key); else feelNoteMinimized.add(key);
+  renderFeelBar();
+}
+function feelNoteHtml(key, value, oninputFn, placeholder){
+  if(feelNoteMinimized.has(key)){
+    const preview = (value||'').trim().slice(0,70) || placeholder;
+    return `<div class="feel-note-minimized" onclick="toggleFeelNoteMinimize('${key}')" title="לחיצה להרחבה">
+      <span class="feel-note-preview">${escapeHtml(preview)}</span>
+      <span class="chev">▸</span>
+    </div>`;
+  }
+  return `<div class="feel-note-wrap">
+    <textarea class="feel-note-textarea" data-field-key="${key}-note" oninput="${oninputFn}(this.value); autoGrowNoteTextarea(this);" placeholder="${placeholder}">${escapeHtml(value||'')}</textarea>
+    <span class="feel-note-min-btn" onclick="toggleFeelNoteMinimize('${key}')" title="מזער">⌄ מזער</span>
+  </div>`;
+}
 function renderFeelBar(){
   const el = document.getElementById('feelBar');
   if(!el) return;
@@ -4843,18 +4942,21 @@ function renderFeelBar(){
         <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
         ${emotionsBankOpen ? `
           ${feelChipGridHtml('activeEmotions')}
-          <textarea class="feel-note-textarea" data-field-key="emotion-note" oninput="onEmotionNoteInput(this.value)" placeholder="מה עובר עלי עכשיו...">${escapeHtml(data.emotionNote||'')}</textarea>
+          ${feelNoteHtml('emotion', data.emotionNote, 'onEmotionNoteInput', 'מה עובר עלי עכשיו...')}
         ` : ''}
       </div>
       <div class="feel-bank">
         <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''}</div>
         ${needsBankOpen ? `
           ${feelChipGridHtml('activeNeeds')}
-          <textarea class="feel-note-textarea" data-field-key="need-note" oninput="onNeedNoteInput(this.value)" placeholder="מה אני צריך/ה עכשיו...">${escapeHtml(data.needNote||'')}</textarea>
+          ${feelNoteHtml('need', data.needNote, 'onNeedNoteInput', 'מה אני צריך/ה עכשיו...')}
         ` : ''}
       </div>
       ` : ''}
     `;
+  });
+  requestAnimationFrame(()=>{
+    el.querySelectorAll('.feel-note-textarea').forEach(autoGrowNoteTextarea);
   });
 }
 
@@ -4866,16 +4968,13 @@ function renderFeelBar(){
    no times, ever, in this list -- promoting to a task is the only way something gets a time. */
 let todayIdeasOpen = true;
 function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; renderTodayIdeas(); }
+// no more daily wipe -- this used to reset the whole list back to 3 blanks every day, which is
+// exactly what kept adding empty rows on every open. now it only ever tops the list UP to 3 (never
+// down, never touching existing content): the very first time there's nothing yet, and again any
+// time she's deleted below 3, however many are already there (empty or filled) just stay.
 function ensureTodayIdeas(){
-  const today = ymd(new Date());
-  if(data.todayIdeasDate !== today){
-    data.todayIdeasDate = today;
-    data.todayIdeas = [];
-    data.todayIdeasShowFavOnly = false;
-  }
-  if(data.todayIdeas.length===0){
-    for(let i=0;i<3;i++) data.todayIdeas.push({id: uid(), text:'', done:false, favorite:false});
-  }
+  if(!data.todayIdeas) data.todayIdeas = [];
+  while(data.todayIdeas.length < 3) data.todayIdeas.push({id: uid(), text:'', done:false, favorite:false});
 }
 function onTodayIdeaInput(id, inputEl){
   const val = inputEl.value;
@@ -4899,9 +4998,14 @@ function toggleTodayIdeaDone(id){
   const item = data.todayIdeas.find(x=>x.id===id);
   if(!item) return;
   item.done = !item.done;
+  data.todayIdeas = data.todayIdeas.filter(x=>x.id!==id);
   if(item.done){
-    data.todayIdeas = data.todayIdeas.filter(x=>x.id!==id);
     data.todayIdeas.push(item);
+  } else {
+    // back to the middle: right before the first remaining done item, where it was before it sank
+    let insertAt = data.todayIdeas.findIndex(x=>x.done);
+    if(insertAt===-1) insertAt = data.todayIdeas.length;
+    data.todayIdeas.splice(insertAt, 0, item);
   }
   saveData();
   renderTodayIdeas();
