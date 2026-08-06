@@ -409,6 +409,32 @@
   .habit-small-start-text{font-size:13.5px; color:var(--muted);}
   .habit-small-start-add{margin:6px 0 0; gap:6px;}
   .habits-footnote{font-size:13px; color:var(--muted); line-height:1.5; margin-top:10px; padding-top:8px; border-top:1px solid var(--border);}
+  .lists-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px;}
+  .list-card{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:14px 12px; cursor:pointer; transition:box-shadow .15s ease, transform .15s ease;}
+  .list-card:hover{box-shadow:0 8px 20px -10px rgba(0,0,0,0.35); transform:translateY(-1px);}
+  .list-card-name{font-size:15px; font-weight:600; color:var(--text); margin-bottom:4px;}
+  .list-card-meta{font-size:12.5px; color:var(--muted);}
+  .list-detail-topbar{display:flex; align-items:center; gap:10px;}
+  .list-detail-name{flex:1; font-size:19px; margin:0; color:var(--text); cursor:pointer;}
+  .list-name-edit{flex:1; font-size:19px; font-family:inherit; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:4px 8px; color:var(--text);}
+  .list-items{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .list-item{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:10px 12px;}
+  .list-item.done{opacity:0.6;}
+  .list-item-row{display:flex; align-items:center; gap:8px;}
+  .list-item-check{width:18px; height:18px; flex-shrink:0; cursor:pointer; accent-color:var(--gold);}
+  .list-item-text{flex:1; font-size:14.5px; color:var(--text); cursor:pointer;}
+  .list-item-text.done{text-decoration:line-through; color:var(--muted2);}
+  .list-item-actions{margin-top:8px;}
+  .list-subitems{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
+  .list-subitem-row{display:flex; align-items:center; gap:8px; padding:4px 0;}
+  .list-subitem-text{flex:1; font-size:13.5px; color:var(--muted);}
+  .list-subitem-text.done{text-decoration:line-through; color:var(--muted2);}
+  .apply-picker{margin-top:8px; padding:10px; background:var(--surface3); border-radius:10px;}
+  .apply-picker-title{font-size:13px; color:var(--text); margin-bottom:6px;}
+  .apply-picker-all{display:block; font-size:13.5px; color:var(--text); font-weight:600; padding:4px 0; cursor:pointer;}
+  .apply-picker-list{display:flex; flex-direction:column; gap:2px; max-height:160px; overflow-y:auto; margin:4px 0 8px; padding-right:4px;}
+  .apply-picker-item{display:block; font-size:13.5px; color:var(--muted); padding:3px 0; cursor:pointer;}
+  .apply-picker-actions{display:flex; gap:8px;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
   .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 2px 4px;}
   .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:none; user-select:none;}
@@ -654,6 +680,7 @@
   <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 בית</button>
   <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 נושאים</button>
   <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
+  <button class="main-tab-btn" id="mainTabListsBtn" onclick="switchMainView('lists')">🗂 רשימות</button>
 </div>
 
 <div class="undo-redo-bar">
@@ -877,6 +904,14 @@
   <div class="feel-block" id="inspiringVideosBlock"></div>
 </div>
 
+<div id="listsView" style="display:none;">
+  <div class="domain-page-topbar">
+    <div class="domain-page-header"><h1>🗂 רשימות</h1></div>
+    <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+  </div>
+  <div id="listsContent"></div>
+</div>
+
 </div>
 
 <div class="status" id="status">נשמר</div>
@@ -908,7 +943,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -1018,7 +1053,8 @@ function loadData(){
       data.procTrueWantNote = parsed.procTrueWantNote || '';
       data.inspiringVideos = parsed.inspiringVideos || [];
       data.habits = (parsed.habits || []).map(h=>({smallStarts:[], ...h}));
-      mainView = (parsed.mainView === 'topics' || parsed.mainView === 'tools') ? parsed.mainView : 'home';
+      data.lists = (parsed.lists || []).map(l=>({...l, items:(l.items||[]).map(i=>({favorite:false, subitems:[], ...i}))}));
+      mainView = ['topics','tools','lists'].includes(parsed.mainView) ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
       data.emotionsList = seedChipList(SEED_EMOTIONS, []);
@@ -1529,15 +1565,19 @@ function applyMainViewState(){
   const home = document.getElementById('homeView');
   const topicsView = document.getElementById('domainPageView');
   const toolsView = document.getElementById('toolsView');
+  const listsView = document.getElementById('listsView');
   const homeBtn = document.getElementById('mainTabHomeBtn');
   const topicsBtn = document.getElementById('mainTabTopicsBtn');
   const toolsBtn = document.getElementById('mainTabToolsBtn');
+  const listsBtn = document.getElementById('mainTabListsBtn');
   home.style.display = mainView==='home' ? '' : 'none';
   topicsView.style.display = mainView==='topics' ? '' : 'none';
   if(toolsView) toolsView.style.display = mainView==='tools' ? '' : 'none';
+  if(listsView) listsView.style.display = mainView==='lists' ? '' : 'none';
   if(homeBtn) homeBtn.classList.toggle('active', mainView==='home');
   if(topicsBtn) topicsBtn.classList.toggle('active', mainView==='topics');
   if(toolsBtn) toolsBtn.classList.toggle('active', mainView==='tools');
+  if(listsBtn) listsBtn.classList.toggle('active', mainView==='lists');
   if(mainView==='topics'){
     if(!activeNoteDomain || !domainById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
     renderDomainEditor();
@@ -1553,6 +1593,10 @@ function applyMainViewState(){
     // countdown timer, keep going silently in the background once they're no longer on screen
     stopBreathing();
     stopToolsTimer();
+  }
+  if(mainView==='lists'){
+    renderListsView();
+    window.scrollTo(0,0);
   }
 }
 
@@ -2584,10 +2628,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -2679,7 +2723,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -4702,12 +4746,13 @@ function resetAll(){
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
   const keepHabits = data.habits;
+  const keepLists = data.lists;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -5254,6 +5299,241 @@ function renderHabits(){
       <div class="habits-footnote">קח/י את זה כהמלצה — אם לא עשית יום, יומיים, שנה, זה בסדר 🥰 תמיד אפשר להתחיל שוב.</div>
     ` : ''}
   `;
+}
+
+/* ---------- lists (🗂 רשימות) ----------
+   a general-purpose nested-checklist tool, separate from topics/notes and from tasks -- for anything
+   worth tracking that isn't a dated task and doesn't belong to a life topic (a wishlist, a shopping
+   list, a practice list...). each item can carry its own small checklist, and that sub-checklist can
+   be copied onto other items in the same list -- e.g. the same "how to learn a solo" steps applied to
+   every solo on the list, instead of retyping it each time. */
+let activeListId = null;
+const listItemSubOpen = new Set(); // 'listId:itemId' keys
+const listNameEditIds = new Set();
+let applyPickerFor = null; // {listId, itemId} or null
+let applyPickerSelected = new Set();
+function listById(id){ return (data.lists||[]).find(l=>l.id===id); }
+function listItemById(listId, itemId){ const l=listById(listId); return l && (l.items||[]).find(i=>i.id===itemId); }
+function addList(){
+  const input = document.getElementById('newListInput');
+  const name = input.value.trim();
+  if(!name) return;
+  data.lists.push({id:uid(), name, items:[], createdAt:Date.now()});
+  input.value='';
+  saveData();
+  renderListsView();
+}
+function deleteList(id){
+  if(!confirm('למחוק את הרשימה הזו לגמרי, כולל כל הפריטים שבה? זה לא ניתן לביטול.')) return;
+  data.lists = data.lists.filter(l=>l.id!==id);
+  if(activeListId===id) activeListId = null;
+  saveData();
+  renderListsView();
+}
+function openList(id){ activeListId = id; renderListsView(); window.scrollTo(0,0); }
+function closeList(){ activeListId = null; applyPickerFor = null; renderListsView(); }
+function saveListNameEdit(id, value){
+  const l = listById(id);
+  if(l && value.trim()) l.name = value.trim();
+  saveData();
+}
+function addListItem(listId){
+  const input = document.getElementById('newListItemInput-'+listId);
+  const text = input.value.trim();
+  if(!text) return;
+  const l = listById(listId);
+  if(!l) return;
+  l.items.push({id:uid(), text, done:false, favorite:false, subitems:[], createdAt:Date.now()});
+  input.value='';
+  saveData();
+  renderListsView();
+}
+function deleteListItem(listId, itemId){
+  const l = listById(listId);
+  if(!l) return;
+  l.items = l.items.filter(i=>i.id!==itemId);
+  listItemSubOpen.delete(listId+':'+itemId);
+  saveData();
+  renderListsView();
+}
+function saveListItemTextEdit(listId, itemId, value){
+  const item = listItemById(listId, itemId);
+  if(item && value.trim()) item.text = value.trim();
+  saveData();
+}
+function toggleListItemDone(listId, itemId){
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  item.done = !item.done;
+  saveData();
+  renderListsView();
+}
+function toggleListItemFavorite(listId, itemId){
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  item.favorite = !item.favorite;
+  saveData();
+  renderListsView();
+}
+function toggleListItemSub(listId, itemId){
+  const key = listId+':'+itemId;
+  if(listItemSubOpen.has(key)) listItemSubOpen.delete(key); else listItemSubOpen.add(key);
+  renderListsView();
+}
+function addListSubitem(listId, itemId){
+  const input = document.getElementById('newSubitemInput-'+listId+'-'+itemId);
+  const text = input.value.trim();
+  if(!text) return;
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  if(!item.subitems) item.subitems = [];
+  item.subitems.push({id:uid(), text, done:false});
+  input.value='';
+  saveData();
+  renderListsView();
+}
+function deleteListSubitem(listId, itemId, subId){
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  item.subitems = (item.subitems||[]).filter(s=>s.id!==subId);
+  saveData();
+  renderListsView();
+}
+function toggleListSubitemDone(listId, itemId, subId){
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  const sub = (item.subitems||[]).find(s=>s.id===subId);
+  if(!sub) return;
+  sub.done = !sub.done;
+  saveData();
+  renderListsView();
+}
+function openApplyPicker(listId, itemId){
+  applyPickerFor = {listId, itemId};
+  applyPickerSelected = new Set();
+  renderListsView();
+}
+function closeApplyPicker(){ applyPickerFor = null; renderListsView(); }
+function toggleApplyPickerItem(itemId){
+  if(applyPickerSelected.has(itemId)) applyPickerSelected.delete(itemId); else applyPickerSelected.add(itemId);
+  renderListsView();
+}
+function toggleApplyPickerAll(){
+  if(!applyPickerFor) return;
+  const l = listById(applyPickerFor.listId);
+  if(!l) return;
+  const others = l.items.filter(i=>i.id!==applyPickerFor.itemId);
+  const allSelected = others.length>0 && others.every(i=>applyPickerSelected.has(i.id));
+  applyPickerSelected = allSelected ? new Set() : new Set(others.map(i=>i.id));
+  renderListsView();
+}
+function applySubitemsToSelected(){
+  if(!applyPickerFor || applyPickerSelected.size===0) return;
+  const l = listById(applyPickerFor.listId);
+  const source = listItemById(applyPickerFor.listId, applyPickerFor.itemId);
+  if(!l || !source) return;
+  const template = (source.subitems||[]).map(s=>s.text);
+  l.items.forEach(i=>{
+    if(!applyPickerSelected.has(i.id)) return;
+    if(!i.subitems) i.subitems = [];
+    template.forEach(text=>{ i.subitems.push({id:uid(), text, done:false}); });
+  });
+  applyPickerFor = null;
+  applyPickerSelected = new Set();
+  saveData();
+  renderListsView();
+  flashStatus('תת-הרשימה הועתקה');
+}
+function renderListsView(){
+  const el = document.getElementById('listsContent');
+  if(!el) return;
+  if(!activeListId){
+    const lists = data.lists || [];
+    el.innerHTML = `
+      <div class="add-row" style="margin-bottom:14px;">
+        <input type="text" id="newListInput" placeholder="שם הרשימה... (למשל: קניות, סולואים ללמוד)" onkeydown="if(event.key==='Enter') addList();">
+        <button onclick="addList()">+ הוסף רשימה</button>
+      </div>
+      ${lists.length ? `<div class="lists-grid">${lists.map(l=>{
+        const doneCount = (l.items||[]).filter(i=>i.done).length;
+        return `<div class="list-card" onclick="openList('${l.id}')">
+          <div class="list-card-name">${escapeHtml(l.name)}</div>
+          <div class="list-card-meta">${l.items.length} פריטים${doneCount?` · ${doneCount} בוצעו`:''}</div>
+        </div>`;
+      }).join('')}</div>` : '<div class="empty">עדיין אין רשימות — אפשר להתחיל עם אחת חדשה למעלה</div>'}
+    `;
+    return;
+  }
+  const l = listById(activeListId);
+  if(!l){ activeListId = null; renderListsView(); return; }
+  const sortedItems = l.items.slice().sort((a,b)=>{
+    if(a.done!==b.done) return a.done?1:-1;
+    if(a.favorite!==b.favorite) return a.favorite?-1:1;
+    return 0;
+  });
+  el.innerHTML = `
+    <div class="list-detail-topbar">
+      <button type="button" class="reset-btn" onclick="closeList()">→ כל הרשימות</button>
+      ${listNameEditIds.has(l.id)
+        ? `<input type="text" class="list-name-edit" value="${escapeAttr(l.name)}" data-inline-key="listname:${l.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('listname:${l.id}', renderListsView) : (saveListNameEdit('${l.id}', this.value), cancelInlineEdit('listname:${l.id}', renderListsView))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+        : `<h2 class="list-detail-name" data-inline-key="listname:${l.id}" onclick="inlineEditToggle('listname:${l.id}', renderListsView)">${escapeHtml(l.name)}</h2>`}
+      <span class="del-task" onclick="deleteList('${l.id}')" title="מחיקת הרשימה">✕</span>
+    </div>
+    <div class="add-row" style="margin:10px 0;">
+      <input type="text" id="newListItemInput-${l.id}" placeholder="פריט חדש..." onkeydown="if(event.key==='Enter') addListItem('${l.id}');">
+      <button onclick="addListItem('${l.id}')">הוסף</button>
+    </div>
+    ${sortedItems.length ? `<ul class="list-items">${sortedItems.map(item=>listItemHtml(l, item)).join('')}</ul>` : '<div class="empty">עדיין אין פריטים ברשימה הזו</div>'}
+  `;
+}
+function listItemHtml(l, item){
+  const key = l.id+':'+item.id;
+  const subOpen = listItemSubOpen.has(key);
+  const subitems = item.subitems || [];
+  const editKey = 'listitem:'+key;
+  const showingPicker = applyPickerFor && applyPickerFor.listId===l.id && applyPickerFor.itemId===item.id;
+  const others = l.items.filter(i=>i.id!==item.id);
+  return `<li class="list-item ${item.done?'done':''}">
+    <div class="list-item-row">
+      <input type="checkbox" class="list-item-check" ${item.done?'checked':''} onchange="toggleListItemDone('${l.id}','${item.id}')">
+      ${inlineEditIds.has(editKey)
+        ? `<input type="text" class="inline-text-edit" value="${escapeAttr(item.text)}" data-inline-key="${editKey}" onblur="this.dataset.cancelled ? cancelInlineEdit('${editKey}', renderListsView) : (saveListItemTextEdit('${l.id}','${item.id}', this.value), cancelInlineEdit('${editKey}', renderListsView))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+        : `<span class="list-item-text ${item.done?'done':''}" data-inline-key="${editKey}" onclick="inlineEditToggle('${editKey}', renderListsView)">${escapeHtml(item.text)}</span>`}
+      <span class="fav-star ${item.favorite?'active':''}" onclick="toggleListItemFavorite('${l.id}','${item.id}')" title="${item.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${item.favorite?'★':'☆'}</span>
+      <span class="del-task" onclick="deleteListItem('${l.id}','${item.id}')">✕</span>
+    </div>
+    <div class="list-item-actions">
+      <button type="button" class="subtask-toggle-btn ${subitems.length?'has-content':''}" onclick="toggleListItemSub('${l.id}','${item.id}')">${subOpen?'▾':'▸'} תת-רשימה${subitems.length?' ('+subitems.length+')':''}</button>
+    </div>
+    ${subOpen ? `
+    <div class="list-subitems">
+      ${subitems.map(s=>`<div class="list-subitem-row">
+        <input type="checkbox" class="list-item-check" ${s.done?'checked':''} onchange="toggleListSubitemDone('${l.id}','${item.id}','${s.id}')">
+        <span class="list-subitem-text ${s.done?'done':''}">${escapeHtml(s.text)}</span>
+        <span class="del-task" onclick="deleteListSubitem('${l.id}','${item.id}','${s.id}')">✕</span>
+      </div>`).join('')}
+      <div class="add-row habit-small-start-add">
+        <input type="text" id="newSubitemInput-${l.id}-${item.id}" placeholder="שלב בתת-הרשימה..." onkeydown="if(event.key==='Enter') addListSubitem('${l.id}','${item.id}');">
+        <button onclick="addListSubitem('${l.id}','${item.id}')">הוסף</button>
+      </div>
+      ${subitems.length && others.length ? `<button type="button" class="subtask-toggle-btn" onclick="openApplyPicker('${l.id}','${item.id}')">📋 החל על עוד סעיפים ברשימה</button>` : ''}
+      ${showingPicker ? applyPickerHtml(item, others) : ''}
+    </div>` : ''}
+  </li>`;
+}
+function applyPickerHtml(item, others){
+  const allSelected = others.length>0 && others.every(i=>applyPickerSelected.has(i.id));
+  return `<div class="apply-picker">
+    <div class="apply-picker-title">להעתיק את תת-הרשימה של "${escapeHtml(item.text)}" לאילו סעיפים?</div>
+    <label class="apply-picker-all"><input type="checkbox" ${allSelected?'checked':''} onchange="toggleApplyPickerAll()"> הכל</label>
+    <div class="apply-picker-list">
+      ${others.map(i=>`<label class="apply-picker-item"><input type="checkbox" ${applyPickerSelected.has(i.id)?'checked':''} onchange="toggleApplyPickerItem('${i.id}')"> ${escapeHtml(i.text)}</label>`).join('')}
+    </div>
+    <div class="apply-picker-actions">
+      <button class="save-btn" ${applyPickerSelected.size===0?'disabled':''} onclick="applySubitemsToSelected()">החל (${applyPickerSelected.size})</button>
+      <button class="cancel-btn" onclick="closeApplyPicker()">ביטול</button>
+    </div>
+  </div>`;
 }
 
 /* ---------- today's ideas: brain dump, then choose ----------
