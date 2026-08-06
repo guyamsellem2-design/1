@@ -4200,6 +4200,13 @@ function setBodyCheckField(kind, id, field, value){
   saveData();
   bodyCheckSection(kind).render();
 }
+function setBodyCheckNote(kind, id, value){
+  const item = bodyCheckItem(kind, id);
+  if(!item) return;
+  if(!item.bodyCheck) item.bodyCheck = {};
+  item.bodyCheck.note = value;
+  saveData();
+}
 function showSelfChoiceReminder(kind, id){
   const key = kind+':'+id;
   const bank = data.selfChoiceReminders || [];
@@ -4236,6 +4243,10 @@ function bodyCheckPanelHtml(kind, id, opts){
         ${energyBtn('no','אין אנרגיה')}
       </div>
     </div>` : ''}
+    <div class="bc-row">
+      <span class="bc-row-label">איפה זה פוגש אותי?</span>
+      <textarea class="detail-desc" dir="auto" placeholder="איפה בגוף / בחיים זה פוגש אותי..." oninput="setBodyCheckNote('${kind}','${id}', this.value)">${escapeHtml(bc.note||'')}</textarea>
+    </div>
     ${showReminderBtn ? `
       <button type="button" class="bc-reminder-btn" onclick="showSelfChoiceReminder('${kind}','${id}')">❤️‍🩹 תזכורת לבחור בעצמי</button>
       ${shown!==null ? `<div class="bc-reminder-shown">${shown ? escapeHtml(shown) : 'עוד אין תזכורות בבנק — אפשר להוסיף אחת בסקירה השבועית (03).'}</div>` : ''}
@@ -4245,7 +4256,7 @@ function bodyCheckPanelHtml(kind, id, opts){
 function bodyCheckToggleBtnHtml(kind, id){
   const item = bodyCheckItem(kind, id);
   const bc = (item && item.bodyCheck) || {};
-  const hasContent = !!(bc.expand || bc.urgency || bc.energy);
+  const hasContent = !!(bc.expand || bc.urgency || bc.energy || bc.note);
   const isOpen = bodyCheckOpenIds.has(kind+':'+id);
   return `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="toggleBodyCheck('${kind}','${id}')">❤️‍🩹 בדיקת גוף${isOpen?' ▴':''}</button>`;
 }
@@ -4276,7 +4287,7 @@ function togglePendingBodyCheck(kind){
 }
 function pendingBodyCheckToggleBtnHtml(kind){
   const bc = pendingBodyCheck[kind];
-  const hasContent = !!(bc.expand || bc.urgency || bc.energy);
+  const hasContent = !!(bc.expand || bc.urgency || bc.energy || bc.note);
   const isOpen = pendingBodyCheckOpen[kind];
   return `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="togglePendingBodyCheck('${kind}')">❤️‍🩹 בדיקת גוף${isOpen?' ▴':''}</button>`;
 }
@@ -4284,6 +4295,9 @@ function setPendingBodyCheckField(kind, field, value){
   const bc = pendingBodyCheck[kind];
   bc[field] = (bc[field]===value) ? '' : value;
   renderPendingBodyCheck(kind);
+}
+function setPendingBodyCheckNote(kind, value){
+  pendingBodyCheck[kind].note = value;
 }
 function pendingBodyCheckPanelHtml(kind){
   const opts = PENDING_BODY_CHECK_OPTS[kind];
@@ -4311,6 +4325,10 @@ function pendingBodyCheckPanelHtml(kind){
         ${energyBtn('no','אין אנרגיה')}
       </div>
     </div>` : ''}
+    <div class="bc-row">
+      <span class="bc-row-label">איפה זה פוגש אותי?</span>
+      <textarea class="detail-desc" dir="auto" placeholder="איפה בגוף / בחיים זה פוגש אותי..." oninput="setPendingBodyCheckNote('${kind}', this.value)">${escapeHtml(bc.note||'')}</textarea>
+    </div>
   </div>`;
 }
 function renderPendingBodyCheck(kind){
