@@ -2677,25 +2677,35 @@ async function runFullSync(){
   syncInProgress = true;
   renderSyncBlock();
   try{
-    const snap = await syncDoc().get();
-    const remote = snap.exists ? (snap.data().plannerData || emptySyncSkeleton()) : emptySyncSkeleton();
-    // the very first sync this device ever does has no real 3-way history to merge against. treating
-    // that as an empty base makes anything already on another (already-synced) device look "brand
-    // new here too" -- including something she'd already deleted locally moments earlier, which then
-    // gets pulled straight back in. starting from remote-as-base for just this one sync means only
-    // content that's genuinely local-only (added before this device ever connected) gets layered on
-    // top of it; anything merely absent locally is left alone instead of resurrected.
-    const storedBase = loadSyncBase();
-    const base = storedBase || remote;
-    const merged = mergePlannerData(data, base, remote);
+    // now connected on more than one device, a plain get()-then-set() has a real race: her phone and
+    // computer can both read the cloud doc within the same moment, each compute a merge unaware of
+    // the other, and whichever finishes writing LAST silently overwrites the other's fresh change --
+    // including a delete, which is exactly what made a just-deleted item come back on its own a few
+    // seconds later. a Firestore transaction closes that window: if the doc changes between its read
+    // and its write, Firestore itself reruns this whole function against the newest data instead of
+    // letting a stale write land.
+    let merged;
+    await fbDb.runTransaction(async (tx)=>{
+      const snap = await tx.get(syncDoc());
+      const remote = snap.exists ? (snap.data().plannerData || emptySyncSkeleton()) : emptySyncSkeleton();
+      // the very first sync this device ever does has no real 3-way history to merge against. treating
+      // that as an empty base makes anything already on another (already-synced) device look "brand
+      // new here too" -- including something she'd already deleted locally moments earlier, which then
+      // gets pulled straight back in. starting from remote-as-base for just this one sync means only
+      // content that's genuinely local-only (added before this device ever connected) gets layered on
+      // top of it; anything merely absent locally is left alone instead of resurrected.
+      const storedBase = loadSyncBase();
+      const base = storedBase || remote;
+      merged = mergePlannerData(data, base, remote);
+      const mergedSnapshot = JSON.parse(JSON.stringify(merged));
+      tx.set(syncDoc(), { plannerData: mergedSnapshot, updatedAt: Date.now() });
+    });
     applyingSyncedData = true;
     applySyncedFields(data, merged);
     saveData();
     renderOrDeferIfTyping();
     applyingSyncedData = false;
-    const mergedSnapshot = JSON.parse(JSON.stringify(merged));
-    saveSyncBase(mergedSnapshot);
-    await syncDoc().set({ plannerData: mergedSnapshot, updatedAt: Date.now() });
+    saveSyncBase(JSON.parse(JSON.stringify(merged)));
     lastSyncAt = Date.now();
     lastSyncError = null;
   }catch(e){
