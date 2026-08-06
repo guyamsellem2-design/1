@@ -2669,8 +2669,19 @@ function renderOrDeferIfTyping(){
 document.addEventListener('focusout', (e)=>{
   if(!pendingRenderAfterTyping) return;
   if(e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') return;
-  pendingRenderAfterTyping = false;
-  renderKeepingScrollPosition();
+  // blurring a field is the FIRST thing that happens when she clicks a button next to it (like "+
+  // הוסף תובנה") -- focusout fires, then only after that does the click's own handler run. rendering
+  // right here, synchronously, rebuilds the whole section (reflection banks, edit forms, etc. aren't
+  // wrapped in withFocusPreserved) and can destroy the very button mid-click before its handler ever
+  // fires, silently losing whatever she'd just typed and was trying to save. deferring one tick lets
+  // the click's own handler -- which reads the field's value and does its own fresh render -- run
+  // first; by the time this fires, either it's now a harmless no-op re-render, or nothing consumed
+  // the field and this still catches it.
+  setTimeout(()=>{
+    if(!pendingRenderAfterTyping) return;
+    pendingRenderAfterTyping = false;
+    renderKeepingScrollPosition();
+  }, 0);
 });
 async function runFullSync(){
   if(!currentSyncUser || !fbDb || syncInProgress) return;
