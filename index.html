@@ -2488,9 +2488,11 @@ const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings',
 function emptySyncSkeleton(){
   return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
+// null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
+// need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
 function loadSyncBase(){
-  try{ const raw = localStorage.getItem(SYNC_BASE_KEY); return raw ? JSON.parse(raw) : emptySyncSkeleton(); }
-  catch(e){ return emptySyncSkeleton(); }
+  try{ const raw = localStorage.getItem(SYNC_BASE_KEY); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
 }
 function saveSyncBase(obj){
   try{ localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(obj)); }catch(e){}
@@ -2669,7 +2671,14 @@ async function runFullSync(){
   try{
     const snap = await syncDoc().get();
     const remote = snap.exists ? (snap.data().plannerData || emptySyncSkeleton()) : emptySyncSkeleton();
-    const base = loadSyncBase();
+    // the very first sync this device ever does has no real 3-way history to merge against. treating
+    // that as an empty base makes anything already on another (already-synced) device look "brand
+    // new here too" -- including something she'd already deleted locally moments earlier, which then
+    // gets pulled straight back in. starting from remote-as-base for just this one sync means only
+    // content that's genuinely local-only (added before this device ever connected) gets layered on
+    // top of it; anything merely absent locally is left alone instead of resurrected.
+    const storedBase = loadSyncBase();
+    const base = storedBase || remote;
     const merged = mergePlannerData(data, base, remote);
     applyingSyncedData = true;
     applySyncedFields(data, merged);
