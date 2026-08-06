@@ -391,6 +391,14 @@
   .feel-energy-row input[type=range]{flex:1; accent-color:var(--gold);}
   .feel-energy-value{font-size:14px; color:var(--muted); min-width:38px; text-align:left; direction:ltr;}
   .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
+  .feel-open-q{margin-bottom:12px;}
+  .feel-open-q:last-child{margin-bottom:0;}
+  .feel-open-q-label{font-size:13.5px; color:var(--muted); line-height:1.45; padding:0 2px;}
+  .hint-inline{color:var(--muted2); font-weight:400;}
+  .video-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
+  .video-li{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:9px 12px;}
+  .video-li a{color:var(--text); font-size:14px; text-decoration:none; flex:1; overflow-wrap:anywhere;}
+  .video-li a:hover{color:var(--gold); text-decoration:underline;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
   .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 2px 4px;}
   .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:none; user-select:none;}
@@ -668,6 +676,10 @@
     </div>
   </div>
 
+  <div class="feel-block" id="procrastinationBlock"></div>
+
+  <div class="feel-block" id="inspiringVideosBlock"></div>
+
   <div class="feel-block" id="todayPicksBlock"></div>
 
   <section>
@@ -886,7 +898,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -979,6 +991,22 @@ function loadData(){
       data.breathHold = (typeof parsed.breathHold === 'number') ? parsed.breathHold : 5;
       data.breathOut = (typeof parsed.breathOut === 'number') ? parsed.breathOut : 5;
       data.breathSoundOn = parsed.breathSoundOn !== false;
+      data.activeBodyLocations = parsed.activeBodyLocations || [];
+      data.bodyNote = parsed.bodyNote || '';
+      data.bodyLocationsList = parsed.bodyLocationsList || [];
+      data.bodyBankSeeded = !!parsed.bodyBankSeeded;
+      if(!data.bodyBankSeeded){
+        if(data.bodyLocationsList.length===0) data.bodyLocationsList = seedChipList(SEED_BODY_LOCATIONS, []);
+        data.bodyBankSeeded = true;
+      }
+      data.qSoulNote = parsed.qSoulNote || '';
+      data.qPowerNote = parsed.qPowerNote || '';
+      data.qHealingNote = parsed.qHealingNote || '';
+      data.qFreeSelfNote = parsed.qFreeSelfNote || '';
+      data.qExpressNote = parsed.qExpressNote || '';
+      data.procWantNote = parsed.procWantNote || '';
+      data.procTrueWantNote = parsed.procTrueWantNote || '';
+      data.inspiringVideos = parsed.inspiringVideos || [];
       mainView = (parsed.mainView === 'topics' || parsed.mainView === 'tools') ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -987,6 +1015,8 @@ function loadData(){
       data.goodThingsList = seedChipList(SEED_GOOD_THINGS, []);
       data.chipBanksSeeded = true;
       data.goodThingsRestoredOnce = true;
+      data.bodyLocationsList = seedChipList(SEED_BODY_LOCATIONS, []);
+      data.bodyBankSeeded = true;
     }
   }catch(e){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -2543,10 +2573,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList'];
-const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos'];
+const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -2638,7 +2668,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -4647,7 +4677,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[]};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4704,18 +4734,23 @@ const SEED_GOOD_THINGS = [
   {id:'gt1',label:'הליכה קצרה בחוץ'}, {id:'gt2',label:'כוס מים קרה'}, {id:'gt3',label:'מקלחת'}, {id:'gt4',label:'לשכב 10 דקות בלי מסך'},
   {id:'gt5',label:'להקשיב לשיר אהוב'}, {id:'gt6',label:'לגעת במשהו רך'}, {id:'gt7',label:'לכתוב 3 משפטים על מה שקורה'}, {id:'gt8',label:'למתוח את הגוף'}
 ];
+const SEED_BODY_LOCATIONS = [
+  {id:'bl-head',label:'ראש'}, {id:'bl-throat',label:'גרון'}, {id:'bl-chest',label:'חזה'}, {id:'bl-heart',label:'לב'},
+  {id:'bl-stomach',label:'בטן'}, {id:'bl-shoulders',label:'כתפיים'}, {id:'bl-back',label:'גב'}, {id:'bl-hands',label:'ידיים'},
+  {id:'bl-legs',label:'רגליים'}, {id:'bl-whole',label:'כל הגוף'}
+];
 function seedChipList(seed, legacyItems){
   const list = seed.map(x=>({...x}));
   (legacyItems||[]).forEach(c=>{ if(c && c.label && c.label.trim()) list.push({id:c.id||uid(), label:c.label}); });
   return list;
 }
-let feelBlockOpen = true, emotionsBankOpen = false, needsBankOpen = false;
+let feelBlockOpen = true, emotionsBankOpen = false, needsBankOpen = false, bodyBankOpen = false, moreQuestionsOpen = false;
 
 /* ---------- chip banks: emotions / needs / good-things share one system ----------
    every chip -- built-in or custom, doesn't matter, there's no distinction anymore -- can be renamed
    (like a topic), deleted, dragged into any order, and toggled on/off ("I'm feeling/choosing this
    right now") independently of the others. */
-function chipListKey(bank){ return bank==='activeEmotions'?'emotionsList':bank==='activeNeeds'?'needsList':'goodThingsList'; }
+function chipListKey(bank){ return bank==='activeEmotions'?'emotionsList':bank==='activeNeeds'?'needsList':bank==='activeBodyLocations'?'bodyLocationsList':'goodThingsList'; }
 function rerenderChipBank(bank){ if(bank==='activeGoodThings') renderToolsView(); else renderFeelBar(); }
 function hashChipColor(id){
   let h=0;
@@ -4929,6 +4964,14 @@ function feelChipGridHtml(bank){
 function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
 function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
+function toggleBodyBank(){ bodyBankOpen = !bodyBankOpen; renderFeelBar(); }
+function toggleMoreQuestions(){ moreQuestionsOpen = !moreQuestionsOpen; renderFeelBar(); }
+function onBodyNoteInput(val){ data.bodyNote = val; saveData(); }
+function onQSoulNoteInput(val){ data.qSoulNote = val; saveData(); }
+function onQPowerNoteInput(val){ data.qPowerNote = val; saveData(); }
+function onQHealingNoteInput(val){ data.qHealingNote = val; saveData(); }
+function onQFreeSelfNoteInput(val){ data.qFreeSelfNote = val; saveData(); }
+function onQExpressNoteInput(val){ data.qExpressNote = val; saveData(); }
 const feelNoteMinimized = new Set();
 function toggleFeelNoteMinimize(key){
   if(feelNoteMinimized.has(key)) feelNoteMinimized.delete(key); else feelNoteMinimized.add(key);
@@ -4952,6 +4995,7 @@ function renderFeelBar(){
   if(!el) return;
   const emotionsCount = (data.activeEmotions||[]).length;
   const needsCount = (data.activeNeeds||[]).length;
+  const bodyCount = (data.activeBodyLocations||[]).length;
   withFocusPreserved('feelBar', ()=>{
     el.innerHTML = `
       <div class="feel-block-header" onclick="toggleFeelBlock()">${feelBlockOpen?'▾':'▸'} 🌤️ איך אני מרגיש/ה עכשיו</div>
@@ -4970,10 +5014,42 @@ function renderFeelBar(){
         ` : ''}
       </div>
       <div class="feel-bank">
+        <div class="feel-bank-header" onclick="toggleBodyBank()">${bodyBankOpen?'▾':'▸'} איפה אני מרגיש/ה את זה בגוף?${bodyCount?' ('+bodyCount+')':''}</div>
+        ${bodyBankOpen ? `
+          ${feelChipGridHtml('activeBodyLocations')}
+          ${feelNoteHtml('body', data.bodyNote, 'onBodyNoteInput', 'איפה בגוף אני מרגיש/ה את זה...')}
+        ` : ''}
+      </div>
+      <div class="feel-bank">
         <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''}</div>
         ${needsBankOpen ? `
           ${feelChipGridHtml('activeNeeds')}
           ${feelNoteHtml('need', data.needNote, 'onNeedNoteInput', 'מה אני צריך/ה עכשיו...')}
+        ` : ''}
+      </div>
+      <div class="feel-bank">
+        <div class="feel-bank-header" onclick="toggleMoreQuestions()">${moreQuestionsOpen?'▾':'▸'} עוד</div>
+        ${moreQuestionsOpen ? `
+          <div class="feel-open-q">
+            <div class="feel-open-q-label">מה הנפש שלי צריכה? מה הנשמה שלי צריכה? מה הלב שלי צריך?</div>
+            ${feelNoteHtml('qSoul', data.qSoulNote, 'onQSoulNoteInput', 'לכתוב מה שעולה...')}
+          </div>
+          <div class="feel-open-q">
+            <div class="feel-open-q-label">מה יעניק לי כוח עכשיו?</div>
+            ${feelNoteHtml('qPower', data.qPowerNote, 'onQPowerNoteInput', 'לכתוב מה שעולה...')}
+          </div>
+          <div class="feel-open-q">
+            <div class="feel-open-q-label">מה יעניק לי ריפוי?</div>
+            ${feelNoteHtml('qHealing', data.qHealingNote, 'onQHealingNoteInput', 'לכתוב מה שעולה...')}
+          </div>
+          <div class="feel-open-q">
+            <div class="feel-open-q-label">איך הגירסה החופשית שלי מרגישה?</div>
+            ${feelNoteHtml('qFreeSelf', data.qFreeSelfNote, 'onQFreeSelfNoteInput', 'לכתוב מה שעולה...')}
+          </div>
+          <div class="feel-open-q">
+            <div class="feel-open-q-label">מה רוצה להתבטא דרכי כרגע?</div>
+            ${feelNoteHtml('qExpress', data.qExpressNote, 'onQExpressNoteInput', 'לכתוב מה שעולה...')}
+          </div>
         ` : ''}
       </div>
       ` : ''}
@@ -4982,6 +5058,77 @@ function renderFeelBar(){
   requestAnimationFrame(()=>{
     el.querySelectorAll('.feel-note-textarea').forEach(autoGrowNoteTextarea);
   });
+}
+
+/* ---------- anti-procrastination: "לדחיינים שבינינו" ----------
+   non-judgmental on purpose -- if she's going to procrastinate anyway, better to notice what would
+   actually feel good right now than to just default into whatever's easiest to numb out with. */
+let procBlockOpen = false;
+function toggleProcBlock(){ procBlockOpen = !procBlockOpen; renderProcrastinationBlock(); }
+function onProcWantNoteInput(val){ data.procWantNote = val; saveData(); }
+function onProcTrueWantNoteInput(val){ data.procTrueWantNote = val; saveData(); }
+function renderProcrastinationBlock(){
+  const el = document.getElementById('procrastinationBlock');
+  if(!el) return;
+  withFocusPreserved('procrastinationBlock', ()=>{
+    el.innerHTML = `
+      <div class="feel-block-header" onclick="toggleProcBlock()">${procBlockOpen?'▾':'▸'} 🌀 לדחיינים שבינינו</div>
+      ${procBlockOpen ? `
+      <div class="feel-open-q">
+        <div class="feel-open-q-label">מה בא לי לעשות עכשיו? <span class="hint-inline">(מותר לך)</span></div>
+        ${feelNoteHtml('procWant', data.procWantNote, 'onProcWantNoteInput', 'מה שבא לך עכשיו, בלי שיפוט...')}
+      </div>
+      <div class="feel-open-q">
+        <div class="feel-open-q-label">מה אני ממש רוצה לעשות עכשיו? מה ירחיב אותי עכשיו באמת?</div>
+        ${feelNoteHtml('procTrueWant', data.procTrueWantNote, 'onProcTrueWantNoteInput', 'מה שבאמת ירחיב אותך עכשיו...')}
+      </div>
+      ` : ''}
+    `;
+  });
+  requestAnimationFrame(()=>{
+    el.querySelectorAll('.feel-note-textarea').forEach(autoGrowNoteTextarea);
+  });
+}
+
+/* ---------- inspiring videos ---------- shown by their own title, never the raw link */
+let videosBlockOpen = false;
+function toggleVideosBlock(){ videosBlockOpen = !videosBlockOpen; renderInspiringVideos(); }
+function addInspiringVideo(){
+  const titleInput = document.getElementById('videoTitleInput');
+  const urlInput = document.getElementById('videoUrlInput');
+  const title = titleInput.value.trim();
+  let url = urlInput.value.trim();
+  if(!title || !url) return;
+  if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  data.inspiringVideos.push({id: uid(), title, url, createdAt: Date.now()});
+  titleInput.value=''; urlInput.value='';
+  saveData();
+  renderInspiringVideos();
+}
+function deleteInspiringVideo(id){
+  data.inspiringVideos = data.inspiringVideos.filter(v=>v.id!==id);
+  saveData();
+  renderInspiringVideos();
+}
+function renderInspiringVideos(){
+  const el = document.getElementById('inspiringVideosBlock');
+  if(!el) return;
+  const videos = data.inspiringVideos || [];
+  el.innerHTML = `
+    <div class="feel-block-header" onclick="toggleVideosBlock()">${videosBlockOpen?'▾':'▸'} 🎬 סרטונים מעוררי השראה${videos.length?' ('+videos.length+')':''}</div>
+    ${videosBlockOpen ? `
+      <div class="add-row" style="margin-bottom:10px;">
+        <input type="text" id="videoTitleInput" placeholder="כותרת הסרטון">
+        <input type="text" id="videoUrlInput" placeholder="קישור" dir="ltr">
+        <button onclick="addInspiringVideo()">הוסף</button>
+      </div>
+      ${videos.length ? `<ul class="video-list">${videos.map(v=>`
+        <li class="video-li">
+          <a href="${escapeAttr(v.url)}" target="_blank" rel="noopener">${escapeHtml(v.title)}</a>
+          <span class="del-task" onclick="deleteInspiringVideo('${v.id}')">✕</span>
+        </li>`).join('')}</ul>` : '<div class="empty">עדיין אין סרטונים שמורים</div>'}
+    ` : ''}
+  `;
 }
 
 /* ---------- today's ideas: brain dump, then choose ----------
@@ -5417,6 +5564,8 @@ function render(){
   renderGcalStatus();
   renderSyncBlock();
   renderFeelBar();
+  renderProcrastinationBlock();
+  renderInspiringVideos();
   renderTodayIdeas();
   renderKeepGrid(activeNoteDomain);
   renderSomedayDomainSelect();
