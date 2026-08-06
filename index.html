@@ -1087,6 +1087,11 @@ function loadData(){
   }catch(e){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
   }
+  // every fresh app open starts fully minimized, on purpose -- a calm, uncluttered first screen
+  // instead of whatever happened to be left expanded last time. this overrides whatever was
+  // saved, every load, not just the very first one.
+  data.collapsedSections = {};
+  SECTION_KEYS.forEach(k=>{ data.collapsedSections[k] = true; });
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
   taskAddOpen = !data.softMode;
   migrateOldNotesToDomainNotes();
@@ -4839,7 +4844,7 @@ function seedChipList(seed, legacyItems){
   (legacyItems||[]).forEach(c=>{ if(c && c.label && c.label.trim()) list.push({id:c.id||uid(), label:c.label}); });
   return list;
 }
-let feelBlockOpen = true, emotionsBankOpen = false, needsBankOpen = false, bodyBankOpen = false, moreQuestionsOpen = false;
+let feelBlockOpen = false, emotionsBankOpen = false, needsBankOpen = false, bodyBankOpen = false, moreQuestionsOpen = false;
 
 /* ---------- chip banks: emotions / needs / good-things share one system ----------
    every chip -- built-in or custom, doesn't matter, there's no distinction anymore -- can be renamed
@@ -5689,7 +5694,7 @@ function applyPickerHtml(item, others){
    she's actually choosing for today, and can switch to a filtered view that shows only those --
    the noise of the full dump doesn't have to stay in front of her once she's decided. no calendar,
    no times, ever, in this list -- promoting to a task is the only way something gets a time. */
-let todayIdeasOpen = true;
+let todayIdeasOpen = false;
 function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; renderTodayIdeas(); }
 // no more daily wipe -- this used to reset the whole list back to 3 blanks every day, which is
 // exactly what kept adding empty rows on every open. now it only ever tops the list UP to 3 (never
