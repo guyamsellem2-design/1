@@ -3060,6 +3060,12 @@ function taskMatchesDateRange(t, range){
   return true;
 }
 function taskChronoCompare(a, b){
+  const aDate = a.date || '', bDate = b.date || '';
+  if(aDate !== bDate){
+    if(!aDate) return 1;
+    if(!bDate) return -1;
+    return aDate < bDate ? -1 : 1;
+  }
   const aHas = !!a.time, bHas = !!b.time;
   if(aHas && bHas && a.time!==b.time) return a.time < b.time ? -1 : 1;
   if(aHas !== bHas) return aHas ? -1 : 1;
