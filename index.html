@@ -105,6 +105,13 @@
   .hamburger-btn{background:var(--surface); border:1px solid var(--border-strong); color:var(--text); width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-family:inherit;}
   .hamburger-btn:hover{border-color:var(--muted);}
 
+  .modal-root{position:fixed; inset:0; z-index:300; display:flex; align-items:center; justify-content:center;}
+  .modal-overlay{position:absolute; inset:0; background:rgba(0,0,0,0.45);}
+  .modal-box{position:relative; background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:20px; width:min(340px, 88vw); box-shadow:0 20px 50px -20px rgba(0,0,0,0.5);}
+  .modal-title{font-size:15px; font-weight:600; color:var(--text); margin-bottom:12px;}
+  .modal-box select{width:100%; margin-bottom:14px;}
+  .modal-actions{display:flex; gap:8px;}
+  .modal-actions button{flex:1;}
   .nav-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.4); opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:200;}
   .nav-overlay.open{opacity:1; pointer-events:auto;}
   .nav-drawer{position:fixed; top:0; bottom:0; right:-300px; width:280px; max-width:82vw; background:var(--surface); border-left:1px solid var(--border-strong); z-index:201; padding:22px 18px; transition:right .3s ease; overflow-y:auto; box-shadow:-14px 0 34px -14px rgba(0,0,0,0.45);}
@@ -410,8 +417,10 @@
   .habit-small-start-add{margin:6px 0 0; gap:6px;}
   .habits-footnote{font-size:13px; color:var(--muted); line-height:1.5; margin-top:10px; padding-top:8px; border-top:1px solid var(--border);}
   .lists-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px;}
-  .list-card{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:14px 12px; cursor:pointer; transition:box-shadow .15s ease, transform .15s ease;}
+  .list-card{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:12px; transition:box-shadow .15s ease, transform .15s ease;}
   .list-card:hover{box-shadow:0 8px 20px -10px rgba(0,0,0,0.35); transform:translateY(-1px);}
+  .list-card-top{display:flex; align-items:flex-start; gap:6px;}
+  .list-card-open{flex:1; cursor:pointer; min-width:0;}
   .list-card-name{font-size:15px; font-weight:600; color:var(--text); margin-bottom:4px;}
   .list-card-meta{font-size:12.5px; color:var(--muted);}
   .list-detail-topbar{display:flex; align-items:center; gap:10px;}
@@ -424,10 +433,13 @@
   .list-item-check{width:18px; height:18px; flex-shrink:0; cursor:pointer; accent-color:var(--gold);}
   .list-item-text{flex:1; font-size:14.5px; color:var(--text); cursor:pointer;}
   .list-item-text.done{text-decoration:line-through; color:var(--muted2);}
-  .list-item-actions{margin-top:8px;}
+  .list-item-actions{margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;}
   .list-subitems{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
   .list-subitem-row{display:flex; align-items:center; gap:8px; padding:4px 0;}
   .list-subitem-text{flex:1; font-size:13.5px; color:var(--muted);}
+  .list-subitem-actions{display:flex; gap:4px; flex-shrink:0;}
+  .list-to-task-btn{cursor:pointer; font-size:12px; color:var(--muted2); padding:2px 6px; border-radius:6px; white-space:nowrap;}
+  .list-to-task-btn:hover{color:var(--gold); background:var(--surface3);}
   .list-subitem-text.done{text-decoration:line-through; color:var(--muted2);}
   .apply-picker{margin-top:8px; padding:10px; background:var(--surface3); border-radius:10px;}
   .apply-picker-title{font-size:13px; color:var(--text); margin-bottom:6px;}
@@ -455,6 +467,7 @@
   .feel-chip-add-cancel:hover{color:var(--text);}
   .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:none; overflow:hidden; padding:8px 10px; line-height:1.5;}
   .feel-note-wrap{margin-top:4px;}
+  .feel-note-wrap > .feel-note-min-btn + .feel-note-min-btn{margin-right:6px;}
   .feel-note-min-btn{display:inline-block; margin-top:4px; cursor:pointer; font-size:12px; color:var(--muted2); padding:3px 8px; border-radius:6px;}
   .feel-note-min-btn:hover{background:var(--surface3); color:var(--text);}
   .feel-note-minimized{display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; margin-top:4px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface2);}
@@ -670,6 +683,9 @@
 <div class="nav-drawer" id="navDrawer">
   <h3>ניווט</h3>
   <div class="nav-home-link" onclick="navigateHome()">🏠 דף הבית</div>
+  <div class="nav-home-link" onclick="switchMainView('topics')">📓 נושאים</div>
+  <div class="nav-home-link" onclick="switchMainView('tools')">🧰 כלים</div>
+  <div class="nav-home-link" onclick="switchMainView('lists')">🗂 רשימות</div>
   <hr>
   <div id="navDomainList"></div>
 </div>
@@ -929,13 +945,15 @@ const DEFAULT_DOMAINS = [
 ];
 /* נושאי חיים כלליים ואוניברסליים — נקודת פתיחה לכל מי שנכנס בפעם הראשונה */
 const STARTER_DOMAINS = [
-  {id:'health',   name:'בריאות וגוף',              color:'#3fae7a'},
-  {id:'family',   name:'משפחה',                    color:'#e2903f'},
-  {id:'love',     name:'זוגיות',                   color:'#b98fc4'},
-  {id:'friends',  name:'חברים',                    color:'#4fb4d6'},
-  {id:'career',   name:'קריירה ועבודה',            color:'#3aa9a0'},
-  {id:'finance',  name:'כספים',                    color:'#cf9a5c'},
-  {id:'growth',   name:'יצירתיות והתפתחות אישית',  color:'#e2a34c'},
+  {id:'health',   name:'בריאות וגוף',                     color:'#3fae7a'},
+  {id:'family',   name:'משפחה',                           color:'#e2903f'},
+  {id:'love',     name:'זוגיות',                          color:'#b98fc4'},
+  {id:'friends',  name:'חברים',                           color:'#4fb4d6'},
+  {id:'career',   name:'קריירה ועבודה',                   color:'#3aa9a0'},
+  {id:'finance',  name:'כספים',                           color:'#cf9a5c'},
+  {id:'growth',   name:'חיבור לעצמי והתפתחות אישית',      color:'#e2a34c'},
+  {id:'hobbies',  name:'תחביבים ופנאי',                   color:'#d68fb0'},
+  {id:'errands',  name:'סידורים',                         color:'#6a8caf'},
 ];
 const ENERGY_COLORS = {low:'#70ac7e', mid:'#d0b463', high:'#c3746b'};
 const ENERGY_LABELS = {low:'🟢 מטעין', mid:'🟡 בינוני', high:'🔴 מרוקן'};
@@ -5063,7 +5081,53 @@ function feelNoteHtml(key, value, oninputFn, placeholder){
   return `<div class="feel-note-wrap">
     <textarea class="feel-note-textarea" data-field-key="${key}-note" oninput="${oninputFn}(this.value); autoGrowNoteTextarea(this);" placeholder="${placeholder}">${escapeHtml(value||'')}</textarea>
     <span class="feel-note-min-btn" onclick="toggleFeelNoteMinimize('${key}')" title="מזער">⌄ מזער</span>
+    <span class="feel-note-min-btn" onclick="openSaveAsNote('${key}')" title="שמירת הטקסט כפתק בנושא">📝 הפוך לפתק</span>
   </div>`;
+}
+/* ---------- "הפוך לפתק": save any feel-note's current text as a real Keep note under a chosen
+   topic, so a passing thought doesn't just get overwritten and lost the next time she types here ---------- */
+let saveAsNoteKey = null;
+let saveAsNoteDomain = null;
+function openSaveAsNote(key){
+  if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
+  saveAsNoteKey = key;
+  saveAsNoteDomain = data.domains[0].id;
+  renderSaveAsNoteModal();
+}
+function closeSaveAsNote(){ saveAsNoteKey = null; renderSaveAsNoteModal(); }
+function setSaveAsNoteDomain(id){ saveAsNoteDomain = id; }
+function confirmSaveAsNote(){
+  if(!saveAsNoteKey || !saveAsNoteDomain) return;
+  const el = document.querySelector(`[data-field-key="${saveAsNoteKey}-note"]`);
+  const text = el ? el.value.trim() : '';
+  const domainId = saveAsNoteDomain;
+  saveAsNoteKey = null;
+  if(!text){ renderSaveAsNoteModal(); return; }
+  ensureDomainNotes(domainId).push({id:uid(), text, color:'', drawing:''});
+  saveData();
+  renderSaveAsNoteModal();
+  if(mainView==='topics' && activeNoteDomain===domainId) renderKeepGrid(activeNoteDomain);
+  flashStatus('נשמר כפתק ב"' + domainById(domainId).name + '"');
+}
+function renderSaveAsNoteModal(){
+  let el = document.getElementById('saveAsNoteModal');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'saveAsNoteModal';
+    document.body.appendChild(el);
+  }
+  if(!saveAsNoteKey){ el.innerHTML=''; el.className=''; return; }
+  el.className = 'modal-root';
+  el.innerHTML = `
+    <div class="modal-overlay" onclick="closeSaveAsNote()"></div>
+    <div class="modal-box">
+      <div class="modal-title">לאיזה נושא לשמור את הפתק?</div>
+      <select id="saveAsNoteDomainSelect" onchange="setSaveAsNoteDomain(this.value)">${domainOptions(saveAsNoteDomain)}</select>
+      <div class="modal-actions">
+        <button class="save-btn" onclick="confirmSaveAsNote()">שמירה כפתק</button>
+        <button class="cancel-btn" onclick="closeSaveAsNote()">ביטול</button>
+      </div>
+    </div>`;
 }
 function renderFeelBar(){
   const el = document.getElementById('feelBar');
@@ -5444,6 +5508,44 @@ function applySubitemsToSelected(){
   renderListsView();
   flashStatus('תת-הרשימה הועתקה');
 }
+function reorderLists(fromId, toId){
+  reorderArrayById(data.lists, fromId, toId);
+  saveData();
+  renderListsView();
+}
+function reorderListItems(listId, fromId, toId){
+  const l = listById(listId);
+  if(!l) return;
+  reorderArrayById(l.items, fromId, toId);
+  saveData();
+  renderListsView();
+}
+function reorderListSubitems(listId, itemId, fromId, toId){
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  reorderArrayById(item.subitems, fromId, toId);
+  saveData();
+  renderListsView();
+}
+function createTaskFromText(text){
+  const task = {id:uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false, createdAt:Date.now()};
+  data.tasks.push(task);
+  saveData();
+  switchMainView('home');
+  openSection('tasks');
+  openTaskEdit(task.id);
+}
+function convertListItemToTask(listId, itemId){
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  createTaskFromText(item.text);
+}
+function convertListSubitemToTask(listId, itemId, subId){
+  const item = listItemById(listId, itemId);
+  const sub = item && (item.subitems||[]).find(s=>s.id===subId);
+  if(!sub) return;
+  createTaskFromText(sub.text);
+}
 function renderListsView(){
   const el = document.getElementById('listsContent');
   if(!el) return;
@@ -5456,9 +5558,14 @@ function renderListsView(){
       </div>
       ${lists.length ? `<div class="lists-grid">${lists.map(l=>{
         const doneCount = (l.items||[]).filter(i=>i.done).length;
-        return `<div class="list-card" onclick="openList('${l.id}')">
-          <div class="list-card-name">${escapeHtml(l.name)}</div>
-          <div class="list-card-meta">${l.items.length} פריטים${doneCount?` · ${doneCount} בוצעו`:''}</div>
+        return `<div class="list-card" data-drag-id="${l.id}">
+          <div class="list-card-top">
+            <div class="list-card-open" onclick="openList('${l.id}')">
+              <div class="list-card-name">${escapeHtml(l.name)}</div>
+              <div class="list-card-meta">${l.items.length} פריטים${doneCount?` · ${doneCount} בוצעו`:''}</div>
+            </div>
+            <span class="grip" onpointerdown="startListDrag(event,'${l.id}','.list-card',reorderLists)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
+          </div>
         </div>`;
       }).join('')}</div>` : '<div class="empty">עדיין אין רשימות — אפשר להתחיל עם אחת חדשה למעלה</div>'}
     `;
@@ -5466,11 +5573,6 @@ function renderListsView(){
   }
   const l = listById(activeListId);
   if(!l){ activeListId = null; renderListsView(); return; }
-  const sortedItems = l.items.slice().sort((a,b)=>{
-    if(a.done!==b.done) return a.done?1:-1;
-    if(a.favorite!==b.favorite) return a.favorite?-1:1;
-    return 0;
-  });
   el.innerHTML = `
     <div class="list-detail-topbar">
       <button type="button" class="reset-btn" onclick="closeList()">→ כל הרשימות</button>
@@ -5483,7 +5585,7 @@ function renderListsView(){
       <input type="text" id="newListItemInput-${l.id}" placeholder="פריט חדש..." onkeydown="if(event.key==='Enter') addListItem('${l.id}');">
       <button onclick="addListItem('${l.id}')">הוסף</button>
     </div>
-    ${sortedItems.length ? `<ul class="list-items">${sortedItems.map(item=>listItemHtml(l, item)).join('')}</ul>` : '<div class="empty">עדיין אין פריטים ברשימה הזו</div>'}
+    ${l.items.length ? `<ul class="list-items">${l.items.map(item=>listItemHtml(l, item)).join('')}</ul>` : '<div class="empty">עדיין אין פריטים ברשימה הזו</div>'}
   `;
 }
 function listItemHtml(l, item){
@@ -5493,8 +5595,9 @@ function listItemHtml(l, item){
   const editKey = 'listitem:'+key;
   const showingPicker = applyPickerFor && applyPickerFor.listId===l.id && applyPickerFor.itemId===item.id;
   const others = l.items.filter(i=>i.id!==item.id);
-  return `<li class="list-item ${item.done?'done':''}">
+  return `<li class="list-item ${item.done?'done':''}" data-drag-id="${item.id}">
     <div class="list-item-row">
+      <span class="grip" onpointerdown="startListDrag(event,'${item.id}','.list-item',(fromId,toId)=>reorderListItems('${l.id}',fromId,toId))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <input type="checkbox" class="list-item-check" ${item.done?'checked':''} onchange="toggleListItemDone('${l.id}','${item.id}')">
       ${inlineEditIds.has(editKey)
         ? `<input type="text" class="inline-text-edit" value="${escapeAttr(item.text)}" data-inline-key="${editKey}" onblur="this.dataset.cancelled ? cancelInlineEdit('${editKey}', renderListsView) : (saveListItemTextEdit('${l.id}','${item.id}', this.value), cancelInlineEdit('${editKey}', renderListsView))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
@@ -5504,13 +5607,18 @@ function listItemHtml(l, item){
     </div>
     <div class="list-item-actions">
       <button type="button" class="subtask-toggle-btn ${subitems.length?'has-content':''}" onclick="toggleListItemSub('${l.id}','${item.id}')">${subOpen?'▾':'▸'} תת-רשימה${subitems.length?' ('+subitems.length+')':''}</button>
+      <span class="list-to-task-btn" onclick="convertListItemToTask('${l.id}','${item.id}')" title="יצירת משימה חדשה מהטקסט הזה">➜ הפוך למשימה</span>
     </div>
     ${subOpen ? `
     <div class="list-subitems">
-      ${subitems.map(s=>`<div class="list-subitem-row">
+      ${subitems.map(s=>`<div class="list-subitem-row" data-drag-id="${s.id}">
+        <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.list-subitem-row',(fromId,toId)=>reorderListSubitems('${l.id}','${item.id}',fromId,toId))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
         <input type="checkbox" class="list-item-check" ${s.done?'checked':''} onchange="toggleListSubitemDone('${l.id}','${item.id}','${s.id}')">
         <span class="list-subitem-text ${s.done?'done':''}">${escapeHtml(s.text)}</span>
-        <span class="del-task" onclick="deleteListSubitem('${l.id}','${item.id}','${s.id}')">✕</span>
+        <span class="list-subitem-actions">
+          <span class="list-to-task-btn" onclick="convertListSubitemToTask('${l.id}','${item.id}','${s.id}')" title="יצירת משימה חדשה מהטקסט הזה">➜ משימה</span>
+          <span class="del-task" onclick="deleteListSubitem('${l.id}','${item.id}','${s.id}')">✕</span>
+        </span>
       </div>`).join('')}
       <div class="add-row habit-small-start-add">
         <input type="text" id="newSubitemInput-${l.id}-${item.id}" placeholder="שלב בתת-הרשימה..." onkeydown="if(event.key==='Enter') addListSubitem('${l.id}','${item.id}');">
