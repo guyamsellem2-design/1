@@ -4120,6 +4120,22 @@ const PENDING_BODY_CHECK_OPTS = {
   someday: {},
   suggestion: {urgencyOptions:['objective','other'], showEnergy:true}
 };
+// task's panel lives inside the already-secondary "עוד.." section, and suggestion's create form is
+// dense enough that the panel should stay tucked behind its own button too -- same ❤️‍🩹 בדיקת גוף
+// button edit mode already uses, just wired to the pending (not-yet-real) holding object instead.
+// someday's create row has nothing else in it, so its panel stays directly visible, no button needed.
+const PENDING_BODY_CHECK_USE_TOGGLE = { task:true, someday:false, suggestion:true };
+let pendingBodyCheckOpen = { task:false, someday:false, suggestion:false };
+function togglePendingBodyCheck(kind){
+  pendingBodyCheckOpen[kind] = !pendingBodyCheckOpen[kind];
+  renderPendingBodyCheck(kind);
+}
+function pendingBodyCheckToggleBtnHtml(kind){
+  const bc = pendingBodyCheck[kind];
+  const hasContent = !!(bc.expand || bc.urgency || bc.energy);
+  const isOpen = pendingBodyCheckOpen[kind];
+  return `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="togglePendingBodyCheck('${kind}')">❤️‍🩹 בדיקת גוף${isOpen?' ▴':''}</button>`;
+}
 function setPendingBodyCheckField(kind, field, value){
   const bc = pendingBodyCheck[kind];
   bc[field] = (bc[field]===value) ? '' : value;
@@ -4155,9 +4171,18 @@ function pendingBodyCheckPanelHtml(kind){
 }
 function renderPendingBodyCheck(kind){
   const el = document.getElementById('pendingBodyCheck-'+kind);
-  if(el) el.innerHTML = pendingBodyCheckPanelHtml(kind);
+  if(!el) return;
+  if(PENDING_BODY_CHECK_USE_TOGGLE[kind]){
+    el.innerHTML = pendingBodyCheckToggleBtnHtml(kind) + (pendingBodyCheckOpen[kind] ? pendingBodyCheckPanelHtml(kind) : '');
+  } else {
+    el.innerHTML = pendingBodyCheckPanelHtml(kind);
+  }
 }
-function resetPendingBodyCheck(kind){ pendingBodyCheck[kind] = {}; renderPendingBodyCheck(kind); }
+function resetPendingBodyCheck(kind){
+  pendingBodyCheck[kind] = {};
+  pendingBodyCheckOpen[kind] = false;
+  renderPendingBodyCheck(kind);
+}
 
 /* ---------- reflection (insight banks) ---------- */
 const REFLECT_QUESTIONS = [
