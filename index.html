@@ -372,7 +372,7 @@
   .feel-bank + .feel-bank, .feel-note-block{margin-top:6px;}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
   .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 2px 4px;}
-  .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:pan-y; user-select:none;}
+  .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:none; user-select:none;}
   .feel-chip.dragging{box-shadow:0 10px 24px -6px rgba(0,0,0,0.45); position:relative; z-index:5;}
   .feel-chip.feel-chip-add{background:transparent; border-style:dashed; color:var(--muted2);}
   .feel-chip.feel-chip-delmode{background:transparent; border-style:dashed; color:var(--muted2); touch-action:auto;}
@@ -4476,10 +4476,10 @@ function startChipPress(e, bank, id){
   e.stopPropagation();
   const chip = e.currentTarget;
   chipPressState = {
-    bank, id, chip, active:false, everMoved:false, targetId:null,
-    startX:e.clientX, startY:e.clientY,
+    bank, id, chip, active:false, everMoved:false, scrolling:false, targetId:null,
+    startX:e.clientX, startY:e.clientY, lastY:e.clientY,
     timer: setTimeout(()=>{
-      if(!chipPressState) return;
+      if(!chipPressState || chipPressState.scrolling) return;
       chipPressState.active = true;
       chip.classList.add('dragging');
       if(navigator.vibrate) navigator.vibrate(15);
@@ -4490,7 +4490,21 @@ function onChipPressMove(e){
   if(!chipPressState) return;
   const dx = e.clientX-chipPressState.startX, dy = e.clientY-chipPressState.startY;
   if(!chipPressState.active){
-    if(Math.hypot(dx,dy) > 10){ clearTimeout(chipPressState.timer); chipPressState = null; }
+    // the chip is touch-action:none (like the codebase's other draggable elements), which hands the
+    // WHOLE gesture to JS from the first touch, since dynamically flipping touch-action mid-gesture
+    // once the hold arms turns out not to reliably stop the browser from already treating it as a
+    // page scroll (confirmed with a real touch-event test). so a scroll that merely started on a
+    // chip has to be re-implemented by hand here instead: once movement says "this isn't a hold,
+    // it's a scroll", stop waiting to arm and drive window scroll directly off the same finger delta
+    // a native scroll would have used.
+    if(!chipPressState.scrolling && Math.hypot(dx,dy) > 10){
+      clearTimeout(chipPressState.timer);
+      chipPressState.scrolling = true;
+    }
+    if(chipPressState.scrolling){
+      window.scrollBy(0, chipPressState.lastY - e.clientY);
+      chipPressState.lastY = e.clientY;
+    }
     return;
   }
   if(Math.hypot(dx,dy) > 6) chipPressState.everMoved = true;
@@ -4872,7 +4886,7 @@ document.addEventListener('pointerdown', (e)=>{
 });
 function todayIdeaRowHtml(item){
   return `
-    <div class="today-idea-row" data-drag-id="${item.id}" onpointerdown="startTodayIdeaPress(event,'${item.id}')">
+    <div class="today-idea-row" data-drag-id="${item.id}" onpointerdown="startTodayIdeaPress(event,'${item.id}')" ${todayIdeasDragMode?'style="touch-action:none;"':''}>
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleTodayIdeaFavorite('${item.id}')" title="${item.favorite?'הסרה מהנבחרים':'סימון כנבחר להיום'}">${item.favorite?'★':'☆'}</span>
       <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
       <input type="text" class="today-idea-input ${item.done?'done':''}" data-field-key="idea-${item.id}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)" ${todayIdeasDragMode?'readonly':''}>
