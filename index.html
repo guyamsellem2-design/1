@@ -399,6 +399,16 @@
   .video-li{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:9px 12px;}
   .video-li a{color:var(--text); font-size:14px; text-decoration:none; flex:1; overflow-wrap:anywhere;}
   .video-li a:hover{color:var(--gold); text-decoration:underline;}
+  .habit-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .habit-li{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:10px 12px;}
+  .habit-li-row{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+  .habit-text{flex:1; font-size:14.5px; color:var(--text); line-height:1.45;}
+  .habit-li-actions{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+  .habit-small-starts{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
+  .habit-small-start-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0;}
+  .habit-small-start-text{font-size:13.5px; color:var(--muted);}
+  .habit-small-start-add{margin:6px 0 0; gap:6px;}
+  .habits-footnote{font-size:13px; color:var(--muted); line-height:1.5; margin-top:10px; padding-top:8px; border-top:1px solid var(--border);}
   .feel-bank-header{cursor:pointer; font-size:14px; font-weight:600; color:var(--text); padding:6px 2px; user-select:none;}
   .feel-chip-grid{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 2px 4px;}
   .feel-chip{display:inline-flex; align-items:center; font-size:13.5px; padding:6px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; touch-action:none; user-select:none;}
@@ -678,6 +688,8 @@
 
   <div class="feel-block" id="todayPicksBlock"></div>
 
+  <div class="feel-block" id="habitsBlock"></div>
+
   <section>
     <div class="section-head">
       <h2 onclick="toggleSection('someday')"><span class="num">01</span> דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
@@ -896,7 +908,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -1005,6 +1017,7 @@ function loadData(){
       data.procWantNote = parsed.procWantNote || '';
       data.procTrueWantNote = parsed.procTrueWantNote || '';
       data.inspiringVideos = parsed.inspiringVideos || [];
+      data.habits = (parsed.habits || []).map(h=>({smallStarts:[], ...h}));
       mainView = (parsed.mainView === 'topics' || parsed.mainView === 'tools') ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -2571,10 +2584,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -2666,7 +2679,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -4688,12 +4701,13 @@ function resetAll(){
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
+  const keepHabits = data.habits;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[]};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -5147,6 +5161,101 @@ function renderInspiringVideos(){
   `;
 }
 
+/* ---------- positive habits: "דברים שהייתי רוצה להתמיד בהם" ----------
+   deliberately not framed as a streak/checklist -- no done-checkbox, no daily tracking, no red X for
+   a missed day. just a soft list of intentions, each with an optional smaller first step, and an
+   optional one-click way to also put it on the weekly schedule as a (skippable) daily anchor. */
+let habitsBlockOpen = false;
+const habitSmallStartsOpen = new Set();
+function toggleHabitsBlock(){ habitsBlockOpen = !habitsBlockOpen; renderHabits(); }
+function addHabit(){
+  const input = document.getElementById('habitInput');
+  const text = input.value.trim();
+  if(!text) return;
+  data.habits.push({id:uid(), text, smallStarts:[], createdAt:Date.now()});
+  input.value='';
+  saveData();
+  renderHabits();
+}
+function deleteHabit(id){
+  data.habits = data.habits.filter(h=>h.id!==id);
+  habitSmallStartsOpen.delete(id);
+  saveData();
+  renderHabits();
+}
+function toggleHabitSmallStarts(id){
+  if(habitSmallStartsOpen.has(id)) habitSmallStartsOpen.delete(id); else habitSmallStartsOpen.add(id);
+  renderHabits();
+}
+function addHabitSmallStart(habitId){
+  const input = document.getElementById('habitSmallStartInput-'+habitId);
+  const text = input.value.trim();
+  if(!text) return;
+  const h = data.habits.find(h=>h.id===habitId);
+  if(!h) return;
+  if(!h.smallStarts) h.smallStarts = [];
+  h.smallStarts.push({id:uid(), text});
+  input.value='';
+  saveData();
+  renderHabits();
+}
+function deleteHabitSmallStart(habitId, stepId){
+  const h = data.habits.find(h=>h.id===habitId);
+  if(!h) return;
+  h.smallStarts = (h.smallStarts||[]).filter(s=>s.id!==stepId);
+  saveData();
+  renderHabits();
+}
+function addHabitAsAnchor(id){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  data.anchors.push({id:uid(), day:new Date().getDay(), time:'', endTime:'', label:h.text, domain:'', buffer:false, repeatType:'daily', date:'', createdAt:Date.now()});
+  saveData();
+  renderScheduleGrid();
+  flashStatus('נוסף כעוגן יומי בלוח השבועי — אפשר לערוך שעה/תדירות שם');
+}
+function renderHabits(){
+  const el = document.getElementById('habitsBlock');
+  if(!el) return;
+  const habits = data.habits || [];
+  el.innerHTML = `
+    <div class="feel-block-header" onclick="toggleHabitsBlock()">${habitsBlockOpen?'▾':'▸'} 🌱 דברים שהייתי רוצה להתמיד בהם${habits.length?' ('+habits.length+')':''}</div>
+    ${habitsBlockOpen ? `
+      <div class="add-row" style="margin-bottom:10px;">
+        <input type="text" id="habitInput" placeholder="פעולה קטנה שאני יכול להתחיל ליישם באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
+        <button onclick="addHabit()">הוסף</button>
+      </div>
+      ${habits.length ? `<ul class="habit-list">${habits.map(h=>{
+        const stepsOpen = habitSmallStartsOpen.has(h.id);
+        const steps = h.smallStarts || [];
+        return `
+        <li class="habit-li">
+          <div class="habit-li-row">
+            <span class="habit-text">${escapeHtml(h.text)}</span>
+            <span class="del-task" onclick="deleteHabit('${h.id}')">✕</span>
+          </div>
+          <div class="habit-li-actions">
+            <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
+            <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן יומי בלוח השבועי (רשות)">📌 הוסף כעוגן</button>
+          </div>
+          ${stepsOpen ? `
+          <div class="habit-small-starts">
+            ${steps.map(s=>`<div class="habit-small-start-row">
+              <span class="habit-small-start-text">${escapeHtml(s.text)}</span>
+              <span class="del-task" onclick="deleteHabitSmallStart('${h.id}','${s.id}')">✕</span>
+            </div>`).join('')}
+            <div class="add-row habit-small-start-add">
+              <input type="text" id="habitSmallStartInput-${h.id}" placeholder="למשל: 5 דק' ביום" onkeydown="if(event.key==='Enter') addHabitSmallStart('${h.id}');">
+              <button onclick="addHabitSmallStart('${h.id}')">הוסף</button>
+            </div>
+          </div>` : ''}
+        </li>`;
+      }).join('')}</ul>` : '<div class="empty">עדיין אין כאן הרגלים — אפשר להתחיל עם אחד קטן</div>'}
+      <div class="habits-footnote">קח/י את זה כהמלצה — אם לא עשית יום, יומיים, שנה, זה בסדר 🥰 תמיד אפשר להתחיל שוב.</div>
+    ` : ''}
+  `;
+}
+
 /* ---------- today's ideas: brain dump, then choose ----------
    the confusion this answers isn't "what should I do" -- it's "I don't even know what's in my head
    right now." so first she dumps everything, unfiltered, no cap. then she stars a few (⭐) as what
@@ -5583,6 +5692,7 @@ function render(){
   renderProcrastinationBlock();
   renderInspiringVideos();
   renderTodayIdeas();
+  renderHabits();
   renderKeepGrid(activeNoteDomain);
   renderSomedayDomainSelect();
   renderSomeday();
