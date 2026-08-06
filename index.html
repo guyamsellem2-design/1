@@ -113,13 +113,19 @@
   .nav-home-link{display:flex; align-items:center; gap:8px; padding:10px 8px; border-radius:10px; cursor:pointer; font-size:15px; color:var(--text); margin-bottom:4px;}
   .nav-home-link:hover{background:var(--surface2);}
   .nav-drawer hr{border:none; border-top:1px solid var(--border); margin:10px 0;}
-  .nav-domain-item{display:flex; align-items:center; gap:8px; padding:6px 4px; border-radius:10px; font-size:15px; color:var(--text);}
+  .nav-domain-item{display:flex; align-items:center; gap:8px; padding:6px 4px; border-radius:10px; font-size:15px; color:var(--text); cursor:pointer; touch-action:pan-y;}
+  .nav-domain-item:hover{background:var(--surface2);}
+  .nav-domain-item.dragging{z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; background:var(--surface2);}
+  .nav-domain-item.list-drag-over{outline:2px dashed var(--gold); outline-offset:-2px;}
   .nav-domain-item .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
   .nav-domain-color-btn{width:22px; height:22px; border-radius:50%; border:1px solid var(--border-strong); cursor:pointer; padding:0; flex-shrink:0;}
+  .nav-domain-name-text{flex:1; min-width:0; padding:4px 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .nav-domain-name-input{flex:1; min-width:0; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; padding:4px 2px;}
   .nav-domain-name-input:focus{outline:none; border-bottom:1px solid var(--border-strong);}
-  .nav-domain-open{color:var(--muted2); font-size:19px; cursor:pointer; padding:2px 4px; flex-shrink:0;}
-  .nav-domain-open:hover{color:var(--text);}
+  .nav-drawer-toolbar{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .nav-mode-btn{background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:6px 14px; font-size:14px; cursor:pointer; font-family:inherit;}
+  .nav-mode-btn:hover{color:var(--text); border-color:var(--muted);}
+  .nav-mode-btn.active{background:var(--gold); border-color:var(--gold); border-style:solid; color:#1a1206;}
 
   .domain-page-topbar{display:flex; align-items:center; justify-content:space-between; gap:8px;}
   .domain-page-header{margin:14px 0 6px;}
@@ -395,7 +401,7 @@
   .today-idea-row.list-drag-over{outline:2px dashed var(--gold); outline-offset:-2px; border-radius:8px;}
   .today-idea-check{width:18px; height:18px; flex-shrink:0; cursor:pointer; accent-color:var(--gold);}
   .today-idea-input{flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-family:inherit; font-size:14.5px;}
-  .today-idea-input[readonly]{color:var(--muted2); border-style:dashed;}
+  .today-idea-input[readonly]{border-style:dashed;}
   .today-idea-input.done{text-decoration:line-through; color:var(--muted2);}
   .today-idea-promote, .today-idea-del{cursor:pointer; font-size:14px; color:var(--muted2); padding:2px 4px; flex-shrink:0;}
   .today-idea-promote:hover, .today-idea-del:hover{color:var(--text);}
@@ -1330,20 +1336,101 @@ function applyNavState(){
   document.getElementById('navDrawer').classList.toggle('open', navOpen);
   document.getElementById('navOverlay').classList.toggle('open', navOpen);
 }
+/* nav drawer topic list: tapping a row navigates straight to its notes -- editing the name and
+   dragging to reorder each get their own explicit mode (toggle buttons, same idea as the delete/edit
+   modes on the feel-chip banks), so a tap never has to guess whether she meant to open the topic,
+   rename it, or start moving it. */
+let navEditMode = false;
+let navDragMode = false;
+function toggleNavEditMode(){
+  navEditMode = !navEditMode;
+  if(navEditMode) navDragMode = false;
+  renderNavList();
+}
+function toggleNavDragMode(){
+  navDragMode = !navDragMode;
+  if(navDragMode) navEditMode = false;
+  renderNavList();
+}
+function onNavDomainRowClick(id){
+  if(navEditMode || navDragMode) return;
+  navigateToDomain(id);
+}
+let navDragPressState = null;
+function startNavDragPress(e, id){
+  if(!navDragMode) return;
+  e.stopPropagation();
+  e.preventDefault();
+  const row = e.currentTarget;
+  row.classList.add('dragging');
+  navDragPressState = { id, row, targetId:null, startY:e.clientY };
+}
+function onNavDragPressMove(e){
+  if(!navDragPressState) return;
+  e.preventDefault();
+  const dy = e.clientY-navDragPressState.startY;
+  navDragPressState.row.style.transform = `translateY(${dy}px) scale(1.02)`;
+  navDragPressState.row.style.pointerEvents = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  navDragPressState.row.style.pointerEvents = '';
+  const targetRow = under ? under.closest('.nav-domain-item[data-drag-id]') : null;
+  document.querySelectorAll('.nav-domain-item.list-drag-over').forEach(r=>r.classList.remove('list-drag-over'));
+  if(targetRow && targetRow!==navDragPressState.row){
+    targetRow.classList.add('list-drag-over');
+    navDragPressState.targetId = targetRow.dataset.dragId;
+  } else {
+    navDragPressState.targetId = null;
+  }
+}
+function onNavDragPressUp(){
+  if(!navDragPressState) return;
+  navDragPressState.row.style.transform = '';
+  navDragPressState.row.classList.remove('dragging');
+  document.querySelectorAll('.nav-domain-item.list-drag-over').forEach(r=>r.classList.remove('list-drag-over'));
+  if(navDragPressState.targetId && navDragPressState.targetId!==navDragPressState.id){
+    const from = data.domains.findIndex(d=>d.id===navDragPressState.id);
+    const to = data.domains.findIndex(d=>d.id===navDragPressState.targetId);
+    if(from>-1 && to>-1){
+      const [item] = data.domains.splice(from,1);
+      data.domains.splice(to,0,item);
+      saveData();
+      render();
+    }
+  }
+  navDragPressState = null;
+}
+document.addEventListener('pointermove', onNavDragPressMove);
+document.addEventListener('pointerup', onNavDragPressUp);
+document.addEventListener('pointercancel', onNavDragPressUp);
+// tapping the drawer background (anything that isn't a row or one of the two mode buttons) drops
+// back to normal, same as tapping the active mode's button again
+document.addEventListener('pointerdown', (e)=>{
+  if(!navEditMode && !navDragMode) return;
+  if(e.target.closest && (e.target.closest('.nav-domain-item') || e.target.closest('.nav-mode-btn'))) return;
+  navEditMode = false; navDragMode = false;
+  renderNavList();
+});
 function renderNavList(){
   const el = document.getElementById('navDomainList');
   if(!el) return;
   el.innerHTML = data.domains.map(d=>`
-    <div class="nav-domain-item">
-      <button type="button" class="nav-domain-color-btn" style="background:${d.color}" onclick="toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
-      <input type="text" class="nav-domain-name-input" value="${escapeAttr(d.name)}"
-        onchange="renameDomainCommit('${d.id}', this.value)"
-        oninput="updateDomainNameLive('${d.id}', this.value)">
-      <span class="nav-domain-open" onclick="navigateToDomain('${d.id}')" title="פתיחת דף הנושא">›</span>
-      <span class="del-task" onclick="deleteDomain('${d.id}')">✕</span>
+    <div class="nav-domain-item" data-drag-id="${d.id}" onclick="onNavDomainRowClick('${d.id}')" onpointerdown="startNavDragPress(event,'${d.id}')" ${navDragMode?'style="touch-action:none;"':''}>
+      <button type="button" class="nav-domain-color-btn" style="background:${d.color}" onclick="event.stopPropagation(); toggleColorPicker('${d.id}')" title="בחירת צבע"></button>
+      ${navEditMode
+        ? `<input type="text" class="nav-domain-name-input" value="${escapeAttr(d.name)}" onclick="event.stopPropagation()"
+             onchange="renameDomainCommit('${d.id}', this.value)"
+             oninput="updateDomainNameLive('${d.id}', this.value)">`
+        : `<span class="nav-domain-name-text">${escapeHtml(d.name)}</span>`}
+      ${!navDragMode ? `<span class="del-task" onclick="event.stopPropagation(); deleteDomain('${d.id}')">✕</span>` : ''}
     </div>
     ${colorPickerForId===d.id ? renderColorPanel(d.id) : ''}
-  `).join('') + `<button class="add-domain-btn" onclick="addDomain()" style="margin-top:12px; width:100%;">+ נושא</button>`;
+  `).join('') + `
+    <div class="nav-drawer-toolbar">
+      <button class="add-domain-btn" onclick="addDomain()">+ נושא</button>
+      <button type="button" class="nav-mode-btn ${navDragMode?'active':''}" onclick="toggleNavDragMode()">${navDragMode?'✓ סיום גרירה':'↕ גרירה'}</button>
+      <button type="button" class="nav-mode-btn ${navEditMode?'active':''}" onclick="toggleNavEditMode()">${navEditMode?'✓ סיום עריכה':'✏️ עריכה'}</button>
+    </div>
+  `;
 }
 /* ---------- two main tabs: בית / נושאים ---------- */
 let mainView = 'home';
