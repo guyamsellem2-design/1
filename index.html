@@ -5060,7 +5060,7 @@ function renderFeelBar(){
   });
 }
 
-/* ---------- anti-procrastination: "לדחיינים שבינינו" ----------
+/* ---------- anti-procrastination: "כשנכנסתי ללופ של דחיינות" ----------
    non-judgmental on purpose -- if she's going to procrastinate anyway, better to notice what would
    actually feel good right now than to just default into whatever's easiest to numb out with. */
 let procBlockOpen = false;
@@ -5072,7 +5072,7 @@ function renderProcrastinationBlock(){
   if(!el) return;
   withFocusPreserved('procrastinationBlock', ()=>{
     el.innerHTML = `
-      <div class="feel-block-header" onclick="toggleProcBlock()">${procBlockOpen?'▾':'▸'} 🌀 לדחיינים שבינינו</div>
+      <div class="feel-block-header" onclick="toggleProcBlock()">${procBlockOpen?'▾':'▸'} 🌀 כשנכנסתי ללופ של דחיינות</div>
       ${procBlockOpen ? `
       <div class="feel-open-q">
         <div class="feel-open-q-label">מה בא לי לעשות עכשיו? <span class="hint-inline">(מותר לך)</span></div>
