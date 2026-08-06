@@ -657,6 +657,7 @@
         <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
         <button onclick="addSomeday()">הוסף</button>
       </div>
+      <div id="pendingBodyCheck-someday" style="margin-bottom:8px;"></div>
       <div class="add-row" style="margin-bottom:10px;">
         <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
           <option value="manual">מיון לפי: ידני (גרירה)</option>
@@ -689,6 +690,7 @@
           <option value="high">🔴 מרוקן</option>
         </select>
         <button type="button" class="add-domain-btn" onclick="toggleTaskSchedule()" id="taskSchedToggle">📅 לתזמן</button>
+        <button type="button" class="add-domain-btn" onclick="toggleTaskMore()" id="taskMoreToggle">עוד..</button>
         <button onclick="addTask()">הוסף</button>
       </div>
       <div class="add-row" id="taskSchedFields" style="display:none;">
@@ -701,6 +703,10 @@
           <input type="hidden" id="taskEndTime" value="">
           <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת סיום (רשות)" onclick="toggleTimePicker('taskEndTime', event)">🕐 <span dir="ltr">שעת סיום (רשות)</span></button>
         </div>
+      </div>
+      <div id="taskMoreFields" style="display:none; margin-top:8px;">
+        <textarea id="taskNewDescription" class="detail-desc" placeholder="הרחבה, הקשר, פרטים..."></textarea>
+        <div id="pendingBodyCheck-task"></div>
       </div>
       </div>
       <div class="section-divider"></div>
@@ -765,6 +771,7 @@
       <div class="add-row" id="suggDetailsFields" style="display:none;">
         <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
       </div>
+      <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
       <ul class="tasks scroll-cap" id="suggestionList"></ul>
       <div class="list-expand-row" id="suggestionListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('suggestion')"></button></div>
     </div>
@@ -3399,6 +3406,12 @@ function toggleTaskSchedule(){
   const fields = document.getElementById('taskSchedFields');
   fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
 }
+function toggleTaskMore(){
+  const fields = document.getElementById('taskMoreFields');
+  const opening = fields.style.display==='none';
+  fields.style.display = opening ? '' : 'none';
+  if(opening) renderPendingBodyCheck('task');
+}
 let taskAddOpen = true;
 function toggleTaskAddOpen(){ taskAddOpen = !taskAddOpen; renderTaskAddState(); }
 function renderTaskAddState(){
@@ -3418,12 +3431,17 @@ function addTask(){
   const date = document.getElementById('taskDate').value || '';
   const time = document.getElementById('taskTime').value || '';
   const endTime = document.getElementById('taskEndTime').value || '';
-  const newTask = {id:uid(), text, domain, done:false, energy, date, time, endTime, description:'', subtasks:[], createdAt:Date.now()};
+  const description = document.getElementById('taskNewDescription').value.trim();
+  const bodyCheck = {...pendingBodyCheck.task};
+  const newTask = {id:uid(), text, domain, done:false, energy, date, time, endTime, description, subtasks:[], createdAt:Date.now(), bodyCheck};
   data.tasks.push(newTask);
   input.value='';
   document.getElementById('taskDate').value='';
   setTimePickerValue('taskTime', '');
   setTimePickerValue('taskEndTime', '');
+  document.getElementById('taskNewDescription').value='';
+  document.getElementById('taskMoreFields').style.display='none';
+  resetPendingBodyCheck('task');
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -3872,8 +3890,10 @@ function addSomeday(){
   if(!text) return;
   const domainSel = document.getElementById('somedayDomain');
   const domain = domainSel ? domainSel.value : data.domains[0].id;
-  data.someday.push({id:uid(), text, domain, description:'', subtasks:[], createdAt:Date.now()});
+  const bodyCheck = {...pendingBodyCheck.someday};
+  data.someday.push({id:uid(), text, domain, description:'', subtasks:[], createdAt:Date.now(), bodyCheck});
   input.value='';
+  resetPendingBodyCheck('someday');
   saveData();
   renderSomeday();
 }
@@ -3965,8 +3985,10 @@ function addSuggestion(){
   const dateInput = document.getElementById('suggReplyDate');
   const text = textInput.value.trim();
   if(!text) return;
-  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : ''});
+  const bodyCheck = {...pendingBodyCheck.suggestion};
+  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : '', bodyCheck});
   whoInput.value=''; textInput.value=''; if(dateInput) dateInput.value='';
+  resetPendingBodyCheck('suggestion');
   saveData();
   renderSuggestions();
 }
@@ -4077,6 +4099,55 @@ function bodyCheckGlowClass(item){
   const val = (item.bodyCheck||{}).expand;
   return val ? `bc-glow-${val}` : '';
 }
+
+/* body check while creating a task/someday/suggestion, before it exists as a real record to attach
+   bodyCheck to. mirrors bodyCheckPanelHtml exactly (same fields, same look) but writes into a plain
+   holding object per kind instead of looking an item up by id; addTask/addSomeday/addSuggestion pull
+   it onto the new record at creation, then it resets for the next one. */
+const pendingBodyCheck = { task:{}, someday:{}, suggestion:{} };
+const PENDING_BODY_CHECK_OPTS = {
+  task: {urgencyOptions:['objective','other','relief'], showEnergy:true},
+  someday: {},
+  suggestion: {urgencyOptions:['objective','other'], showEnergy:true}
+};
+function setPendingBodyCheckField(kind, field, value){
+  const bc = pendingBodyCheck[kind];
+  bc[field] = (bc[field]===value) ? '' : value;
+  renderPendingBodyCheck(kind);
+}
+function pendingBodyCheckPanelHtml(kind){
+  const opts = PENDING_BODY_CHECK_OPTS[kind];
+  const bc = pendingBodyCheck[kind];
+  const expandBtn = (val, cls, label) => `<button type="button" class="bc-toggle-btn ${cls} ${bc.expand===val?'active':''}" onclick="setPendingBodyCheckField('${kind}','expand','${val}')">${label}</button>`;
+  const urgencyBtn = val => `<button type="button" class="bc-toggle-btn ${bc.urgency===val?'active':''}" onclick="setPendingBodyCheckField('${kind}','urgency','${val}')">${URGENCY_LABELS[val]}</button>`;
+  const energyBtn = (val, label) => `<button type="button" class="bc-toggle-btn ${bc.energy===val?'active':''}" onclick="setPendingBodyCheckField('${kind}','energy','${val}')">${label}</button>`;
+  return `<div class="body-check-panel">
+    <div class="bc-row">
+      <span class="bc-row-label">מה קורה בגוף?</span>
+      <div class="bc-btn-group">
+        ${expandBtn('expand','bc-expand','🌱 מרחיב')}
+        ${expandBtn('neutral','bc-neutral','◦ ניטרלי')}
+        ${expandBtn('contract','bc-contract','🥀 מכווץ')}
+      </div>
+    </div>
+    ${opts.urgencyOptions ? `<div class="bc-row">
+      <span class="bc-row-label">דחוף?</span>
+      <div class="bc-btn-group">${opts.urgencyOptions.map(urgencyBtn).join('')}</div>
+    </div>` : ''}
+    ${opts.showEnergy ? `<div class="bc-row">
+      <span class="bc-row-label">יש לי אנרגיה לזה כרגע?</span>
+      <div class="bc-btn-group">
+        ${energyBtn('yes','יש אנרגיה')}
+        ${energyBtn('no','אין אנרגיה')}
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+function renderPendingBodyCheck(kind){
+  const el = document.getElementById('pendingBodyCheck-'+kind);
+  if(el) el.innerHTML = pendingBodyCheckPanelHtml(kind);
+}
+function resetPendingBodyCheck(kind){ pendingBodyCheck[kind] = {}; renderPendingBodyCheck(kind); }
 
 /* ---------- reflection (insight banks) ---------- */
 const REFLECT_QUESTIONS = [
@@ -5177,6 +5248,8 @@ function render(){
   renderSomedayDomainSelect();
   renderSomeday();
   renderSuggestions();
+  renderPendingBodyCheck('someday');
+  renderPendingBodyCheck('suggestion');
   renderReflection();
   applyAllSectionCollapse();
   applyMainViewState();
