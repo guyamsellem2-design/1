@@ -415,6 +415,10 @@
   .habit-li-row{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
   .habit-text{flex:1; font-size:14.5px; color:var(--text); line-height:1.45;}
   .habit-li-actions{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+  .habit-context-row{margin-top:4px;}
+  .habit-context-text{font-size:12.5px; color:var(--muted); cursor:pointer;}
+  .habit-context-text.habit-context-empty{color:var(--muted2);}
+  .habit-last-done{font-size:12px; color:var(--muted2); margin-top:6px;}
   .habit-small-starts{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
   .habit-small-start-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0;}
   .habit-small-start-text{font-size:13.5px; color:var(--muted);}
@@ -670,6 +674,8 @@
   .decision-quote-row{background:var(--surface3); border-radius:8px; padding:8px 10px; font-size:14px; line-height:1.5; display:flex; align-items:flex-start; gap:8px;}
   .decision-quote-row > span:first-child{flex:1; cursor:pointer;}
   .decision-quote-row textarea.inline-text-edit{min-height:50px; resize:vertical; line-height:1.5;}
+  .copy-script-btn{cursor:pointer; font-size:13px; color:var(--muted2); padding:3px 6px; border-radius:6px; flex-shrink:0; white-space:nowrap;}
+  .copy-script-btn:hover{background:var(--surface); color:var(--text);}
 
   footer{margin-top:50px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted2); font-size:14.5px; line-height:1.7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:13.5px; cursor:pointer; font-family:inherit;}
@@ -778,6 +784,7 @@
     <div class="section-head">
       <h2 onclick="toggleSection('tasks')"><span class="num">02</span> משימות <span class="chev" id="chev-tasks">▾</span></h2>
       <div class="hint">הנקודה = רמת אנרגיה (לחיצה מחליפה) · לחיצה על הטקסט לעריכה</div>
+      <button class="reset-btn" onclick="clearAllTasks()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-tasks">
     <div class="card">
@@ -861,6 +868,7 @@
     <div class="section-head">
       <h2 onclick="toggleSection('suggestions')"><span class="num">05</span> התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
       <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך, וגם מקום לדברים שאת/ה מתלבט/ת עליהם בכלל — בלי שזה יילחץ עליך ישר</div>
+      <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-suggestions">
     <div class="card">
@@ -1082,6 +1090,12 @@ function loadData(){
         if(data.decisionHelperQuotes.length===0) data.decisionHelperQuotes = SEED_DECISION_QUOTES.map(q=>({...q}));
         data.decisionHelperQuotesSeeded = true;
       }
+      data.replyScripts = parsed.replyScripts || [];
+      data.replyScriptsSeeded = !!parsed.replyScriptsSeeded;
+      if(!data.replyScriptsSeeded){
+        if(data.replyScripts.length===0) data.replyScripts = SEED_REPLY_SCRIPTS.map(s=>({...s}));
+        data.replyScriptsSeeded = true;
+      }
       mainView = ['topics','tools','lists'].includes(parsed.mainView) ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -1096,6 +1110,8 @@ function loadData(){
       data.decisionHelperLinks = [];
       data.decisionHelperQuotes = SEED_DECISION_QUOTES.map(q=>({...q}));
       data.decisionHelperQuotesSeeded = true;
+      data.replyScripts = SEED_REPLY_SCRIPTS.map(s=>({...s}));
+      data.replyScriptsSeeded = true;
     }
   }catch(e){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -2752,10 +2768,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -4651,9 +4667,44 @@ function deleteDecisionHelperLink(id){
   saveData();
   rerenderActiveDilemmaList();
 }
+// "תשובות מוכנות": ready-to-copy replies for the exact moment someone's waiting on an answer --
+// the gap she described isn't knowing what she wants (body-check already covers that), it's not
+// having the words ready under social pressure. copy button uses the clipboard API with a quiet
+// fallback if it's ever blocked, since the whole point is getting the text into her hands fast.
+function addReplyScript(){
+  const input = document.getElementById('replyScriptInput');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  if(!data.replyScripts) data.replyScripts = [];
+  data.replyScripts.push({id:uid(), text});
+  saveData();
+  rerenderActiveDilemmaList();
+}
+function saveReplyScriptEdit(id, val){
+  const key = 'replyscript:'+id;
+  inlineEditIds.delete(key);
+  const s = (data.replyScripts||[]).find(x=>x.id===id);
+  if(s && val.trim()){ s.text = val.trim(); saveData(); }
+  rerenderActiveDilemmaList();
+}
+function deleteReplyScript(id){
+  data.replyScripts = (data.replyScripts||[]).filter(x=>x.id!==id);
+  saveData();
+  rerenderActiveDilemmaList();
+}
+function copyReplyScript(id){
+  const s = (data.replyScripts||[]).find(x=>x.id===id);
+  if(!s) return;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(s.text).then(()=>flashStatus('הועתק ללוח')).catch(()=>flashStatus('לא הצלחתי להעתיק — אפשר לסמן ולהעתיק ידנית'));
+  } else {
+    flashStatus('לא הצלחתי להעתיק — אפשר לסמן ולהעתיק ידנית');
+  }
+}
 function decisionHelperPanelHtml(){
   const quotes = data.decisionHelperQuotes || [];
   const links = data.decisionHelperLinks || [];
+  const scripts = data.replyScripts || [];
   return `<div class="decision-helper-panel">
     <div class="bc-row-label">משפטים ושאלות שעוזרים לי לקבל החלטה</div>
     <div class="decision-quote-list">
@@ -4678,6 +4729,20 @@ function decisionHelperPanelHtml(){
       <input type="text" id="decisionLinkTitleInput" placeholder="כותרת הקישור">
       <input type="text" id="decisionLinkUrlInput" placeholder="קישור" dir="ltr">
       <button onclick="addDecisionHelperLink()">הוסף</button>
+    </div>
+    <div class="bc-row-label" style="margin-top:10px;">תשובות מוכנות להעתקה — למי שמחכה לתשובה ממני</div>
+    <div class="decision-quote-list">
+      ${scripts.map(s=>`<div class="decision-quote-row" data-entry-id="${s.id}">
+        ${inlineEditIds.has('replyscript:'+s.id)
+          ? `<textarea class="inline-text-edit" data-inline-key="replyscript:${s.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('replyscript:${s.id}', rerenderActiveDilemmaList) : saveReplyScriptEdit('${s.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(s.text)}</textarea>`
+          : `<span data-inline-key="replyscript:${s.id}" onclick="inlineEditToggle('replyscript:${s.id}', rerenderActiveDilemmaList)">${escapeHtml(s.text)}</span>`}
+        <span class="copy-script-btn" onclick="copyReplyScript('${s.id}')" title="העתקה ללוח">📋 העתק</span>
+        <span class="del-task" onclick="deleteReplyScript('${s.id}')">✕</span>
+      </div>`).join('') || '<div class="empty">אין עדיין תשובות מוכנות בבנק הזה</div>'}
+    </div>
+    <div class="add-row">
+      <input type="text" id="replyScriptInput" placeholder="תשובה מוכנה שאני רוצה שתהיה זמינה..." onkeydown="if(event.key==='Enter') addReplyScript();">
+      <button onclick="addReplyScript()">הוסף</button>
     </div>
   </div>`;
 }
@@ -5205,7 +5270,7 @@ function renderAllDependent(){
 }
 
 function resetAll(){
-  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ההתלבטויות הכלליות, ורעיונות ומשימות לעתיד? בנק התובנות, בנק התזכורות לבחור בעצמי, ובנק המשפטים/הקישורים לעזרה בקבלת החלטה יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
+  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ההתלבטויות הכלליות, ורעיונות ומשימות לעתיד? בנק התובנות, בנק התזכורות לבחור בעצמי, ובנק המשפטים/הקישורים/התשובות המוכנות לעזרה בקבלת החלטה יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
@@ -5213,12 +5278,13 @@ function resetAll(){
   const keepLists = data.lists;
   const keepDecisionHelperQuotes = data.decisionHelperQuotes;
   const keepDecisionHelperLinks = data.decisionHelperLinks;
+  const keepReplyScripts = data.replyScripts;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -5232,6 +5298,29 @@ function clearDoneTasks(){
   saveData();
   renderTasks();
   renderScheduleGrid();
+}
+// clears ALL tasks, not just done ones -- deliberately doesn't touch data.anchors, since the
+// weekly schedule syncs with Google Calendar separately and shouldn't be affected by this at all
+function clearAllTasks(){
+  if(data.tasks.length===0){ flashStatus('רשימת המשימות כבר ריקה'); return; }
+  if(!confirm(`למחוק את כל ${data.tasks.length} המשימות (כולל מה שלא בוצע)? זה לא נוגע ללוח השבועי/יומן גוגל. לא ניתן לביטול — מומלץ להוריד גיבוי קודם.`)) return;
+  data.tasks = [];
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+  flashStatus('רשימת המשימות נוקתה');
+}
+// clears both sub-tabs together (העדפות של אחרים + התלבטויות כלליות) -- after a couple of weeks
+// a stale request from someone else is just as irrelevant as a stale general dilemma
+function clearDilemmasSection(){
+  const total = (data.suggestions||[]).length + (data.generalDilemmas||[]).length;
+  if(total===0){ flashStatus('אין כרגע כלום לנקות בהתלבטויות'); return; }
+  if(!confirm(`למחוק את כל ${total} הפריטים בהתלבטויות (גם העדפות של אחרים וגם התלבטויות כלליות)? לא ניתן לביטול — מומלץ להוריד גיבוי קודם.`)) return;
+  data.suggestions = [];
+  data.generalDilemmas = [];
+  saveData();
+  renderDilemmasSection();
+  flashStatus('ההתלבטויות נוקו');
 }
 function clearSomeday(){
   if(data.someday.length===0){ flashStatus('הרשימה כבר ריקה'); return; }
@@ -5288,6 +5377,13 @@ const SEED_DECISION_QUOTES = [
   {id:'dq3', text:'לפעמים עוזר לזכור, שלא תמיד יש אופציה שהיא נכונה יותר מהאחרות, ושהחלטה היא נכונה משום שהחלטנו שהיא נכונה, משום שבחרנו בה. וזה מספיק טוב כדי להגיד שהחלטה היא נכונה.'},
   {id:'dq4', text:'לפעמים קל לא לשים לב אפילו, ולדחות עוד ועוד קבלה של החלטה. וזה לא קל. אבל אם נמצאים במצב כזה, ניתן פשוט לחזור ולשאול: מה אני מרגיש/ה בגוף? ולסמוך על זה. אין דרך מיוחדת למצוא תשובה יותר בעומק הנשמה ממה שהאינטואיציה פשוט אומרת בפשטות דרך תחושות הגוף.'},
   {id:'dq5', text:'אם יש זמן לקבל את ההחלטה, וזה מרגיש לא — זה בסדר לבחור בלא ולהישאר פתוח/ה שאולי בעתיד יגיע הכן. אבל גם בסדר לשחרר ולהמשיך הלאה — לפעמים הכן יבוא, ולפעמים לא.'}
+];
+// default ready-to-copy replies for the moment someone's actually waiting on an answer -- not
+// about knowing what she wants (body-check already covers that), but having the words ready
+const SEED_REPLY_SCRIPTS = [
+  {id:'rs1', text:'תודה ששאלת/שהצעת — אני צריך/ה קצת זמן לחשוב על זה ואחזור/אחזיר אליך.'},
+  {id:'rs2', text:'לא מתאים לי הפעם, אבל אשמח בהזדמנות אחרת.'},
+  {id:'rs3', text:'אשמח, אבל רק בתנאי ש___.'}
 ];
 function seedChipList(seed, legacyItems){
   const list = seed.map(x=>({...x}));
@@ -5869,7 +5965,7 @@ function addHabit(){
   const input = document.getElementById('habitInput');
   const text = input.value.trim();
   if(!text) return;
-  data.habits.push({id:uid(), text, smallStarts:[], createdAt:Date.now()});
+  data.habits.push({id:uid(), text, smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
   input.value='';
   saveData();
   renderHabits();
@@ -5886,6 +5982,39 @@ function saveHabitTextEdit(id, val){
   const h = data.habits.find(h=>h.id===id);
   if(h && val.trim()){ h.text = val.trim(); saveData(); }
   renderHabits();
+}
+// "אחרי מה?" -- an existing anchor in her day ("אחרי הקפה של הבוקר"), not a fixed clock time.
+// implementation-intention research is the strongest single lever for actually following through
+// on a habit, and this is the cheapest way to capture one without turning the habit into a task.
+function saveHabitContextEdit(id, val){
+  const key = 'habitctx:'+id;
+  inlineEditIds.delete(key);
+  const h = data.habits.find(h=>h.id===id);
+  if(h) h.contextAnchor = val.trim();
+  saveData();
+  renderHabits();
+}
+// a single tap for "did it today", with a soft relative-date caption -- no streak, no red, no
+// "you broke it" language anywhere, matching the existing "קח/י את זה כהמלצה" tone of this section
+function markHabitDoneToday(id){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  h.lastDoneDate = ymd(new Date());
+  saveData();
+  renderHabits();
+}
+function habitLastDoneLabel(dateStr){
+  if(!dateStr) return '';
+  const todayStr = ymd(new Date());
+  if(dateStr===todayStr) return 'לאחרונה: היום';
+  // diff midnight-to-midnight (not against the current moment) so the current time of day never
+  // skews the day count by one
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const [ty,tm,td] = todayStr.split('-').map(Number);
+  const days = Math.round((new Date(ty,tm-1,td) - new Date(y,m-1,d)) / 86400000);
+  if(days<=0) return 'לאחרונה: היום';
+  if(days===1) return 'לאחרונה: אתמול';
+  return `לאחרונה: לפני ${days} ימים`;
 }
 function toggleHabitSmallStarts(id){
   if(habitSmallStartsOpen.has(id)) habitSmallStartsOpen.delete(id); else habitSmallStartsOpen.add(id);
@@ -5932,6 +6061,8 @@ function renderHabits(){
       ${habits.length ? `<ul class="habit-list">${habits.map(h=>{
         const stepsOpen = habitSmallStartsOpen.has(h.id);
         const steps = h.smallStarts || [];
+        const doneToday = h.lastDoneDate===ymd(new Date());
+        const lastDoneLabel = habitLastDoneLabel(h.lastDoneDate);
         return `
         <li class="habit-li">
           <div class="habit-li-row">
@@ -5940,10 +6071,17 @@ function renderHabits(){
               : `<span class="habit-text" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
             <span class="del-task" onclick="deleteHabit('${h.id}')">✕</span>
           </div>
+          <div class="habit-context-row">
+            ${inlineEditIds.has('habitctx:'+h.id)
+              ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+              : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ אחרי מה זה קורה? (רשות)'}</span>`}
+          </div>
           <div class="habit-li-actions">
             <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
             <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן יומי בלוח השבועי (רשות)">📌 הוסף כעוגן</button>
+            <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
           </div>
+          ${lastDoneLabel ? `<div class="habit-last-done">${lastDoneLabel}</div>` : ''}
           ${stepsOpen ? `
           <div class="habit-small-starts">
             ${steps.map(s=>`<div class="habit-small-start-row">
