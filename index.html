@@ -2827,7 +2827,27 @@ function syncDoc(){ return fbDb.collection('users').doc(currentSyncUser.uid); }
 // if it lands while she's mid-sentence in a text field, recreating that field kills its focus and
 // the on-screen keyboard closes on her. hold off until she's actually done with that field.
 let pendingRenderAfterTyping = false;
+// a range slider (e.g. the energy slider) has no text cursor to lose, so it's deliberately excluded
+// from isTypingNow's "still editing" check below -- but while a finger/mouse is actively DOWN on one
+// mid-drag, a sync re-render landing right then recreates that exact DOM node out from under the
+// gesture, which visibly snaps/jumps the page. track that drag window the same way text typing is
+// tracked, so a mid-drag sync defers instead of firing into it.
+let activeRangeInput = null;
+document.addEventListener('pointerdown', (e)=>{
+  if(e.target && e.target.tagName==='INPUT' && e.target.type==='range') activeRangeInput = e.target;
+});
+function releaseActiveRangeInput(){
+  if(!activeRangeInput) return;
+  activeRangeInput = null;
+  if(pendingRenderAfterTyping){
+    pendingRenderAfterTyping = false;
+    renderKeepingScrollPosition();
+  }
+}
+document.addEventListener('pointerup', releaseActiveRangeInput);
+document.addEventListener('pointercancel', releaseActiveRangeInput);
 function isTypingNow(){
+  if(activeRangeInput) return true;
   const el = document.activeElement;
   if(!el) return false;
   if(el.tagName==='TEXTAREA') return true;
