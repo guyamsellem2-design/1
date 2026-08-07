@@ -2877,6 +2877,7 @@ async function runFullSync(){
     // seconds later. a Firestore transaction closes that window: if the doc changes between its read
     // and its write, Firestore itself reruns this whole function against the newest data instead of
     // letting a stale write land.
+    const preSyncSnapshot = JSON.parse(JSON.stringify(data));
     let merged;
     await fbDb.runTransaction(async (tx)=>{
       const snap = await tx.get(syncDoc());
@@ -2893,6 +2894,16 @@ async function runFullSync(){
       const mergedSnapshot = JSON.parse(JSON.stringify(merged));
       tx.set(syncDoc(), { plannerData: mergedSnapshot, updatedAt: Date.now() });
     });
+    // she may have kept editing (most notably: deleting something) WHILE the transaction above was
+    // still in flight -- its read-then-write round trip takes real time -- so `merged` was computed
+    // from a `data` snapshot from back when the callback ran, not from `data` as it stands right now.
+    // applying it as-is would silently undo whatever changed in that window: a just-deleted item
+    // coming back on its own, needing a second delete to actually stick. re-merging live `data`
+    // against the pre-transaction snapshot (as base) folds those in-flight changes back on top before
+    // any of this reaches the screen, and scheduling another sync right after pushes the correction to
+    // the cloud too, instead of leaving the now-stale write sitting there for another device to see.
+    const changedDuringSync = JSON.stringify(data) !== JSON.stringify(preSyncSnapshot);
+    if(changedDuringSync) merged = mergePlannerData(data, preSyncSnapshot, merged);
     applyingSyncedData = true;
     applySyncedFields(data, merged);
     saveData();
@@ -2901,6 +2912,7 @@ async function runFullSync(){
     saveSyncBase(JSON.parse(JSON.stringify(merged)));
     lastSyncAt = Date.now();
     lastSyncError = null;
+    if(changedDuringSync) scheduleCloudSync();
   }catch(e){
     console.error('sync failed', e);
     lastSyncError = e;
