@@ -5880,6 +5880,13 @@ function deleteHabit(id){
   saveData();
   renderHabits();
 }
+function saveHabitTextEdit(id, val){
+  const key = 'habit:'+id;
+  inlineEditIds.delete(key);
+  const h = data.habits.find(h=>h.id===id);
+  if(h && val.trim()){ h.text = val.trim(); saveData(); }
+  renderHabits();
+}
 function toggleHabitSmallStarts(id){
   if(habitSmallStartsOpen.has(id)) habitSmallStartsOpen.delete(id); else habitSmallStartsOpen.add(id);
   renderHabits();
@@ -5928,7 +5935,9 @@ function renderHabits(){
         return `
         <li class="habit-li">
           <div class="habit-li-row">
-            <span class="habit-text">${escapeHtml(h.text)}</span>
+            ${inlineEditIds.has('habit:'+h.id)
+              ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+              : `<span class="habit-text" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
             <span class="del-task" onclick="deleteHabit('${h.id}')">✕</span>
           </div>
           <div class="habit-li-actions">
