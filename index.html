@@ -3613,15 +3613,27 @@ function toggleSubtaskFavorite(taskId, subId){
   const s = t && (t.subtasks||[]).find(s=>s.id===subId);
   if(s){ s.favorite = !s.favorite; saveData(); renderTasks(); }
 }
+let taskSchedFieldsOpen = false;
+let taskMoreFieldsOpen = false;
 function toggleTaskSchedule(){
-  const fields = document.getElementById('taskSchedFields');
-  fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
+  taskSchedFieldsOpen = !taskSchedFieldsOpen;
+  applyTaskComposeToggles();
 }
 function toggleTaskMore(){
-  const fields = document.getElementById('taskMoreFields');
-  const opening = fields.style.display==='none';
-  fields.style.display = opening ? '' : 'none';
-  if(opening) renderPendingBodyCheck('task');
+  taskMoreFieldsOpen = !taskMoreFieldsOpen;
+  applyTaskComposeToggles();
+  if(taskMoreFieldsOpen) renderPendingBodyCheck('task');
+}
+// a plain DOM style toggle here (instead of state checked on every render, like everything else
+// in this file) silently loses "open" the moment ANYTHING re-renders the page around her -- a
+// background cloud sync tick, a totally unrelated click -- because that re-render never knew to
+// re-apply it. tracking it as real state and reapplying it inside render() every time makes it
+// immune to that regardless of what triggered the re-render.
+function applyTaskComposeToggles(){
+  const sched = document.getElementById('taskSchedFields');
+  if(sched) sched.style.display = taskSchedFieldsOpen ? 'flex' : 'none';
+  const more = document.getElementById('taskMoreFields');
+  if(more) more.style.display = taskMoreFieldsOpen ? '' : 'none';
 }
 let taskAddOpen = true;
 function toggleTaskAddOpen(){ taskAddOpen = !taskAddOpen; renderTaskAddState(); }
@@ -3631,6 +3643,7 @@ function renderTaskAddState(){
   if(!btn || !body) return;
   btn.querySelector('.chev').textContent = taskAddOpen ? '▾' : '▸';
   body.style.display = taskAddOpen ? '' : 'none';
+  applyTaskComposeToggles();
 }
 function addTask(){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
@@ -3651,7 +3664,8 @@ function addTask(){
   setTimePickerValue('taskTime', '');
   setTimePickerValue('taskEndTime', '');
   document.getElementById('taskNewDescription').value='';
-  document.getElementById('taskMoreFields').style.display='none';
+  taskMoreFieldsOpen = false;
+  applyTaskComposeToggles();
   resetPendingBodyCheck('task');
   saveData();
   renderTasks();
