@@ -383,6 +383,7 @@
   select.tag{appearance:none; -webkit-appearance:none; border:none; cursor:pointer; font-family:inherit; background-image:none; max-width:110px; text-overflow:ellipsis;}
   select.tag:focus{outline:2px solid var(--glow-gold); outline-offset:1px;}
   .tag.tag-empty{background:transparent; border:1px dashed var(--border-strong); color:var(--muted2); font-weight:500;}
+  .tag.tag-dimmed{filter:saturate(0.4) brightness(0.85); opacity:.6;}
   .dimmed-item{filter:saturate(0.5) brightness(0.92); opacity:.65;}
   .overdue-divider{display:block; padding:16px 4px 6px; border-bottom:none;}
   .overdue-divider-line{border-top:2px solid var(--gold); opacity:.55; margin-bottom:10px;}
@@ -570,9 +571,6 @@
   .bc-toggle-btn.bc-contract.active{color:var(--energy-high); border-color:var(--energy-high);}
   .bc-reminder-btn{align-self:flex-start; background:transparent; border:1px solid var(--energy-high); color:var(--energy-high); border-radius:999px; padding:5px 13px; font-size:13px; cursor:pointer; font-family:inherit;}
   .bc-reminder-shown{font-size:13.5px; color:var(--text); background:var(--surface); border-radius:8px; padding:8px 10px; line-height:1.5;}
-  .bc-glow-expand{box-shadow:0 0 0 1.5px var(--energy-low), 0 0 8px 0 var(--energy-low);}
-  .bc-glow-neutral{box-shadow:0 0 0 1px var(--gold);}
-  .bc-glow-contract{box-shadow:0 0 0 1.5px var(--energy-high), 0 0 8px 0 var(--energy-high);}
   .edit-form-row{display:flex; gap:6px; min-width:0;}
   .edit-form-row select, .edit-form-row .field-label, .edit-form-row input[type=text]{flex:1; min-width:0;}
   .anchor-form{min-width:0;}
@@ -1674,6 +1672,7 @@ function renderKeepGrid(id){
       <div class="keep-note-toolbar">
         <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
         <span class="keep-note-fmt-btn fmt-underline" onmousedown="event.preventDefault()" onclick="execNoteFormat('underline')" title="קו תחתון">U</span>
+        <span class="keep-note-fmt-btn fmt-bullet" onmousedown="event.preventDefault()" onclick="insertBulletAtLineStart()" title="תבליט בתחילת השורה">•</span>
       </div>
       <div class="keep-note-editor ${isMedium?'note-clip':''}" contenteditable="true" dir="auto" data-placeholder="כתוב כאן..." data-field-key="note-${n.id}"
         oninput="onKeepNoteRichInput('${id}','${n.id}', this)" onkeydown="onKeepNoteEditorKeydown(event)" onpaste="onKeepNoteEditorPaste(event)"
@@ -1855,11 +1854,7 @@ const NOTE_BULLET = '\u2022 ';
 // text from the start of the caret's current line (the nearest preceding <br>, or the
 // start of the editor) up to the caret, via Range comparison -- avoids innerText's <br>-as-\n
 // vs Range.toString()'s <br>-is-ignored mismatch entirely by never mixing the two
-function textBeforeCaretOnLine(el){
-  const sel = window.getSelection();
-  if(!sel || !sel.rangeCount) return null;
-  const caretRange = sel.getRangeAt(0);
-  if(!el.contains(caretRange.startContainer)) return null;
+function lineStartPosition(el, caretRange){
   let lineStartNode = el, lineStartOffset = 0;
   const brs = el.querySelectorAll('br');
   for(const br of brs){
@@ -1870,10 +1865,36 @@ function textBeforeCaretOnLine(el){
       lineStartOffset = Array.prototype.indexOf.call(br.parentNode.childNodes, br) + 1;
     }
   }
+  return {node: lineStartNode, offset: lineStartOffset};
+}
+function textBeforeCaretOnLine(el){
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount) return null;
+  const caretRange = sel.getRangeAt(0);
+  if(!el.contains(caretRange.startContainer)) return null;
+  const linePos = lineStartPosition(el, caretRange);
   const lineRange = document.createRange();
-  lineRange.setStart(lineStartNode, lineStartOffset);
+  lineRange.setStart(linePos.node, linePos.offset);
   lineRange.setEnd(caretRange.startContainer, caretRange.startOffset);
   return lineRange.toString().replace(new RegExp(NOTE_ZWSP,'g'), '');
+}
+// manual bullet button: same effect as typing "* "/"- " at a fresh line, but works from wherever
+// the cursor currently sits in the line, not just at the very start of it
+function insertBulletAtLineStart(){
+  const el = document.activeElement;
+  if(!el || !el.classList || !el.classList.contains('keep-note-editor')) return;
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount) return;
+  const caretRange = sel.getRangeAt(0);
+  if(!el.contains(caretRange.startContainer)) return;
+  const linePos = lineStartPosition(el, caretRange);
+  const range = document.createRange();
+  range.setStart(linePos.node, linePos.offset);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand('insertText', false, NOTE_BULLET);
+  el.dispatchEvent(new Event('input', {bubbles:true}));
 }
 // inserting a bare <br> leaves the caret positioned BEFORE it (a known contenteditable quirk),
 // so typing right after Enter gets swallowed back into the previous line's bold/underline run;
@@ -1921,7 +1942,7 @@ function onKeepNoteEditorKeydown(e){
   const el = e.currentTarget;
   if(e.key===' '){
     const currentLine = textBeforeCaretOnLine(el);
-    if(currentLine==='*'){
+    if(currentLine==='*' || currentLine==='-'){
       e.preventDefault();
       document.execCommand('delete', false, null);
       document.execCommand('insertText', false, NOTE_BULLET);
@@ -3284,15 +3305,15 @@ function taskRowHtml(t){
   const hasIncompleteSubtasks = subCount>0 && !(t.subtasks||[]).every(s=>s.done);
   const isOverdue = t.date && !t.done && t.date < ymd(new Date());
   const isFarFuture = t.date && !t.done && !isOverdue && t.date > ymd(currentWeekDates()[6]);
-  const isDimmed = isOverdue || isFarFuture || (data.softMode && !energy);
+  const isDimmed = isOverdue || isFarFuture || t.done || (data.softMode && !energy);
   const subBtnLabel = isSubtasksOpen ? `▾ תת-משימות${subCount?' ('+subCount+')':''}` : (subCount ? `▸ תת-משימות (${subCount})` : '+ תת-משימה');
   const canDrag = taskSortBy==='manual';
-  let html = `<li class="task-li ${isDimmed?'dimmed-item':''} ${bodyCheckGlowClass(t)}" data-drag-id="${t.id}">
+  let html = `<li class="task-li ${isDimmed?'dimmed-item':''}" data-drag-id="${t.id}">
     <div class="task-row-main">
       ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
       <span class="task-text ${t.done?'done':''} ${(!t.done && energy==='low')?'task-text-energizing':''}" onclick="taskTextClick('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
-      <select class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
+      <select class="tag ${dom?'':'tag-empty'} ${t.done?'tag-dimmed':''}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
       <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
     </div>
     <div class="task-row-meta">
@@ -3301,6 +3322,7 @@ function taskRowHtml(t){
       ${isOverdue ? `<span class="promote" onclick="pushTaskToTomorrow('${t.id}')">→ מחר</span>` : ''}
       <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
+    ${bodyCheckStatusBadgesHtml(t, {urgencyOptions:['objective','other','relief'], showEnergy:true})}
   </li>`;
   if(isSubtasksOpen) html += taskDetailHtml(t);
   return html;
@@ -3927,13 +3949,14 @@ function somedayRowHtml(s){
   const hasIncompleteSubtasks = subCount>0 && !(s.subtasks||[]).every(x=>x.done);
   const hasContent = hasIncompleteSubtasks || (s.description||'').trim();
   const canDrag = somedaySortBy==='manual';
-  let html = `<li class="someday-li ${bodyCheckGlowClass(s)}" data-drag-id="${s.id}">
+  let html = `<li class="someday-li" data-drag-id="${s.id}">
     ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${s.id}','.someday-li',reorderSomeday)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
     <span class="fav-star ${s.favorite?'active':''}" onclick="toggleSomedayFavorite('${s.id}')" title="${s.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${s.favorite?'★':'☆'}</span>
     <span class="task-text" style="flex:1" onclick="somedayTextClick('${s.id}')">${escapeHtml(s.text)}</span>
     <select class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};" onclick="event.stopPropagation()" onchange="quickChangeSomedayDomain('${s.id}', this.value)" title="שינוי נושא">${domainOptions(s.domain)}</select>
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
     <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
+    ${bodyCheckStatusBadgesHtml(s, {})}
   </li>`;
   if(isExpanded) html += somedayDetailHtml(s);
   return html;
@@ -4130,14 +4153,20 @@ function suggestionSortWeight(s){
   if((s.bodyCheck||{}).expand==='contract') return 1;
   return 0;
 }
-function suggestionStatusBadgesHtml(s){
-  const bc = s.bodyCheck || {};
+// shared subtle status-badge row for anything with a body-check -- replaces the old neon glow
+// ring, which stays reserved for the weekly schedule only (soft-mode energy emphasis there)
+function bodyCheckStatusBadgesHtml(item, opts){
+  opts = opts || {};
+  const bc = item.bodyCheck || {};
   const badges = [];
   if(bc.expand==='contract') badges.push('<span class="sugg-status-badge sugg-status-contract">🥀 מכווץ</span>');
   if(bc.expand==='expand') badges.push('<span class="sugg-status-badge sugg-status-expand">🌱 מרחיב</span>');
-  if(bc.urgency==='objective') badges.push('<span class="sugg-status-badge">⚠️ דחוף אובייקטיבית</span>');
-  if(bc.urgency==='other') badges.push('<span class="sugg-status-badge">⚠️ דחוף כי זו העדפה של מישהו אחר</span>');
-  if(bc.energy==='no') badges.push('<span class="sugg-status-badge">🔋 אין לי אנרגיה לזה</span>');
+  if(opts.urgencyOptions){
+    if(bc.urgency==='objective') badges.push('<span class="sugg-status-badge">⏰ דחוף</span>');
+    if(bc.urgency==='other') badges.push('<span class="sugg-status-badge">🗣️ דחוף (העדפה של מישהו אחר)</span>');
+    if(bc.urgency==='relief') badges.push('<span class="sugg-status-badge">💭 '+URGENCY_LABELS.relief+'</span>');
+  }
+  if(opts.showEnergy && bc.energy==='no') badges.push('<span class="sugg-status-badge">🔋 אין לי אנרגיה לזה</span>');
   return badges.length ? `<div class="sugg-status-row">${badges.join('')}</div>` : '';
 }
 function renderSuggestions(){
@@ -4152,7 +4181,7 @@ function renderSuggestions(){
   el.innerHTML = sorted.map(s=>{
     if(editingSuggestionId===s.id) return suggestionEditFormHtml(s);
     return `
-    <li class="suggestion-li ${s.done?'suggestion-done':''} ${bodyCheckGlowClass(s)}" data-drag-id="${s.id}">
+    <li class="suggestion-li ${s.done?'suggestion-done':''}" data-drag-id="${s.id}">
       <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
       <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
@@ -4160,7 +4189,7 @@ function renderSuggestions(){
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
       ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}</div>` : ''}
-      ${suggestionStatusBadgesHtml(s)}
+      ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other'], showEnergy:true})}
     </li>`;
   }).join('');
   applyListCap('suggestion', data.suggestions.length);
@@ -4342,11 +4371,6 @@ function bodyCheckToggleBtnHtml(kind, id){
   const isOpen = bodyCheckOpenIds.has(kind+':'+id);
   return `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="toggleBodyCheck('${kind}','${id}')">❤️‍🩹 בדיקת גוף${isOpen?' ▴':''}</button>`;
 }
-function bodyCheckGlowClass(item){
-  const val = (item.bodyCheck||{}).expand;
-  return val ? `bc-glow-${val}` : '';
-}
-
 /* body check while creating a task/someday/suggestion, before it exists as a real record to attach
    bodyCheck to. mirrors bodyCheckPanelHtml exactly (same fields, same look) but writes into a plain
    holding object per kind instead of looking an item up by id; addTask/addSomeday/addSuggestion pull
@@ -5597,7 +5621,7 @@ function renderListsView(){
     const lists = data.lists || [];
     el.innerHTML = `
       <div class="add-row" style="margin-bottom:14px;">
-        <input type="text" id="newListInput" placeholder="שם הרשימה... (למשל: קניות, סולואים ללמוד)" onkeydown="if(event.key==='Enter') addList();">
+        <input type="text" id="newListInput" placeholder="שם הרשימה... (למשל: קניות, ספרים לקרוא)" onkeydown="if(event.key==='Enter') addList();">
         <button onclick="addList()">+ הוסף רשימה</button>
       </div>
       ${lists.length ? `<div class="lists-grid">${lists.map(l=>{
@@ -5611,7 +5635,8 @@ function renderListsView(){
             <span class="grip" onpointerdown="startListDrag(event,'${l.id}','.list-card',reorderLists)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
           </div>
         </div>`;
-      }).join('')}</div>` : '<div class="empty">עדיין אין רשימות — אפשר להתחיל עם אחת חדשה למעלה</div>'}
+      }).join('')}</div>` : `<div class="empty">עדיין אין רשימות — אפשר להתחיל עם אחת חדשה למעלה</div>
+        <div class="hint" style="margin-top:8px;">כמה רעיונות: ספרים לקרוא (עם אותם שלבי קריאה לכל ספר), אנשים שבא לי לשמור איתם על קשר, אנשים שעושה לי טוב לדבר איתם, רשימת קניות</div>` }
     `;
     return;
   }
