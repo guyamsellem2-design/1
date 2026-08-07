@@ -703,6 +703,7 @@
 <div class="undo-redo-bar">
   <button class="reset-btn" id="undoBtn" onclick="performUndo()" disabled title="בטל">↶ בטל</button>
   <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled title="בצע שוב">↷ בצע שוב</button>
+  <button class="reset-btn" id="collapseAllBtn" onclick="collapseAllOnCurrentView()" disabled title="ממזער הכל בדף הזה, כולל פתקים">🗕 מזער הכל</button>
 </div>
 
 <div id="homeView">
@@ -1171,6 +1172,52 @@ function updateUndoRedoButtons(){
   if(undoBtn) undoBtn.disabled = undoStack.length===0;
   if(redoBtn) redoBtn.disabled = redoStack.length===0;
 }
+// "מזער הכל": a one-press reset for whichever tab she's currently on, for the moment things feel
+// like too much on screen at once -- greyed out (a no-op) once everything on this tab is already
+// collapsed, and lights back up the moment anything gets expanded again. only tracks the top-level
+// accordions here (section headers, the feel/today-ideas/habits/procrastination/videos blocks) --
+// those alone already answer "is anything open on this tab", so sub-toggles inside an already-closed
+// block don't need their own separate tracking for this check.
+function isEverythingCollapsedOnCurrentView(){
+  if(mainView==='home'){
+    if(SECTION_KEYS.some(k=>!isSectionCollapsed(k))) return false;
+    return !feelBlockOpen && !todayIdeasOpen && !habitsBlockOpen;
+  }
+  if(mainView==='tools') return !procBlockOpen && !videosBlockOpen;
+  return true;
+}
+function updateCollapseAllButton(){
+  const btn = document.getElementById('collapseAllBtn');
+  if(btn) btn.disabled = isEverythingCollapsedOnCurrentView();
+}
+function collapseAllOnCurrentView(){
+  if(isEverythingCollapsedOnCurrentView()) return;
+  if(mainView==='home'){
+    if(!data.collapsedSections) data.collapsedSections = {};
+    SECTION_KEYS.forEach(k=>{ data.collapsedSections[k] = true; });
+    saveData();
+    applyAllSectionCollapse();
+    feelBlockOpen = false;
+    todayIdeasOpen = false;
+    habitsBlockOpen = false;
+    emotionsBankOpen = false;
+    needsBankOpen = false;
+    bodyBankOpen = false;
+    moreQuestionsOpen = false;
+    ['emotion','body','need','qSoul','qPower','qHealing','qFreeSelf','qExpress'].forEach(k=>feelNoteMinimized.add(k));
+    renderFeelBar();
+    renderTodayIdeas();
+    renderHabits();
+  } else if(mainView==='tools'){
+    procBlockOpen = false;
+    videosBlockOpen = false;
+    feelNoteMinimized.add('procWant');
+    feelNoteMinimized.add('procTrueWant');
+    renderProcrastinationBlock();
+    renderInspiringVideos();
+  }
+  updateCollapseAllButton();
+}
 function restoreSnapshot(json){
   isRestoringHistory = true;
   // closing whatever was open mid-edit can shrink the page (or grow it back), which shifts the
@@ -1602,6 +1649,7 @@ function applyMainViewState(){
   if(topicsBtn) topicsBtn.classList.toggle('active', mainView==='topics');
   if(toolsBtn) toolsBtn.classList.toggle('active', mainView==='tools');
   if(listsBtn) listsBtn.classList.toggle('active', mainView==='lists');
+  updateCollapseAllButton();
   if(mainView==='topics'){
     if(!activeNoteDomain || !domainById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
     renderDomainEditor();
@@ -5197,7 +5245,7 @@ function feelChipGridHtml(bank){
     ${deleteModeToggleHtml(bank)}
   </div>`;
 }
-function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); }
+function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); updateCollapseAllButton(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
 function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
 function toggleBodyBank(){ bodyBankOpen = !bodyBankOpen; renderFeelBar(); }
@@ -5398,7 +5446,7 @@ function renderFeelBar(){
    non-judgmental on purpose -- if she's going to procrastinate anyway, better to notice what would
    actually feel good right now than to just default into whatever's easiest to numb out with. */
 let procBlockOpen = false;
-function toggleProcBlock(){ procBlockOpen = !procBlockOpen; renderProcrastinationBlock(); }
+function toggleProcBlock(){ procBlockOpen = !procBlockOpen; renderProcrastinationBlock(); updateCollapseAllButton(); }
 function onProcWantNoteInput(val){ data.procWantNote = val; saveData(); }
 function onProcTrueWantNoteInput(val){ data.procTrueWantNote = val; saveData(); }
 function renderProcrastinationBlock(){
@@ -5426,7 +5474,7 @@ function renderProcrastinationBlock(){
 
 /* ---------- inspiring videos ---------- shown by their own title, never the raw link */
 let videosBlockOpen = false;
-function toggleVideosBlock(){ videosBlockOpen = !videosBlockOpen; renderInspiringVideos(); }
+function toggleVideosBlock(){ videosBlockOpen = !videosBlockOpen; renderInspiringVideos(); updateCollapseAllButton(); }
 function addInspiringVideo(){
   const titleInput = document.getElementById('videoTitleInput');
   const urlInput = document.getElementById('videoUrlInput');
@@ -5471,7 +5519,7 @@ function renderInspiringVideos(){
    optional one-click way to also put it on the weekly schedule as a (skippable) daily anchor. */
 let habitsBlockOpen = false;
 const habitSmallStartsOpen = new Set();
-function toggleHabitsBlock(){ habitsBlockOpen = !habitsBlockOpen; renderHabits(); }
+function toggleHabitsBlock(){ habitsBlockOpen = !habitsBlockOpen; renderHabits(); updateCollapseAllButton(); }
 function addHabit(){
   const input = document.getElementById('habitInput');
   const text = input.value.trim();
@@ -5847,7 +5895,7 @@ function applyPickerHtml(item, others){
    the noise of the full dump doesn't have to stay in front of her once she's decided. no calendar,
    no times, ever, in this list -- promoting to a task is the only way something gets a time. */
 let todayIdeasOpen = false;
-function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; renderTodayIdeas(); }
+function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; renderTodayIdeas(); updateCollapseAllButton(); }
 // no more daily wipe -- this used to reset the whole list back to 3 blanks every day, which is
 // exactly what kept adding empty rows on every open. now it only ever tops the list UP to 3 (never
 // down, never touching existing content): the very first time there's nothing yet, and again any
@@ -6287,6 +6335,7 @@ function render(){
   applyAllSectionCollapse();
   applyMainViewState();
   updateUndoRedoButtons();
+  updateCollapseAllButton();
 }
 
 /* ---------- collapsible sections ---------- */
@@ -6301,6 +6350,7 @@ function toggleSection(key){
   data.collapsedSections[key] = !wasCollapsed;
   saveData();
   applySectionCollapse(key);
+  updateCollapseAllButton();
   if(wasCollapsed) scrollSectionHeaderToTop(key);
 }
 function openSection(key){
@@ -6309,6 +6359,7 @@ function openSection(key){
   data.collapsedSections[key] = false;
   saveData();
   applySectionCollapse(key);
+  updateCollapseAllButton();
   scrollSectionHeaderToTop(key);
 }
 function scrollSectionHeaderToTop(key){
