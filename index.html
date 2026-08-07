@@ -158,6 +158,8 @@
   .keep-note textarea{width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; resize:none; overflow:hidden; line-height:1.55; padding:0;}
   .keep-note textarea:focus{outline:none;}
   .keep-note textarea.note-clip{max-height:110px;}
+  .keep-note-topbar{display:flex; align-items:center; gap:6px; justify-content:flex-end; margin-bottom:8px;}
+  .keep-note-draw-row{display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-top:8px;}
   .keep-note-toolbar{display:flex; gap:4px; margin-bottom:6px;}
   .keep-note-fmt-btn{cursor:pointer; font-size:13px; padding:3px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface3); color:var(--text); user-select:none;}
   .keep-note-fmt-btn.fmt-bold{font-weight:700;}
@@ -1719,6 +1721,12 @@ function renderKeepGrid(id){
     const isMedium = level===1;
     return `
     <div class="keep-note" style="${noteStyle}">
+      <div class="keep-note-topbar">
+        ${isMedium
+          ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
+          : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
+        <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
+      </div>
       <div class="keep-note-toolbar">
         <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
         <span class="keep-note-fmt-btn fmt-underline" onmousedown="event.preventDefault()" onclick="execNoteFormat('underline')" title="קו תחתון">U</span>
@@ -1736,20 +1744,21 @@ function renderKeepGrid(id){
           <div class="draw-sizes">
             ${DRAW_SIZES.map(s=>`<span class="draw-size-dot ${drawSize===s?'active':''}" data-size="${s}" onclick="setDrawSize(${s})"><span style="width:${s}px;height:${s}px;"></span></span>`).join('')}
           </div>
-          <span class="note-size-btn" onclick="toggleNoteDrawing('${id}','${n.id}')" title="מיזעור הציור">🗕 מזער ציור</span>
-          <span class="del-task" onclick="clearNoteDrawing('${id}','${n.id}')" title="נקה ציור">🗑</span>
         </div>
         <canvas class="keep-note-canvas" id="canvas-${n.id}" data-domain="${id}" data-note="${n.id}"></canvas>
       ` : ''}
+      <div class="keep-note-draw-row">
+        <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
+        ${isDrawing ? `
+          <span class="note-size-btn" onclick="clearNoteDrawing('${id}','${n.id}')" title="ניקוי תוכן הציור">🧽 מחק</span>
+          <span class="note-size-btn" onclick="toggleNoteDrawing('${id}','${n.id}')" title="מיזעור הציור">🗕 מזער ציור</span>
+          <span class="del-task" onclick="deleteNoteDrawing('${id}','${n.id}')" title="מחיקת הציור">✕</span>
+        ` : ''}
+      </div>
       <div class="keep-note-actions">
         <div class="keep-colors">
           ${KEEP_COLORS.map(c=>`<span class="${(n.color||'')===c?'active':''}" style="background:${c||'var(--surface3)'}" onclick="setKeepNoteColor('${id}','${n.id}','${c}')"></span>`).join('')}
         </div>
-        ${isMedium
-          ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
-          : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
-        <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
-        <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
       </div>
       ${renderMemoSection(id, n)}
     </div>`;
@@ -2059,6 +2068,16 @@ function clearNoteDrawing(domainId, noteId){
   if(n){ n.drawing = ''; saveData(); }
   const canvas = document.getElementById('canvas-'+noteId);
   if(canvas) initDrawCanvas(canvas);
+}
+// removes the drawing entirely and exits drawing mode, unlike "מחק" above which only wipes the
+// canvas so she can keep drawing on a clean surface -- no confirm() here, matching how destructive
+// actions elsewhere in this file lean on the global undo/redo instead of a blocking dialog
+function deleteNoteDrawing(domainId, noteId){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(n) n.drawing = '';
+  if(drawingNoteId===noteId) drawingNoteId = null;
+  saveData();
+  renderKeepGrid(domainId);
 }
 function initDrawCanvas(canvas){
   const domainId = canvas.dataset.domain;
