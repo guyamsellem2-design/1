@@ -661,6 +661,15 @@
   .bank-entry textarea.inline-text-edit{min-height:50px; resize:vertical; line-height:1.5;}
   .bank-entry > span:nth-child(2){flex:1; cursor:pointer;}
   .bank-entry .bank-date{color:var(--muted2); font-size:12.5px; flex-shrink:0; white-space:nowrap; padding-top:1px;}
+  .dilemma-subtabs{display:flex; gap:8px; margin-bottom:14px;}
+  .dilemma-subtab-btn{flex:1; background:var(--surface3); border:1px solid var(--border-strong); color:var(--muted); border-radius:10px; padding:9px 12px; font-size:14px; font-family:inherit; cursor:pointer;}
+  .dilemma-subtab-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
+  .dilemma-subtab-btn:not(.active):hover{color:var(--text); border-color:var(--muted);}
+  .decision-helper-panel{display:flex; flex-direction:column; gap:6px; background:var(--surface2); border-radius:10px; padding:10px; margin-top:6px;}
+  .decision-quote-list{display:flex; flex-direction:column; gap:6px;}
+  .decision-quote-row{background:var(--surface3); border-radius:8px; padding:8px 10px; font-size:14px; line-height:1.5; display:flex; align-items:flex-start; gap:8px;}
+  .decision-quote-row > span:first-child{flex:1; cursor:pointer;}
+  .decision-quote-row textarea.inline-text-edit{min-height:50px; resize:vertical; line-height:1.5;}
 
   footer{margin-top:50px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted2); font-size:14.5px; line-height:1.7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:13.5px; cursor:pointer; font-family:inherit;}
@@ -850,27 +859,16 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('suggestions')"><span class="num">05</span> העדפות של אחרים <span class="chev" id="chev-suggestions">▾</span></h2>
-      <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך — בלי שזה יילחץ עליך ישר</div>
+      <h2 onclick="toggleSection('suggestions')"><span class="num">05</span> התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
+      <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך, וגם מקום לדברים שאת/ה מתלבט/ת עליהם בכלל — בלי שזה יילחץ עליך ישר</div>
     </div>
     <div id="secbody-suggestions">
     <div class="card">
-      <div class="add-row">
-        <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
-        <input type="text" id="suggText" placeholder="מה ההצעה...">
-        <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ תאריך תשובה (רשות)</button>
-        <button onclick="addSuggestion()">הוסף</button>
+      <div class="dilemma-subtabs">
+        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabOthersBtn" onclick="setDilemmaSubTab('others')">העדפות של אחרים</button>
+        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabGeneralBtn" onclick="setDilemmaSubTab('general')">התלבטויות כלליות</button>
       </div>
-      <div class="add-row" id="suggDetailsFields" style="display:none;">
-        <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
-        <div class="time-picker-wrap">
-          <input type="hidden" id="suggReplyTime" value="">
-          <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעה" onclick="toggleTimePicker('suggReplyTime', event)">🕐 <span dir="ltr">שעה</span></button>
-        </div>
-      </div>
-      <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
-      <ul class="tasks scroll-cap" id="suggestionList"></ul>
-      <div class="list-expand-row" id="suggestionListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('suggestion')"></button></div>
+      <div id="dilemmasSectionBody"></div>
     </div>
     </div>
   </section>
@@ -1076,6 +1074,14 @@ function loadData(){
       data.inspiringVideos = parsed.inspiringVideos || [];
       data.habits = (parsed.habits || []).map(h=>({smallStarts:[], ...h}));
       data.lists = (parsed.lists || []).map(l=>({...l, items:(l.items||[]).map(i=>({favorite:false, subitems:[], ...i}))}));
+      data.generalDilemmas = parsed.generalDilemmas || [];
+      data.decisionHelperLinks = parsed.decisionHelperLinks || [];
+      data.decisionHelperQuotes = parsed.decisionHelperQuotes || [];
+      data.decisionHelperQuotesSeeded = !!parsed.decisionHelperQuotesSeeded;
+      if(!data.decisionHelperQuotesSeeded){
+        if(data.decisionHelperQuotes.length===0) data.decisionHelperQuotes = SEED_DECISION_QUOTES.map(q=>({...q}));
+        data.decisionHelperQuotesSeeded = true;
+      }
       mainView = ['topics','tools','lists'].includes(parsed.mainView) ? parsed.mainView : 'home';
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -1086,6 +1092,10 @@ function loadData(){
       data.goodThingsRestoredOnce = true;
       data.bodyLocationsList = seedChipList(SEED_BODY_LOCATIONS, []);
       data.bodyBankSeeded = true;
+      data.generalDilemmas = [];
+      data.decisionHelperLinks = [];
+      data.decisionHelperQuotes = SEED_DECISION_QUOTES.map(q=>({...q}));
+      data.decisionHelperQuotesSeeded = true;
     }
   }catch(e){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
@@ -1229,7 +1239,7 @@ function restoreSnapshot(json){
   lastSnapshotJSON = json;
   try{ localStorage.setItem(STORAGE_KEY, json); }catch(e){}
   editingTaskId = null; scheduleEditingTaskId = null; editingSuggestionId = null; editingSomedayId = null;
-  editingAnchorId = null; openForm = null; drawingNoteId = null; colorPickerForId = null;
+  editingDilemmaId = null; editingAnchorId = null; openForm = null; drawingNoteId = null; colorPickerForId = null;
   longPressedTaskId = null;
   render();
   window.scrollTo(0, scrollY);
@@ -2742,10 +2752,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -2837,7 +2847,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','generalDilemmas','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -3330,7 +3340,7 @@ function reorderTaskSubtasks(taskId, fromId, toId){
 let overdueSectionOpen = false;
 function toggleOverdueSection(){ overdueSectionOpen = !overdueSectionOpen; renderTasks(); }
 const LIST_CAP_THRESHOLD = 5;
-const listExpandState = { task:false, someday:false, suggestion:false };
+const listExpandState = { task:false, someday:false, suggestion:false, dilemma:false };
 function toggleListExpand(key){
   listExpandState[key] = !listExpandState[key];
   const el = document.getElementById(key+'List');
@@ -4257,12 +4267,57 @@ function reorderSomedaySubtasks(somedayId, fromId, toId){
   saveData();
   renderSomeday();
 }
-/* ---------- others' suggestions ---------- */
+/* ---------- התלבטויות: "העדפות של אחרים" (existing) + "התלבטויות כלליות" (new) share this one
+   numbered section, switched by a small sub-tab strip -- she wanted the two kept apart (others'
+   suggestions almost always have a real reply deadline; general dilemmas often don't) but sharing
+   the same body-check and "עוד" decision-helper panel, since both are really the same underlying
+   question: "what do I do about this." only one sub-tab's list/form is ever rendered at a time. ---------- */
+let dilemmaSubTab = 'others';
+function setDilemmaSubTab(tab){
+  dilemmaSubTab = tab;
+  renderDilemmasSection();
+}
+function renderDilemmasSection(){
+  const el = document.getElementById('dilemmasSectionBody');
+  if(!el) return;
+  const othersBtn = document.getElementById('dilemmaSubtabOthersBtn');
+  const generalBtn = document.getElementById('dilemmaSubtabGeneralBtn');
+  if(othersBtn) othersBtn.classList.toggle('active', dilemmaSubTab==='others');
+  if(generalBtn) generalBtn.classList.toggle('active', dilemmaSubTab==='general');
+  withFocusPreserved('dilemmasSectionBody', ()=>{
+    el.innerHTML = dilemmaSubTab==='general' ? generalDilemmasSubViewHtml() : suggestionsSubViewHtml();
+  });
+  if(dilemmaSubTab==='general'){
+    renderGeneralDilemmaList();
+    renderPendingBodyCheck('dilemma');
+  } else {
+    renderSuggestions();
+    renderPendingBodyCheck('suggestion');
+  }
+}
+function suggestionsSubViewHtml(){
+  return `
+    <div class="add-row">
+      <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
+      <input type="text" id="suggText" placeholder="מה ההצעה...">
+      <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ תאריך תשובה (רשות)</button>
+      <button onclick="addSuggestion()">הוסף</button>
+    </div>
+    <div class="add-row" id="suggDetailsFields" style="display:none;">
+      <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
+      ${timePickerHtml('suggReplyTime', '', 'שעה')}
+    </div>
+    <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
+    <ul class="tasks scroll-cap" id="suggestionList"></ul>
+    <div class="list-expand-row" id="suggestionListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('suggestion')"></button></div>
+  `;
+}
 let editingSuggestionId = null;
 // done sinks all the way to the bottom (fully resolved); marked "contract" sinks below the regular
 // items too but stays above anything done, since it's a "not now" signal, not a "finished" one --
 // and it's fully reactive to the CURRENT bodyCheck value, so switching back to neutral/expand moves
-// it back up on its own, no separate "undo the sink" action needed anywhere
+// it back up on its own, no separate "undo the sink" action needed anywhere. shared by suggestions
+// and general dilemmas -- both just need a `.done` flag and an optional `.bodyCheck`.
 function suggestionSortWeight(s){
   if(s.done) return 2;
   if((s.bodyCheck||{}).expand==='contract') return 1;
@@ -4322,6 +4377,8 @@ function suggestionEditFormHtml(s){
       </div>
       ${bodyCheckToggleBtnHtml('suggestion', s.id)}
       ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other'], showEnergy:true}) : ''}
+      ${decisionHelperToggleBtnHtml('suggestion', s.id)}
+      ${decisionHelperOpenIds.has('suggestion:'+s.id) ? decisionHelperPanelHtml() : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSuggestionEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSuggestionEdit()">בטל</button>
@@ -4403,6 +4460,228 @@ function reorderSuggestions(fromId, toId){
   renderSuggestions();
 }
 
+/* ---------- "התלבטויות כלליות" (general dilemmas) -- same shape as suggestions (text, optional
+   topic, optional date, body-check, done-flag) minus the "who"/reply-deadline framing, since these
+   aren't waiting on anyone else's question. body-check is the one field she wants impossible to miss
+   here, so unlike suggestion's create form it's never tucked behind a toggle -- see
+   PENDING_BODY_CHECK_USE_TOGGLE.dilemma above. ---------- */
+let editingDilemmaId = null;
+function generalDilemmasSubViewHtml(){
+  return `
+    <div class="add-row">
+      <input type="text" id="dilemmaText" placeholder="במה אני מתלבט/ת...">
+      <select id="dilemmaDomain">${domainOptionsWithEmpty('')}</select>
+      <button type="button" class="add-domain-btn" onclick="toggleDilemmaDetails()" id="dilemmaDetailsToggle">+ מועד קבלת ההחלטה (רשות)</button>
+      <button onclick="addGeneralDilemma()">הוסף</button>
+    </div>
+    <div class="add-row" id="dilemmaDetailsFields" style="display:none;">
+      <label class="field-label">יש מועד שרוצים להחליט עד אליו? (לא חובה)<input type="date" id="dilemmaDate"></label>
+    </div>
+    <div id="pendingBodyCheck-dilemma" style="margin-bottom:8px;"></div>
+    <ul class="tasks scroll-cap" id="dilemmaList"></ul>
+    <div class="list-expand-row" id="dilemmaListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('dilemma')"></button></div>
+  `;
+}
+function toggleDilemmaDetails(){
+  const fields = document.getElementById('dilemmaDetailsFields');
+  fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
+}
+function addGeneralDilemma(){
+  const textInput = document.getElementById('dilemmaText');
+  const domainSel = document.getElementById('dilemmaDomain');
+  const dateInput = document.getElementById('dilemmaDate');
+  const text = textInput.value.trim();
+  if(!text) return;
+  const bodyCheck = {...pendingBodyCheck.dilemma};
+  if(!data.generalDilemmas) data.generalDilemmas = [];
+  data.generalDilemmas.push({id:uid(), text, domain: domainSel ? domainSel.value : '', decisionDate: dateInput ? dateInput.value : '', done:false, bodyCheck, createdAt:Date.now()});
+  textInput.value=''; if(dateInput) dateInput.value='';
+  resetPendingBodyCheck('dilemma');
+  saveData();
+  renderGeneralDilemmaList();
+}
+function toggleDilemmaDone(id){
+  const d = (data.generalDilemmas||[]).find(d=>d.id===id);
+  if(d){ d.done = !d.done; saveData(); renderGeneralDilemmaList(); }
+}
+function deleteGeneralDilemma(id){
+  data.generalDilemmas = (data.generalDilemmas||[]).filter(d=>d.id!==id);
+  saveData();
+  renderGeneralDilemmaList();
+}
+function reorderGeneralDilemmas(fromId, toId){
+  reorderArrayById(data.generalDilemmas, fromId, toId);
+  saveData();
+  renderGeneralDilemmaList();
+}
+function convertDilemmaToTask(id){
+  const d = (data.generalDilemmas||[]).find(d=>d.id===id);
+  if(!d) return;
+  const newTask = {id:uid(), text: `להחליט: ${d.text}`, domain:d.domain||'', done:false, energy:'', date:d.decisionDate||'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
+  data.tasks.push(newTask);
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+  flashStatus('נוספה כמשימה');
+}
+function renderGeneralDilemmaList(){
+  const el = document.getElementById('dilemmaList');
+  if(!el) return;
+  const list = data.generalDilemmas || [];
+  if(list.length===0){
+    el.innerHTML = '<li class="empty">אין כרגע התלבטויות כלליות</li>';
+    applyListCap('dilemma', 0);
+    return;
+  }
+  const sorted = list.slice().sort((a,b)=>suggestionSortWeight(a)-suggestionSortWeight(b));
+  el.innerHTML = sorted.map(d=>{
+    if(editingDilemmaId===d.id) return dilemmaEditFormHtml(d);
+    const dom = d.domain ? domainById(d.domain) : null;
+    return `
+    <li class="suggestion-li ${d.done?'suggestion-done':''}" data-drag-id="${d.id}">
+      <span class="grip" onpointerdown="startListDrag(event,'${d.id}','.suggestion-li',reorderGeneralDilemmas)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
+      <div class="chk ${d.done?'done':''}" onclick="toggleDilemmaDone('${d.id}')"></div>
+      <span class="task-text" style="flex:1" onclick="openDilemmaEdit('${d.id}')">${escapeHtml(d.text)}</span>
+      ${dom ? `<span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>` : ''}
+      <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 הפוך למשימה</span>
+      <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
+      <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')">✕</span>
+      ${d.decisionDate ? `<div class="sugg-reply-due">⏰ להחליט עד: ${formatDateHe(d.decisionDate)}</div>` : ''}
+      ${bodyCheckStatusBadgesHtml(d, {})}
+    </li>`;
+  }).join('');
+  applyListCap('dilemma', list.length);
+}
+function dilemmaEditFormHtml(d){
+  return `<li class="edit-li" data-drag-id="${d.id}">
+    <div class="anchor-form">
+      <input type="text" id="dilemmaEditText-${d.id}" value="${escapeAttr(d.text)}" placeholder="במה אני מתלבט/ת...">
+      <div class="edit-form-row">
+        <select id="dilemmaEditDomain-${d.id}">${domainOptionsWithEmpty(d.domain)}</select>
+        <label class="field-label">מועד קבלת ההחלטה<input type="date" id="dilemmaEditDate-${d.id}" value="${d.decisionDate||''}"></label>
+      </div>
+      ${bodyCheckToggleBtnHtml('dilemma', d.id)}
+      ${bodyCheckOpenIds.has('dilemma:'+d.id) ? bodyCheckPanelHtml('dilemma', d.id, {}) : ''}
+      ${decisionHelperToggleBtnHtml('dilemma', d.id)}
+      ${decisionHelperOpenIds.has('dilemma:'+d.id) ? decisionHelperPanelHtml() : ''}
+      <div class="anchor-form-actions">
+        <button class="save-btn" onclick="saveDilemmaEdit('${d.id}')">שמור</button>
+        <button class="cancel-btn" onclick="closeDilemmaEdit()">בטל</button>
+      </div>
+    </div>
+  </li>`;
+}
+function openDilemmaEdit(id){
+  if(editingDilemmaId && editingDilemmaId!==id){ closeDilemmaEdit(); return; }
+  const opening = editingDilemmaId!==id;
+  editingDilemmaId = (editingDilemmaId===id) ? null : id;
+  if(editingDilemmaId) ensureListExpanded('dilemma');
+  renderGeneralDilemmaList();
+  if(opening){ const input = document.getElementById(`dilemmaEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
+}
+function closeDilemmaEdit(){ editingDilemmaId = null; renderGeneralDilemmaList(); }
+function saveDilemmaEdit(id){
+  const d = (data.generalDilemmas||[]).find(d=>d.id===id);
+  if(!d) return;
+  const text = document.getElementById(`dilemmaEditText-${id}`).value.trim();
+  if(!text) return;
+  d.text = text;
+  const domainSel = document.getElementById(`dilemmaEditDomain-${id}`);
+  d.domain = domainSel ? domainSel.value : '';
+  d.decisionDate = document.getElementById(`dilemmaEditDate-${id}`).value || '';
+  editingDilemmaId = null;
+  saveData();
+  renderGeneralDilemmaList();
+}
+
+/* ---------- shared "עוד" decision-helper panel: a bank of editable/deletable quotes+questions
+   (seeded with 5 defaults, see SEED_DECISION_QUOTES) plus a bank of helpful links, both global and
+   shared between suggestions and general dilemmas -- the content is the same everywhere it's opened
+   from, so editing it from one item's panel is visible in every other open panel too. ---------- */
+const decisionHelperOpenIds = new Set();
+function toggleDecisionHelper(kind, id){
+  const key = kind+':'+id;
+  if(decisionHelperOpenIds.has(key)) decisionHelperOpenIds.delete(key); else decisionHelperOpenIds.add(key);
+  bodyCheckSection(kind).render();
+}
+function decisionHelperToggleBtnHtml(kind, id){
+  const isOpen = decisionHelperOpenIds.has(kind+':'+id);
+  return `<button type="button" class="subtask-toggle-btn has-content" onclick="toggleDecisionHelper('${kind}','${id}')">💭 עוד... עזרה בקבלת החלטה${isOpen?' ▴':''}</button>`;
+}
+// any change here can be visible from either sub-tab's currently-open panel, so refresh whichever
+// list is actually on screen right now rather than a specific kind
+function rerenderActiveDilemmaList(){
+  if(dilemmaSubTab==='general') renderGeneralDilemmaList(); else renderSuggestions();
+}
+function addDecisionHelperQuote(){
+  const input = document.getElementById('decisionQuoteInput');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  if(!data.decisionHelperQuotes) data.decisionHelperQuotes = [];
+  data.decisionHelperQuotes.push({id:uid(), text});
+  saveData();
+  rerenderActiveDilemmaList();
+}
+function saveDecisionHelperQuoteEdit(id, val){
+  const key = 'dhquote:'+id;
+  inlineEditIds.delete(key);
+  const q = (data.decisionHelperQuotes||[]).find(x=>x.id===id);
+  if(q && val.trim()){ q.text = val.trim(); saveData(); }
+  rerenderActiveDilemmaList();
+}
+function deleteDecisionHelperQuote(id){
+  data.decisionHelperQuotes = (data.decisionHelperQuotes||[]).filter(x=>x.id!==id);
+  saveData();
+  rerenderActiveDilemmaList();
+}
+function addDecisionHelperLink(){
+  const titleInput = document.getElementById('decisionLinkTitleInput');
+  const urlInput = document.getElementById('decisionLinkUrlInput');
+  const title = titleInput ? titleInput.value.trim() : '';
+  let url = urlInput ? urlInput.value.trim() : '';
+  if(!title || !url) return;
+  if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  if(!data.decisionHelperLinks) data.decisionHelperLinks = [];
+  data.decisionHelperLinks.push({id:uid(), title, url});
+  saveData();
+  rerenderActiveDilemmaList();
+}
+function deleteDecisionHelperLink(id){
+  data.decisionHelperLinks = (data.decisionHelperLinks||[]).filter(x=>x.id!==id);
+  saveData();
+  rerenderActiveDilemmaList();
+}
+function decisionHelperPanelHtml(){
+  const quotes = data.decisionHelperQuotes || [];
+  const links = data.decisionHelperLinks || [];
+  return `<div class="decision-helper-panel">
+    <div class="bc-row-label">משפטים ושאלות שעוזרים לי לקבל החלטה</div>
+    <div class="decision-quote-list">
+      ${quotes.map(q=>`<div class="decision-quote-row" data-entry-id="${q.id}">
+        ${inlineEditIds.has('dhquote:'+q.id)
+          ? `<textarea class="inline-text-edit" data-inline-key="dhquote:${q.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('dhquote:${q.id}', rerenderActiveDilemmaList) : saveDecisionHelperQuoteEdit('${q.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(q.text)}</textarea>`
+          : `<span data-inline-key="dhquote:${q.id}" onclick="inlineEditToggle('dhquote:${q.id}', rerenderActiveDilemmaList)">${escapeHtml(q.text)}</span>`}
+        <span class="del-task" onclick="deleteDecisionHelperQuote('${q.id}')">✕</span>
+      </div>`).join('') || '<div class="empty">אין עדיין משפטים בבנק הזה</div>'}
+    </div>
+    <div class="add-row">
+      <input type="text" id="decisionQuoteInput" placeholder="משפט/שאלה שעוזרים לי..." onkeydown="if(event.key==='Enter') addDecisionHelperQuote();">
+      <button onclick="addDecisionHelperQuote()">הוסף</button>
+    </div>
+    <div class="bc-row-label" style="margin-top:10px;">קישורים שעוזרים לי (פודקאסט/סרטון/מאמר/תמונה)</div>
+    ${links.length ? `<ul class="video-list">${links.map(l=>`
+      <li class="video-li">
+        <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.title)}</a>
+        <span class="del-task" onclick="deleteDecisionHelperLink('${l.id}')">✕</span>
+      </li>`).join('')}</ul>` : '<div class="empty">עדיין אין קישורים שמורים</div>'}
+    <div class="add-row" style="margin-top:6px;">
+      <input type="text" id="decisionLinkTitleInput" placeholder="כותרת הקישור">
+      <input type="text" id="decisionLinkUrlInput" placeholder="קישור" dir="ltr">
+      <button onclick="addDecisionHelperLink()">הוסף</button>
+    </div>
+  </div>`;
+}
+
 /* ---------- body check (בדיקת גוף) ---------- */
 const bodyCheckOpenIds = new Set();
 const bodyCheckShownReminder = new Map(); // "kind:id" -> reminder text, or '' if the bank is empty
@@ -4410,6 +4689,7 @@ const URGENCY_LABELS = { objective:'אובייקטיבית', other:'כי זו ה
 function bodyCheckSection(kind){
   if(kind==='task') return {arr:data.tasks, render:renderTasks};
   if(kind==='someday') return {arr:data.someday, render:renderSomeday};
+  if(kind==='dilemma') return {arr:data.generalDilemmas, render:renderGeneralDilemmaList};
   return {arr:data.suggestions, render:renderSuggestions};
 }
 function bodyCheckItem(kind, id){ return bodyCheckSection(kind).arr.find(x=>x.id===id); }
@@ -4490,18 +4770,21 @@ function bodyCheckToggleBtnHtml(kind, id){
    bodyCheck to. mirrors bodyCheckPanelHtml exactly (same fields, same look) but writes into a plain
    holding object per kind instead of looking an item up by id; addTask/addSomeday/addSuggestion pull
    it onto the new record at creation, then it resets for the next one. */
-const pendingBodyCheck = { task:{}, someday:{}, suggestion:{} };
+const pendingBodyCheck = { task:{}, someday:{}, suggestion:{}, dilemma:{} };
 const PENDING_BODY_CHECK_OPTS = {
   task: {urgencyOptions:['objective','other','relief'], showEnergy:true},
   someday: {},
-  suggestion: {urgencyOptions:['objective','other'], showEnergy:true}
+  suggestion: {urgencyOptions:['objective','other'], showEnergy:true},
+  dilemma: {}
 };
 // task's panel lives inside the already-secondary "עוד.." section, and suggestion's create form is
 // dense enough that the panel should stay tucked behind its own button too -- same ❤️‍🩹 בדיקת גוף
 // button edit mode already uses, just wired to the pending (not-yet-real) holding object instead.
 // someday's create row has nothing else in it, so its panel stays directly visible, no button needed.
-const PENDING_BODY_CHECK_USE_TOGGLE = { task:true, someday:false, suggestion:true };
-let pendingBodyCheckOpen = { task:false, someday:false, suggestion:false };
+// a general dilemma is body-check-first by design (it's the one mandatory field there), so its panel
+// also stays directly visible rather than tucked behind a toggle.
+const PENDING_BODY_CHECK_USE_TOGGLE = { task:true, someday:false, suggestion:true, dilemma:false };
+let pendingBodyCheckOpen = { task:false, someday:false, suggestion:false, dilemma:false };
 function togglePendingBodyCheck(kind){
   pendingBodyCheckOpen[kind] = !pendingBodyCheckOpen[kind];
   renderPendingBodyCheck(kind);
@@ -4922,18 +5205,20 @@ function renderAllDependent(){
 }
 
 function resetAll(){
-  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ורעיונות ומשימות לעתיד? בנק התובנות ובנק התזכורות לבחור בעצמי יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
+  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ההתלבטויות הכלליות, ורעיונות ומשימות לעתיד? בנק התובנות, בנק התזכורות לבחור בעצמי, ובנק המשפטים/הקישורים לעזרה בקבלת החלטה יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
   const keepHabits = data.habits;
   const keepLists = data.lists;
+  const keepDecisionHelperQuotes = data.decisionHelperQuotes;
+  const keepDecisionHelperLinks = data.decisionHelperLinks;
   const keepCollapsed = data.collapsedSections;
   const keepNight = data.nightMode;
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -4994,6 +5279,15 @@ const SEED_BODY_LOCATIONS = [
   {id:'bl-head',label:'ראש'}, {id:'bl-throat',label:'גרון'}, {id:'bl-chest',label:'חזה'}, {id:'bl-heart',label:'לב'},
   {id:'bl-stomach',label:'בטן'}, {id:'bl-shoulders',label:'כתפיים'}, {id:'bl-back',label:'גב'}, {id:'bl-hands',label:'ידיים'},
   {id:'bl-legs',label:'רגליים'}, {id:'bl-whole',label:'כל הגוף'}
+];
+// default decision-helper quotes/reminders, shown in the shared "עוד" panel on both suggestions and
+// general dilemmas -- her own words, kept editable/deletable like every other seeded bank in this file
+const SEED_DECISION_QUOTES = [
+  {id:'dq1', text:'תמיד אפשר לבדוק ולבקש האם ניתן לקחת רגע ולדחות קצת קבלת ההחלטה, למען בירור עצמי בנחת.'},
+  {id:'dq2', text:'מותר לטעות בקבלת החלטה, לא צריך תמיד לקבל את ההחלטה הכי נכונה.'},
+  {id:'dq3', text:'לפעמים עוזר לזכור, שלא תמיד יש אופציה שהיא נכונה יותר מהאחרות, ושהחלטה היא נכונה משום שהחלטנו שהיא נכונה, משום שבחרנו בה. וזה מספיק טוב כדי להגיד שהחלטה היא נכונה.'},
+  {id:'dq4', text:'לפעמים קל לא לשים לב אפילו, ולדחות עוד ועוד קבלה של החלטה. וזה לא קל. אבל אם נמצאים במצב כזה, ניתן פשוט לחזור ולשאול: מה אני מרגיש/ה בגוף? ולסמוך על זה. אין דרך מיוחדת למצוא תשובה יותר בעומק הנשמה ממה שהאינטואיציה פשוט אומרת בפשטות דרך תחושות הגוף.'},
+  {id:'dq5', text:'אם יש זמן לקבל את ההחלטה, וזה מרגיש לא — זה בסדר לבחור בלא ולהישאר פתוח/ה שאולי בעתיד יגיע הכן. אבל גם בסדר לשחרר ולהמשיך הלאה — לפעמים הכן יבוא, ולפעמים לא.'}
 ];
 function seedChipList(seed, legacyItems){
   const list = seed.map(x=>({...x}));
@@ -5211,19 +5505,22 @@ document.addEventListener('click', (e)=>{
   const target = e.target;
   const prevTask = editingTaskId, prevSchedTask = scheduleEditingTaskId;
   const prevSomeday = editingSomedayId, prevSuggestion = editingSuggestionId;
+  const prevDilemma = editingDilemmaId;
   const prevOpenForm = openForm, prevAddTask = addingTaskDayIdx;
   const outsideTask = prevTask !== null && clickIsOutsideEl(document.querySelector(`#taskList [data-drag-id="${prevTask}"]`), target);
   const outsideSchedTask = prevSchedTask !== null && clickIsOutsideEl(document.getElementById('scheduleGrid'), target);
   const outsideSomeday = prevSomeday !== null && clickIsOutsideEl(document.querySelector(`#somedayList [data-drag-id="${prevSomeday}"]`), target);
   const outsideSuggestion = prevSuggestion !== null && clickIsOutsideEl(document.querySelector(`#suggestionList [data-drag-id="${prevSuggestion}"]`), target);
+  const outsideDilemma = prevDilemma !== null && clickIsOutsideEl(document.querySelector(`#dilemmaList [data-drag-id="${prevDilemma}"]`), target);
   const scheduleFormDayIdx = prevOpenForm !== null ? prevOpenForm : prevAddTask;
   const outsideScheduleForm = scheduleFormDayIdx !== null && clickIsOutsideEl(document.querySelector(`.day-col[data-day-idx="${scheduleFormDayIdx}"]`), target);
-  if(!outsideTask && !outsideSchedTask && !outsideSomeday && !outsideSuggestion && !outsideScheduleForm) return;
+  if(!outsideTask && !outsideSchedTask && !outsideSomeday && !outsideSuggestion && !outsideDilemma && !outsideScheduleForm) return;
   setTimeout(()=>{
     if(outsideTask && editingTaskId===prevTask) closeTaskEdit();
     else if(outsideSchedTask && scheduleEditingTaskId===prevSchedTask) closeTaskEdit();
     if(outsideSomeday && editingSomedayId===prevSomeday) closeSomedayEdit();
     if(outsideSuggestion && editingSuggestionId===prevSuggestion) closeSuggestionEdit();
+    if(outsideDilemma && editingDilemmaId===prevDilemma) closeDilemmaEdit();
     if(outsideScheduleForm && (openForm===prevOpenForm && addingTaskDayIdx===prevAddTask)) closeAllScheduleForms();
   }, 0);
 }, true);
@@ -6403,9 +6700,8 @@ function render(){
   renderKeepGrid(activeNoteDomain);
   renderSomedayDomainSelect();
   renderSomeday();
-  renderSuggestions();
+  renderDilemmasSection();
   renderPendingBodyCheck('someday');
-  renderPendingBodyCheck('suggestion');
   renderReflection();
   applyAllSectionCollapse();
   applyMainViewState();
