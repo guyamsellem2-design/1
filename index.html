@@ -5007,7 +5007,33 @@ let feelBlockOpen = false, emotionsBankOpen = false, needsBankOpen = false, body
    (like a topic), deleted, dragged into any order, and toggled on/off ("I'm feeling/choosing this
    right now") independently of the others. */
 function chipListKey(bank){ return bank==='activeEmotions'?'emotionsList':bank==='activeNeeds'?'needsList':bank==='activeBodyLocations'?'bodyLocationsList':'goodThingsList'; }
-function rerenderChipBank(bank){ if(bank==='activeGoodThings') renderToolsView(); else renderFeelBar(); }
+// a custom list-tab "chip bank" list (bank === "list:<listId>") stores its chip definitions/
+// selections on the list object itself instead of a global data field -- these two accessors let
+// every other chip-bank function below stay agnostic to which kind of bank it's operating on.
+function chipDefsArray(bank){
+  if(bank.startsWith('list:')){
+    const l = listById(bank.slice(5));
+    if(!l) return [];
+    if(!l.chips) l.chips = [];
+    return l.chips;
+  }
+  return data[chipListKey(bank)];
+}
+function chipSelectedArray(bank){
+  if(bank.startsWith('list:')){
+    const l = listById(bank.slice(5));
+    if(!l) return [];
+    if(!l.selected) l.selected = [];
+    return l.selected;
+  }
+  if(!data[bank]) data[bank] = [];
+  return data[bank];
+}
+function rerenderChipBank(bank){
+  if(bank.startsWith('list:')) renderListsView();
+  else if(bank==='activeGoodThings') renderToolsView();
+  else renderFeelBar();
+}
 function hashChipColor(id){
   let h=0;
   for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))|0;
@@ -5016,7 +5042,7 @@ function hashChipColor(id){
 let addingFeelChipBank = null;
 let editingChipBank = null, editingChipId = null;
 function toggleFeelChip(bank, id){
-  const arr = data[bank] || (data[bank] = []);
+  const arr = chipSelectedArray(bank);
   const idx = arr.indexOf(id);
   if(idx>-1) arr.splice(idx,1); else arr.push(id);
   saveData();
@@ -5041,7 +5067,7 @@ function commitAddFeelChip(bank){
   const text = input ? input.value.trim() : '';
   addingFeelChipBank = null;
   if(text){
-    data[chipListKey(bank)].push({id: uid(), label: text});
+    chipDefsArray(bank).push({id: uid(), label: text});
     saveData();
   }
   rerenderChipBank(bank);
@@ -5057,20 +5083,22 @@ function commitEditChip(bank, id){
   const text = input ? input.value.trim() : '';
   editingChipBank = null; editingChipId = null;
   if(text){
-    const item = data[chipListKey(bank)].find(x=>x.id===id);
+    const item = chipDefsArray(bank).find(x=>x.id===id);
     if(item) item.label = text;
     saveData();
   }
   rerenderChipBank(bank);
 }
 function deleteFeelChip(bank, id){
-  data[chipListKey(bank)] = data[chipListKey(bank)].filter(x=>x.id!==id);
-  data[bank] = (data[bank]||[]).filter(x=>x!==id);
+  const defs = chipDefsArray(bank);
+  defs.splice(0, defs.length, ...defs.filter(x=>x.id!==id));
+  const selected = chipSelectedArray(bank);
+  selected.splice(0, selected.length, ...selected.filter(x=>x!==id));
   saveData();
   rerenderChipBank(bank);
 }
 function reorderChipBank(bank, fromId, toId){
-  reorderArrayById(data[chipListKey(bank)], fromId, toId);
+  reorderArrayById(chipDefsArray(bank), fromId, toId);
   saveData();
   rerenderChipBank(bank);
 }
@@ -5218,7 +5246,7 @@ function feelChipHtml(bank, item){
       <span class="feel-chip-add-cancel" onclick="cancelEditChip('${bank}')" title="ביטול">✕</span>
     </span>`;
   }
-  const active = (data[bank]||[]).includes(item.id);
+  const active = chipSelectedArray(bank).includes(item.id);
   const color = hashChipColor(item.id);
   return `<span class="feel-chip" data-drag-id="${item.id}"
     style="${active?`background:${color}; border-color:${color}; color:#fff; font-weight:600;`:`border-color:${color}; color:${color};`}"
@@ -5244,16 +5272,17 @@ function editModeToggleHtml(bank){
   return `<span class="feel-chip feel-chip-editmode ${active?'active':''}" onclick="toggleEditMode('${bank}')">${active?'✓ סיום עריכה':'✏️ עריכה'}</span>`;
 }
 function clearChipSelections(bank){
-  data[bank] = [];
+  const selected = chipSelectedArray(bank);
+  selected.length = 0;
   saveData();
   rerenderChipBank(bank);
 }
 function clearSelectionsToggleHtml(bank){
-  const hasSelections = (data[bank]||[]).length>0;
+  const hasSelections = chipSelectedArray(bank).length>0;
   return `<span class="feel-chip feel-chip-clearmode ${hasSelections?'':'disabled'}" onclick="${hasSelections?`clearChipSelections('${bank}')`:''}">🧹 נקה בחירות</span>`;
 }
 function feelChipGridHtml(bank){
-  const list = data[chipListKey(bank)] || [];
+  const list = chipDefsArray(bank) || [];
   const inDeleteMode = deleteModeBank===bank;
   const inEditMode = editModeBank===bank;
   return `<div class="feel-chip-grid ${inDeleteMode?'delete-mode':''} ${inEditMode?'edit-mode':''}">
@@ -5644,7 +5673,10 @@ function addList(){
   const input = document.getElementById('newListInput');
   const name = input.value.trim();
   if(!name) return;
-  data.lists.push({id:uid(), name, items:[], createdAt:Date.now()});
+  const kindSelect = document.getElementById('newListKind');
+  const kind = kindSelect && kindSelect.value==='chipbank' ? 'chipbank' : 'checklist';
+  if(kind==='chipbank') data.lists.push({id:uid(), name, kind:'chipbank', chips:[], selected:[], createdAt:Date.now()});
+  else data.lists.push({id:uid(), name, items:[], createdAt:Date.now()});
   input.value='';
   saveData();
   renderListsView();
@@ -5816,15 +5848,23 @@ function renderListsView(){
     el.innerHTML = `
       <div class="add-row" style="margin-bottom:14px;">
         <input type="text" id="newListInput" placeholder="שם הרשימה... (למשל: קניות, ספרים לקרוא)" onkeydown="if(event.key==='Enter') addList();">
+        <select id="newListKind">
+          <option value="checklist">רשימת משימות רגילה</option>
+          <option value="chipbank">רשימת בחירה (צ'יפים בצבעים)</option>
+        </select>
         <button onclick="addList()">+ הוסף רשימה</button>
       </div>
+      <p class="hint" style="margin:0 0 14px;">רשימת בחירה = כמו הבנקים של רגשות/צרכים/מה שעושה טוב - את/ה קובע/ת את הקטגוריות שלה בעצמך, בצבעים אקראיים שאפשר גם לערוך, ומסמנים במה בוחרים. שימושי למשל לרשימת אנשים לשמור איתם על קשר.</p>
       ${lists.length ? `<div class="lists-grid">${lists.map(l=>{
-        const doneCount = (l.items||[]).filter(i=>i.done).length;
+        const isChipBank = l.kind==='chipbank';
+        const meta = isChipBank
+          ? `${(l.chips||[]).length} קטגוריות${(l.selected||[]).length?` · ${(l.selected||[]).length} מסומנות`:''}`
+          : `${l.items.length} פריטים${(l.items||[]).filter(i=>i.done).length?` · ${(l.items||[]).filter(i=>i.done).length} בוצעו`:''}`;
         return `<div class="list-card" data-drag-id="${l.id}">
           <div class="list-card-top">
             <div class="list-card-open" onclick="openList('${l.id}')">
-              <div class="list-card-name">${escapeHtml(l.name)}</div>
-              <div class="list-card-meta">${l.items.length} פריטים${doneCount?` · ${doneCount} בוצעו`:''}</div>
+              <div class="list-card-name">${isChipBank?'🎨 ':''}${escapeHtml(l.name)}</div>
+              <div class="list-card-meta">${meta}</div>
             </div>
             <span class="grip" onpointerdown="startListDrag(event,'${l.id}','.list-card',reorderLists)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
           </div>
@@ -5836,20 +5876,36 @@ function renderListsView(){
   }
   const l = listById(activeListId);
   if(!l){ activeListId = null; renderListsView(); return; }
-  el.innerHTML = `
+  const topbarHtml = `
     <div class="list-detail-topbar">
       <button type="button" class="reset-btn" onclick="closeList()">→ כל הרשימות</button>
       ${listNameEditIds.has(l.id)
         ? `<input type="text" class="list-name-edit" value="${escapeAttr(l.name)}" data-inline-key="listname:${l.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('listname:${l.id}', renderListsView) : (saveListNameEdit('${l.id}', this.value), cancelInlineEdit('listname:${l.id}', renderListsView))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
         : `<h2 class="list-detail-name" data-inline-key="listname:${l.id}" onclick="inlineEditToggle('listname:${l.id}', renderListsView)">${escapeHtml(l.name)}</h2>`}
       <span class="del-task" onclick="deleteList('${l.id}')" title="מחיקת הרשימה">✕</span>
-    </div>
+    </div>`;
+  if(l.kind==='chipbank'){
+    el.innerHTML = topbarHtml + listChipBankHtml(l);
+    return;
+  }
+  el.innerHTML = topbarHtml + `
     <div class="add-row" style="margin:10px 0;">
       <input type="text" id="newListItemInput-${l.id}" placeholder="פריט חדש..." onkeydown="if(event.key==='Enter') addListItem('${l.id}');">
       <button onclick="addListItem('${l.id}')">הוסף</button>
     </div>
     ${l.items.length ? `<ul class="list-items">${l.items.map(item=>listItemHtml(l, item)).join('')}</ul>` : '<div class="empty">עדיין אין פריטים ברשימה הזו</div>'}
   `;
+}
+/* ---------- "chip bank" list kind: same select-and-highlight UX as the built-in emotion/need/
+   body-location/good-things banks, but fully custom -- her own title, her own categories, random
+   colors she can rename. one active list at a time, so this state doesn't need per-list namespacing. */
+// reuses the exact same chip-bank engine as the built-in emotion/need/body-location/good-things
+// banks (tap-to-select, hold-and-drag reorder, add/edit/delete modes, "נקה בחירות") -- a "list:<id>"
+// bank string routes chipDefsArray/chipSelectedArray/rerenderChipBank to this list's own chips/
+// selected arrays instead of a global data field, see those functions below.
+function listChipBankHtml(l){
+  return `<p class="hint" style="margin:10px 0;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</p>
+  ${feelChipGridHtml('list:'+l.id)}`;
 }
 function listItemHtml(l, item){
   const key = l.id+':'+item.id;
