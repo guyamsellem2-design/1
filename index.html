@@ -5209,9 +5209,16 @@ function onQHealingNoteInput(val){ data.qHealingNote = val; saveData(); }
 function onQFreeSelfNoteInput(val){ data.qFreeSelfNote = val; saveData(); }
 function onQExpressNoteInput(val){ data.qExpressNote = val; saveData(); }
 const feelNoteMinimized = new Set();
+// feelNoteHtml is shared by two different sections (the "איך אני מרגיש/ה" block and the separate
+// anti-procrastination block) that each own their own DOM subtree and render function -- minimizing
+// a note has to redraw whichever one actually contains it, not always the first one.
+function rerenderFeelNoteOwner(key){
+  if(key==='procWant' || key==='procTrueWant') renderProcrastinationBlock();
+  else renderFeelBar();
+}
 function toggleFeelNoteMinimize(key){
   if(feelNoteMinimized.has(key)) feelNoteMinimized.delete(key); else feelNoteMinimized.add(key);
-  renderFeelBar();
+  rerenderFeelNoteOwner(key);
 }
 function feelNoteHtml(key, value, oninputFn, placeholder){
   if(feelNoteMinimized.has(key)){
@@ -5227,6 +5234,51 @@ function feelNoteHtml(key, value, oninputFn, placeholder){
     <span class="feel-note-min-btn" onclick="openSaveAsNote('${key}')" title="שמירת הטקסט כפתק בנושא">📝 הפוך לפתק</span>
   </div>`;
 }
+// true if the textarea's current text is short enough to render on one visual line -- checked by
+// actually measuring it (font + available width), not just "no newline character", so a short line
+// that still happens to wrap counts as multi-line too
+function isNoteSingleLine(el){
+  const value = el.value || '';
+  if(value.includes('\n')) return false;
+  if(!value.trim()) return true;
+  const style = getComputedStyle(el);
+  if(!isNoteSingleLine._canvas) isNoteSingleLine._canvas = document.createElement('canvas');
+  const ctx = isNoteSingleLine._canvas.getContext('2d');
+  ctx.font = `${style.fontSize} ${style.fontFamily}`;
+  const availableWidth = el.clientWidth - (parseFloat(style.paddingLeft)||0) - (parseFloat(style.paddingRight)||0);
+  return ctx.measureText(value).width <= availableWidth;
+}
+// she liked how the "עוד" open-questions notes already minimize to a compact one-line preview, and
+// asked for that same behavior everywhere: the moment she clicks anywhere outside a feel-note that's
+// still short enough to read as one line, minimize it automatically. a note she's actually written
+// more than a line into is left alone until she presses "מזער" herself, since that one's still
+// probably being worked on. mirrors the click-outside-closes-edit-form pattern elsewhere in this file:
+// read what's "outside" in the CAPTURE phase (before the click's own handler can mutate anything),
+// then apply it a tick later so a click that's itself opening/typing into a note never self-closes it.
+document.addEventListener('click', (e)=>{
+  const target = e.target;
+  const keysToMinimize = [];
+  document.querySelectorAll('.feel-note-wrap .feel-note-textarea').forEach(el=>{
+    const wrap = el.closest('.feel-note-wrap');
+    if(!wrap || wrap.contains(target)) return;
+    if(!isNoteSingleLine(el)) return;
+    const key = el.dataset.fieldKey.replace(/-note$/, '');
+    if(!feelNoteMinimized.has(key)) keysToMinimize.push(key);
+  });
+  if(!keysToMinimize.length) return;
+  setTimeout(()=>{
+    const owners = new Set();
+    keysToMinimize.forEach(key=>{
+      const el = document.querySelector(`[data-field-key="${key}-note"]`);
+      if(el && !feelNoteMinimized.has(key) && isNoteSingleLine(el)){
+        feelNoteMinimized.add(key);
+        owners.add(key==='procWant'||key==='procTrueWant' ? 'proc' : 'feel');
+      }
+    });
+    if(owners.has('feel')) renderFeelBar();
+    if(owners.has('proc')) renderProcrastinationBlock();
+  }, 0);
+}, true);
 /* ---------- "הפוך לפתק": save any feel-note's current text as a real Keep note under a chosen
    topic, so a passing thought doesn't just get overwritten and lost the next time she types here ---------- */
 let saveAsNoteKey = null;
