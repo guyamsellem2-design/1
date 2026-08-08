@@ -1080,6 +1080,7 @@
     <div class="add-row">
       <button id="addNoteBtn" onclick="addDomainNote()">+ פתק חדש</button>
     </div>
+    <div id="keepNoteHeaderManage"></div>
     <div class="keep-grid" id="keepGrid"></div>
   </div>
 </div>
@@ -1143,7 +1144,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -1196,6 +1197,7 @@ function loadData(){
       data.collapsedSections = parsed.collapsedSections || {};
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
+      data.domainNoteHeaders = parsed.domainNoteHeaders || {};
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
@@ -1721,9 +1723,12 @@ function deleteDomain(id){
   }
   if(noteCount>0){
     const fbNotes = ensureDomainNotes(fallback);
-    fbNotes.push(...data.domainNotes[id]);
+    // headers belong to this domain, not to the note itself -- moved notes fall back to "ללא
+    // כותרת" in the new domain rather than dragging along headerIds that won't match anything there
+    fbNotes.push(...data.domainNotes[id].map(n=>({...n, headerId:''})));
     delete data.domainNotes[id];
   }
+  delete data.domainNoteHeaders[id];
   data.domains = data.domains.filter(d=>d.id!==id);
   if(activeNoteDomain===id) activeNoteDomain = data.domains[0].id;
   saveData();
@@ -1942,13 +1947,96 @@ function collapseUnpinnedNotesForTopic(domainId){
 }
 function autoGrowNoteTextarea(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
 function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(!data.domainNotes[id]) data.domainNotes[id] = []; return data.domainNotes[id]; }
-function renderKeepGrid(id){
-  const el = document.getElementById('keepGrid');
-  if(!el) return;
-  const notes = ensureDomainNotes(id);
-  if(notes.length===0){ el.innerHTML = '<div class="empty" onclick="addDomainNote()" style="cursor:pointer;">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
-  withFocusPreserved('keepGrid', ()=>{
-  el.innerHTML = notes.map(n=>{
+/* ---------- note headers ("כותרות") per topic, same idea as the chip-bank headers in רשימות:
+   collapsible groups, an unlabeled catch-all for notes with no header, headers rendered/managed
+   with the exact same classes (.chip-group / .chip-group-header / .chip-header-*) on purpose so
+   they look and behave identically. ---------- */
+function ensureDomainNoteHeaders(id){ if(!data.domainNoteHeaders) data.domainNoteHeaders = {}; if(!data.domainNoteHeaders[id]) data.domainNoteHeaders[id] = []; return data.domainNoteHeaders[id]; }
+function noteHeaderSelectHtml(domainId, n){
+  const headers = ensureDomainNoteHeaders(domainId);
+  if(!headers.length) return '';
+  return `<select class="chip-header-select" onchange="setNoteHeader('${domainId}','${n.id}', this.value)">
+    <option value="">(ללא כותרת)</option>
+    ${headers.map(h=>`<option value="${h.id}" ${n.headerId===h.id?'selected':''}>${escapeHtml(h.label)}</option>`).join('')}
+  </select>`;
+}
+function setNoteHeader(domainId, noteId, headerId){
+  const n = ensureDomainNotes(domainId).find(x=>x.id===noteId);
+  if(n){ n.headerId = headerId; saveData(); }
+  renderKeepGrid(domainId);
+}
+let addingNoteHeaderDomain = null;
+function startAddNoteHeader(domainId){
+  addingNoteHeaderDomain = domainId;
+  renderKeepGrid(domainId);
+  requestAnimationFrame(()=>{ const el = document.getElementById('noteHeaderAddInput'); if(el) el.focus(); });
+}
+function cancelAddNoteHeader(){ addingNoteHeaderDomain = null; renderKeepGrid(activeNoteDomain); }
+function commitAddNoteHeader(domainId){
+  const input = document.getElementById('noteHeaderAddInput');
+  const text = input ? input.value.trim() : '';
+  addingNoteHeaderDomain = null;
+  if(text){
+    ensureDomainNoteHeaders(domainId).push({id: uid(), label: text});
+    saveData();
+  }
+  renderKeepGrid(domainId);
+}
+let editingNoteHeaderKey = null; // "domainId:headerId"
+function startEditNoteHeader(domainId, headerId){
+  editingNoteHeaderKey = domainId+':'+headerId;
+  renderKeepGrid(domainId);
+  requestAnimationFrame(()=>{ const el = document.getElementById('noteHeaderEditInput'); if(el){ el.focus(); el.select(); } });
+}
+function cancelEditNoteHeader(){ editingNoteHeaderKey = null; renderKeepGrid(activeNoteDomain); }
+function commitEditNoteHeader(domainId, headerId){
+  const input = document.getElementById('noteHeaderEditInput');
+  const text = input ? input.value.trim() : '';
+  editingNoteHeaderKey = null;
+  if(text){
+    const h = ensureDomainNoteHeaders(domainId).find(x=>x.id===headerId);
+    if(h) h.label = text;
+    saveData();
+  }
+  renderKeepGrid(domainId);
+}
+function deleteNoteHeader(domainId, headerId){
+  data.domainNoteHeaders[domainId] = ensureDomainNoteHeaders(domainId).filter(h=>h.id!==headerId);
+  // the notes themselves are never deleted -- they just fall back into "ללא כותרת"
+  ensureDomainNotes(domainId).forEach(n=>{ if(n.headerId===headerId) n.headerId=''; });
+  saveData();
+  renderKeepGrid(domainId);
+}
+function noteHeaderManageHtml(domainId){
+  const headers = ensureDomainNoteHeaders(domainId);
+  return `<div class="chip-header-manage">
+    ${headers.map(h => editingNoteHeaderKey===(domainId+':'+h.id) ? `
+      <span class="feel-chip-add-row">
+        <input type="text" id="noteHeaderEditInput" class="feel-chip-add-input" value="${escapeAttr(h.label)}"
+          onkeydown="if(event.key==='Enter') commitEditNoteHeader('${domainId}','${h.id}'); if(event.key==='Escape') cancelEditNoteHeader();">
+        <span class="feel-chip-add-confirm" onclick="commitEditNoteHeader('${domainId}','${h.id}')" title="שמירה">✓</span>
+        <span class="feel-chip-add-cancel" onclick="cancelEditNoteHeader()" title="ביטול">✕</span>
+      </span>
+    ` : `
+      <span class="chip-header-pill" onclick="startEditNoteHeader('${domainId}','${h.id}')" title="לחיצה לעריכת השם">🏷 ${escapeHtml(h.label)}</span>
+      <span class="chip-header-del" onclick="deleteNoteHeader('${domainId}','${h.id}')" title="מחיקת הכותרת (הפתקים נשארים, עוברים לללא כותרת)">✕</span>
+    `).join('')}
+    ${addingNoteHeaderDomain===domainId ? `
+      <span class="feel-chip-add-row">
+        <input type="text" id="noteHeaderAddInput" class="feel-chip-add-input" placeholder="שם כותרת..." onkeydown="if(event.key==='Enter') commitAddNoteHeader('${domainId}'); if(event.key==='Escape') cancelAddNoteHeader();">
+        <span class="feel-chip-add-confirm" onclick="commitAddNoteHeader('${domainId}')" title="הוספה">✓</span>
+        <span class="feel-chip-add-cancel" onclick="cancelAddNoteHeader()" title="ביטול">✕</span>
+      </span>
+    ` : `<span class="chip-header-pill" onclick="startAddNoteHeader('${domainId}')">+ כותרת</span>`}
+  </div>`;
+}
+const collapsedNoteHeaders = new Set(); // keyed by "domainId:headerId" ('' headerId = the "ללא כותרת" group)
+function toggleNoteHeaderCollapse(domainId, headerId){
+  const key = domainId+':'+headerId;
+  if(collapsedNoteHeaders.has(key)) collapsedNoteHeaders.delete(key); else collapsedNoteHeaders.add(key);
+  renderKeepGrid(domainId);
+}
+function keepNoteHtml(id, n){
     const isDrawing = drawingNoteId===n.id;
     const level = getNoteLevel(id, n.id);
     const noteStyle = `background:${n.color||'var(--surface2)'};${n.color?` --note-fg:${contrastTextColor(n.color)}; --note-fg-muted:${contrastMutedColor(n.color)};`:''}`;
@@ -1966,6 +2054,7 @@ function renderKeepGrid(id){
     <div class="keep-note" style="${noteStyle}">
       <div class="keep-note-topbar">
         <span class="note-pin-btn ${n.pinned?'active':''}" onclick="toggleNotePin('${id}','${n.id}')" title="${n.pinned?'בטל נעיצה':'נעיצה — נשאר פתוח תמיד'}">📌</span>
+        ${noteHeaderSelectHtml(id, n)}
         ${isMedium
           ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
           : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
@@ -2009,7 +2098,38 @@ function renderKeepGrid(id){
       </div>
       ${renderMemoSection(id, n)}
     </div>`;
-  }).join('');
+}
+function renderKeepGrid(id){
+  const el = document.getElementById('keepGrid');
+  if(!el) return;
+  const notes = ensureDomainNotes(id);
+  const manageEl = document.getElementById('keepNoteHeaderManage');
+  if(manageEl) manageEl.innerHTML = notes.length ? noteHeaderManageHtml(id) : '';
+  if(notes.length===0){ el.innerHTML = '<div class="empty" onclick="addDomainNote()" style="cursor:pointer;">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
+  const headers = ensureDomainNoteHeaders(id);
+  withFocusPreserved('keepGrid', ()=>{
+    if(!headers.length){
+      el.innerHTML = notes.map(n=>keepNoteHtml(id, n)).join('');
+    } else {
+      const grouped = headers.map(h => ({header:h, notes: notes.filter(n=>n.headerId===h.id)}));
+      const ungrouped = notes.filter(n=>!n.headerId || !headers.some(h=>h.id===n.headerId));
+      el.innerHTML = grouped.map(g => {
+        const collapsed = collapsedNoteHeaders.has(id+':'+g.header.id);
+        return `
+        <div class="chip-group" data-header-id="${g.header.id}">
+          <div class="chip-group-header" onclick="toggleNoteHeaderCollapse('${id}','${g.header.id}')" style="cursor:pointer;">
+            <span class="chev">${collapsed?'▸':'▾'}</span> ${escapeHtml(g.header.label)}${g.notes.length?' ('+g.notes.length+')':''}
+          </div>
+          ${collapsed ? '' : `<div class="keep-grid">${g.notes.map(n=>keepNoteHtml(id, n)).join('')}</div>`}
+        </div>`;
+      }).join('') + (ungrouped.length ? `
+        <div class="chip-group" data-header-id="">
+          <div class="chip-group-header chip-group-header-none" onclick="toggleNoteHeaderCollapse('${id}','')" style="cursor:pointer;">
+            <span class="chev">${collapsedNoteHeaders.has(id+':')?'▸':'▾'}</span> ללא כותרת${ungrouped.length?' ('+ungrouped.length+')':''}
+          </div>
+          ${collapsedNoteHeaders.has(id+':') ? '' : `<div class="keep-grid">${ungrouped.map(n=>keepNoteHtml(id, n)).join('')}</div>`}
+        </div>` : '');
+    }
   });
   if(drawingNoteId){
     const canvas = document.getElementById('canvas-'+drawingNoteId);
@@ -3001,7 +3121,7 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','possibilities','customTimerPresets'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], customTimerPresets:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], customTimerPresets:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -3129,6 +3249,7 @@ function mergePlannerData(local, base, remote){
   SYNCED_SCALAR_FIELDS.forEach(f=>{ merged[f] = mergeScalar(local[f], base[f], remote[f]); });
   merged.notes = mergeDictOfObjects(local.notes, base.notes, remote.notes);
   merged.domainNotes = mergeDictOfArrays(local.domainNotes, base.domainNotes, remote.domainNotes);
+  merged.domainNoteHeaders = mergeDictOfArrays(local.domainNoteHeaders, base.domainNoteHeaders, remote.domainNoteHeaders);
   merged.reflectionBanks = mergeDictOfArrays(local.reflectionBanks, base.reflectionBanks, remote.reflectionBanks);
   ORDERED_LIST_FIELDS.forEach(f=>{
     const mergedOrder = mergeOrderList((local[f]||[]).map(x=>x.id), (base[f]||[]).map(x=>x.id), (remote[f]||[]).map(x=>x.id));
@@ -3141,6 +3262,7 @@ function applySyncedFields(target, merged){
   SYNCED_SCALAR_FIELDS.forEach(f=>{ target[f] = merged[f]; });
   target.notes = merged.notes;
   target.domainNotes = merged.domainNotes;
+  target.domainNoteHeaders = merged.domainNoteHeaders;
   target.reflectionBanks = merged.reflectionBanks;
 }
 
@@ -6260,6 +6382,7 @@ function importData(e){
       data.nightMode = !!parsed.nightMode;
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
+      data.domainNoteHeaders = parsed.domainNoteHeaders || {};
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
@@ -6465,7 +6588,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -6936,24 +7059,32 @@ function feelChipGridHtml(bank){
   const grouped = headers.map(h => ({header:h, chips: list.filter(c=>c.headerId===h.id)}));
   const ungrouped = list.filter(c=>!c.headerId || !headers.some(h=>h.id===c.headerId));
   return `
-    ${grouped.map(g => `
+    ${grouped.map(g => {
+      const collapsed = collapsedChipHeaders.has(bank+':'+g.header.id);
+      return `
       <div class="chip-group" data-header-id="${g.header.id}">
-        <div class="chip-group-header">${escapeHtml(g.header.label)}</div>
-        <div class="feel-chip-grid ${modeClass}">
-          ${g.chips.map(item=>feelChipHtml(bank, item)).join('')}
+        <div class="chip-group-header" onclick="toggleChipHeaderCollapse('${bank}','${g.header.id}')" style="cursor:pointer;">
+          <span class="chev">${collapsed?'▸':'▾'}</span> ${escapeHtml(g.header.label)}${g.chips.length?' ('+g.chips.length+')':''}
         </div>
+        ${collapsed ? '' : `<div class="feel-chip-grid ${modeClass}">${g.chips.map(item=>feelChipHtml(bank, item)).join('')}</div>`}
       </div>
-    `).join('')}
+    `;}).join('')}
     ${ungrouped.length ? `
       <div class="chip-group" data-header-id="">
-        <div class="chip-group-header chip-group-header-none">ללא כותרת</div>
-        <div class="feel-chip-grid ${modeClass}">
-          ${ungrouped.map(item=>feelChipHtml(bank, item)).join('')}
+        <div class="chip-group-header chip-group-header-none" onclick="toggleChipHeaderCollapse('${bank}','')" style="cursor:pointer;">
+          <span class="chev">${collapsedChipHeaders.has(bank+':')?'▸':'▾'}</span> ללא כותרת${ungrouped.length?' ('+ungrouped.length+')':''}
         </div>
+        ${collapsedChipHeaders.has(bank+':') ? '' : `<div class="feel-chip-grid ${modeClass}">${ungrouped.map(item=>feelChipHtml(bank, item)).join('')}</div>`}
       </div>
     ` : ''}
     ${controlsRow}
   `;
+}
+const collapsedChipHeaders = new Set(); // keyed by "bank:headerId" ('' headerId = the "ללא כותרת" group)
+function toggleChipHeaderCollapse(bank, headerId){
+  const key = bank+':'+headerId;
+  if(collapsedChipHeaders.has(key)) collapsedChipHeaders.delete(key); else collapsedChipHeaders.add(key);
+  rerenderChipBank(bank);
 }
 function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); updateCollapseAllButton(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
