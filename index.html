@@ -4711,6 +4711,16 @@ function setTimelineSheetDay(dayIdx){
   timelineSheetDayIdx = dayIdx;
   document.querySelectorAll('.timeline-sheet-day-btn').forEach((btn,i)=>btn.classList.toggle('active', i===dayIdx));
 }
+// a brand-new task with no time yet defaults to right now (rounded to the grid's half-hour
+// step, clamped into the visible hour range) instead of sitting with no time at all -- she can
+// still change it with one tap on the time picker, but "no time" is never the silent default.
+function currentRoundedTimeSlot(){
+  const now = new Date();
+  let h = now.getHours(), m = Math.round(now.getMinutes()/30)*30;
+  if(m===60){ m = 0; h += 1; }
+  h = Math.max(TIMELINE_START_HOUR, Math.min(h, TIMELINE_END_HOUR-1));
+  return pad(h)+':'+pad(m);
+}
 function renderTimelineSheet(){
   const sheet = document.getElementById('timelineSheet');
   if(!sheet || !timelineSheetItem) return;
@@ -4718,10 +4728,10 @@ function renderTimelineSheet(){
   const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
   if(!rec){ closeTimelineSheet(); return; }
   const label = kind==='task' ? rec.text : rec.label;
-  // the topic picker only shows here for anchors (explicitly asked for) -- squeezed into the same
-  // row as the name, at its left edge, instead of a row of its own, so it doesn't grow the sheet
-  const domainPickerHtml = kind==='anchor'
-    ? `<select id="timelineSheetDomain" class="timeline-sheet-domain">${domainOptions(rec.domain)}</select>` : '';
+  // squeezed into the same row as the name, at its left edge, instead of a row of its own, so it
+  // doesn't grow the sheet -- shown for both tasks and anchors now
+  const domainPickerHtml = `<select id="timelineSheetDomain" class="timeline-sheet-domain">${domainOptions(rec.domain)}</select>`;
+  const timeValue = (kind==='task' && !rec.time) ? currentRoundedTimeSlot() : (rec.time||'');
   sheet.innerHTML = `
     <div class="timeline-sheet-handle"></div>
     <div class="timeline-sheet-title-row">
@@ -4731,7 +4741,7 @@ function renderTimelineSheet(){
     <div class="timeline-sheet-daypicker">
       ${DAYS.map((dn,di)=>`<button type="button" class="timeline-sheet-day-btn ${timelineSheetDayIdx===di?'active':''}" onclick="setTimelineSheetDay(${di})">${dn}</button>`).join('')}
     </div>
-    ${timePickerHtml('timelineSheetTime', rec.time||'', 'שעה')}
+    ${timePickerHtml('timelineSheetTime', timeValue, 'שעה')}
     <label class="buf-label" style="margin-top:10px;"><input type="checkbox" id="timelineSheetDraft" ${rec.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
     <div class="timeline-sheet-actions">
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
@@ -4740,7 +4750,7 @@ function renderTimelineSheet(){
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
-    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="timelineSheetMoreOptions()">עוד אפשרויות (נושא, חזרתיות, סנכרון גוגל...) ›</button>
+    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="timelineSheetMoreOptions()">עוד אפשרויות (חזרתיות, סנכרון גוגל...) ›</button>
   `;
   // deliberately no auto-focus here -- opening an item is first and foremost "look at what this
   // is," not an implicit "start typing now." the keyboard should only appear once the person
@@ -4757,25 +4767,29 @@ function saveTimelineSheet(){
   const draft = document.getElementById('timelineSheetDraft').checked;
   const dateStr = ymd(viewedWeekDates()[timelineSheetDayIdx]);
   const isNew = timelineSheetIsNew;
+  const domainEl = document.getElementById('timelineSheetDomain');
   if(kind==='task'){
     const t = data.tasks.find(x=>x.id===id);
     if(!t) return;
     const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
     t.text = text; t.date = dateStr; t.time = time; t.draft = draft;
+    if(domainEl) t.domain = domainEl.value;
     saveData();
     renderScheduleGrid();
     renderTasks();
-    applyGcalSyncForTask(t, isNew || t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd);
+    // the gcal push is a best-effort network call -- if it throws for any reason, the save itself
+    // (already committed above) must still visibly finish: close the sheet and show "נשמר", not
+    // leave her tapping a "שמירה" button that silently does nothing.
+    try{ applyGcalSyncForTask(t, isNew || t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd); }catch(e){ console.error('gcal sync failed', e); }
   } else {
     const a = data.anchors.find(x=>x.id===id);
     if(!a) return;
     const prevDay = a.day, prevTime = a.time;
-    const domainEl = document.getElementById('timelineSheetDomain');
     a.label = text; a.day = timelineSheetDayIdx; a.time = time; a.draft = draft;
     if(domainEl) a.domain = domainEl.value;
     saveData();
     renderScheduleGrid();
-    applyGcalSyncForAnchor(a, isNew || a.day!==prevDay || a.time!==prevTime);
+    try{ applyGcalSyncForAnchor(a, isNew || a.day!==prevDay || a.time!==prevTime); }catch(e){ console.error('gcal sync failed', e); }
   }
   timelineSheetIsNew = false;
   closeTimelineSheet();
@@ -7879,15 +7893,15 @@ function deleteTodayIdea(id){
   saveData();
   renderTodayIdeas();
 }
+// duplicates into tasks/the weekly schedule -- the idea itself stays exactly as it was in "מה בא
+// לי לעשות היום", not cleared/consumed, since promoting it there is a copy, not a move.
 function promoteTodayIdeaToTask(id){
   const item = data.todayIdeas.find(x=>x.id===id);
   if(!item || !item.text.trim()) return;
   const text = item.text.trim();
-  item.text = ''; item.done = false; item.favorite = false;
   const task = {id: uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false};
   data.tasks.push(task);
   saveData();
-  renderTodayIdeas();
   renderTasks();
   renderScheduleGrid();
   openSection('schedule');
