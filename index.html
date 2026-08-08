@@ -167,6 +167,8 @@
   .keep-note-editor{width:100%; min-height:70px; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; line-height:1.55; padding:0; white-space:pre-wrap; overflow-wrap:break-word; overflow:hidden;}
   .keep-note-editor:focus{outline:none;}
   .keep-note-editor.note-clip{max-height:110px;}
+  .keep-note-editor-wrap{position:relative;}
+  .note-clip-more{position:absolute; bottom:0; left:50%; transform:translateX(-50%); font-size:16px; line-height:1; letter-spacing:2px; padding:2px 10px 0; color:var(--note-fg-muted, var(--muted2)); cursor:pointer;}
   .keep-note-editor:empty::before{content:attr(data-placeholder); color:var(--muted2);}
   .note-size-btn{cursor:pointer; font-size:12.5px; color:var(--muted2); padding:4px 10px; border-radius:999px; border:1px solid var(--border-strong); background:var(--surface3); white-space:nowrap;}
   .note-size-btn:hover{background:var(--surface2);}
@@ -627,7 +629,10 @@
   .field-label{display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted2);}
   .field-label input{width:100%; box-sizing:border-box;}
   .time-picker-wrap{position:relative; min-width:0; flex:1;}
-  .time-picker-btn{width:100%; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:6px 8px; border-radius:6px; font-size:14px; font-family:inherit; cursor:pointer; text-align:right; box-sizing:border-box;}
+  /* width:100% of a flex:1 column looks fine on a phone-width screen, but the body has no
+     max-width so on a desktop-wide window that column (and this button with it) can stretch to
+     hundreds of pixels -- cap it at a normal button size everywhere it's used. */
+  .time-picker-btn{width:100%; max-width:130px; background:var(--surface3); border:1px solid var(--border); color:var(--text); padding:6px 8px; border-radius:6px; font-size:14px; font-family:inherit; cursor:pointer; text-align:right; box-sizing:border-box;}
   .time-picker-btn.time-picker-empty{color:var(--muted2);}
   .time-picker-btn:hover{border-color:var(--gold);}
   .time-picker-panel{position:absolute; z-index:20; top:calc(100% + 4px); right:0; width:220px; max-width:calc(100vw - 24px); background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; box-shadow:0 10px 28px -10px rgba(0,0,0,0.4); padding:8px; max-height:220px; display:flex; flex-direction:column; gap:6px; overflow-x:hidden; box-sizing:border-box;}
@@ -739,7 +744,7 @@
   .timeline-hourcol{width:32px; flex-shrink:0; position:relative;}
   .timeline-hourlabel{position:absolute; right:2px; transform:translateY(-50%); font-size:10px; color:var(--muted2); white-space:nowrap;}
   .timeline-daycol{flex:1; min-width:0; position:relative; border-right:1px solid var(--border); cursor:pointer;}
-  .timeline-item{position:absolute; right:1px; left:1px; background:var(--surface2); border-radius:5px; padding:1px 3px; font-size:10.5px; line-height:1.25; overflow:hidden; border-right:3px solid var(--gold); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:1; touch-action:none;}
+  .timeline-item{position:absolute; right:1px; left:1px; background:var(--surface2); border-radius:5px; padding:1px 3px; font-size:10.5px; line-height:1.25; overflow:hidden; border-right:3px solid var(--gold); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:1; touch-action:none; user-select:none; -webkit-user-drag:none;}
   .timeline-item.chip-picked{outline:2px solid var(--gold); outline-offset:1px; z-index:2;}
   .timeline-item.chip-active{outline:2px solid var(--text); outline-offset:1px; z-index:2;}
   .timeline-item.dragging{opacity:.85; box-shadow:0 4px 14px rgba(0,0,0,.35); z-index:5;}
@@ -753,9 +758,14 @@
   .timeline-untimed-chip{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface3); border-radius:6px; padding:4px 7px; font-size:12.5px; cursor:pointer; border-right:3px solid var(--gold);}
   /* tapping an item opens this instead of anything native -- a real bottom sheet, like the one a
      phone calendar app opens for editing an event, that we fully own and can extend later. */
-  .timeline-sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1100;}
-  .timeline-sheet{position:fixed; left:0; right:0; bottom:0; z-index:1101; background:var(--surface); border-radius:16px 16px 0 0; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); box-shadow:0 -8px 30px rgba(0,0,0,.4); max-height:82vh; overflow-y:auto;}
+  /* above .timeline-wrap.fullscreen's z-index:5000 -- otherwise the sheet opens visually BEHIND the
+     fullscreen timeline and is invisible until fullscreen is closed again. */
+  .timeline-sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:5100;}
+  .timeline-sheet{position:fixed; left:0; right:0; bottom:0; z-index:5101; background:var(--surface); border-radius:16px 16px 0 0; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); box-shadow:0 -8px 30px rgba(0,0,0,.4); max-height:82vh; overflow-y:auto;}
   .timeline-sheet-handle{width:40px; height:4px; background:var(--border-strong); border-radius:2px; margin:0 auto 12px;}
+  .timeline-sheet-title-row{display:flex; align-items:center; gap:8px; margin-bottom:12px;}
+  .timeline-sheet-title-row .timeline-sheet-title{flex:1; margin-bottom:0;}
+  .timeline-sheet-domain{flex-shrink:0; max-width:38%; font-size:13.5px; font-family:inherit; background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:6px 6px;}
   .timeline-sheet-title{width:100%; font-size:17px; font-family:inherit; background:transparent; border:none; border-bottom:1.5px solid var(--border); color:var(--text); padding:6px 2px; margin-bottom:12px;}
   .timeline-sheet-title:focus{outline:none; border-bottom-color:var(--gold);}
   .timeline-sheet-daypicker{display:flex; gap:4px; margin-bottom:10px;}
@@ -881,9 +891,10 @@
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
         <div id="pendingBodyCheck-someday"></div>
         <div id="pendingSomedayDescWrap"></div>
+        <div id="pendingSomedaySubtasksWrap"></div>
       </div>
       <div class="add-row" style="margin-bottom:10px;">
-        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">🗕 מזער</button>
+        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">🔽 הצג את כל הרשימה</button>
         <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
           <option value="manual">מיון לפי: ידני (גרירה)</option>
           <option value="date">מיון לפי: תאריך הוספה</option>
@@ -1954,9 +1965,12 @@ function renderKeepGrid(id){
         <span class="keep-note-fmt-btn fmt-underline" onmousedown="event.preventDefault()" onclick="execNoteFormat('underline')" title="קו תחתון">U</span>
         <span class="keep-note-fmt-btn fmt-bullet" onmousedown="event.preventDefault()" onclick="insertBulletAtLineStart()" title="תבליט בתחילת השורה">•</span>
       </div>
-      <div class="keep-note-editor ${isMedium?'note-clip':''}" contenteditable="true" dir="auto" data-placeholder="כתוב כאן..." data-field-key="note-${n.id}"
-        oninput="onKeepNoteRichInput('${id}','${n.id}', this)" onkeydown="onKeepNoteEditorKeydown(event)" onpaste="onKeepNoteEditorPaste(event)"
-      >${noteEditorHtml(n)}</div>
+      <div class="keep-note-editor-wrap">
+        <div class="keep-note-editor ${isMedium?'note-clip':''}" contenteditable="true" dir="auto" data-placeholder="כתוב כאן..." data-field-key="note-${n.id}"
+          oninput="onKeepNoteRichInput('${id}','${n.id}', this)" onkeydown="onKeepNoteEditorKeydown(event)" onpaste="onKeepNoteEditorPaste(event)"
+        >${noteEditorHtml(n)}</div>
+        ${isMedium ? `<div class="note-clip-more" onclick="expandNoteStep('${id}','${n.id}')" title="יש עוד טקסט — לחיצה להרחבה" style="display:none; background:linear-gradient(to top, ${n.color||'var(--surface2)'} 55%, transparent);">⋯</div>` : ''}
+      </div>
       ${(n.drawing && !isDrawing) ? `<img class="keep-note-drawing-preview" src="${n.drawing}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="לחיצה לעריכת הציור">` : ''}
       ${isDrawing ? `
         <div class="draw-toolbar">
@@ -1994,6 +2008,13 @@ function renderKeepGrid(id){
   // placed in the DOM, so a long note doesn't start clipped until the next keystroke re-triggers it
   requestAnimationFrame(()=>{
     el.querySelectorAll('.keep-note-editor:not(.note-clip)').forEach(autoGrowNoteTextarea);
+    // "⋯" only shows when the clipped box is ACTUALLY hiding text below the fold, not on every
+    // medium-sized note regardless of length -- otherwise a short note would misleadingly imply
+    // there's more to see
+    el.querySelectorAll('.keep-note-editor.note-clip').forEach(ed=>{
+      const indicator = ed.parentElement ? ed.parentElement.querySelector('.note-clip-more') : null;
+      if(indicator) indicator.style.display = ed.scrollHeight > ed.clientHeight + 2 ? '' : 'none';
+    });
   });
 }
 
@@ -3573,7 +3594,9 @@ function applyListCap(key, itemCount){
   const topBtn = document.getElementById(key+'TopMinimizeBtn');
   if(topBtn){
     topBtn.style.display = needsCap ? '' : 'none';
-    topBtn.textContent = expanded ? '🗕 כווץ בחזרה' : '🗕 מזער';
+    // the button's own action is always "what the list currently isn't" -- collapsed by default
+    // means tapping it EXPANDS, so the label has to say that, not "מזער" (that named the opposite action)
+    topBtn.textContent = expanded ? '🗕 כווץ בחזרה' : '🔽 הצג את כל הרשימה';
   }
 }
 function renderTasks(){
@@ -4323,7 +4346,7 @@ function timelineChipHtml(it, dayIdx, dateStr){
   // (breaking mid-word if a single word is too long for the width) -- only once even that isn't
   // enough does the browser's own line-clamp ellipsis kick in, on the last visible line.
   const availableLines = Math.max(1, Math.floor((height-2)/13));
-  return `<div class="timeline-item ${picked?'chip-picked':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;"
+  return `<div class="timeline-item ${picked?'chip-picked':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;" draggable="false" ondragstart="return false;"
     onpointerdown="startTimelineItemDrag(event,'${it.kind}','${it.data.id}')"
     onclick="event.stopPropagation(); onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${it.time}', '${dateStr}')">
     <span class="timeline-chip-text" style="--lc:${availableLines};">${escapeHtml(timelineItemLabel(it))}</span>
@@ -4365,6 +4388,19 @@ function commitTimelineAddOnBlur(dayIdx, slot, dateStr){
 }
 function pickTimelineItem(kind, id){ timelinePickedItem = {kind, id}; renderTimelineGrid(); }
 function cancelTimelinePick(){ timelinePickedItem = null; renderTimelineGrid(); }
+// keeps a moved item's original duration instead of collapsing it to the default 30min -- shifts
+// the same start-to-end gap onto the new start time, clamped so it never runs past the visible
+// end of the day's grid.
+function timelineShiftedEndTime(newStart, prevStart, prevEnd){
+  if(!prevEnd || !prevStart) return '';
+  const [ph, pm] = prevStart.split(':').map(Number);
+  const [eh, em] = prevEnd.split(':').map(Number);
+  const durMin = (eh*60+em) - (ph*60+pm);
+  if(durMin<=0) return '';
+  const [nh, nm] = newStart.split(':').map(Number);
+  const totalMin = Math.min(nh*60+nm+durMin, TIMELINE_END_HOUR*60);
+  return pad(Math.floor(totalMin/60))+':'+pad(totalMin%60);
+}
 // the actual move commit, shared by "tap a target while something is picked up" -- always routes
 // through the existing applyGcalSyncForTask/applyGcalSyncForAnchor helpers, never a direct push,
 // and for anchors always treats a day-only change as a timing change (see saveAnchor) so a moved
@@ -4377,7 +4413,7 @@ function commitTimelineMoveTo(dayIdx, slot, dateStr){
     const t = data.tasks.find(x=>x.id===picked.id);
     if(!t) return;
     const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
-    t.date = dateStr; t.time = slot; t.endTime = '';
+    t.date = dateStr; t.time = slot; t.endTime = timelineShiftedEndTime(slot, prevTime, prevEnd);
     saveData();
     renderScheduleGrid();
     renderTasks();
@@ -4385,8 +4421,8 @@ function commitTimelineMoveTo(dayIdx, slot, dateStr){
   } else {
     const a = data.anchors.find(x=>x.id===picked.id);
     if(!a) return;
-    const prevDay = a.day, prevTime = a.time;
-    a.day = dayIdx; a.time = slot;
+    const prevDay = a.day, prevTime = a.time, prevEnd = a.endTime;
+    a.day = dayIdx; a.time = slot; a.endTime = timelineShiftedEndTime(slot, prevTime, prevEnd);
     saveData();
     renderScheduleGrid();
     applyGcalSyncForAnchor(a, a.day!==prevDay || a.time!==prevTime);
@@ -4413,6 +4449,9 @@ function timelineDragGhostEl(){
 function startTimelineItemDrag(e, kind, id){
   if(timelinePickedItem) return; // already mid-move via the 2-tap flow -- don't also start a drag
   e.stopPropagation();
+  // on a mouse (not touch), holding the button down over text starts a native text-selection/drag
+  // gesture that competes with our own pointermove-driven drag -- block it right at pointerdown
+  e.preventDefault();
   const chip = e.currentTarget;
   timelineDragState = {
     kind, id, chip, active:false, everMoved:false, scrolling:false,
@@ -4532,6 +4571,10 @@ let timelineSheetDayIdx = null;  // staged day selection while the sheet is open
 // quickAddTaskForDay, list-tab "+ עוגן"/"+ משימה") -- if it gets closed without a title ever being
 // typed, the blank placeholder record is removed instead of lingering in the data forever.
 let timelineSheetIsNew = false;
+// set when the sheet was opened via a "→ הפוך למשימה" conversion (someday item or someday small
+// step) -- the source item is deliberately NOT deleted at conversion time, only offered here as an
+// explicit choice, so promoting something to a task never also silently removes it from its list.
+let timelineSheetConvertedFrom = null; // {kind:'someday', id} | {kind:'somedaySubtask', somedayId, subId}
 function dayIdxForDateStr(dateStr){
   const idx = viewedWeekDates().findIndex(d=>ymd(d)===dateStr);
   return idx>=0 ? idx : 0;
@@ -4560,9 +4603,27 @@ function closeTimelineSheet(){
   }
   timelineSheetItem = null;
   timelineSheetIsNew = false;
+  timelineSheetConvertedFrom = null;
   const overlay = document.getElementById('timelineSheetOverlay'), sheet = document.getElementById('timelineSheet');
   if(overlay) overlay.style.display = 'none';
   if(sheet) sheet.style.display = 'none';
+}
+// removes the ORIGINAL someday item/step this task sheet was promoted from -- an explicit, separate
+// choice from the sheet's own delete button (which would delete the new task itself, not the source)
+function deleteConvertedSourceItem(){
+  if(!timelineSheetConvertedFrom) return;
+  const src = timelineSheetConvertedFrom;
+  if(src.kind==='someday'){
+    data.someday = data.someday.filter(x=>x.id!==src.id);
+  } else if(src.kind==='somedaySubtask'){
+    const s = data.someday.find(x=>x.id===src.somedayId);
+    if(s) s.subtasks = (s.subtasks||[]).filter(x=>x.id!==src.subId);
+  }
+  timelineSheetConvertedFrom = null;
+  saveData();
+  renderSomeday();
+  renderTimelineSheet();
+  flashStatus('הוסר מ"דברים לעשות"');
 }
 // deliberately does NOT call renderTimelineSheet() -- a full re-render would rebuild the title
 // input and time picker from the underlying record again, silently discarding whatever the user
@@ -4578,9 +4639,16 @@ function renderTimelineSheet(){
   const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
   if(!rec){ closeTimelineSheet(); return; }
   const label = kind==='task' ? rec.text : rec.label;
+  // the topic picker only shows here for anchors (explicitly asked for) -- squeezed into the same
+  // row as the name, at its left edge, instead of a row of its own, so it doesn't grow the sheet
+  const domainPickerHtml = kind==='anchor'
+    ? `<select id="timelineSheetDomain" class="timeline-sheet-domain">${domainOptions(rec.domain)}</select>` : '';
   sheet.innerHTML = `
     <div class="timeline-sheet-handle"></div>
-    <input type="text" class="timeline-sheet-title" id="timelineSheetTitleInput" value="${escapeAttr(label)}" placeholder="שם...">
+    <div class="timeline-sheet-title-row">
+      <input type="text" class="timeline-sheet-title" id="timelineSheetTitleInput" value="${escapeAttr(label)}" placeholder="שם...">
+      ${domainPickerHtml}
+    </div>
     <div class="timeline-sheet-daypicker">
       ${DAYS.map((dn,di)=>`<button type="button" class="timeline-sheet-day-btn ${timelineSheetDayIdx===di?'active':''}" onclick="setTimelineSheetDay(${di})">${dn}</button>`).join('')}
     </div>
@@ -4590,6 +4658,7 @@ function renderTimelineSheet(){
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
       <button type="button" class="cancel-btn" onclick="closeTimelineSheet()">ביטול</button>
       <button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה</button>
+      ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="timelineSheetMoreOptions()">עוד אפשרויות (נושא, חזרתיות, סנכרון גוגל...) ›</button>
@@ -4622,7 +4691,9 @@ function saveTimelineSheet(){
     const a = data.anchors.find(x=>x.id===id);
     if(!a) return;
     const prevDay = a.day, prevTime = a.time;
+    const domainEl = document.getElementById('timelineSheetDomain');
     a.label = text; a.day = timelineSheetDayIdx; a.time = time; a.draft = draft;
+    if(domainEl) a.domain = domainEl.value;
     saveData();
     renderScheduleGrid();
     applyGcalSyncForAnchor(a, isNew || a.day!==prevDay || a.time!==prevTime);
@@ -4860,7 +4931,9 @@ function somedayEditFormHtml(s){
 function convertSomedayToTask(id){
   const s = data.someday.find(s=>s.id===id);
   if(!s) return;
-  data.someday = data.someday.filter(x=>x.id!==id);
+  // the someday item is NOT removed here -- it stays in "דברים לעשות" until she explicitly chooses
+  // to remove it from the sheet that opens next (מחק מ"דברים לעשות"), so a promotion to a task is
+  // never also a silent deletion decided on her behalf
   const newTask = {id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()};
   data.tasks.push(newTask);
   editingSomedayId = null;
@@ -4868,6 +4941,7 @@ function convertSomedayToTask(id){
   renderSomeday();
   renderTasks();
   renderScheduleGrid();
+  timelineSheetConvertedFrom = {kind:'someday', id};
   openTimelineSheet('task', newTask.id);
 }
 function somedayDetailHtml(s){
@@ -4998,13 +5072,14 @@ function convertSomedaySubtaskToTask(id, subId){
   if(!s) return;
   const sub = (s.subtasks||[]).find(x=>x.id===subId);
   if(!sub) return;
-  s.subtasks = (s.subtasks||[]).filter(x=>x.id!==subId);
+  // same as convertSomedayToTask above -- the small step stays put until explicitly removed from the sheet
   const newTask = {id:uid(), text:sub.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:sub.done||false, energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
   data.tasks.push(newTask);
   saveData();
   renderSomeday();
   renderTasks();
   renderScheduleGrid();
+  timelineSheetConvertedFrom = {kind:'somedaySubtask', somedayId:id, subId};
   openTimelineSheet('task', newTask.id);
 }
 // a description field pre-creation, next to the pending body-check toggle, same idea as the "תיאור"
@@ -5029,6 +5104,48 @@ function resetPendingSomedayDesc(){
   pendingSomedayDescOpen = false;
   renderPendingSomedayDesc();
 }
+// same idea, for subtasks -- lets a first small step get typed in right at creation instead of only
+// after saving and reopening to edit, same as the description toggle right next to it.
+let pendingSomedaySubtasksOpen = false;
+let pendingSomedaySubtasks = [];
+function togglePendingSomedaySubtasks(){
+  pendingSomedaySubtasksOpen = !pendingSomedaySubtasksOpen;
+  renderPendingSomedaySubtasks();
+}
+function addPendingSomedaySubtask(){
+  const input = document.getElementById('pendingSomedaySubInput');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  pendingSomedaySubtasks.push({id:uid(), text, done:false});
+  input.value = '';
+  renderPendingSomedaySubtasks();
+}
+function deletePendingSomedaySubtask(id){
+  pendingSomedaySubtasks = pendingSomedaySubtasks.filter(x=>x.id!==id);
+  renderPendingSomedaySubtasks();
+}
+function renderPendingSomedaySubtasks(){
+  const el = document.getElementById('pendingSomedaySubtasksWrap');
+  if(!el) return;
+  const hasContent = pendingSomedaySubtasks.length>0;
+  const rowsHtml = pendingSomedaySubtasks.map(sub=>`
+    <div class="subtask-row">
+      <span class="subtask-text">${escapeHtml(sub.text)}</span>
+      <span class="del-task" onclick="deletePendingSomedaySubtask('${sub.id}')">✕</span>
+    </div>`).join('');
+  el.innerHTML = `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="togglePendingSomedaySubtasks()">${pendingSomedaySubtasksOpen?'▾':'▸'} צעדים קטנים</button>
+    ${pendingSomedaySubtasksOpen ? `
+    <div class="subtask-add-row">
+      <input type="text" id="pendingSomedaySubInput" placeholder="צעד קטן..." onkeydown="if(event.key==='Enter') addPendingSomedaySubtask();">
+      <button type="button" onclick="addPendingSomedaySubtask()">+ הוסף</button>
+    </div>
+    ${rowsHtml}` : ''}`;
+}
+function resetPendingSomedaySubtasks(){
+  pendingSomedaySubtasks = [];
+  pendingSomedaySubtasksOpen = false;
+  renderPendingSomedaySubtasks();
+}
 function addSomeday(){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
   const input = document.getElementById('somedayInput');
@@ -5037,10 +5154,11 @@ function addSomeday(){
   const domainSel = document.getElementById('somedayDomain');
   const domain = domainSel ? domainSel.value : data.domains[0].id;
   const bodyCheck = {...pendingBodyCheck.someday};
-  data.someday.push({id:uid(), text, domain, description:pendingSomedayDesc, subtasks:[], createdAt:Date.now(), bodyCheck});
+  data.someday.push({id:uid(), text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck});
   input.value='';
   resetPendingBodyCheck('someday');
   resetPendingSomedayDesc();
+  resetPendingSomedaySubtasks();
   saveData();
   renderSomeday();
 }
@@ -5572,13 +5690,6 @@ function addReplyScript(){
   saveData();
   rerenderActiveDilemmaList();
 }
-function saveReplyScriptEdit(id, val){
-  const key = 'replyscript:'+id;
-  inlineEditIds.delete(key);
-  const s = (data.replyScripts||[]).find(x=>x.id===id);
-  if(s && val.trim()){ s.text = val.trim(); saveData(); }
-  rerenderActiveDilemmaList();
-}
 function deleteReplyScript(id){
   data.replyScripts = (data.replyScripts||[]).filter(x=>x.id!==id);
   saveData();
@@ -5631,18 +5742,19 @@ function replyScriptRowHtml(kind, id, s){
     return `<div class="decision-quote-row" data-entry-id="${s.id}">
       <textarea id="replyScriptOverrideInput" class="inline-text-edit">${escapeHtml(s.text)}</textarea>
       <div class="anchor-form-actions" style="margin-top:6px;">
-        <button type="button" class="save-btn" onclick="useReplyScriptOnce()" title="הנוסח הזה משמש רק כאן, בלי לשנות את ברירת המחדל">📋 העתק רק לכאן</button>
+        <button type="button" class="save-btn" onclick="useReplyScriptOnce()" title="הנוסח הזה משמש רק כאן, בלי לשנות את ברירת המחדל">📋 שמור רק לכאן</button>
         <button type="button" class="save-btn" onclick="useReplyScriptAsNewDefault('${s.id}')" title="שומר את הנוסח הזה כברירת מחדל לכולם, וגם מעתיק">💾 שמור כברירת מחדל</button>
         <button type="button" class="cancel-btn" onclick="cancelReplyScriptOverride()">בטל</button>
       </div>
     </div>`;
   }
+  // clicking the text itself opens the same per-item override editor as the old dedicated "התאמה
+  // לכאן" button did -- having both a click-to-edit AND a separate button doing two different
+  // things (one silently rewriting the shared default, one not) was confusing, so they're merged
+  // into one action instead of removing either.
   return `<div class="decision-quote-row" data-entry-id="${s.id}">
-    ${inlineEditIds.has('replyscript:'+s.id)
-      ? `<textarea class="inline-text-edit" data-inline-key="replyscript:${s.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('replyscript:${s.id}', rerenderActiveDilemmaList) : saveReplyScriptEdit('${s.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(s.text)}</textarea>`
-      : `<span data-inline-key="replyscript:${s.id}" onclick="inlineEditToggle('replyscript:${s.id}', rerenderActiveDilemmaList)">${escapeHtml(s.text)}</span>`}
+    <span onclick="startReplyScriptOverride('${kind}','${id}','${s.id}')" title="לחיצה לעריכה מותאמת כאן">${escapeHtml(s.text)}</span>
     <span class="copy-script-btn" onclick="copyReplyScript('${s.id}')" title="העתקה ללוח כמו שהוא">📋 העתק</span>
-    <span class="copy-script-btn" onclick="startReplyScriptOverride('${kind}','${id}','${s.id}')" title="עריכה מותאמת לזה בלבד, בלי לשנות את ברירת המחדל">✏️ התאמה לכאן</span>
     <span class="del-task" onclick="deleteReplyScript('${s.id}')">✕</span>
   </div>`;
 }
@@ -7090,10 +7202,12 @@ function saveHabitContextEdit(id, val){
 }
 // a single tap for "did it today", with a soft relative-date caption -- no streak, no red, no
 // "you broke it" language anywhere, matching the existing "קח/י את זה כהמלצה" tone of this section
+// a second tap undoes it -- so an accidental tap is never stuck marked done with no way back
 function markHabitDoneToday(id){
   const h = data.habits.find(h=>h.id===id);
   if(!h) return;
-  h.lastDoneDate = ymd(new Date());
+  const today = ymd(new Date());
+  h.lastDoneDate = (h.lastDoneDate===today) ? '' : today;
   saveData();
   renderHabits();
 }
@@ -8137,6 +8251,7 @@ function render(){
   renderDilemmasSection();
   renderPendingBodyCheck('someday');
   renderPendingSomedayDesc();
+  renderPendingSomedaySubtasks();
   renderReflection();
   applyAllSectionCollapse();
   applyMainViewState();
