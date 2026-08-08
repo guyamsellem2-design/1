@@ -475,6 +475,15 @@
   .feel-chip-add-confirm, .feel-chip-add-cancel{cursor:pointer; font-size:15px; padding:2px 4px; color:var(--muted2);}
   .feel-chip-add-confirm:hover{color:var(--safe, var(--text));}
   .feel-chip-add-cancel:hover{color:var(--text);}
+  .chip-group{margin-bottom:6px;}
+  .chip-group-header{font-size:13px; font-weight:700; color:var(--muted); margin:10px 0 2px; padding:0 2px;}
+  .chip-group-header-none{font-weight:400; color:var(--muted2); font-style:italic;}
+  .chip-header-manage{display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:2px 2px 10px; border-bottom:1px dashed var(--border); margin-bottom:4px;}
+  .chip-header-pill{display:inline-flex; align-items:center; font-size:12.5px; padding:4px 10px; border-radius:999px; border:1.5px dashed var(--border); color:var(--muted); cursor:pointer;}
+  .chip-header-pill:hover{color:var(--text); border-color:var(--text);}
+  .chip-header-del{cursor:pointer; font-size:13px; color:var(--muted2); margin-inline-start:-4px; padding:2px 4px;}
+  .chip-header-del:hover{color:#c0453f;}
+  .chip-header-select{font-family:inherit; font-size:12.5px; padding:4px 6px; border-radius:8px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); max-width:120px;}
   .feel-note-textarea{width:100%; min-height:60px; margin-top:4px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:inherit; font-size:14.5px; resize:none; overflow:hidden; padding:8px 10px; line-height:1.5;}
   .feel-note-wrap{margin-top:4px;}
   .feel-note-wrap > .feel-note-min-btn + .feel-note-min-btn{margin-right:6px;}
@@ -701,8 +710,8 @@
 <div class="nav-drawer" id="navDrawer">
   <h3>ניווט</h3>
   <div class="nav-home-link" onclick="navigateHome()">🏠 דף הבית</div>
-  <div class="nav-home-link" onclick="switchMainView('topics')">📓 נושאים</div>
   <div class="nav-home-link" onclick="switchMainView('tools')">🧰 כלים</div>
+  <div class="nav-home-link" onclick="switchMainView('topics')">📓 נושאים</div>
   <div class="nav-home-link" onclick="switchMainView('lists')">🗂 רשימות</div>
   <hr>
   <div id="navDomainList"></div>
@@ -712,8 +721,8 @@
 
 <div class="main-tab-bar">
   <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 בית</button>
-  <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 נושאים</button>
   <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
+  <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 נושאים</button>
   <button class="main-tab-btn" id="mainTabListsBtn" onclick="switchMainView('lists')">🗂 רשימות</button>
 </div>
 
@@ -971,7 +980,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -1060,9 +1069,9 @@ function loadData(){
       data.todayIdeasDate = parsed.todayIdeasDate || '';
       data.todayIdeasShowFavOnly = !!parsed.todayIdeasShowFavOnly;
       data.todayIdeas = parsed.todayIdeas || [];
-      data.breathIn = (typeof parsed.breathIn === 'number') ? parsed.breathIn : 5;
-      data.breathHold = (typeof parsed.breathHold === 'number') ? parsed.breathHold : 5;
-      data.breathOut = (typeof parsed.breathOut === 'number') ? parsed.breathOut : 5;
+      data.breathIn = (typeof parsed.breathIn === 'number') ? parsed.breathIn : 3;
+      data.breathHold = (typeof parsed.breathHold === 'number') ? parsed.breathHold : 3;
+      data.breathOut = (typeof parsed.breathOut === 'number') ? parsed.breathOut : 6;
       data.breathSoundOn = parsed.breathSoundOn !== false;
       data.activeBodyLocations = parsed.activeBodyLocations || [];
       data.bodyNote = parsed.bodyNote || '';
@@ -2771,7 +2780,7 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -5284,7 +5293,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:5, breathHold:5, breathOut:5, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -5409,6 +5418,27 @@ function chipDefsArray(bank){
   }
   return data[chipListKey(bank)];
 }
+// headers ("categories") only exist for custom list chip banks -- built-in banks (emotions/needs/
+// body-locations/good-things) always return [], so every header-aware branch below is a no-op for
+// them and they render exactly as they did before this existed.
+function chipHeaders(bank){
+  if(!bank.startsWith('list:')) return [];
+  const l = listById(bank.slice(5));
+  return l && l.chipHeaders ? l.chipHeaders : [];
+}
+function chipHeaderSelectHtml(bank, item, selectId){
+  const headers = chipHeaders(bank);
+  if(!headers.length) return '';
+  return `<select class="chip-header-select" id="${selectId}" onchange="${item ? `setChipHeader('${bank}','${item.id}', this.value)` : ''}">
+    <option value="">(ללא כותרת)</option>
+    ${headers.map(h=>`<option value="${h.id}" ${item && item.headerId===h.id?'selected':''}>${escapeHtml(h.label)}</option>`).join('')}
+  </select>`;
+}
+function setChipHeader(bank, chipId, headerId){
+  const item = chipDefsArray(bank).find(x=>x.id===chipId);
+  if(item){ item.headerId = headerId; saveData(); }
+  rerenderChipBank(bank);
+}
 function chipSelectedArray(bank){
   if(bank.startsWith('list:')){
     const l = listById(bank.slice(5));
@@ -5454,10 +5484,12 @@ function startAddFeelChip(bank){
 function cancelAddFeelChip(bank){ addingFeelChipBank = null; rerenderChipBank(bank); }
 function commitAddFeelChip(bank){
   const input = document.getElementById('feelChipAddInput');
+  const headerSel = document.getElementById('feelChipAddHeaderSelect');
   const text = input ? input.value.trim() : '';
+  const headerId = headerSel ? headerSel.value : '';
   addingFeelChipBank = null;
   if(text){
-    chipDefsArray(bank).push({id: uid(), label: text});
+    chipDefsArray(bank).push({id: uid(), label: text, headerId});
     saveData();
   }
   rerenderChipBank(bank);
@@ -5635,6 +5667,7 @@ function feelChipHtml(bank, item){
     return `<span class="feel-chip-add-row">
       <input type="text" id="chipEditInput" class="feel-chip-add-input" value="${escapeAttr(item.label)}"
         onkeydown="if(event.key==='Enter') commitEditChip('${bank}','${item.id}'); if(event.key==='Escape') cancelEditChip('${bank}');">
+      ${chipHeaderSelectHtml(bank, item, 'chipEditHeaderSelect')}
       <span class="feel-chip-add-confirm" onclick="commitEditChip('${bank}','${item.id}')" title="שמירה">✓</span>
       <span class="feel-chip-add-cancel" onclick="cancelEditChip('${bank}')" title="ביטול">✕</span>
     </span>`;
@@ -5650,6 +5683,7 @@ function feelAddRowHtml(bank){
   if(addingFeelChipBank===bank){
     return `<span class="feel-chip-add-row">
       <input type="text" id="feelChipAddInput" class="feel-chip-add-input" placeholder="שם חדש..." onkeydown="if(event.key==='Enter') commitAddFeelChip('${bank}'); if(event.key==='Escape') cancelAddFeelChip('${bank}');">
+      ${chipHeaderSelectHtml(bank, null, 'feelChipAddHeaderSelect')}
       <span class="feel-chip-add-confirm" onclick="commitAddFeelChip('${bank}')" title="הוספה">✓</span>
       <span class="feel-chip-add-cancel" onclick="cancelAddFeelChip('${bank}')" title="ביטול">✕</span>
     </span>`;
@@ -5678,13 +5712,44 @@ function feelChipGridHtml(bank){
   const list = chipDefsArray(bank) || [];
   const inDeleteMode = deleteModeBank===bank;
   const inEditMode = editModeBank===bank;
-  return `<div class="feel-chip-grid ${inDeleteMode?'delete-mode':''} ${inEditMode?'edit-mode':''}">
-    ${list.map(item=>feelChipHtml(bank, item)).join('')}
+  const modeClass = `${inDeleteMode?'delete-mode':''} ${inEditMode?'edit-mode':''}`;
+  const controlsRow = `<div class="feel-chip-grid ${modeClass}">
     ${(!inDeleteMode && !inEditMode) ? feelAddRowHtml(bank) : ''}
     ${(!inDeleteMode && !inEditMode) ? clearSelectionsToggleHtml(bank) : ''}
     ${editModeToggleHtml(bank)}
     ${deleteModeToggleHtml(bank)}
   </div>`;
+  const headers = chipHeaders(bank);
+  if(!headers.length){
+    return `<div class="feel-chip-grid ${modeClass}">
+      ${list.map(item=>feelChipHtml(bank, item)).join('')}
+      ${(!inDeleteMode && !inEditMode) ? feelAddRowHtml(bank) : ''}
+      ${(!inDeleteMode && !inEditMode) ? clearSelectionsToggleHtml(bank) : ''}
+      ${editModeToggleHtml(bank)}
+      ${deleteModeToggleHtml(bank)}
+    </div>`;
+  }
+  const grouped = headers.map(h => ({header:h, chips: list.filter(c=>c.headerId===h.id)}));
+  const ungrouped = list.filter(c=>!c.headerId || !headers.some(h=>h.id===c.headerId));
+  return `
+    ${grouped.map(g => `
+      <div class="chip-group">
+        <div class="chip-group-header">${escapeHtml(g.header.label)}</div>
+        <div class="feel-chip-grid ${modeClass}">
+          ${g.chips.map(item=>feelChipHtml(bank, item)).join('')}
+        </div>
+      </div>
+    `).join('')}
+    ${ungrouped.length ? `
+      <div class="chip-group">
+        <div class="chip-group-header chip-group-header-none">ללא כותרת</div>
+        <div class="feel-chip-grid ${modeClass}">
+          ${ungrouped.map(item=>feelChipHtml(bank, item)).join('')}
+        </div>
+      </div>
+    ` : ''}
+    ${controlsRow}
+  `;
 }
 function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); updateCollapseAllButton(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
@@ -6347,8 +6412,80 @@ function renderListsView(){
 // banks (tap-to-select, hold-and-drag reorder, add/edit/delete modes, "נקה בחירות") -- a "list:<id>"
 // bank string routes chipDefsArray/chipSelectedArray/rerenderChipBank to this list's own chips/
 // selected arrays instead of a global data field, see those functions below.
+let addingChipHeaderList = null;
+let editingChipHeaderKey = null; // "listId:headerId"
+function startAddChipHeader(listId){
+  addingChipHeaderList = listId;
+  renderListsView();
+  requestAnimationFrame(()=>{ const el = document.getElementById('chipHeaderAddInput'); if(el) el.focus(); });
+}
+function cancelAddChipHeader(){ addingChipHeaderList = null; renderListsView(); }
+function commitAddChipHeader(listId){
+  const input = document.getElementById('chipHeaderAddInput');
+  const text = input ? input.value.trim() : '';
+  addingChipHeaderList = null;
+  if(text){
+    const l = listById(listId);
+    if(!l.chipHeaders) l.chipHeaders = [];
+    l.chipHeaders.push({id: uid(), label: text});
+    saveData();
+  }
+  renderListsView();
+}
+function startEditChipHeader(listId, headerId){
+  editingChipHeaderKey = listId+':'+headerId;
+  renderListsView();
+  requestAnimationFrame(()=>{ const el = document.getElementById('chipHeaderEditInput'); if(el){ el.focus(); el.select(); } });
+}
+function cancelEditChipHeader(){ editingChipHeaderKey = null; renderListsView(); }
+function commitEditChipHeader(listId, headerId){
+  const input = document.getElementById('chipHeaderEditInput');
+  const text = input ? input.value.trim() : '';
+  editingChipHeaderKey = null;
+  if(text){
+    const l = listById(listId);
+    const h = l && l.chipHeaders ? l.chipHeaders.find(x=>x.id===headerId) : null;
+    if(h) h.label = text;
+    saveData();
+  }
+  renderListsView();
+}
+function deleteChipHeader(listId, headerId){
+  const l = listById(listId);
+  if(!l) return;
+  l.chipHeaders = (l.chipHeaders||[]).filter(h=>h.id!==headerId);
+  // the chips themselves are never deleted -- they just fall back into "ללא כותרת"
+  (l.chips||[]).forEach(c=>{ if(c.headerId===headerId) c.headerId=''; });
+  saveData();
+  renderListsView();
+}
+function chipHeaderManageHtml(l){
+  const headers = l.chipHeaders || [];
+  return `<div class="chip-header-manage">
+    ${headers.map(h => editingChipHeaderKey===(l.id+':'+h.id) ? `
+      <span class="feel-chip-add-row">
+        <input type="text" id="chipHeaderEditInput" class="feel-chip-add-input" value="${escapeAttr(h.label)}"
+          onkeydown="if(event.key==='Enter') commitEditChipHeader('${l.id}','${h.id}'); if(event.key==='Escape') cancelEditChipHeader();">
+        <span class="feel-chip-add-confirm" onclick="commitEditChipHeader('${l.id}','${h.id}')" title="שמירה">✓</span>
+        <span class="feel-chip-add-cancel" onclick="cancelEditChipHeader()" title="ביטול">✕</span>
+      </span>
+    ` : `
+      <span class="chip-header-pill" onclick="startEditChipHeader('${l.id}','${h.id}')" title="לחיצה לעריכת השם">🏷 ${escapeHtml(h.label)}</span>
+      <span class="chip-header-del" onclick="deleteChipHeader('${l.id}','${h.id}')" title="מחיקת הכותרת (הפריטים נשארים, עוברים לללא כותרת)">✕</span>
+    `).join('')}
+    ${addingChipHeaderList===l.id ? `
+      <span class="feel-chip-add-row">
+        <input type="text" id="chipHeaderAddInput" class="feel-chip-add-input" placeholder="שם כותרת..." onkeydown="if(event.key==='Enter') commitAddChipHeader('${l.id}'); if(event.key==='Escape') cancelAddChipHeader();">
+        <span class="feel-chip-add-confirm" onclick="commitAddChipHeader('${l.id}')" title="הוספה">✓</span>
+        <span class="feel-chip-add-cancel" onclick="cancelAddChipHeader()" title="ביטול">✕</span>
+      </span>
+    ` : `<span class="feel-chip feel-chip-add" onclick="startAddChipHeader('${l.id}')">+ הוספת כותרת</span>`}
+  </div>`;
+}
 function listChipBankHtml(l){
-  return `<p class="hint" style="margin:10px 0;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</p>
+  if(!l.chipHeaders) l.chipHeaders = [];
+  return `<p class="hint" style="margin:10px 0;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה · כותרות מקבצות את הפריטים לתתי-רשימות</p>
+  ${chipHeaderManageHtml(l)}
   ${feelChipGridHtml('list:'+l.id)}`;
 }
 function listItemHtml(l, item){
@@ -6740,9 +6877,9 @@ let breathingActive = false, breathingChainId = 0;
 function breathingConfig(){
   const inEl = document.getElementById('breathIn'), holdEl = document.getElementById('breathHold'), outEl = document.getElementById('breathOut');
   return {
-    inSec: Math.max(1, +(inEl ? inEl.value : data.breathIn) || 5),
-    holdSec: Math.max(0, +(holdEl ? holdEl.value : data.breathHold) || 0),
-    outSec: Math.max(1, +(outEl ? outEl.value : data.breathOut) || 5)
+    inSec: Math.max(1, +(inEl ? inEl.value : data.breathIn) || 3),
+    holdSec: Math.max(0, +(holdEl ? holdEl.value : data.breathHold) || 3),
+    outSec: Math.max(1, +(outEl ? outEl.value : data.breathOut) || 6)
   };
 }
 function playBreathTone(freq){
@@ -6843,9 +6980,9 @@ function renderToolsView(){
       <h3>🌬 נשימה</h3>
       <p class="hint" style="margin:0 0 6px;">עיגול שמתרחב ומתכווץ בקצב שאת/ה קובע/ת. בלי מילים.</p>
       <div class="breathing-config">
-        <span>פנימה</span><input type="number" id="breathIn" min="1" max="30" value="${data.breathIn||5}">
-        <span>עצור</span><input type="number" id="breathHold" min="0" max="30" value="${data.breathHold||5}">
-        <span>החוצה</span><input type="number" id="breathOut" min="1" max="30" value="${data.breathOut||5}">
+        <span>פנימה</span><input type="number" id="breathIn" min="1" max="30" value="${data.breathIn||3}">
+        <span>עצור</span><input type="number" id="breathHold" min="0" max="30" value="${data.breathHold||3}">
+        <span>החוצה</span><input type="number" id="breathOut" min="1" max="30" value="${data.breathOut||6}">
         <label style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" ${data.breathSoundOn!==false?'checked':''} onchange="toggleBreathSound()"> 🔊 צליל</label>
       </div>
       <div class="breathing-circle-wrap">
