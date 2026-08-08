@@ -680,6 +680,25 @@
   .dilemma-subtabs{display:flex; gap:8px; margin-bottom:14px;}
   .dilemma-subtab-btn{flex:1; background:var(--surface3); border:1px solid var(--border-strong); color:var(--muted); border-radius:10px; padding:9px 12px; font-size:14px; font-family:inherit; cursor:pointer;}
   .dilemma-subtab-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
+  .schedule-tabs{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;}
+  .schedule-tab-btn{flex:1; min-width:70px; background:var(--surface3); border:1px solid var(--border-strong); color:var(--muted); border-radius:10px; padding:8px 6px; font-size:13.5px; font-family:inherit; cursor:pointer;}
+  .schedule-tab-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
+
+  .timeline-grid{display:grid; grid-template-columns:44px repeat(7,1fr); border:1px solid var(--border); border-radius:10px; overflow:hidden; font-size:12.5px;}
+  .timeline-daylabel{grid-row:1; background:var(--surface3); padding:6px 2px; text-align:center; font-weight:600; position:sticky; top:0; z-index:2;}
+  .timeline-timelabel{background:var(--surface3); color:var(--muted2); text-align:center; padding:2px; font-size:11px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:center;}
+  .timeline-cell{border-top:1px solid var(--border); border-right:1px solid var(--border); min-height:26px; padding:1px; position:relative; cursor:pointer; background:var(--surface);}
+  .timeline-cell:hover{background:var(--surface2);}
+  .timeline-cell.has-item{padding:0;}
+  .timeline-chip{background:var(--surface2); border-radius:6px; padding:2px 5px; font-size:11.5px; line-height:1.3; height:100%; display:flex; flex-direction:column; gap:1px; border-right:3px solid var(--gold); cursor:pointer;}
+  .timeline-chip.chip-picked{outline:2px solid var(--gold); outline-offset:1px;}
+  .timeline-chip .timeline-chip-text{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .timeline-chip-actions{display:flex; gap:4px; font-size:10px; color:var(--muted2); flex-wrap:wrap;}
+  .timeline-chip-actions span{cursor:pointer; text-decoration:underline;}
+  .timeline-add-input{width:100%; height:100%; border:none; background:transparent; color:var(--text); font-family:inherit; font-size:11.5px; padding:2px 4px;}
+  .timeline-untimed{display:flex; flex-direction:column; gap:4px; padding:6px; background:var(--surface2); border-radius:8px; margin-bottom:8px;}
+  .timeline-untimed-title{font-size:12px; color:var(--muted); font-weight:600;}
+  .timeline-untimed-chip{background:var(--surface3); border-radius:6px; padding:4px 7px; font-size:12.5px; cursor:pointer; border-right:3px solid var(--gold);}
   .dilemma-subtab-btn:not(.active):hover{color:var(--text); border-color:var(--muted);}
   .decision-helper-panel{display:flex; flex-direction:column; gap:6px; background:var(--surface2); border-radius:10px; padding:10px; margin-top:6px;}
   .decision-quote-list{display:flex; flex-direction:column; gap:6px;}
@@ -821,76 +840,93 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('tasks')"><span class="num">04</span> משימות <span class="chev" id="chev-tasks">▾</span></h2>
-      <div class="hint">הנקודה = רמת אנרגיה (לחיצה מחליפה) · לחיצה על הטקסט לעריכה</div>
-      <button class="reset-btn" onclick="clearAllTasks()">🧹 נקה הכל</button>
-    </div>
-    <div id="secbody-tasks">
-    <div class="card">
-      <button type="button" class="list-expand-btn" id="taskAddToggleBtn" onclick="toggleTaskAddOpen()" style="margin-bottom:10px;"><span class="chev">▸</span> הוספת משימה</button>
-      <div id="taskAddBody" style="display:none;">
-      <div class="add-row">
-        <input type="text" id="taskInput" placeholder="משימה קטנה לשבוע הזה...">
-        <select id="taskDomain" onchange="onTaskDomainChange(this.value)"></select>
-        <select id="taskEnergy">
-          <option value="low">🟢 מטעין</option>
-          <option value="mid" selected>🟡 בינוני</option>
-          <option value="high">🔴 מרוקן</option>
-        </select>
-        <button type="button" class="add-domain-btn" onclick="toggleTaskSchedule()" id="taskSchedToggle">📅 לתזמן</button>
-        <button type="button" class="add-domain-btn" onclick="toggleTaskMore()" id="taskMoreToggle">עוד..</button>
-        <button onclick="addTask()">הוסף</button>
-      </div>
-      <div class="add-row" id="taskSchedFields" style="display:none;">
-        <input type="date" id="taskDate">
-        <div class="time-picker-wrap">
-          <input type="hidden" id="taskTime" value="">
-          <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת התחלה" onclick="toggleTimePicker('taskTime', event)">🕐 <span dir="ltr">שעת התחלה</span></button>
-        </div>
-        <div class="time-picker-wrap">
-          <input type="hidden" id="taskEndTime" value="">
-          <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת סיום (רשות)" onclick="toggleTimePicker('taskEndTime', event)">🕐 <span dir="ltr">שעת סיום (רשות)</span></button>
-        </div>
-      </div>
-      <div id="taskMoreFields" style="display:none; margin-top:8px;">
-        <textarea id="taskNewDescription" class="detail-desc" placeholder="הרחבה, הקשר, פרטים..."></textarea>
-        <div id="pendingBodyCheck-task"></div>
-      </div>
-      </div>
-      <div class="section-divider"></div>
-      <div class="view-controls">
-        <span class="control-label">תצוגה</span>
-        <div class="add-row view-controls-row" style="margin-bottom:10px;">
-          <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
-            <option value="manual">ידני (גרירה)</option>
-            <option value="time" selected>לפי זמן</option>
-            <option value="topic">לפי נושא</option>
-          </select>
-          <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
-          <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
-            <option value="all" selected>הכל</option>
-            <option value="today">היום</option>
-            <option value="week">השבוע</option>
-            <option value="month">החודש</option>
-          </select>
-        </div>
-      </div>
-      <div class="section-divider"></div>
-      <ul class="tasks scroll-cap" id="taskList"></ul>
-      <div class="list-expand-row" id="taskListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('task')"></button></div>
-    </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2 onclick="toggleSection('schedule')"><span class="num">05</span> לוח השבוע <span class="chev" id="chev-schedule">▾</span></h2>
-      <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
+      <h2 onclick="toggleSection('schedule')"><span class="num">04</span> לוח + משימות <span class="chev" id="chev-schedule">▾</span></h2>
+      <div class="hint">הכל במקום אחד — לוח שעות חופשי, רשימה לפי יום, משימות לפי נושא, ועוגנים קבועים</div>
     </div>
     <div id="secbody-schedule">
       <div class="schedule-reminder">כל פעם שאתה ממלא כאן משהו, תזכור לשאול את עצמך — מה מרחיב אותי עכשיו? מה מרגש אותי? מה מעורר בי השראה?</div>
-      <div class="week-nav" id="weekNav"></div>
-      <div class="schedule-grid" id="scheduleGrid"></div>
+      <div class="schedule-tabs" id="scheduleTabs">
+        <button type="button" class="schedule-tab-btn" data-tab="timeline" onclick="setScheduleTab('timeline')">לוח שעות</button>
+        <button type="button" class="schedule-tab-btn" data-tab="list" onclick="setScheduleTab('list')">רשימה</button>
+        <button type="button" class="schedule-tab-btn" data-tab="tasks" onclick="setScheduleTab('tasks')">משימות</button>
+        <button type="button" class="schedule-tab-btn" data-tab="anchors" onclick="setScheduleTab('anchors')">עוגנים</button>
+      </div>
+
+      <div id="scheduleWeekNavWrap" style="display:none;">
+        <div class="week-nav" id="weekNav"></div>
+      </div>
+
+      <div id="scheduleTabTimeline" style="display:none;">
+        <div id="timelineUntimedWrap"></div>
+        <div class="timeline-grid" id="timelineGrid"></div>
+      </div>
+
+      <div id="scheduleTabList" style="display:none;">
+        <div class="schedule-grid" id="scheduleGrid"></div>
+      </div>
+
+      <div id="scheduleTabTasks" style="display:none;">
+        <div class="card">
+          <button type="button" class="list-expand-btn" id="taskAddToggleBtn" onclick="toggleTaskAddOpen()" style="margin-bottom:10px;"><span class="chev">▸</span> הוספת משימה</button>
+          <div id="taskAddBody" style="display:none;">
+          <div class="add-row">
+            <input type="text" id="taskInput" placeholder="משימה קטנה לשבוע הזה...">
+            <select id="taskDomain" onchange="onTaskDomainChange(this.value)"></select>
+            <select id="taskEnergy">
+              <option value="low">🟢 מטעין</option>
+              <option value="mid" selected>🟡 בינוני</option>
+              <option value="high">🔴 מרוקן</option>
+            </select>
+            <button type="button" class="add-domain-btn" onclick="toggleTaskSchedule()" id="taskSchedToggle">📅 לתזמן</button>
+            <button type="button" class="add-domain-btn" onclick="toggleTaskMore()" id="taskMoreToggle">עוד..</button>
+            <button onclick="addTask()">הוסף</button>
+          </div>
+          <div class="add-row" id="taskSchedFields" style="display:none;">
+            <input type="date" id="taskDate">
+            <div class="time-picker-wrap">
+              <input type="hidden" id="taskTime" value="">
+              <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת התחלה" onclick="toggleTimePicker('taskTime', event)">🕐 <span dir="ltr">שעת התחלה</span></button>
+            </div>
+            <div class="time-picker-wrap">
+              <input type="hidden" id="taskEndTime" value="">
+              <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת סיום (רשות)" onclick="toggleTimePicker('taskEndTime', event)">🕐 <span dir="ltr">שעת סיום (רשות)</span></button>
+            </div>
+          </div>
+          <div id="taskMoreFields" style="display:none; margin-top:8px;">
+            <textarea id="taskNewDescription" class="detail-desc" placeholder="הרחבה, הקשר, פרטים..."></textarea>
+            <div id="pendingBodyCheck-task"></div>
+          </div>
+          </div>
+          <div class="section-divider"></div>
+          <div class="view-controls">
+            <span class="control-label">תצוגה</span>
+            <div class="add-row view-controls-row" style="margin-bottom:10px;">
+              <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
+                <option value="manual">ידני (גרירה)</option>
+                <option value="time" selected>לפי זמן</option>
+                <option value="topic">לפי נושא</option>
+              </select>
+              <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
+              <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
+                <option value="all" selected>הכל</option>
+                <option value="today">היום</option>
+                <option value="week">השבוע</option>
+                <option value="month">החודש</option>
+              </select>
+            </div>
+          </div>
+          <div class="section-divider"></div>
+          <ul class="tasks scroll-cap" id="taskList"></ul>
+          <div class="list-expand-row" id="taskListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('task')"></button></div>
+          <button class="reset-btn" onclick="clearAllTasks()" style="margin-top:10px;">🧹 נקה הכל</button>
+        </div>
+      </div>
+
+      <div id="scheduleTabAnchors" style="display:none;">
+        <div class="card">
+          <ul class="tasks scroll-cap" id="anchorsList"></ul>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -4041,6 +4077,260 @@ function renderScheduleGrid(){
       ${moreHtml}
     </div>`;
   }).join('');
+  // the timeline/anchors tabs share the exact same underlying data (data.anchors/data.tasks) as
+  // this grid, so piggybacking their redraw here means every one of the ~30 existing call sites
+  // that already call renderScheduleGrid() keeps every tab in sync for free, with no changes to
+  // any of them.
+  renderTimelineGrid();
+  renderAnchorsTab();
+  renderScheduleTabs();
+}
+
+/* ---------- schedule tabs: לוח שעות (free-write timeline) / רשימה (existing day grid) /
+   משימות (existing task list) / עוגנים (flat recurring list) -- one merged section instead of
+   two, so opening "the week" isn't itself a second decision on top of what to put in it. ---------- */
+let scheduleActiveTab = 'timeline';
+function setScheduleTab(tab){
+  scheduleActiveTab = tab;
+  timelinePickedItem = null;
+  renderScheduleTabs();
+  // a tab that was hidden can go stale if data changed while something else was active -- refresh
+  // the one just switched into directly (renderScheduleGrid already piggybacks timeline+anchors,
+  // so routing 'list' through it covers those two for free without recursing back into this function)
+  if(tab==='timeline') renderTimelineGrid();
+  else if(tab==='anchors') renderAnchorsTab();
+  else if(tab==='list') renderScheduleGrid();
+  else if(tab==='tasks') renderTasks();
+}
+function renderScheduleTabs(){
+  document.querySelectorAll('.schedule-tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===scheduleActiveTab));
+  const weekNavWrap = document.getElementById('scheduleWeekNavWrap');
+  if(weekNavWrap) weekNavWrap.style.display = (scheduleActiveTab==='timeline'||scheduleActiveTab==='list') ? '' : 'none';
+  const map = {timeline:'scheduleTabTimeline', list:'scheduleTabList', tasks:'scheduleTabTasks', anchors:'scheduleTabAnchors'};
+  Object.keys(map).forEach(k=>{ const elx = document.getElementById(map[k]); if(elx) elx.style.display = (scheduleActiveTab===k) ? '' : 'none'; });
+  if(scheduleActiveTab==='timeline' || scheduleActiveTab==='list') renderWeekNav();
+}
+
+/* ---------- "לוח שעות": a real hour-by-hour week, free to write on anywhere, like a whiteboard --
+   no "+ משימה"/"+ עוגן" branching up front; tapping any empty half-hour cell just opens a text
+   input, and whatever gets typed is always created as a plain draft task first. becoming a
+   recurring anchor is a later, optional upgrade on the item itself, never a decision required
+   at the moment of writing something down. */
+const TIMELINE_START_HOUR = 7, TIMELINE_END_HOUR = 23;
+function timelineSlots(){
+  const slots = [];
+  for(let h=TIMELINE_START_HOUR; h<TIMELINE_END_HOUR; h++){ slots.push(pad(h)+':00'); slots.push(pad(h)+':30'); }
+  return slots;
+}
+function timelineSlotForTime(timeStr){
+  if(!timeStr) return null;
+  const parts = timeStr.split(':');
+  const h = +parts[0], m = +parts[1];
+  if(isNaN(h) || isNaN(m) || h<TIMELINE_START_HOUR || h>=TIMELINE_END_HOUR) return null;
+  return pad(h)+':'+(m>=30?'30':'00');
+}
+function timelinePerDay(){
+  const weekDates = viewedWeekDates();
+  return weekDates.map((dateObj, dayIdx)=>{
+    const dateStr = ymd(dateObj);
+    const anchorsForDay = data.anchors.filter(a=>anchorAppliesToDate(a, dateObj, dayIdx));
+    const tasksForDay = data.tasks.filter(t=>t.date===dateStr);
+    const items = anchorsForDay.map(a=>({kind:'anchor', data:a, time:a.time||''}))
+      .concat(tasksForDay.map(t=>({kind:'task', data:t, time:t.time||''})));
+    const bySlot = {}, untimed = [];
+    items.forEach(it=>{
+      const slot = timelineSlotForTime(it.time);
+      if(slot){ if(!bySlot[slot]) bySlot[slot]=[]; bySlot[slot].push(it); }
+      else untimed.push(it);
+    });
+    return {dayIdx, dateObj, dateStr, bySlot, untimed};
+  });
+}
+let timelinePickedItem = null; // {kind, id} -- "picked up", waiting for a target cell to move to
+let timelineAddCell = null;    // {dayIdx, slot} -- which empty cell currently shows a write-in input
+let timelineRenamingKey = null; // "kind:id" -- which chip currently shows a rename input
+function timelineItemLabel(it){ return it.kind==='task' ? it.data.text : it.data.label; }
+function timelineChipHtml(it, dayIdx, slot, dateStr){
+  const key = it.kind+':'+it.data.id;
+  const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
+  const draft = !!it.data.draft;
+  if(timelineRenamingKey===key){
+    return `<div class="timeline-chip ${draft?'chip-draft':''}">
+      <input type="text" class="timeline-add-input" id="timelineRenameInput" value="${escapeAttr(timelineItemLabel(it))}"
+        onkeydown="if(event.key==='Enter') commitTimelineRename('${it.kind}','${it.data.id}', this.value); if(event.key==='Escape') cancelTimelineRename();"
+        onblur="commitTimelineRename('${it.kind}','${it.data.id}', this.value)">
+    </div>`;
+  }
+  return `<div class="timeline-chip ${picked?'chip-picked':''} ${draft?'chip-draft':''}" onclick="onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${slot}', '${dateStr}')">
+    <span class="timeline-chip-text">${escapeHtml(timelineItemLabel(it))}</span>
+    <div class="timeline-chip-actions">
+      <span onclick="event.stopPropagation(); startTimelineRename('${it.kind}','${it.data.id}')">✎ שינוי טקסט</span>
+      <span onclick="event.stopPropagation(); pickTimelineItem('${it.kind}','${it.data.id}')">${picked?'✓ בחרתי יעד':'↕ הזזה'}</span>
+      <span onclick="event.stopPropagation(); timelineJumpToEdit('${it.kind}','${it.data.id}', ${it.kind==='task'?'null':dayIdx})">עוד אפשרויות</span>
+    </div>
+  </div>`;
+}
+function timelineUntimedChipHtml(it, dayIdx, dateStr){
+  const draft = !!it.data.draft;
+  const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
+  return `<div class="timeline-untimed-chip ${picked?'chip-picked':''} ${draft?'chip-draft':''}" onclick="timelineJumpToEdit('${it.kind}','${it.data.id}', ${it.kind==='task'?'null':dayIdx})">
+    ${DAYS[dayIdx]}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}
+  </div>`;
+}
+function openTimelineAddCell(dayIdx, slot){
+  timelineAddCell = {dayIdx, slot};
+  renderTimelineGrid();
+}
+function cancelTimelineAdd(){ timelineAddCell = null; renderTimelineGrid(); }
+function commitTimelineAdd(dayIdx, slot, dateStr){
+  const input = document.getElementById('timelineAddInput');
+  const text = input ? input.value.trim() : '';
+  timelineAddCell = null;
+  if(!text){ renderTimelineGrid(); return; }
+  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:dateStr, time:slot, endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
+  data.tasks.push(newTask);
+  saveData();
+  renderScheduleGrid();
+  renderTasks();
+  applyGcalSyncForTask(newTask, true);
+}
+// blur fires right before the Escape-triggered blur too -- guard against double-committing by
+// checking timelineAddCell is still this exact cell (Escape/Enter already cleared it by the time
+// blur runs after them)
+function commitTimelineAddOnBlur(dayIdx, slot, dateStr){
+  if(!timelineAddCell || timelineAddCell.dayIdx!==dayIdx || timelineAddCell.slot!==slot) return;
+  commitTimelineAdd(dayIdx, slot, dateStr);
+}
+function startTimelineRename(kind, id){ timelineRenamingKey = kind+':'+id; renderTimelineGrid(); requestAnimationFrame(()=>{ const el=document.getElementById('timelineRenameInput'); if(el){el.focus(); el.select();} }); }
+function cancelTimelineRename(){ timelineRenamingKey = null; renderTimelineGrid(); }
+function commitTimelineRename(kind, id, value){
+  const text = (value||'').trim();
+  timelineRenamingKey = null;
+  if(text){
+    if(kind==='task'){ const t = data.tasks.find(x=>x.id===id); if(t) t.text = text; }
+    else { const a = data.anchors.find(x=>x.id===id); if(a) a.label = text; }
+    saveData();
+  }
+  renderScheduleGrid();
+}
+function pickTimelineItem(kind, id){
+  if(timelinePickedItem && timelinePickedItem.kind===kind && timelinePickedItem.id===id){ timelinePickedItem = null; }
+  else { timelinePickedItem = {kind, id}; }
+  renderTimelineGrid();
+}
+// the actual move commit, shared by "tap a target cell while something is picked up" -- always
+// routes through the existing applyGcalSyncForTask/applyGcalSyncForAnchor helpers, never a direct
+// push, and for anchors always treats a day-only change as a timing change (see saveAnchor) so a
+// moved weekly anchor never keeps silently pushing its old day to Google.
+function commitTimelineMoveTo(dayIdx, slot, dateStr){
+  const picked = timelinePickedItem;
+  timelinePickedItem = null;
+  if(!picked) return;
+  if(picked.kind==='task'){
+    const t = data.tasks.find(x=>x.id===picked.id);
+    if(!t) return;
+    const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
+    t.date = dateStr; t.time = slot; t.endTime = '';
+    saveData();
+    renderScheduleGrid();
+    renderTasks();
+    applyGcalSyncForTask(t, t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd);
+  } else {
+    const a = data.anchors.find(x=>x.id===picked.id);
+    if(!a) return;
+    const prevDay = a.day, prevTime = a.time;
+    a.day = dayIdx; a.time = slot;
+    saveData();
+    renderScheduleGrid();
+    applyGcalSyncForAnchor(a, a.day!==prevDay || a.time!==prevTime);
+  }
+  flashStatus(`הועבר ליום ${DAYS[dayIdx]} · ${slot}`);
+}
+function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
+  if(timelinePickedItem){
+    // tapping any chip while something is picked up (even a different item, even itself) resolves
+    // the pending move onto this slot -- exactly the same "tap a target" gesture as tapping an
+    // empty cell, so the picked item never gets stuck needing an empty cell specifically
+    commitTimelineMoveTo(dayIdx, slot, dateStr);
+    return;
+  }
+  pickTimelineItem(kind, id);
+}
+function timelineJumpToEdit(kind, id, dayIdx){
+  setScheduleTab('list');
+  if(kind==='task') editTaskFromSchedule(id);
+  else editAnchor(id, dayIdx!==null ? dayIdx : (data.anchors.find(a=>a.id===id)||{day:0}).day);
+}
+function renderTimelineGrid(){
+  const el = document.getElementById('timelineGrid');
+  const untimedWrap = document.getElementById('timelineUntimedWrap');
+  if(!el) return;
+  const slots = timelineSlots();
+  const perDay = timelinePerDay();
+
+  const untimedItems = [];
+  perDay.forEach(d=>{ d.untimed.forEach(it=>untimedItems.push({it, dayIdx:d.dayIdx, dateStr:d.dateStr})); });
+  if(untimedWrap){
+    untimedWrap.innerHTML = untimedItems.length ? `
+      <div class="timeline-untimed">
+        <div class="timeline-untimed-title">בלי שעה / מחוץ לטווח המוצג (${TIMELINE_START_HOUR}:00–${TIMELINE_END_HOUR}:00)</div>
+        ${untimedItems.map(x=>timelineUntimedChipHtml(x.it, x.dayIdx, x.dateStr)).join('')}
+      </div>` : '';
+  }
+
+  const headerRow = `<div class="timeline-daylabel"></div>` + perDay.map(d=>`<div class="timeline-daylabel">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
+
+  const bodyRows = slots.map(slot=>{
+    const timeLabel = `<div class="timeline-timelabel">${slot}</div>`;
+    const dayCells = perDay.map(d=>{
+      const itemsHere = d.bySlot[slot] || [];
+      if(itemsHere.length===0){
+        const isAdding = timelineAddCell && timelineAddCell.dayIdx===d.dayIdx && timelineAddCell.slot===slot;
+        if(isAdding){
+          return `<div class="timeline-cell">
+            <input type="text" class="timeline-add-input" id="timelineAddInput" placeholder="כתוב כאן..."
+              onkeydown="if(event.key==='Enter') commitTimelineAdd(${d.dayIdx}, '${slot}', '${d.dateStr}'); if(event.key==='Escape') cancelTimelineAdd();"
+              onblur="commitTimelineAddOnBlur(${d.dayIdx}, '${slot}', '${d.dateStr}')">
+          </div>`;
+        }
+        const clickAction = timelinePickedItem ? `commitTimelineMoveTo(${d.dayIdx}, '${slot}', '${d.dateStr}')` : `openTimelineAddCell(${d.dayIdx}, '${slot}')`;
+        return `<div class="timeline-cell" onclick="${clickAction}"></div>`;
+      }
+      return `<div class="timeline-cell has-item">${itemsHere.map(it=>timelineChipHtml(it, d.dayIdx, slot, d.dateStr)).join('')}</div>`;
+    }).join('');
+    return timeLabel + dayCells;
+  }).join('');
+
+  el.innerHTML = headerRow + bodyRows;
+  requestAnimationFrame(()=>{
+    const inp = document.getElementById('timelineAddInput') || document.getElementById('timelineRenameInput');
+    if(inp) inp.focus();
+  });
+}
+
+/* ---------- "עוגנים": a flat, day-agnostic list of every recurring commitment -- for reviewing
+   "everything that repeats" in one glance, same list treatment as the משימות tab. editing jumps to
+   the list tab where the existing full anchor form already lives; nothing duplicated here. */
+function anchorRowHtml(a){
+  const dom = domainById(a.domain);
+  const repeatLabel = {once:'חד-פעמי', daily:'מדי יום', weekly:'מדי שבוע', monthly:'מדי חודש', yearly:'מדי שנה'}[a.repeatType||'weekly'] || 'מדי שבוע';
+  const dayLabel = (a.repeatType||'weekly')==='weekly' ? DAYS[a.day] : repeatLabel;
+  return `<li class="task-li ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" onclick="timelineJumpToEdit('anchor','${a.id}', ${a.day})">
+    <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>
+    <span class="task-text" style="flex:1">${escapeHtml(a.label)}${a.draft?' <span class="draft-badge">🌱 טיוטה</span>':''}</span>
+    <span class="task-date-badge">${dayLabel}${a.time?' · '+a.time:''}</span>
+  </li>`;
+}
+function renderAnchorsTab(){
+  const el = document.getElementById('anchorsList');
+  if(!el) return;
+  const list = data.anchors.slice().sort((a,b)=>{
+    const da = (a.repeatType||'weekly')==='weekly' ? a.day : 7;
+    const db = (b.repeatType||'weekly')==='weekly' ? b.day : 7;
+    if(da!==db) return da-db;
+    return (a.time||'').localeCompare(b.time||'');
+  });
+  el.innerHTML = list.length ? list.map(anchorRowHtml).join('') : '<li class="empty">אין עדיין עוגנים קבועים</li>';
 }
 
 /* ---------- topics notebook: tab strip selects which topic's notes show below ---------- */
@@ -7049,7 +7339,7 @@ function render(){
 }
 
 /* ---------- collapsible sections ---------- */
-const SECTION_KEYS = ['schedule','tasks','suggestions','someday','reflection','backup'];
+const SECTION_KEYS = ['schedule','suggestions','someday','reflection','backup'];
 function isSectionCollapsed(key){
   if(!data.collapsedSections || !(key in data.collapsedSections)) return false;
   return !!data.collapsedSections[key];
