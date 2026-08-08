@@ -688,8 +688,15 @@
      screen width at once (flex columns that shrink, no horizontal scroll ever), only the vertical
      axis scrolls, events are positioned/sized by their real time instead of snapped into a fixed
      per-half-hour table cell. */
-  .timeline-wrap{border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface);}
-  .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:1000; border-radius:0; display:flex; flex-direction:column;}
+  .timeline-wrap{border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); position:relative; transition:box-shadow .35s ease;}
+  .timeline-wrap.current-week{box-shadow:0 0 0 1.5px rgba(15,165,182,0.7), 0 0 14px 2px rgba(15,165,182,0.38);}
+  body.night-mode .timeline-wrap.current-week{box-shadow:0 0 0 1px rgba(108,246,255,0.55), 0 0 12px 1px rgba(108,246,255,0.28);}
+  /* fullscreen deliberately does NOT switch to a flex layout with an inner flex:1 scroll region --
+     that nested-flex-inside-fixed-inside-flex combination is exactly the kind of thing that renders
+     "weird" on some mobile browsers. instead the whole wrap itself just becomes one plain scrolling
+     block; simpler and far more reliable, at the small cost of the day-names row no longer staying
+     pinned while scrolling in this mode specifically. */
+  .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:5000; border-radius:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
   .timeline-toolbar{display:flex; justify-content:flex-end; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
   .timeline-fs-btn{background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:5px 10px; font-size:12.5px; font-family:inherit; cursor:pointer;}
   .timeline-daynames{display:flex; background:var(--surface3); border-bottom:1px solid var(--border);}
@@ -698,7 +705,7 @@
   .timeline-actionbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--gold); color:#241a06; font-size:12.5px; font-weight:600; padding:7px 10px;}
   .timeline-actionbar span{cursor:pointer; text-decoration:underline;}
   .timeline-scroll{overflow-y:auto; overflow-x:hidden; max-height:58vh; -webkit-overflow-scrolling:touch;}
-  .timeline-wrap.fullscreen .timeline-scroll{max-height:none; flex:1;}
+  .timeline-wrap.fullscreen .timeline-scroll{max-height:none; overflow:visible;}
   .timeline-body{display:flex; position:relative; background-image:repeating-linear-gradient(to bottom, var(--border) 0, var(--border) 1px, transparent 1px, transparent var(--timeline-hour-px, 52px));}
   .timeline-hourcol{width:32px; flex-shrink:0; position:relative;}
   .timeline-hourlabel{position:absolute; right:2px; transform:translateY(-50%); font-size:10px; color:var(--muted2); white-space:nowrap;}
@@ -810,7 +817,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('reflection')"><span class="num">01</span> תובנות <span class="chev" id="chev-reflection">▾</span></h2>
+      <h2 onclick="toggleSection('reflection')"><span class="num">01</span> תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
       <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת, ממלאים מתי שבא</div>
     </div>
     <div id="secbody-reflection">
@@ -869,9 +876,9 @@
       <div class="hint">הכל במקום אחד — לוח שעות חופשי, רשימה לפי יום, משימות לפי נושא, ועוגנים קבועים</div>
     </div>
     <div id="secbody-schedule">
-      <div class="schedule-reminder">כל פעם שאתה ממלא כאן משהו, תזכור לשאול את עצמך — מה מרחיב אותי עכשיו? מה מרגש אותי? מה מעורר בי השראה?</div>
+      <div class="schedule-reminder">תזכורת — לשאול את עצמך: מה מרחיב אותי עכשיו? מה מרגש אותי? מה מעורר בי השראה?</div>
       <div class="schedule-tabs" id="scheduleTabs">
-        <button type="button" class="schedule-tab-btn" data-tab="timeline" onclick="setScheduleTab('timeline')">לוח שעות</button>
+        <button type="button" class="schedule-tab-btn" data-tab="timeline" onclick="setScheduleTab('timeline')">מערכת שעות</button>
         <button type="button" class="schedule-tab-btn" data-tab="list" onclick="setScheduleTab('list')">רשימה</button>
         <button type="button" class="schedule-tab-btn" data-tab="tasks" onclick="setScheduleTab('tasks')">משימות</button>
         <button type="button" class="schedule-tab-btn" data-tab="anchors" onclick="setScheduleTab('anchors')">עוגנים</button>
@@ -4221,7 +4228,7 @@ function timelineChipHtml(it, dayIdx, dateStr){
 }
 function timelineUntimedChipHtml(it, dayIdx, dateStr){
   const draft = !!it.data.draft;
-  return `<div class="timeline-untimed-chip ${draft?'chip-draft':''}" onclick="timelineJumpToEdit('${it.kind}','${it.data.id}', ${it.kind==='task'?'null':dayIdx})">
+  return `<div class="timeline-untimed-chip ${draft?'chip-draft':''}" onclick="openTimelineSheet('${it.kind}','${it.data.id}')">
     ${DAYS[dayIdx]}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}
   </div>`;
 }
@@ -4366,7 +4373,9 @@ function renderTimelineSheet(){
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="timelineSheetMoreOptions()">עוד אפשרויות (נושא, חזרתיות, סנכרון גוגל...) ›</button>
   `;
-  requestAnimationFrame(()=>{ const el = document.getElementById('timelineSheetTitleInput'); if(el){ el.focus(); el.select(); } });
+  // deliberately no auto-focus here -- opening an item is first and foremost "look at what this
+  // is," not an implicit "start typing now." the keyboard should only appear once the person
+  // actually taps into a field on their own.
 }
 function saveTimelineSheet(){
   if(!timelineSheetItem) return;
@@ -4417,12 +4426,15 @@ function timelineSheetMoreOptions(){
   const dayIdx = timelineSheetDayIdx;
   timelineJumpToEdit(kind, id, kind==='task' ? null : dayIdx);
 }
+let timelineUntimedExpanded = false;
 function renderTimelineGrid(){
   const el = document.getElementById('timelineGrid');
   const untimedWrap = document.getElementById('timelineUntimedWrap');
   const daynamesWrap = document.getElementById('timelineDaynames');
   const barWrap = document.getElementById('timelineActionBarWrap');
+  const wrapEl = document.getElementById('timelineWrap');
   if(!el) return;
+  if(wrapEl) wrapEl.classList.toggle('current-week', weekOffset===0);
   const perDay = timelinePerDay();
 
   if(daynamesWrap){
@@ -4434,10 +4446,14 @@ function renderTimelineGrid(){
   const untimedItems = [];
   perDay.forEach(d=>{ d.untimed.forEach(it=>untimedItems.push({it, dayIdx:d.dayIdx, dateStr:d.dateStr})); });
   if(untimedWrap){
+    const visibleItems = timelineUntimedExpanded ? untimedItems : untimedItems.slice(0,2);
+    const hiddenCount = untimedItems.length - visibleItems.length;
     untimedWrap.innerHTML = untimedItems.length ? `
       <div class="timeline-untimed">
         <div class="timeline-untimed-title">בלי שעה / מחוץ לטווח המוצג (${TIMELINE_START_HOUR}:00–${TIMELINE_END_HOUR}:00)</div>
-        ${untimedItems.map(x=>timelineUntimedChipHtml(x.it, x.dayIdx, x.dateStr)).join('')}
+        ${visibleItems.map(x=>timelineUntimedChipHtml(x.it, x.dayIdx, x.dateStr)).join('')}
+        ${hiddenCount>0 ? `<button type="button" class="day-more" onclick="timelineUntimedExpanded=true; renderTimelineGrid();">+${hiddenCount} עוד</button>` : ''}
+        ${timelineUntimedExpanded && untimedItems.length>2 ? `<button type="button" class="day-more" onclick="timelineUntimedExpanded=false; renderTimelineGrid();">מזעור</button>` : ''}
       </div>` : '';
   }
 
@@ -4832,6 +4848,7 @@ function bodyCheckStatusBadgesHtml(item, opts){
     if(bc.urgency==='objective') badges.push('<span class="sugg-status-badge">⏰ דחוף</span>');
     if(bc.urgency==='other') badges.push('<span class="sugg-status-badge">🗣️ דחוף (העדפה של מישהו אחר)</span>');
     if(bc.urgency==='relief') badges.push('<span class="sugg-status-badge">💭 '+URGENCY_LABELS.relief+'</span>');
+    if(bc.urgency==='waitDiscomfort') badges.push('<span class="sugg-status-badge">⏳ '+URGENCY_LABELS.waitDiscomfort+'</span>');
   }
   if(opts.showEnergy && bc.energy==='no') badges.push('<span class="sugg-status-badge">🔋 אין לי אנרגיה לזה</span>');
   return badges.length ? `<div class="sugg-status-row">${badges.join('')}</div>` : '';
@@ -4856,7 +4873,7 @@ function renderSuggestions(){
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
       ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}</div>` : ''}
-      ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other'], showEnergy:true})}
+      ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true})}
     </li>`;
   }).join('');
   applyListCap('suggestion', data.suggestions.length);
@@ -4873,7 +4890,7 @@ function suggestionEditFormHtml(s){
         ${timePickerHtml('suggEditTime-'+s.id, s.replyTime||'', 'שעה')}
       </div>
       ${bodyCheckToggleBtnHtml('suggestion', s.id)}
-      ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other'], showEnergy:true}) : ''}
+      ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true}) : ''}
       ${decisionHelperToggleBtnHtml('suggestion', s.id)}
       ${decisionHelperOpenIds.has('suggestion:'+s.id) ? decisionHelperPanelHtml() : ''}
       <div class="anchor-form-actions">
@@ -5231,7 +5248,7 @@ function decisionHelperPanelHtml(){
 /* ---------- body check (בדיקת גוף) ---------- */
 const bodyCheckOpenIds = new Set();
 const bodyCheckShownReminder = new Map(); // "kind:id" -> reminder text, or '' if the bank is empty
-const URGENCY_LABELS = { objective:'אובייקטיבית', other:'כי זו העדפה של מישהו אחר', relief:'כי משהו בי רוצה הקלה/בריחה' };
+const URGENCY_LABELS = { objective:'אובייקטיבית', other:'כי זו העדפה של מישהו אחר', relief:'כי משהו בי רוצה הקלה/בריחה', waitDiscomfort:'דחוף כי קשה לי לתת למישהו לחכות' };
 function bodyCheckSection(kind){
   if(kind==='task') return {arr:data.tasks, render:renderTasks};
   if(kind==='someday') return {arr:data.someday, render:renderSomeday};
@@ -5320,7 +5337,7 @@ const pendingBodyCheck = { task:{}, someday:{}, suggestion:{}, dilemma:{} };
 const PENDING_BODY_CHECK_OPTS = {
   task: {urgencyOptions:['objective','other','relief'], showEnergy:true},
   someday: {},
-  suggestion: {urgencyOptions:['objective','other'], showEnergy:true},
+  suggestion: {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true},
   dilemma: {}
 };
 // task's panel lives inside the already-secondary "עוד.." section, and suggestion's create form is
@@ -5398,9 +5415,9 @@ function resetPendingBodyCheck(kind){
 
 /* ---------- reflection (insight banks) ---------- */
 const REFLECT_QUESTIONS = [
-  {key:'fed', icon:'🟢', label:'מה הזין אותי השבוע?'},
+  {key:'fed', icon:'🟢', label:'מה הזין אותי היום/השבוע?'},
   {key:'hard', icon:'🔴', label:'איפה הרגשתי עומס יתר / התרוקנות של אנרגיה?'},
-  {key:'insights', icon:'💡', label:'תובנות מהשבוע'}
+  {key:'insights', icon:'💡', label:'תובנות מהיום/השבוע'}
 ];
 const expandedBanks = new Set();
 function weekKey(){ return ymd(currentWeekDates()[0]); }
