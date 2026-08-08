@@ -712,6 +712,18 @@
   .timeline-untimed{display:flex; flex-direction:column; gap:4px; padding:6px; background:var(--surface2); border-radius:8px; margin-bottom:8px;}
   .timeline-untimed-title{font-size:12px; color:var(--muted); font-weight:600;}
   .timeline-untimed-chip{background:var(--surface3); border-radius:6px; padding:4px 7px; font-size:12.5px; cursor:pointer; border-right:3px solid var(--gold);}
+  /* tapping an item opens this instead of anything native -- a real bottom sheet, like the one a
+     phone calendar app opens for editing an event, that we fully own and can extend later. */
+  .timeline-sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1100;}
+  .timeline-sheet{position:fixed; left:0; right:0; bottom:0; z-index:1101; background:var(--surface); border-radius:16px 16px 0 0; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); box-shadow:0 -8px 30px rgba(0,0,0,.4); max-height:82vh; overflow-y:auto;}
+  .timeline-sheet-handle{width:40px; height:4px; background:var(--border-strong); border-radius:2px; margin:0 auto 12px;}
+  .timeline-sheet-title{width:100%; font-size:17px; font-family:inherit; background:transparent; border:none; border-bottom:1.5px solid var(--border); color:var(--text); padding:6px 2px; margin-bottom:12px;}
+  .timeline-sheet-title:focus{outline:none; border-bottom-color:var(--gold);}
+  .timeline-sheet-daypicker{display:flex; gap:4px; margin-bottom:10px;}
+  .timeline-sheet-day-btn{flex:1; background:var(--surface2); border:1px solid var(--border-strong); color:var(--muted); border-radius:8px; padding:7px 2px; font-size:12.5px; font-family:inherit; cursor:pointer;}
+  .timeline-sheet-day-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
+  .timeline-sheet-actions{display:flex; gap:8px; margin-top:12px;}
+  .timeline-sheet-more{width:100%; margin-top:8px; text-align:center;}
   .dilemma-subtab-btn:not(.active):hover{color:var(--text); border-color:var(--muted);}
   .decision-helper-panel{display:flex; flex-direction:column; gap:6px; background:var(--surface2); border-radius:10px; padding:10px; margin-top:6px;}
   .decision-quote-list{display:flex; flex-direction:column; gap:6px;}
@@ -947,6 +959,9 @@
           <ul class="tasks scroll-cap" id="anchorsList"></ul>
         </div>
       </div>
+
+      <div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="closeTimelineSheet()" style="display:none;"></div>
+      <div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
     </div>
   </section>
 
@@ -4180,10 +4195,8 @@ function timelinePerDay(){
     return {dayIdx, dateObj, dateStr, timed, untimed};
   });
 }
-let timelinePickedItem = null;  // {kind, id} -- "picked up", waiting for a tap to move to
+let timelinePickedItem = null;  // {kind, id} -- "picked up" via the sheet's quick-move link, waiting for a tap to move to
 let timelineAddCell = null;     // {dayIdx, slot} -- which day currently shows a write-in input, and where
-let timelineRenamingKey = null; // "kind:id" -- which item currently shows a rename input
-let timelineActiveKey = null;   // "kind:id" -- which item is selected, showing the action bar
 let timelineFullscreen = false;
 function timelineItemLabel(it){ return it.kind==='task' ? it.data.text : it.data.label; }
 function toggleTimelineFullscreen(){
@@ -4193,24 +4206,17 @@ function toggleTimelineFullscreen(){
   if(wrap) wrap.classList.toggle('fullscreen', timelineFullscreen);
   if(btn) btn.textContent = timelineFullscreen ? '✕ סגירה' : '⤢ מסך מלא';
 }
+// the block only ever shows the name -- position on the axis already says when it is, exactly
+// like a real calendar's week view; repeating the start time in the label just crowded out the
+// name on narrow blocks (that was the previous version's actual bug, not a display preference).
 function timelineChipHtml(it, dayIdx, dateStr){
-  const key = it.kind+':'+it.data.id;
   const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
-  const active = timelineActiveKey===key;
   const draft = !!it.data.draft;
   const top = timelineTopPx(it.time);
-  if(timelineRenamingKey===key){
-    return `<div class="timeline-item ${draft?'chip-draft':''}" style="top:${top}px; height:26px;">
-      <input type="text" class="timeline-add-input" id="timelineRenameInput" value="${escapeAttr(timelineItemLabel(it))}"
-        onclick="event.stopPropagation()"
-        onkeydown="if(event.key==='Enter') commitTimelineRename('${it.kind}','${it.data.id}', this.value); if(event.key==='Escape') cancelTimelineRename();"
-        onblur="commitTimelineRename('${it.kind}','${it.data.id}', this.value)">
-    </div>`;
-  }
   const height = timelineHeightPx(it.time, it.data.endTime);
-  return `<div class="timeline-item ${picked?'chip-picked':''} ${active?'chip-active':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;"
+  return `<div class="timeline-item ${picked?'chip-picked':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;"
     onclick="event.stopPropagation(); onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${it.time}', '${dateStr}')">
-    <span class="timeline-chip-text">${it.time?it.time+' · ':''}${escapeHtml(timelineItemLabel(it))}</span>
+    <span class="timeline-chip-text">${escapeHtml(timelineItemLabel(it))}</span>
   </div>`;
 }
 function timelineUntimedChipHtml(it, dayIdx, dateStr){
@@ -4243,29 +4249,7 @@ function commitTimelineAddOnBlur(dayIdx, slot, dateStr){
   if(!timelineAddCell || timelineAddCell.dayIdx!==dayIdx || timelineAddCell.slot!==slot) return;
   commitTimelineAdd(dayIdx, slot, dateStr);
 }
-function startTimelineRename(kind, id){
-  timelineActiveKey = null; timelineRenamingKey = kind+':'+id;
-  renderTimelineGrid();
-  requestAnimationFrame(()=>{ const el=document.getElementById('timelineRenameInput'); if(el){el.focus(); el.select();} });
-}
-function cancelTimelineRename(){ timelineRenamingKey = null; renderTimelineGrid(); }
-function commitTimelineRename(kind, id, value){
-  // Enter's keydown handler commits and re-renders, which removes the now-stale input from the
-  // DOM -- that removal fires a second, native blur on it that would otherwise re-enter this exact
-  // function mid-render and crash ("node to be removed is no longer a child of this node"). the
-  // guard makes the second call in the same tick a safe no-op instead.
-  if(timelineRenamingKey !== kind+':'+id) return;
-  const text = (value||'').trim();
-  timelineRenamingKey = null;
-  if(text){
-    if(kind==='task'){ const t = data.tasks.find(x=>x.id===id); if(t) t.text = text; }
-    else { const a = data.anchors.find(x=>x.id===id); if(a) a.label = text; }
-    saveData();
-  }
-  renderScheduleGrid();
-}
 function pickTimelineItem(kind, id){ timelinePickedItem = {kind, id}; renderTimelineGrid(); }
-function startTimelineMoveFromBar(kind, id){ timelineActiveKey = null; pickTimelineItem(kind, id); }
 function cancelTimelinePick(){ timelinePickedItem = null; renderTimelineGrid(); }
 // the actual move commit, shared by "tap a target while something is picked up" -- always routes
 // through the existing applyGcalSyncForTask/applyGcalSyncForAnchor helpers, never a direct push,
@@ -4303,8 +4287,7 @@ function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
     commitTimelineMoveTo(dayIdx, slot, dateStr);
     return;
   }
-  timelineActiveKey = (timelineActiveKey===kind+':'+id) ? null : kind+':'+id;
-  renderTimelineGrid();
+  openTimelineSheet(kind, id);
 }
 function onTimelineColClick(e, dayIdx, dateStr){
   if(e.target !== e.currentTarget) return; // a click that landed on a child (an item, the add input) isn't a click on empty space
@@ -4314,27 +4297,125 @@ function onTimelineColClick(e, dayIdx, dateStr){
   openTimelineAddCell(dayIdx, slot);
 }
 function timelineJumpToEdit(kind, id, dayIdx){
-  timelineActiveKey = null;
+  closeTimelineSheet();
   setScheduleTab('list');
   if(kind==='task') editTaskFromSchedule(id);
   else editAnchor(id, dayIdx!==null ? dayIdx : (data.anchors.find(a=>a.id===id)||{day:0}).day);
 }
+// only ever shown while something is mid-move (picked up from the sheet's quick-move link) --
+// everything else about editing now lives in the bottom sheet itself.
 function timelineActionBarHtml(){
-  if(timelinePickedItem){
-    const label = timelinePickedItem.kind==='task'
-      ? (data.tasks.find(t=>t.id===timelinePickedItem.id)||{}).text
-      : (data.anchors.find(a=>a.id===timelinePickedItem.id)||{}).label;
-    return `<div class="timeline-actionbar">מזיזים את "${escapeHtml(label||'')}" — הקש/י על מקום חדש · <span onclick="cancelTimelinePick()">ביטול</span></div>`;
+  if(!timelinePickedItem) return '';
+  const label = timelinePickedItem.kind==='task'
+    ? (data.tasks.find(t=>t.id===timelinePickedItem.id)||{}).text
+    : (data.anchors.find(a=>a.id===timelinePickedItem.id)||{}).label;
+  return `<div class="timeline-actionbar">מזיזים את "${escapeHtml(label||'')}" — הקש/י על מקום חדש · <span onclick="cancelTimelinePick()">ביטול</span></div>`;
+}
+
+/* ---------- edit sheet: a real bottom sheet, fully ours, like a phone calendar app's "edit event"
+   panel -- opens on tapping any item instead of the old thin inline action bar, which had no room
+   for a name + day + time together on narrow blocks. */
+let timelineSheetItem = null;    // {kind, id}
+let timelineSheetDayIdx = null;  // staged day selection while the sheet is open, committed on שמירה
+function dayIdxForDateStr(dateStr){
+  const idx = viewedWeekDates().findIndex(d=>ymd(d)===dateStr);
+  return idx>=0 ? idx : 0;
+}
+function openTimelineSheet(kind, id){
+  const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
+  if(!rec) return;
+  timelineSheetItem = {kind, id};
+  timelineSheetDayIdx = kind==='task' ? dayIdxForDateStr(rec.date) : rec.day;
+  document.getElementById('timelineSheetOverlay').style.display = '';
+  document.getElementById('timelineSheet').style.display = '';
+  renderTimelineSheet();
+}
+function closeTimelineSheet(){
+  timelineSheetItem = null;
+  const overlay = document.getElementById('timelineSheetOverlay'), sheet = document.getElementById('timelineSheet');
+  if(overlay) overlay.style.display = 'none';
+  if(sheet) sheet.style.display = 'none';
+}
+// deliberately does NOT call renderTimelineSheet() -- a full re-render would rebuild the title
+// input and time picker from the underlying record again, silently discarding whatever the user
+// had already typed/picked but not yet saved. just toggle which day button looks active.
+function setTimelineSheetDay(dayIdx){
+  timelineSheetDayIdx = dayIdx;
+  document.querySelectorAll('.timeline-sheet-day-btn').forEach((btn,i)=>btn.classList.toggle('active', i===dayIdx));
+}
+function renderTimelineSheet(){
+  const sheet = document.getElementById('timelineSheet');
+  if(!sheet || !timelineSheetItem) return;
+  const {kind, id} = timelineSheetItem;
+  const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
+  if(!rec){ closeTimelineSheet(); return; }
+  const label = kind==='task' ? rec.text : rec.label;
+  sheet.innerHTML = `
+    <div class="timeline-sheet-handle"></div>
+    <input type="text" class="timeline-sheet-title" id="timelineSheetTitleInput" value="${escapeAttr(label)}" placeholder="שם...">
+    <div class="timeline-sheet-daypicker">
+      ${DAYS.map((dn,di)=>`<button type="button" class="timeline-sheet-day-btn ${timelineSheetDayIdx===di?'active':''}" onclick="setTimelineSheetDay(${di})">${dn}</button>`).join('')}
+    </div>
+    ${timePickerHtml('timelineSheetTime', rec.time||'', 'שעה')}
+    <label class="buf-label" style="margin-top:10px;"><input type="checkbox" id="timelineSheetDraft" ${rec.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
+    <div class="timeline-sheet-actions">
+      <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
+      <button type="button" class="cancel-btn" onclick="closeTimelineSheet()">ביטול</button>
+      <button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה</button>
+    </div>
+    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
+    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="timelineSheetMoreOptions()">עוד אפשרויות (נושא, חזרתיות, סנכרון גוגל...) ›</button>
+  `;
+  requestAnimationFrame(()=>{ const el = document.getElementById('timelineSheetTitleInput'); if(el){ el.focus(); el.select(); } });
+}
+function saveTimelineSheet(){
+  if(!timelineSheetItem) return;
+  const {kind, id} = timelineSheetItem;
+  const titleInput = document.getElementById('timelineSheetTitleInput');
+  const text = titleInput ? titleInput.value.trim() : '';
+  if(!text) return;
+  const timeEl = document.getElementById('timelineSheetTime');
+  const time = timeEl ? timeEl.value : '';
+  const draft = document.getElementById('timelineSheetDraft').checked;
+  const dateStr = ymd(viewedWeekDates()[timelineSheetDayIdx]);
+  if(kind==='task'){
+    const t = data.tasks.find(x=>x.id===id);
+    if(!t) return;
+    const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
+    t.text = text; t.date = dateStr; t.time = time; t.draft = draft;
+    saveData();
+    renderScheduleGrid();
+    renderTasks();
+    applyGcalSyncForTask(t, t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd);
+  } else {
+    const a = data.anchors.find(x=>x.id===id);
+    if(!a) return;
+    const prevDay = a.day, prevTime = a.time;
+    a.label = text; a.day = timelineSheetDayIdx; a.time = time; a.draft = draft;
+    saveData();
+    renderScheduleGrid();
+    applyGcalSyncForAnchor(a, a.day!==prevDay || a.time!==prevTime);
   }
-  if(!timelineActiveKey) return '';
-  const [kind,id] = timelineActiveKey.split(':');
-  const dayIdxForJump = kind==='anchor' ? (data.anchors.find(a=>a.id===id)||{day:0}).day : null;
-  return `<div class="timeline-actionbar">
-    <span onclick="startTimelineRename('${kind}','${id}')">✎ שינוי טקסט</span>
-    <span onclick="startTimelineMoveFromBar('${kind}','${id}')">↕ הזזה</span>
-    <span onclick="timelineJumpToEdit('${kind}','${id}', ${dayIdxForJump})">עוד אפשרויות</span>
-    <span onclick="timelineActiveKey=null; renderTimelineGrid();">✕</span>
-  </div>`;
+  closeTimelineSheet();
+  flashStatus('נשמר');
+}
+function deleteFromTimelineSheet(){
+  if(!timelineSheetItem) return;
+  const {kind, id} = timelineSheetItem;
+  closeTimelineSheet();
+  if(kind==='task') deleteTask(id); else deleteAnchor(id);
+}
+function quickMoveFromSheet(){
+  if(!timelineSheetItem) return;
+  const {kind, id} = timelineSheetItem;
+  closeTimelineSheet();
+  pickTimelineItem(kind, id);
+}
+function timelineSheetMoreOptions(){
+  if(!timelineSheetItem) return;
+  const {kind, id} = timelineSheetItem;
+  const dayIdx = timelineSheetDayIdx;
+  timelineJumpToEdit(kind, id, kind==='task' ? null : dayIdx);
 }
 function renderTimelineGrid(){
   const el = document.getElementById('timelineGrid');
