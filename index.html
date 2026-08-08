@@ -387,6 +387,9 @@
   .tag.tag-empty{background:transparent; border:1px dashed var(--border-strong); color:var(--muted2); font-weight:500;}
   .tag.tag-dimmed{filter:saturate(0.4) brightness(0.85); opacity:.6;}
   .dimmed-item{filter:saturate(0.5) brightness(0.92); opacity:.65;}
+  .chip-draft{filter:saturate(0.6) brightness(0.97); opacity:.8; border-style:dashed !important;}
+  .chip-draft .draft-badge{color:var(--muted2); font-size:11px; margin-inline-start:6px;}
+  .schedule-reminder{font-size:13.5px; color:var(--muted); background:var(--surface2); border-radius:10px; padding:10px 12px; margin-bottom:12px; line-height:1.5;}
   .overdue-divider{display:block; padding:16px 4px 6px; border-bottom:none;}
   .overdue-divider-line{border-top:2px solid var(--gold); opacity:.55; margin-bottom:10px;}
   .overdue-divider-title{font-family:'Frank Ruhl Libre', serif; font-size:15px; color:var(--gold); cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;}
@@ -885,6 +888,7 @@
       <div class="hint">עוגנים קבועים + משימות שתוזמנו, מוצגים יחד · לחיצה על עוגן לעריכה/מחיקה/יומן · + עוגן בתחתית כל יום</div>
     </div>
     <div id="secbody-schedule">
+      <div class="schedule-reminder">כל פעם שאתה ממלא כאן משהו, תזכור לשאול את עצמך — מה מרחיב אותי עכשיו? מה מרגש אותי? מה מעורר בי השראה?</div>
       <div class="week-nav" id="weekNav"></div>
       <div class="schedule-grid" id="scheduleGrid"></div>
     </div>
@@ -3155,6 +3159,7 @@ function addTaskFormHtml(dayIdx, dateStr){
       </select>
       ${timePickerHtml('newTaskTime-'+dayIdx, '', 'שעה (רשות)')}
     </div>
+    <label class="buf-label"><input type="checkbox" id="newTaskDraft-${dayIdx}"> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
     <div class="anchor-form-actions">
       <button class="save-btn" onclick="saveNewTaskFromSchedule(${dayIdx}, '${dateStr}')">שמור</button>
       <button class="cancel-btn" onclick="closeAddTaskForm()">בטל</button>
@@ -3167,7 +3172,8 @@ function saveNewTaskFromSchedule(dayIdx, dateStr){
   const domain = document.getElementById(`newTaskDomain-${dayIdx}`).value;
   const energy = document.getElementById(`newTaskEnergy-${dayIdx}`).value;
   const time = document.getElementById(`newTaskTime-${dayIdx}`).value || '';
-  const newTask = {id:uid(), text, domain, done:false, energy, date:dateStr, time, endTime:'', description:'', subtasks:[], createdAt:Date.now()};
+  const draft = document.getElementById(`newTaskDraft-${dayIdx}`).checked;
+  const newTask = {id:uid(), text, domain, done:false, energy, date:dateStr, time, endTime:'', description:'', subtasks:[], draft, createdAt:Date.now()};
   data.tasks.push(newTask);
   addingTaskDayIdx = null;
   saveData();
@@ -3178,8 +3184,10 @@ function saveNewTaskFromSchedule(dayIdx, dateStr){
 function toggleAnchorDateField(dayIdx){
   const sel = document.getElementById(`anchorRepeat-${dayIdx}`);
   const wrap = document.getElementById(`anchorDateWrap-${dayIdx}`);
+  const dayWrap = document.getElementById(`anchorDayWrap-${dayIdx}`);
   if(!sel || !wrap) return;
   wrap.style.display = ['once','monthly','yearly'].includes(sel.value) ? 'block' : 'none';
+  if(dayWrap) dayWrap.style.display = sel.value==='weekly' ? 'block' : 'none';
 }
 function anchorAppliesToDate(a, dateObj, dayIdx){
   const repeatType = a.repeatType || 'weekly';
@@ -3197,9 +3205,12 @@ function saveAnchor(dayIdx){
   const label = document.getElementById(`anchorLabel-${dayIdx}`).value.trim();
   const domain = document.getElementById(`anchorDomain-${dayIdx}`).value;
   const buffer = document.getElementById(`anchorBuffer-${dayIdx}`).checked;
+  const draft = document.getElementById(`anchorDraft-${dayIdx}`).checked;
   const repeatType = document.getElementById(`anchorRepeat-${dayIdx}`).value;
   const dateEl = document.getElementById(`anchorDate-${dayIdx}`);
   const date = (['once','monthly','yearly'].includes(repeatType) && dateEl) ? dateEl.value : '';
+  const dayEl = document.getElementById(`anchorDay-${dayIdx}`);
+  const day = (repeatType==='weekly' && dayEl) ? +dayEl.value : dayIdx;
   if(!label) return;
   const gcalSyncEl = document.getElementById(`anchorGcalSync-${dayIdx}`);
   let anchorRef, changedTiming, prevGcalSync;
@@ -3208,13 +3219,16 @@ function saveAnchor(dayIdx){
     if(idx>-1){
       const prev = data.anchors[idx];
       prevGcalSync = prev.gcalSync;
-      changedTiming = prev.time!==time || prev.endTime!==endTime || prev.repeatType!==repeatType || prev.date!==date;
+      // day matters for the RRULE Google Calendar push (weekly anchors encode their day-of-week into
+      // the recurrence rule) -- a day-only move must still be treated as a timing change, or the sync
+      // silently keeps pushing the OLD day to Google forever.
+      changedTiming = prev.time!==time || prev.endTime!==endTime || prev.repeatType!==repeatType || prev.date!==date || prev.day!==day;
       const gcalSync = gcalSyncEl ? gcalSyncEl.checked : prev.gcalSync;
-      data.anchors[idx] = {...prev, time, endTime, label, domain, buffer, repeatType, date, gcalSync};
+      data.anchors[idx] = {...prev, day, time, endTime, label, domain, buffer, draft, repeatType, date, gcalSync};
       anchorRef = data.anchors[idx];
     }
   } else {
-    anchorRef = {id:uid(), day:dayIdx, time, endTime, label, domain, buffer, repeatType, date, createdAt:Date.now()};
+    anchorRef = {id:uid(), day, time, endTime, label, domain, buffer, draft, repeatType, date, createdAt:Date.now()};
     data.anchors.push(anchorRef);
     changedTiming = true;
   }
@@ -3503,6 +3517,7 @@ function taskEditFormInner(t){
       ` : ''}
       <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDescOpen('${t.id}')">${descOpen?'▾ תיאור':'▸ תיאור'}</button>
       ${descOpen ? `<textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>` : ''}
+      <label class="buf-label"><input type="checkbox" id="taskEditDraft-${t.id}" ${t.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
       ${bodyCheckToggleBtnHtml('task', t.id)}
       ${bodyCheckOpenIds.has('task:'+t.id) ? bodyCheckPanelHtml('task', t.id, {urgencyOptions:['objective','other','relief'], showEnergy:true}) : ''}
       <div class="anchor-form-actions">
@@ -3641,6 +3656,8 @@ function saveTaskEdit(id){
   if(descEl) t.description = descEl.value || '';
   const gcalSyncEl = document.getElementById(`taskEditGcalSync-${id}`);
   if(gcalSyncEl) t.gcalSync = gcalSyncEl.checked;
+  const draftEl = document.getElementById(`taskEditDraft-${id}`);
+  if(draftEl) t.draft = draftEl.checked;
   editingTaskId = null;
   scheduleEditingTaskId = null;
   taskDateOpenIds.delete(id);
@@ -3934,6 +3951,9 @@ function renderScheduleGrid(){
           </select>
           <select id="anchorDomain-${dayIdx}">${domainOptions(isEditingThisDay?editingHere.domain:null)}</select>
         </div>
+        <div id="anchorDayWrap-${dayIdx}" style="display:${currentRepeatType==='weekly'?'block':'none'};">
+          <select id="anchorDay-${dayIdx}">${DAYS.map((dn,di)=>`<option value="${di}" ${(isEditingThisDay?editingHere.day:dayIdx)===di?'selected':''}>${dn}</option>`).join('')}</select>
+        </div>
         <div id="anchorDateWrap-${dayIdx}" style="display:${showDateField?'block':'none'};">
           <input type="date" id="anchorDate-${dayIdx}" value="${defaultDateVal}">
         </div>
@@ -3942,6 +3962,7 @@ function renderScheduleGrid(){
           ${timePickerHtml('anchorEnd-'+dayIdx, isEditingThisDay?editingHere.endTime||'':'', 'שעת סיום')}
         </div>
         <label class="buf-label"><input type="checkbox" id="anchorBuffer-${dayIdx}" ${isEditingThisDay&&editingHere.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
+        <label class="buf-label"><input type="checkbox" id="anchorDraft-${dayIdx}" ${isEditingThisDay&&editingHere.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
         <div class="anchor-form-actions">
           <button class="save-btn" onclick="saveAnchor(${dayIdx})">שמור</button>
           <button class="cancel-btn" onclick="closeForm()">בטל</button>
@@ -3972,9 +3993,10 @@ function renderScheduleGrid(){
         const a = it.data;
         const dom = domainById(a.domain);
         const isEditingThisAnchor = isEditingThisDay && editingHere.id===a.id;
-        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''} ${data.softMode?'soft-dim':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''} ${data.softMode?'soft-dim':''} ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
             ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
             ${escapeHtml(a.label)}
+            ${a.draft ? '<span class="draft-badge">🌱 טיוטה</span>' : ''}
             ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
         </div>`;
         return chip + (isEditingThisAnchor ? anchorFormHtml : '');
@@ -3985,10 +4007,11 @@ function renderScheduleGrid(){
       const showTrash = longPressedTaskId===t.id;
       const isEditingThisTask = scheduleEditingTaskId===t.id;
       const softClass = data.softMode ? (t.energy==='low' ? 'soft-emphasize' : 'soft-dim') : '';
-      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''} ${softClass}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
+      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''} ${softClass} ${t.draft?'chip-draft':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
           ${showTrash ? `<span class="task-chip-trash" onclick="event.stopPropagation(); unscheduleTaskFromWeek('${t.id}')" title="הסרה מתצוגת השבוע">🗑</span>` : ''}
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
+          ${t.draft ? '<span class="draft-badge">🌱 טיוטה</span>' : ''}
       </div>`;
       return chip + (isEditingThisTask ? taskEditFormInner(t) : '');
     });
