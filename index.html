@@ -418,9 +418,10 @@
   .habit-li-row{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
   .habit-text{flex:1; font-size:14.5px; color:var(--text); line-height:1.45;}
   .habit-li-actions{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
-  .habit-context-row{margin-top:4px;}
+  .habit-context-row{margin-top:4px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px;}
   .habit-context-text{font-size:12.5px; color:var(--muted); cursor:pointer;}
   .habit-context-text.habit-context-empty{color:var(--muted2);}
+  .habit-inline-actions{display:flex; flex-wrap:wrap; gap:6px; margin-inline-start:auto;}
   .habit-last-done{font-size:12px; color:var(--muted2); margin-top:6px;}
   .habit-small-starts{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
   .habit-small-start-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0;}
@@ -6596,10 +6597,25 @@ function deleteHabitSmallStart(habitId, stepId){
 function addHabitAsAnchor(id){
   const h = data.habits.find(h=>h.id===id);
   if(!h) return;
-  data.anchors.push({id:uid(), day:new Date().getDay(), time:'', endTime:'', label:h.text, domain:'', buffer:false, repeatType:'daily', date:'', createdAt:Date.now()});
+  const newAnchor = {id:uid(), day:new Date().getDay(), time:'', endTime:'', label:h.text, domain:'', buffer:false, draft:true, repeatType:'daily', date:'', createdAt:Date.now()};
+  data.anchors.push(newAnchor);
   saveData();
   renderScheduleGrid();
-  flashStatus('נוסף כעוגן יומי בלוח השבועי — אפשר לערוך שעה/תדירות שם');
+  openTimelineSheet('anchor', newAnchor.id);
+}
+// a lighter alternative to "הוסף כעוגן" -- for someone who isn't ready to commit to a daily/weekly
+// recurrence yet, but still wants this specific attempt to actually have a place on the calendar.
+// creates a plain one-off draft task and opens the quick-edit sheet immediately so the day/time
+// gets picked in the same motion, instead of leaving an unscheduled task easy to forget about.
+function addHabitAsOneTimeTask(id){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  const newTask = {id:uid(), text:h.text, domain:'', done:false, energy:'', date:'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
+  data.tasks.push(newTask);
+  saveData();
+  renderTasks();
+  renderScheduleGrid();
+  openTimelineSheet('task', newTask.id);
 }
 function renderHabits(){
   const el = document.getElementById('habitsBlock');
@@ -6629,10 +6645,13 @@ function renderHabits(){
             ${inlineEditIds.has('habitctx:'+h.id)
               ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
               : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ אחרי מה זה קורה? (רשות)'}</span>`}
+            <span class="habit-inline-actions">
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">📌 הוסף כעוגן</button>
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">➕ הוסף כמשימה חד-פעמית</button>
+            </span>
           </div>
           <div class="habit-li-actions">
             <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
-            <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן יומי בלוח השבועי (רשות)">📌 הוסף כעוגן</button>
             <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
           </div>
           ${lastDoneLabel ? `<div class="habit-last-done">${lastDoneLabel}</div>` : ''}
