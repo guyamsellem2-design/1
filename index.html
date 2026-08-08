@@ -684,18 +684,31 @@
   .schedule-tab-btn{flex:1; min-width:70px; background:var(--surface3); border:1px solid var(--border-strong); color:var(--muted); border-radius:10px; padding:8px 6px; font-size:13.5px; font-family:inherit; cursor:pointer;}
   .schedule-tab-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
 
-  .timeline-grid{display:grid; grid-template-columns:44px repeat(7,1fr); border:1px solid var(--border); border-radius:10px; overflow:hidden; font-size:12.5px;}
-  .timeline-daylabel{grid-row:1; background:var(--surface3); padding:6px 2px; text-align:center; font-weight:600; position:sticky; top:0; z-index:2;}
-  .timeline-timelabel{background:var(--surface3); color:var(--muted2); text-align:center; padding:2px; font-size:11px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:center;}
-  .timeline-cell{border-top:1px solid var(--border); border-right:1px solid var(--border); min-height:26px; padding:1px; position:relative; cursor:pointer; background:var(--surface);}
-  .timeline-cell:hover{background:var(--surface2);}
-  .timeline-cell.has-item{padding:0;}
-  .timeline-chip{background:var(--surface2); border-radius:6px; padding:2px 5px; font-size:11.5px; line-height:1.3; height:100%; display:flex; flex-direction:column; gap:1px; border-right:3px solid var(--gold); cursor:pointer;}
-  .timeline-chip.chip-picked{outline:2px solid var(--gold); outline-offset:1px;}
-  .timeline-chip .timeline-chip-text{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .timeline-chip-actions{display:flex; gap:4px; font-size:10px; color:var(--muted2); flex-wrap:wrap;}
-  .timeline-chip-actions span{cursor:pointer; text-decoration:underline;}
-  .timeline-add-input{width:100%; height:100%; border:none; background:transparent; color:var(--text); font-family:inherit; font-size:11.5px; padding:2px 4px;}
+  /* "לוח שעות": a real hour-axis week like a native calendar's week view -- all 7 days fit the
+     screen width at once (flex columns that shrink, no horizontal scroll ever), only the vertical
+     axis scrolls, events are positioned/sized by their real time instead of snapped into a fixed
+     per-half-hour table cell. */
+  .timeline-wrap{border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface);}
+  .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:1000; border-radius:0; display:flex; flex-direction:column;}
+  .timeline-toolbar{display:flex; justify-content:flex-end; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
+  .timeline-fs-btn{background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:5px 10px; font-size:12.5px; font-family:inherit; cursor:pointer;}
+  .timeline-daynames{display:flex; background:var(--surface3); border-bottom:1px solid var(--border);}
+  .timeline-daynames-spacer{width:32px; flex-shrink:0;}
+  .timeline-dayname{flex:1; min-width:0; text-align:center; font-size:10.5px; font-weight:600; padding:4px 1px; line-height:1.3;}
+  .timeline-actionbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--gold); color:#241a06; font-size:12.5px; font-weight:600; padding:7px 10px;}
+  .timeline-actionbar span{cursor:pointer; text-decoration:underline;}
+  .timeline-scroll{overflow-y:auto; overflow-x:hidden; max-height:58vh; -webkit-overflow-scrolling:touch;}
+  .timeline-wrap.fullscreen .timeline-scroll{max-height:none; flex:1;}
+  .timeline-body{display:flex; position:relative; background-image:repeating-linear-gradient(to bottom, var(--border) 0, var(--border) 1px, transparent 1px, transparent var(--timeline-hour-px, 52px));}
+  .timeline-hourcol{width:32px; flex-shrink:0; position:relative;}
+  .timeline-hourlabel{position:absolute; right:2px; transform:translateY(-50%); font-size:10px; color:var(--muted2); white-space:nowrap;}
+  .timeline-daycol{flex:1; min-width:0; position:relative; border-right:1px solid var(--border); cursor:pointer;}
+  .timeline-item{position:absolute; right:1px; left:1px; background:var(--surface2); border-radius:5px; padding:1px 3px; font-size:10.5px; line-height:1.25; overflow:hidden; border-right:3px solid var(--gold); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:1;}
+  .timeline-item.chip-picked{outline:2px solid var(--gold); outline-offset:1px; z-index:2;}
+  .timeline-item.chip-active{outline:2px solid var(--text); outline-offset:1px; z-index:2;}
+  .timeline-item .timeline-chip-text{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .timeline-item-add{position:absolute; right:1px; left:1px; z-index:2;}
+  .timeline-add-input{width:100%; border:1px solid var(--gold); border-radius:5px; background:var(--surface); color:var(--text); font-family:inherit; font-size:11px; padding:3px 5px;}
   .timeline-untimed{display:flex; flex-direction:column; gap:4px; padding:6px; background:var(--surface2); border-radius:8px; margin-bottom:8px;}
   .timeline-untimed-title{font-size:12px; color:var(--muted); font-weight:600;}
   .timeline-untimed-chip{background:var(--surface3); border-radius:6px; padding:4px 7px; font-size:12.5px; cursor:pointer; border-right:3px solid var(--gold);}
@@ -858,7 +871,14 @@
 
       <div id="scheduleTabTimeline" style="display:none;">
         <div id="timelineUntimedWrap"></div>
-        <div class="timeline-grid" id="timelineGrid"></div>
+        <div class="timeline-wrap" id="timelineWrap">
+          <div class="timeline-toolbar"><button type="button" class="timeline-fs-btn" id="timelineFsBtn" onclick="toggleTimelineFullscreen()">⤢ מסך מלא</button></div>
+          <div class="timeline-daynames" id="timelineDaynames"></div>
+          <div id="timelineActionBarWrap"></div>
+          <div class="timeline-scroll" id="timelineScroll">
+            <div class="timeline-grid" id="timelineGrid"></div>
+          </div>
+        </div>
       </div>
 
       <div id="scheduleTabList" style="display:none;">
@@ -4111,23 +4131,40 @@ function renderScheduleTabs(){
   if(scheduleActiveTab==='timeline' || scheduleActiveTab==='list') renderWeekNav();
 }
 
-/* ---------- "לוח שעות": a real hour-by-hour week, free to write on anywhere, like a whiteboard --
-   no "+ משימה"/"+ עוגן" branching up front; tapping any empty half-hour cell just opens a text
-   input, and whatever gets typed is always created as a plain draft task first. becoming a
-   recurring anchor is a later, optional upgrade on the item itself, never a decision required
-   at the moment of writing something down. */
-const TIMELINE_START_HOUR = 7, TIMELINE_END_HOUR = 23;
-function timelineSlots(){
-  const slots = [];
-  for(let h=TIMELINE_START_HOUR; h<TIMELINE_END_HOUR; h++){ slots.push(pad(h)+':00'); slots.push(pad(h)+':30'); }
-  return slots;
-}
+/* ---------- "לוח שעות": a real hour-axis week, like a native calendar's week view -- all 7 days
+   fit the screen at once (flex columns, no horizontal scroll), only vertical scroll, events
+   positioned/sized by their real time. no "+ משימה"/"+ עוגן" branching up front; tapping any
+   empty spot just opens a text input, and whatever gets typed is always created as a plain draft
+   task first. becoming a recurring anchor is a later, optional upgrade on the item itself, never
+   a decision required at the moment of writing something down. editing an item never leaves this
+   view for a native-feeling text box -- only our own compact action bar. */
+const TIMELINE_START_HOUR = 5, TIMELINE_END_HOUR = 23, TIMELINE_PX_PER_HOUR = 52;
 function timelineSlotForTime(timeStr){
   if(!timeStr) return null;
   const parts = timeStr.split(':');
   const h = +parts[0], m = +parts[1];
   if(isNaN(h) || isNaN(m) || h<TIMELINE_START_HOUR || h>=TIMELINE_END_HOUR) return null;
   return pad(h)+':'+(m>=30?'30':'00');
+}
+function timelineTopPx(timeStr){
+  const [h,m] = timeStr.split(':').map(Number);
+  return ((h-TIMELINE_START_HOUR) + (m||0)/60) * TIMELINE_PX_PER_HOUR;
+}
+function timelineHeightPx(startTime, endTime){
+  let durMin = 30;
+  if(endTime){
+    const [sh,sm] = startTime.split(':').map(Number);
+    const [eh,em] = endTime.split(':').map(Number);
+    const d = (eh*60+em) - (sh*60+sm);
+    if(d>0) durMin = d;
+  }
+  return Math.max(18, durMin/60*TIMELINE_PX_PER_HOUR);
+}
+function timelineSlotFromY(y){
+  const totalMinutes = TIMELINE_START_HOUR*60 + (y/TIMELINE_PX_PER_HOUR)*60;
+  let rounded = Math.round(totalMinutes/30)*30;
+  rounded = Math.max(TIMELINE_START_HOUR*60, Math.min(rounded, TIMELINE_END_HOUR*60 - 30));
+  return pad(Math.floor(rounded/60))+':'+pad(rounded%60);
 }
 function timelinePerDay(){
   const weekDates = viewedWeekDates();
@@ -4137,43 +4174,48 @@ function timelinePerDay(){
     const tasksForDay = data.tasks.filter(t=>t.date===dateStr);
     const items = anchorsForDay.map(a=>({kind:'anchor', data:a, time:a.time||''}))
       .concat(tasksForDay.map(t=>({kind:'task', data:t, time:t.time||''})));
-    const bySlot = {}, untimed = [];
-    items.forEach(it=>{
-      const slot = timelineSlotForTime(it.time);
-      if(slot){ if(!bySlot[slot]) bySlot[slot]=[]; bySlot[slot].push(it); }
-      else untimed.push(it);
-    });
-    return {dayIdx, dateObj, dateStr, bySlot, untimed};
+    const timed = [], untimed = [];
+    items.forEach(it=>{ if(timelineSlotForTime(it.time)) timed.push(it); else untimed.push(it); });
+    timed.sort((a,b)=>a.time.localeCompare(b.time));
+    return {dayIdx, dateObj, dateStr, timed, untimed};
   });
 }
-let timelinePickedItem = null; // {kind, id} -- "picked up", waiting for a target cell to move to
-let timelineAddCell = null;    // {dayIdx, slot} -- which empty cell currently shows a write-in input
-let timelineRenamingKey = null; // "kind:id" -- which chip currently shows a rename input
+let timelinePickedItem = null;  // {kind, id} -- "picked up", waiting for a tap to move to
+let timelineAddCell = null;     // {dayIdx, slot} -- which day currently shows a write-in input, and where
+let timelineRenamingKey = null; // "kind:id" -- which item currently shows a rename input
+let timelineActiveKey = null;   // "kind:id" -- which item is selected, showing the action bar
+let timelineFullscreen = false;
 function timelineItemLabel(it){ return it.kind==='task' ? it.data.text : it.data.label; }
-function timelineChipHtml(it, dayIdx, slot, dateStr){
+function toggleTimelineFullscreen(){
+  timelineFullscreen = !timelineFullscreen;
+  const wrap = document.getElementById('timelineWrap');
+  const btn = document.getElementById('timelineFsBtn');
+  if(wrap) wrap.classList.toggle('fullscreen', timelineFullscreen);
+  if(btn) btn.textContent = timelineFullscreen ? '✕ סגירה' : '⤢ מסך מלא';
+}
+function timelineChipHtml(it, dayIdx, dateStr){
   const key = it.kind+':'+it.data.id;
   const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
+  const active = timelineActiveKey===key;
   const draft = !!it.data.draft;
+  const top = timelineTopPx(it.time);
   if(timelineRenamingKey===key){
-    return `<div class="timeline-chip ${draft?'chip-draft':''}">
+    return `<div class="timeline-item ${draft?'chip-draft':''}" style="top:${top}px; height:26px;">
       <input type="text" class="timeline-add-input" id="timelineRenameInput" value="${escapeAttr(timelineItemLabel(it))}"
+        onclick="event.stopPropagation()"
         onkeydown="if(event.key==='Enter') commitTimelineRename('${it.kind}','${it.data.id}', this.value); if(event.key==='Escape') cancelTimelineRename();"
         onblur="commitTimelineRename('${it.kind}','${it.data.id}', this.value)">
     </div>`;
   }
-  return `<div class="timeline-chip ${picked?'chip-picked':''} ${draft?'chip-draft':''}" onclick="onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${slot}', '${dateStr}')">
-    <span class="timeline-chip-text">${escapeHtml(timelineItemLabel(it))}</span>
-    <div class="timeline-chip-actions">
-      <span onclick="event.stopPropagation(); startTimelineRename('${it.kind}','${it.data.id}')">✎ שינוי טקסט</span>
-      <span onclick="event.stopPropagation(); pickTimelineItem('${it.kind}','${it.data.id}')">${picked?'✓ בחרתי יעד':'↕ הזזה'}</span>
-      <span onclick="event.stopPropagation(); timelineJumpToEdit('${it.kind}','${it.data.id}', ${it.kind==='task'?'null':dayIdx})">עוד אפשרויות</span>
-    </div>
+  const height = timelineHeightPx(it.time, it.data.endTime);
+  return `<div class="timeline-item ${picked?'chip-picked':''} ${active?'chip-active':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;"
+    onclick="event.stopPropagation(); onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${it.time}', '${dateStr}')">
+    <span class="timeline-chip-text">${it.time?it.time+' · ':''}${escapeHtml(timelineItemLabel(it))}</span>
   </div>`;
 }
 function timelineUntimedChipHtml(it, dayIdx, dateStr){
   const draft = !!it.data.draft;
-  const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
-  return `<div class="timeline-untimed-chip ${picked?'chip-picked':''} ${draft?'chip-draft':''}" onclick="timelineJumpToEdit('${it.kind}','${it.data.id}', ${it.kind==='task'?'null':dayIdx})">
+  return `<div class="timeline-untimed-chip ${draft?'chip-draft':''}" onclick="timelineJumpToEdit('${it.kind}','${it.data.id}', ${it.kind==='task'?'null':dayIdx})">
     ${DAYS[dayIdx]}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}
   </div>`;
 }
@@ -4201,9 +4243,18 @@ function commitTimelineAddOnBlur(dayIdx, slot, dateStr){
   if(!timelineAddCell || timelineAddCell.dayIdx!==dayIdx || timelineAddCell.slot!==slot) return;
   commitTimelineAdd(dayIdx, slot, dateStr);
 }
-function startTimelineRename(kind, id){ timelineRenamingKey = kind+':'+id; renderTimelineGrid(); requestAnimationFrame(()=>{ const el=document.getElementById('timelineRenameInput'); if(el){el.focus(); el.select();} }); }
+function startTimelineRename(kind, id){
+  timelineActiveKey = null; timelineRenamingKey = kind+':'+id;
+  renderTimelineGrid();
+  requestAnimationFrame(()=>{ const el=document.getElementById('timelineRenameInput'); if(el){el.focus(); el.select();} });
+}
 function cancelTimelineRename(){ timelineRenamingKey = null; renderTimelineGrid(); }
 function commitTimelineRename(kind, id, value){
+  // Enter's keydown handler commits and re-renders, which removes the now-stale input from the
+  // DOM -- that removal fires a second, native blur on it that would otherwise re-enter this exact
+  // function mid-render and crash ("node to be removed is no longer a child of this node"). the
+  // guard makes the second call in the same tick a safe no-op instead.
+  if(timelineRenamingKey !== kind+':'+id) return;
   const text = (value||'').trim();
   timelineRenamingKey = null;
   if(text){
@@ -4213,15 +4264,13 @@ function commitTimelineRename(kind, id, value){
   }
   renderScheduleGrid();
 }
-function pickTimelineItem(kind, id){
-  if(timelinePickedItem && timelinePickedItem.kind===kind && timelinePickedItem.id===id){ timelinePickedItem = null; }
-  else { timelinePickedItem = {kind, id}; }
-  renderTimelineGrid();
-}
-// the actual move commit, shared by "tap a target cell while something is picked up" -- always
-// routes through the existing applyGcalSyncForTask/applyGcalSyncForAnchor helpers, never a direct
-// push, and for anchors always treats a day-only change as a timing change (see saveAnchor) so a
-// moved weekly anchor never keeps silently pushing its old day to Google.
+function pickTimelineItem(kind, id){ timelinePickedItem = {kind, id}; renderTimelineGrid(); }
+function startTimelineMoveFromBar(kind, id){ timelineActiveKey = null; pickTimelineItem(kind, id); }
+function cancelTimelinePick(){ timelinePickedItem = null; renderTimelineGrid(); }
+// the actual move commit, shared by "tap a target while something is picked up" -- always routes
+// through the existing applyGcalSyncForTask/applyGcalSyncForAnchor helpers, never a direct push,
+// and for anchors always treats a day-only change as a timing change (see saveAnchor) so a moved
+// weekly anchor never keeps silently pushing its old day to Google.
 function commitTimelineMoveTo(dayIdx, slot, dateStr){
   const picked = timelinePickedItem;
   timelinePickedItem = null;
@@ -4248,25 +4297,58 @@ function commitTimelineMoveTo(dayIdx, slot, dateStr){
 }
 function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
   if(timelinePickedItem){
-    // tapping any chip while something is picked up (even a different item, even itself) resolves
-    // the pending move onto this slot -- exactly the same "tap a target" gesture as tapping an
-    // empty cell, so the picked item never gets stuck needing an empty cell specifically
+    // tapping any item while something is picked up (even a different one) resolves the pending
+    // move onto its slot -- the same "tap a target" gesture as tapping empty space, so the picked
+    // item is never stuck needing empty space specifically
     commitTimelineMoveTo(dayIdx, slot, dateStr);
     return;
   }
-  pickTimelineItem(kind, id);
+  timelineActiveKey = (timelineActiveKey===kind+':'+id) ? null : kind+':'+id;
+  renderTimelineGrid();
+}
+function onTimelineColClick(e, dayIdx, dateStr){
+  if(e.target !== e.currentTarget) return; // a click that landed on a child (an item, the add input) isn't a click on empty space
+  const rect = e.currentTarget.getBoundingClientRect();
+  const slot = timelineSlotFromY(e.clientY - rect.top);
+  if(timelinePickedItem){ commitTimelineMoveTo(dayIdx, slot, dateStr); return; }
+  openTimelineAddCell(dayIdx, slot);
 }
 function timelineJumpToEdit(kind, id, dayIdx){
+  timelineActiveKey = null;
   setScheduleTab('list');
   if(kind==='task') editTaskFromSchedule(id);
   else editAnchor(id, dayIdx!==null ? dayIdx : (data.anchors.find(a=>a.id===id)||{day:0}).day);
 }
+function timelineActionBarHtml(){
+  if(timelinePickedItem){
+    const label = timelinePickedItem.kind==='task'
+      ? (data.tasks.find(t=>t.id===timelinePickedItem.id)||{}).text
+      : (data.anchors.find(a=>a.id===timelinePickedItem.id)||{}).label;
+    return `<div class="timeline-actionbar">מזיזים את "${escapeHtml(label||'')}" — הקש/י על מקום חדש · <span onclick="cancelTimelinePick()">ביטול</span></div>`;
+  }
+  if(!timelineActiveKey) return '';
+  const [kind,id] = timelineActiveKey.split(':');
+  const dayIdxForJump = kind==='anchor' ? (data.anchors.find(a=>a.id===id)||{day:0}).day : null;
+  return `<div class="timeline-actionbar">
+    <span onclick="startTimelineRename('${kind}','${id}')">✎ שינוי טקסט</span>
+    <span onclick="startTimelineMoveFromBar('${kind}','${id}')">↕ הזזה</span>
+    <span onclick="timelineJumpToEdit('${kind}','${id}', ${dayIdxForJump})">עוד אפשרויות</span>
+    <span onclick="timelineActiveKey=null; renderTimelineGrid();">✕</span>
+  </div>`;
+}
 function renderTimelineGrid(){
   const el = document.getElementById('timelineGrid');
   const untimedWrap = document.getElementById('timelineUntimedWrap');
+  const daynamesWrap = document.getElementById('timelineDaynames');
+  const barWrap = document.getElementById('timelineActionBarWrap');
   if(!el) return;
-  const slots = timelineSlots();
   const perDay = timelinePerDay();
+
+  if(daynamesWrap){
+    daynamesWrap.innerHTML = `<div class="timeline-daynames-spacer"></div>` +
+      perDay.map(d=>`<div class="timeline-dayname">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
+  }
+  if(barWrap) barWrap.innerHTML = timelineActionBarHtml();
 
   const untimedItems = [];
   perDay.forEach(d=>{ d.untimed.forEach(it=>untimedItems.push({it, dayIdx:d.dayIdx, dateStr:d.dateStr})); });
@@ -4278,30 +4360,26 @@ function renderTimelineGrid(){
       </div>` : '';
   }
 
-  const headerRow = `<div class="timeline-daylabel"></div>` + perDay.map(d=>`<div class="timeline-daylabel">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
+  const totalHeight = (TIMELINE_END_HOUR-TIMELINE_START_HOUR)*TIMELINE_PX_PER_HOUR;
+  const hourLabels = [];
+  for(let h=TIMELINE_START_HOUR; h<=TIMELINE_END_HOUR; h++){
+    hourLabels.push(`<div class="timeline-hourlabel" style="top:${(h-TIMELINE_START_HOUR)*TIMELINE_PX_PER_HOUR}px">${pad(h)}:00</div>`);
+  }
+  const hourCol = `<div class="timeline-hourcol" style="height:${totalHeight}px;">${hourLabels.join('')}</div>`;
 
-  const bodyRows = slots.map(slot=>{
-    const timeLabel = `<div class="timeline-timelabel">${slot}</div>`;
-    const dayCells = perDay.map(d=>{
-      const itemsHere = d.bySlot[slot] || [];
-      if(itemsHere.length===0){
-        const isAdding = timelineAddCell && timelineAddCell.dayIdx===d.dayIdx && timelineAddCell.slot===slot;
-        if(isAdding){
-          return `<div class="timeline-cell">
-            <input type="text" class="timeline-add-input" id="timelineAddInput" placeholder="כתוב כאן..."
-              onkeydown="if(event.key==='Enter') commitTimelineAdd(${d.dayIdx}, '${slot}', '${d.dateStr}'); if(event.key==='Escape') cancelTimelineAdd();"
-              onblur="commitTimelineAddOnBlur(${d.dayIdx}, '${slot}', '${d.dateStr}')">
-          </div>`;
-        }
-        const clickAction = timelinePickedItem ? `commitTimelineMoveTo(${d.dayIdx}, '${slot}', '${d.dateStr}')` : `openTimelineAddCell(${d.dayIdx}, '${slot}')`;
-        return `<div class="timeline-cell" onclick="${clickAction}"></div>`;
-      }
-      return `<div class="timeline-cell has-item">${itemsHere.map(it=>timelineChipHtml(it, d.dayIdx, slot, d.dateStr)).join('')}</div>`;
-    }).join('');
-    return timeLabel + dayCells;
+  const dayCols = perDay.map(d=>{
+    const isAddingHere = timelineAddCell && timelineAddCell.dayIdx===d.dayIdx;
+    const addBox = isAddingHere ? `<div class="timeline-item-add" style="top:${timelineTopPx(timelineAddCell.slot)}px;">
+      <input type="text" class="timeline-add-input" id="timelineAddInput" placeholder="כתוב כאן..."
+        onclick="event.stopPropagation()"
+        onkeydown="if(event.key==='Enter') commitTimelineAdd(${d.dayIdx}, '${timelineAddCell.slot}', '${d.dateStr}'); if(event.key==='Escape') cancelTimelineAdd();"
+        onblur="commitTimelineAddOnBlur(${d.dayIdx}, '${timelineAddCell.slot}', '${d.dateStr}')">
+    </div>` : '';
+    const itemsHtml = d.timed.map(it=>timelineChipHtml(it, d.dayIdx, d.dateStr)).join('');
+    return `<div class="timeline-daycol" style="height:${totalHeight}px;" onclick="onTimelineColClick(event, ${d.dayIdx}, '${d.dateStr}')">${itemsHtml}${addBox}</div>`;
   }).join('');
 
-  el.innerHTML = headerRow + bodyRows;
+  el.innerHTML = `<div class="timeline-body" style="height:${totalHeight}px; --timeline-hour-px:${TIMELINE_PX_PER_HOUR}px;">${hourCol}${dayCols}</div>`;
   requestAnimationFrame(()=>{
     const inp = document.getElementById('timelineAddInput') || document.getElementById('timelineRenameInput');
     if(inp) inp.focus();
