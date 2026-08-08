@@ -658,7 +658,7 @@
   li.suggestion-done{opacity:.55;}
   li.suggestion-done .task-text, li.suggestion-done .suggestion-badge{text-decoration:line-through;}
   li.suggestion-li{flex-wrap:wrap;}
-  .sugg-reply-due{flex-basis:100%; font-size:15px; font-weight:700; color:var(--gold); margin-top:2px;}
+  .sugg-reply-due{flex-basis:100%; font-size:15px; font-weight:700; color:var(--gold); margin-top:2px; cursor:pointer;}
   .sugg-status-row{flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;}
   .sugg-status-badge{font-size:12px; background:var(--surface3); color:var(--muted); padding:3px 8px; border-radius:999px; white-space:nowrap;}
   .sugg-status-badge.sugg-status-contract{background:rgba(192,69,63,0.15); color:#c0453f;}
@@ -4893,7 +4893,7 @@ function suggestionsSubViewHtml(){
       <button onclick="addSuggestion()">הוסף</button>
     </div>
     <div class="add-row" id="suggDetailsFields" style="display:none;">
-      <label class="field-label">יודע/ת מתי תחזיר/י תשובה? (לא חובה)<input type="date" id="suggReplyDate"></label>
+      <label class="field-label">מתשובה עד (לא חובה)<input type="date" id="suggReplyDate"></label>
       ${timePickerHtml('suggReplyTime', '', 'שעה')}
     </div>
     <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
@@ -4948,7 +4948,7 @@ function renderSuggestions(){
       <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
-      ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}</div>` : ''}
+      ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due" onclick="openSuggestionEdit('${s.id}')" title="לחיצה לשינוי מועד התשובה">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true})}
     </li>`;
   }).join('');
@@ -4957,18 +4957,21 @@ function renderSuggestions(){
 function suggestionEditFormHtml(s){
   return `<li class="edit-li" data-drag-id="${s.id}">
     <div class="anchor-form">
-      <input type="text" id="suggEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="מה ההצעה...">
       <div class="edit-form-row">
+        <input type="text" id="suggEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="מה ההצעה..." style="flex:2;">
         <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע? (רשות)">
       </div>
       <div class="edit-form-row">
-        <label class="field-label">יודע/ת מתי תחזיר/י תשובה?<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}"></label>
+        <label class="field-label">מתשובה עד<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}" onchange="onSuggReplyDateChange('${s.id}', this.value)"></label>
         ${timePickerHtml('suggEditTime-'+s.id, s.replyTime||'', 'שעה')}
       </div>
-      ${bodyCheckToggleBtnHtml('suggestion', s.id)}
+      <div class="hint sugg-reply-comfort-hint" id="suggReplyComfortHint-${s.id}" style="display:none;">רגע — זה באמת זמן נוח בשבילי להשיב עד אז?</div>
+      <div class="edit-form-row">
+        ${bodyCheckToggleBtnHtml('suggestion', s.id)}
+        ${decisionHelperToggleBtnHtml('suggestion', s.id)}
+      </div>
       ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true}) : ''}
-      ${decisionHelperToggleBtnHtml('suggestion', s.id)}
-      ${decisionHelperOpenIds.has('suggestion:'+s.id) ? decisionHelperPanelHtml() : ''}
+      ${decisionHelperOpenIds.has('suggestion:'+s.id) ? decisionHelperPanelHtml('suggestion', s.id) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSuggestionEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSuggestionEdit()">בטל</button>
@@ -4986,6 +4989,13 @@ function openSuggestionEdit(id){
   if(opening){ const input = document.getElementById(`suggEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
 }
 function closeSuggestionEdit(){ editingSuggestionId = null; renderSuggestions(); }
+// a gentle nudge, not a blocking confirm() -- shows the moment a reply-by date/time is actually
+// set, so committing to a deadline for answering someone always comes with a beat to check whether
+// that's a comfortable pace or just an automatic "sure, I'll get back to you."
+function onSuggReplyDateChange(id, val){
+  const hint = document.getElementById('suggReplyComfortHint-'+id);
+  if(hint) hint.style.display = val ? '' : 'none';
+}
 function saveSuggestionEdit(id){
   const s = data.suggestions.find(s=>s.id===id);
   if(!s) return;
@@ -5153,7 +5163,7 @@ function dilemmaEditFormHtml(d){
       ${bodyCheckToggleBtnHtml('dilemma', d.id)}
       ${bodyCheckOpenIds.has('dilemma:'+d.id) ? bodyCheckPanelHtml('dilemma', d.id, {}) : ''}
       ${decisionHelperToggleBtnHtml('dilemma', d.id)}
-      ${decisionHelperOpenIds.has('dilemma:'+d.id) ? decisionHelperPanelHtml() : ''}
+      ${decisionHelperOpenIds.has('dilemma:'+d.id) ? decisionHelperPanelHtml('dilemma', d.id) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveDilemmaEdit('${d.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeDilemmaEdit()">בטל</button>
@@ -5266,21 +5276,103 @@ function deleteReplyScript(id){
   saveData();
   rerenderActiveDilemmaList();
 }
-function copyReplyScript(id){
-  const s = (data.replyScripts||[]).find(x=>x.id===id);
-  if(!s) return;
+function copyTextToClipboard(text){
   if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(s.text).then(()=>flashStatus('הועתק ללוח')).catch(()=>flashStatus('לא הצלחתי להעתיק — אפשר לסמן ולהעתיק ידנית'));
+    navigator.clipboard.writeText(text).then(()=>flashStatus('הועתק ללוח')).catch(()=>flashStatus('לא הצלחתי להעתיק — אפשר לסמן ולהעתיק ידנית'));
   } else {
     flashStatus('לא הצלחתי להעתיק — אפשר לסמן ולהעתיק ידנית');
   }
 }
-function decisionHelperPanelHtml(){
+function copyReplyScript(id){
+  const s = (data.replyScripts||[]).find(x=>x.id===id);
+  if(!s) return;
+  copyTextToClipboard(s.text);
+}
+// per-item customization of a reply script -- without this, editing a script always rewrites the
+// shared default for everyone. "התאמה לכאן" lets her tweak the wording for THIS suggestion/dilemma
+// only (copies the edited text but never touches the bank), or explicitly promote it to be the new
+// shared default when that's actually what she wants.
+let replyScriptOverrideEditing = null; // "kind:id:scriptId"
+function startReplyScriptOverride(kind, id, scriptId){
+  replyScriptOverrideEditing = kind+':'+id+':'+scriptId;
+  rerenderActiveDilemmaList();
+  requestAnimationFrame(()=>{ const el = document.getElementById('replyScriptOverrideInput'); if(el){ el.focus(); } });
+}
+function cancelReplyScriptOverride(){ replyScriptOverrideEditing = null; rerenderActiveDilemmaList(); }
+function useReplyScriptOnce(){
+  const input = document.getElementById('replyScriptOverrideInput');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  copyTextToClipboard(text);
+  replyScriptOverrideEditing = null;
+  rerenderActiveDilemmaList();
+}
+function useReplyScriptAsNewDefault(scriptId){
+  const input = document.getElementById('replyScriptOverrideInput');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  const s = (data.replyScripts||[]).find(x=>x.id===scriptId);
+  if(s){ s.text = text; saveData(); }
+  copyTextToClipboard(text);
+  replyScriptOverrideEditing = null;
+  rerenderActiveDilemmaList();
+}
+function replyScriptRowHtml(kind, id, s){
+  const overrideKey = kind+':'+id+':'+s.id;
+  if(replyScriptOverrideEditing===overrideKey){
+    return `<div class="decision-quote-row" data-entry-id="${s.id}">
+      <textarea id="replyScriptOverrideInput" class="inline-text-edit">${escapeHtml(s.text)}</textarea>
+      <div class="anchor-form-actions" style="margin-top:6px;">
+        <button type="button" class="save-btn" onclick="useReplyScriptOnce()" title="הנוסח הזה משמש רק כאן, בלי לשנות את ברירת המחדל">📋 העתק רק לכאן</button>
+        <button type="button" class="save-btn" onclick="useReplyScriptAsNewDefault('${s.id}')" title="שומר את הנוסח הזה כברירת מחדל לכולם, וגם מעתיק">💾 שמור כברירת מחדל</button>
+        <button type="button" class="cancel-btn" onclick="cancelReplyScriptOverride()">בטל</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="decision-quote-row" data-entry-id="${s.id}">
+    ${inlineEditIds.has('replyscript:'+s.id)
+      ? `<textarea class="inline-text-edit" data-inline-key="replyscript:${s.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('replyscript:${s.id}', rerenderActiveDilemmaList) : saveReplyScriptEdit('${s.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(s.text)}</textarea>`
+      : `<span data-inline-key="replyscript:${s.id}" onclick="inlineEditToggle('replyscript:${s.id}', rerenderActiveDilemmaList)">${escapeHtml(s.text)}</span>`}
+    <span class="copy-script-btn" onclick="copyReplyScript('${s.id}')" title="העתקה ללוח כמו שהוא">📋 העתק</span>
+    <span class="copy-script-btn" onclick="startReplyScriptOverride('${kind}','${id}','${s.id}')" title="עריכה מותאמת לזה בלבד, בלי לשנות את ברירת המחדל">✏️ התאמה לכאן</span>
+    <span class="del-task" onclick="deleteReplyScript('${s.id}')">✕</span>
+  </div>`;
+}
+// "איך אני אענה?" -- a free-write draft per suggestion/dilemma, auto-minimized so it doesn't add
+// clutter to items that don't need it, for thinking out loud before actually replying to anyone.
+const answerDraftOpenIds = new Set();
+function toggleAnswerDraft(kind, id){
+  const key = kind+':'+id;
+  if(answerDraftOpenIds.has(key)) answerDraftOpenIds.delete(key); else answerDraftOpenIds.add(key);
+  rerenderActiveDilemmaList();
+}
+function setAnswerDraft(kind, id, val){
+  const item = bodyCheckItem(kind, id);
+  if(item){ item.answerDraft = val; saveData(); }
+}
+function answerDraftBoxHtml(kind, id){
+  const item = bodyCheckItem(kind, id);
+  if(!item) return '';
+  const isOpen = answerDraftOpenIds.has(kind+':'+id);
+  const hasContent = !!(item.answerDraft||'').trim();
+  return `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="toggleAnswerDraft('${kind}','${id}')">💬 איך אני אענה?${isOpen?' ▴':''}</button>
+    ${isOpen ? `<textarea class="detail-desc" dir="auto" placeholder="טיוטה חופשית — איך בא לי לענות..." oninput="setAnswerDraft('${kind}','${id}', this.value)">${escapeHtml(item.answerDraft||'')}</textarea>` : ''}`;
+}
+function decisionHelperPanelHtml(kind, id){
   const quotes = data.decisionHelperQuotes || [];
   const links = data.decisionHelperLinks || [];
   const scripts = data.replyScripts || [];
   return `<div class="decision-helper-panel">
-    <div class="bc-row-label">משפטים ושאלות שעוזרים לי לקבל החלטה</div>
+    <div class="bc-row-label">תשובות מוכנות להעתקה — למי שמחכה לתשובה ממני</div>
+    <div class="decision-quote-list">
+      ${scripts.map(s=>replyScriptRowHtml(kind, id, s)).join('') || '<div class="empty">אין עדיין תשובות מוכנות בבנק הזה</div>'}
+    </div>
+    <div class="add-row">
+      <input type="text" id="replyScriptInput" placeholder="תשובה מוכנה שאני רוצה שתהיה זמינה..." onkeydown="if(event.key==='Enter') addReplyScript();">
+      <button onclick="addReplyScript()">הוסף</button>
+    </div>
+    <div style="margin-top:10px;">${answerDraftBoxHtml(kind, id)}</div>
+    <div class="bc-row-label" style="margin-top:10px;">משפטים ושאלות שעוזרים לי לקבל החלטה</div>
     <div class="decision-quote-list">
       ${quotes.map(q=>`<div class="decision-quote-row" data-entry-id="${q.id}">
         ${inlineEditIds.has('dhquote:'+q.id)
@@ -5303,20 +5395,6 @@ function decisionHelperPanelHtml(){
       <input type="text" id="decisionLinkTitleInput" placeholder="כותרת הקישור">
       <input type="text" id="decisionLinkUrlInput" placeholder="קישור" dir="ltr">
       <button onclick="addDecisionHelperLink()">הוסף</button>
-    </div>
-    <div class="bc-row-label" style="margin-top:10px;">תשובות מוכנות להעתקה — למי שמחכה לתשובה ממני</div>
-    <div class="decision-quote-list">
-      ${scripts.map(s=>`<div class="decision-quote-row" data-entry-id="${s.id}">
-        ${inlineEditIds.has('replyscript:'+s.id)
-          ? `<textarea class="inline-text-edit" data-inline-key="replyscript:${s.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('replyscript:${s.id}', rerenderActiveDilemmaList) : saveReplyScriptEdit('${s.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(s.text)}</textarea>`
-          : `<span data-inline-key="replyscript:${s.id}" onclick="inlineEditToggle('replyscript:${s.id}', rerenderActiveDilemmaList)">${escapeHtml(s.text)}</span>`}
-        <span class="copy-script-btn" onclick="copyReplyScript('${s.id}')" title="העתקה ללוח">📋 העתק</span>
-        <span class="del-task" onclick="deleteReplyScript('${s.id}')">✕</span>
-      </div>`).join('') || '<div class="empty">אין עדיין תשובות מוכנות בבנק הזה</div>'}
-    </div>
-    <div class="add-row">
-      <input type="text" id="replyScriptInput" placeholder="תשובה מוכנה שאני רוצה שתהיה זמינה..." onkeydown="if(event.key==='Enter') addReplyScript();">
-      <button onclick="addReplyScript()">הוסף</button>
     </div>
   </div>`;
 }
