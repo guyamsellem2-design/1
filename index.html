@@ -4949,7 +4949,7 @@ function renderSuggestions(){
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
       ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due" onclick="openSuggestionEdit('${s.id}')" title="לחיצה לשינוי מועד התשובה">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}</div>` : ''}
-      ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true})}
+      ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true})}
     </li>`;
   }).join('');
   applyListCap('suggestion', data.suggestions.length);
@@ -4970,7 +4970,7 @@ function suggestionEditFormHtml(s){
         ${bodyCheckToggleBtnHtml('suggestion', s.id)}
         ${decisionHelperToggleBtnHtml('suggestion', s.id)}
       </div>
-      ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true}) : ''}
+      ${bodyCheckOpenIds.has('suggestion:'+s.id) ? bodyCheckPanelHtml('suggestion', s.id, {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true}) : ''}
       ${decisionHelperOpenIds.has('suggestion:'+s.id) ? decisionHelperPanelHtml('suggestion', s.id) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSuggestionEdit('${s.id}')">שמור</button>
@@ -4996,6 +4996,38 @@ function onSuggReplyDateChange(id, val){
   const hint = document.getElementById('suggReplyComfortHint-'+id);
   if(hint) hint.style.display = val ? '' : 'none';
 }
+// a reply-by date isn't just informational -- it's a real commitment on the calendar, so it gets a
+// linked task kept in sync on the weekly schedule (which is itself what pushes it on to Google
+// Calendar, same as every other scheduled task). setting/moving the date updates the same linked
+// task instead of piling up duplicates; clearing the date removes it from the schedule entirely,
+// same as unscheduling any other task -- the suggestion itself is never touched by this.
+function syncSuggestionReplyToSchedule(s){
+  if(!s.replyDate){
+    if(s.linkedTaskId){
+      const t = data.tasks.find(t=>t.id===s.linkedTaskId);
+      if(t){
+        data.tasks = data.tasks.filter(x=>x.id!==t.id);
+        if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData());
+      }
+      s.linkedTaskId = null;
+    }
+    return;
+  }
+  const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
+  let t = s.linkedTaskId ? data.tasks.find(x=>x.id===s.linkedTaskId) : null;
+  if(!t){
+    t = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate, time:s.replyTime||'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
+    data.tasks.push(t);
+    s.linkedTaskId = t.id;
+    applyGcalSyncForTask(t, true);
+  } else {
+    const prevDate = t.date, prevTime = t.time;
+    t.text = text; t.date = s.replyDate; t.time = s.replyTime||'';
+    applyGcalSyncForTask(t, t.date!==prevDate || t.time!==prevTime);
+  }
+  renderTasks();
+  renderScheduleGrid();
+}
 function saveSuggestionEdit(id){
   const s = data.suggestions.find(s=>s.id===id);
   if(!s) return;
@@ -5007,6 +5039,7 @@ function saveSuggestionEdit(id){
   const timeInput = document.getElementById(`suggEditTime-${id}`);
   s.replyTime = timeInput ? timeInput.value : '';
   editingSuggestionId = null;
+  syncSuggestionReplyToSchedule(s);
   saveData();
   renderSuggestions();
 }
@@ -5022,10 +5055,12 @@ function addSuggestion(){
   const text = textInput.value.trim();
   if(!text) return;
   const bodyCheck = {...pendingBodyCheck.suggestion};
-  data.suggestions.push({id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : '', replyTime: timeInput ? timeInput.value : '', bodyCheck});
+  const newSuggestion = {id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : '', replyTime: timeInput ? timeInput.value : '', bodyCheck};
+  data.suggestions.push(newSuggestion);
   whoInput.value=''; textInput.value=''; if(dateInput) dateInput.value='';
   if(timeInput) setTimePickerValue('suggReplyTime', '');
   resetPendingBodyCheck('suggestion');
+  syncSuggestionReplyToSchedule(newSuggestion);
   saveData();
   renderSuggestions();
 }
@@ -5040,16 +5075,32 @@ function toggleSuggestionDone(id){
 function convertSuggestionToTask(id){
   const s = data.suggestions.find(s=>s.id===id);
   if(!s) return;
-  const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
-  // created quietly, no topic and no energy chosen — added to the list, editable whenever you actually want to touch it
-  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
-  data.tasks.push(newTask);
+  // a reply-date already keeps a linked task on the schedule in sync (see syncSuggestionReplyToSchedule)
+  // -- reuse that one instead of creating a second, duplicate task for the same suggestion
+  let newTask = s.linkedTaskId ? data.tasks.find(t=>t.id===s.linkedTaskId) : null;
+  if(!newTask){
+    const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
+    newTask = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:s.replyTime||'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
+    data.tasks.push(newTask);
+  }
+  data.suggestions = data.suggestions.filter(x=>x.id!==id);
   saveData();
   renderTasks();
   renderScheduleGrid();
+  renderSuggestions();
   openTimelineSheet('task', newTask.id);
 }
 function deleteSuggestion(id){
+  const s = data.suggestions.find(s=>s.id===id);
+  if(s && s.linkedTaskId){
+    const t = data.tasks.find(t=>t.id===s.linkedTaskId);
+    if(t){
+      data.tasks = data.tasks.filter(x=>x.id!==t.id);
+      if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData());
+      renderTasks();
+      renderScheduleGrid();
+    }
+  }
   data.suggestions = data.suggestions.filter(s=>s.id!==id);
   saveData();
   renderSuggestions();
@@ -5147,7 +5198,7 @@ function renderGeneralDilemmaList(){
       <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
       <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')">✕</span>
       ${d.decisionDate ? `<div class="sugg-reply-due">⏰ להחליט עד: ${formatDateHe(d.decisionDate)}</div>` : ''}
-      ${bodyCheckStatusBadgesHtml(d, {})}
+      ${bodyCheckStatusBadgesHtml(d, {urgencyOptions:['objective','other','relief']})}
     </li>`;
   }).join('');
   applyListCap('dilemma', list.length);
@@ -5161,7 +5212,7 @@ function dilemmaEditFormHtml(d){
         <label class="field-label">מועד קבלת ההחלטה<input type="date" id="dilemmaEditDate-${d.id}" value="${d.decisionDate||''}"></label>
       </div>
       ${bodyCheckToggleBtnHtml('dilemma', d.id)}
-      ${bodyCheckOpenIds.has('dilemma:'+d.id) ? bodyCheckPanelHtml('dilemma', d.id, {}) : ''}
+      ${bodyCheckOpenIds.has('dilemma:'+d.id) ? bodyCheckPanelHtml('dilemma', d.id, {urgencyOptions:['objective','other','relief']}) : ''}
       ${decisionHelperToggleBtnHtml('dilemma', d.id)}
       ${decisionHelperOpenIds.has('dilemma:'+d.id) ? decisionHelperPanelHtml('dilemma', d.id) : ''}
       <div class="anchor-form-actions">
@@ -5491,8 +5542,8 @@ const pendingBodyCheck = { task:{}, someday:{}, suggestion:{}, dilemma:{} };
 const PENDING_BODY_CHECK_OPTS = {
   task: {urgencyOptions:['objective','other','relief'], showEnergy:true},
   someday: {hideNote:true},
-  suggestion: {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true},
-  dilemma: {}
+  suggestion: {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true},
+  dilemma: {urgencyOptions:['objective','other','relief']}
 };
 // task's panel lives inside the already-secondary "עוד.." section, and suggestion's create form is
 // dense enough that the panel should stay tucked behind its own button too -- same ❤️‍🩹 בדיקת גוף
@@ -5969,9 +6020,18 @@ function clearDilemmasSection(){
   const total = (data.suggestions||[]).length + (data.generalDilemmas||[]).length;
   if(total===0){ flashStatus('אין כרגע כלום לנקות בהתלבטויות'); return; }
   if(!confirm(`למחוק את כל ${total} הפריטים בהתלבטויות (גם העדפות של אחרים וגם התלבטויות כלליות)? לא ניתן לביטול — מומלץ להוריד גיבוי קודם.`)) return;
+  // clear out the linked reply-date tasks too, or they'd be left stranded on the schedule/gcal
+  // with nothing left pointing back at them
+  (data.suggestions||[]).forEach(s=>{
+    if(!s.linkedTaskId) return;
+    const t = data.tasks.find(t=>t.id===s.linkedTaskId);
+    if(t){ data.tasks = data.tasks.filter(x=>x.id!==t.id); if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData()); }
+  });
   data.suggestions = [];
   data.generalDilemmas = [];
   saveData();
+  renderTasks();
+  renderScheduleGrid();
   renderDilemmasSection();
   flashStatus('ההתלבטויות נוקו');
 }
