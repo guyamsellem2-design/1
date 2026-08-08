@@ -256,7 +256,14 @@
   .main-tab-btn:hover{color:var(--text); border-color:var(--muted);}
   .main-tab-btn.active{background:var(--gold); color:#241a06; border-color:transparent; box-shadow:0 6px 18px -8px var(--glow-gold);}
 
-  section{margin-bottom:44px; padding-top:32px; border-top:1px solid var(--border); animation:sectionRise .7s cubic-bezier(.22,1,.36,1) both;}
+  /* "backwards" (not "both") on purpose -- it still holds the invisible pre-start frame during the
+     animation-delay so nothing flashes unanimated, but once the .7s animation actually finishes the
+     section falls back to its normal (non-animated) opacity:1/transform:none instead of the animation
+     freezing transform:translateY(0) on it forever. that lingering transform, even though visually
+     identical to none, still makes the section a new CSS containing block for any position:fixed
+     descendant -- which is exactly what silently broke the timeline's "fullscreen" toggle: instead of
+     covering the real viewport, it resolved against this section's own (much smaller) box. */
+  section{margin-bottom:44px; padding-top:32px; border-top:1px solid var(--border); animation:sectionRise .7s cubic-bezier(.22,1,.36,1) backwards;}
   section:first-of-type{padding-top:0; border-top:none;}
   section:nth-of-type(1){animation-delay:.02s;}
   section:nth-of-type(2){animation-delay:.08s;}
@@ -272,7 +279,13 @@
   h2 .num{color:var(--gold); font-size:15px; font-weight:400; opacity:.8;}
   .hint{font-size:14px; color:var(--muted2);}
   #secbody-schedule, #secbody-tasks, #secbody-reflection, #secbody-someday, #secbody-suggestions{
-    transition:opacity .22s ease, transform .22s cubic-bezier(.22,1,.36,1); transform-origin:top; opacity:1; transform:translateY(0) scaleY(1);
+    transition:opacity .22s ease, transform .22s cubic-bezier(.22,1,.36,1); transform-origin:top; opacity:1;
+    /* deliberately no resting `transform` here (even an identity one like translateY(0) scaleY(1))
+       -- ANY transform value, identity or not, makes this element the CSS containing block for any
+       position:fixed descendant. that silently broke the timeline's fullscreen toggle: instead of
+       covering the real viewport, `position:fixed; inset:0` on .timeline-wrap.fullscreen resolved
+       against THIS section's own box, rendering as a small, squashed rectangle instead of fullscreen.
+       the collapse animation below still transitions smoothly from the implicit `none` default. */
   }
   .section-collapsing{opacity:0 !important; transform:translateY(-8px) scaleY(0.97) !important;}
   @media (prefers-reduced-motion: reduce){
@@ -483,9 +496,14 @@
   .feel-chip-add-confirm, .feel-chip-add-cancel{cursor:pointer; font-size:15px; padding:2px 4px; color:var(--muted2);}
   .feel-chip-add-confirm:hover{color:var(--safe, var(--text));}
   .feel-chip-add-cancel:hover{color:var(--text);}
-  .chip-group{margin-bottom:6px;}
+  .chip-group{margin-bottom:6px; border-radius:8px; transition:box-shadow .15s ease;}
   .chip-group-header{font-size:13px; font-weight:700; color:var(--muted); margin:10px 0 2px; padding:0 2px;}
   .chip-group-header-none{font-weight:400; color:var(--muted2); font-style:italic;}
+  /* dragging a chip: same-group reorder gets a plain dashed outline; dropping it onto a DIFFERENT
+     header's group instead gets a dashed outline in the color/weight of the chip being dragged --
+     a clear "this is where it's about to land" cue, set inline per-drag via --drag-color */
+  .feel-chip.list-drag-over{outline:2px dashed var(--gold); outline-offset:2px;}
+  .feel-chip.list-drag-over-reassign, .chip-group.list-drag-over-reassign{outline:2.5px dashed var(--drag-color, var(--gold)); outline-offset:3px;}
   .chip-header-manage{display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:2px 2px 10px; border-bottom:1px dashed var(--border); margin-bottom:4px;}
   .chip-header-pill{display:inline-flex; align-items:center; font-size:12.5px; padding:4px 10px; border-radius:999px; border:1.5px dashed var(--border); color:var(--muted); cursor:pointer;}
   .chip-header-pill:hover{color:var(--text); border-color:var(--text);}
@@ -514,6 +532,8 @@
   .tools-card h3{margin:0 0 6px; font-size:16px;}
   .timer-presets{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
   .timer-preset-btn{padding:8px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; font-size:13.5px; font-family:inherit;}
+  .timer-preset-btn.timer-preset-delmode{background:transparent; border-style:dashed; border-color:#c0453f; color:#c0453f; animation:chipShake .35s ease;}
+  @media (prefers-reduced-motion: reduce){ .timer-preset-btn.timer-preset-delmode{animation:none;} }
   .timer-preset-btn.active{background:var(--gold); color:#1a1a1a; border-color:var(--gold);}
   .timer-display{text-align:center; font-size:44px; font-weight:700; font-variant-numeric:tabular-nums; margin:8px 0; color:var(--text); direction:ltr;}
   .timer-controls{display:flex; gap:10px; justify-content:center;}
@@ -705,7 +725,7 @@
      "weird" on some mobile browsers. instead the whole wrap itself just becomes one plain scrolling
      block; simpler and far more reliable, at the small cost of the day-names row no longer staying
      pinned while scrolling in this mode specifically. */
-  .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:5000; border-radius:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+  .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:5000; border-radius:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; background:var(--bg);}
   .timeline-toolbar{display:flex; justify-content:flex-end; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
   .timeline-fs-btn{background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:5px 10px; font-size:12.5px; font-family:inherit; cursor:pointer;}
   .timeline-daynames{display:flex; background:var(--surface3); border-bottom:1px solid var(--border);}
@@ -719,9 +739,12 @@
   .timeline-hourcol{width:32px; flex-shrink:0; position:relative;}
   .timeline-hourlabel{position:absolute; right:2px; transform:translateY(-50%); font-size:10px; color:var(--muted2); white-space:nowrap;}
   .timeline-daycol{flex:1; min-width:0; position:relative; border-right:1px solid var(--border); cursor:pointer;}
-  .timeline-item{position:absolute; right:1px; left:1px; background:var(--surface2); border-radius:5px; padding:1px 3px; font-size:10.5px; line-height:1.25; overflow:hidden; border-right:3px solid var(--gold); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:1;}
+  .timeline-item{position:absolute; right:1px; left:1px; background:var(--surface2); border-radius:5px; padding:1px 3px; font-size:10.5px; line-height:1.25; overflow:hidden; border-right:3px solid var(--gold); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:1; touch-action:none;}
   .timeline-item.chip-picked{outline:2px solid var(--gold); outline-offset:1px; z-index:2;}
   .timeline-item.chip-active{outline:2px solid var(--text); outline-offset:1px; z-index:2;}
+  .timeline-item.dragging{opacity:.85; box-shadow:0 4px 14px rgba(0,0,0,.35); z-index:5;}
+  .timeline-daycol.list-drag-over{background:rgba(201,162,39,.14); outline:2px dashed var(--gold); outline-offset:-2px;}
+  .timeline-drag-ghost{position:fixed; z-index:999; pointer-events:none; background:var(--text); color:var(--bg); font-size:12px; padding:3px 9px; border-radius:6px; transform:translate(-50%,-135%); white-space:nowrap; display:none; box-shadow:0 2px 8px rgba(0,0,0,.3);}
   .timeline-item .timeline-chip-text{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--lc,2); overflow:hidden; white-space:normal; word-break:break-word; overflow-wrap:break-word;}
   .timeline-item-add{position:absolute; right:1px; left:1px; z-index:2;}
   .timeline-add-input{width:100%; border:1px solid var(--gold); border-radius:5px; background:var(--surface); color:var(--text); font-family:inherit; font-size:11px; padding:3px 5px;}
@@ -751,6 +774,7 @@
 
   footer{margin-top:50px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted2); font-size:14.5px; line-height:1.7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
   .reset-btn{background:transparent; border:1px solid var(--border-strong); color:var(--muted2); padding:6px 12px; border-radius:8px; font-size:13.5px; cursor:pointer; font-family:inherit;}
+  .reset-btn.active{background:#c0453f; border-color:#c0453f; color:#fff;}
   .reset-btn:disabled{opacity:.4; cursor:default;}
   .reset-btn:disabled:hover{color:var(--muted2); border-color:var(--border-strong);}
   .reset-btn:hover{color:var(--text); border-color:var(--muted);}
@@ -1097,7 +1121,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -1184,6 +1208,7 @@ function loadData(){
         data.goodThingsRestoredOnce = true;
       }
       data.possibilities = parsed.possibilities || [];
+      data.customTimerPresets = parsed.customTimerPresets || [];
       data.todayIdeasDate = parsed.todayIdeasDate || '';
       data.todayIdeasShowFavOnly = !!parsed.todayIdeasShowFavOnly;
       data.todayIdeas = parsed.todayIdeas || [];
@@ -2941,10 +2966,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','possibilities'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','possibilities','customTimerPresets'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], customTimerPresets:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -4299,6 +4324,7 @@ function timelineChipHtml(it, dayIdx, dateStr){
   // enough does the browser's own line-clamp ellipsis kick in, on the last visible line.
   const availableLines = Math.max(1, Math.floor((height-2)/13));
   return `<div class="timeline-item ${picked?'chip-picked':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;"
+    onpointerdown="startTimelineItemDrag(event,'${it.kind}','${it.data.id}')"
     onclick="event.stopPropagation(); onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${it.time}', '${dateStr}')">
     <span class="timeline-chip-text" style="--lc:${availableLines};">${escapeHtml(timelineItemLabel(it))}</span>
   </div>`;
@@ -4367,7 +4393,104 @@ function commitTimelineMoveTo(dayIdx, slot, dateStr){
   }
   flashStatus(`הועבר ליום ${DAYS[dayIdx]} · ${slot}`);
 }
+/* long-press-and-drag a scheduled item straight to another day/time, as an alternative to the
+   2-tap "pick up, then tap a target" flow above -- same disambiguation shape as startChipPress
+   (hold-timer arms the drag, movement before it fires is treated as a scroll instead), and on
+   drop it hands off to the existing commitTimelineMoveTo so the move goes through the exact same
+   gcal-sync-safe path as every other way of moving a scheduled item. */
+let timelineDragState = null;
+let justDraggedTimelineItem = null;
+function timelineDragGhostEl(){
+  let el = document.getElementById('timelineDragGhost');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'timelineDragGhost';
+    el.className = 'timeline-drag-ghost';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function startTimelineItemDrag(e, kind, id){
+  if(timelinePickedItem) return; // already mid-move via the 2-tap flow -- don't also start a drag
+  e.stopPropagation();
+  const chip = e.currentTarget;
+  timelineDragState = {
+    kind, id, chip, active:false, everMoved:false, scrolling:false,
+    targetDayIdx:null, targetSlot:null, targetDateStr:null,
+    startX:e.clientX, startY:e.clientY, lastY:e.clientY,
+    timer: setTimeout(()=>{
+      if(!timelineDragState || timelineDragState.scrolling) return;
+      timelineDragState.active = true;
+      chip.classList.add('dragging');
+      if(navigator.vibrate) navigator.vibrate(15);
+    }, 380)
+  };
+}
+function onTimelineItemDragMove(e){
+  if(!timelineDragState) return;
+  const dx = e.clientX-timelineDragState.startX, dy = e.clientY-timelineDragState.startY;
+  if(!timelineDragState.active){
+    if(!timelineDragState.scrolling && Math.hypot(dx,dy) > 10){
+      clearTimeout(timelineDragState.timer);
+      timelineDragState.scrolling = true;
+    }
+    if(timelineDragState.scrolling){
+      const scrollEl = document.getElementById('timelineScroll');
+      if(scrollEl) scrollEl.scrollTop += (timelineDragState.lastY - e.clientY);
+      timelineDragState.lastY = e.clientY;
+    }
+    return;
+  }
+  if(Math.hypot(dx,dy) > 6) timelineDragState.everMoved = true;
+  e.preventDefault();
+  timelineDragState.chip.style.transform = `translate(${dx}px, ${dy}px) scale(1.04)`;
+  timelineDragState.chip.style.pointerEvents = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  timelineDragState.chip.style.pointerEvents = '';
+  document.querySelectorAll('.timeline-daycol.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+  const col = under ? under.closest('.timeline-daycol[data-day-idx]') : null;
+  const ghost = timelineDragGhostEl();
+  if(col){
+    col.classList.add('list-drag-over');
+    const rect = col.getBoundingClientRect();
+    timelineDragState.targetDayIdx = +col.dataset.dayIdx;
+    timelineDragState.targetDateStr = col.dataset.dateStr;
+    timelineDragState.targetSlot = timelineSlotFromY(e.clientY - rect.top);
+    ghost.textContent = `${DAYS[timelineDragState.targetDayIdx]} · ${timelineDragState.targetSlot}`;
+    ghost.style.left = e.clientX+'px';
+    ghost.style.top = e.clientY+'px';
+    ghost.style.display = 'block';
+  } else {
+    timelineDragState.targetDayIdx = null;
+    timelineDragState.targetSlot = null;
+    timelineDragState.targetDateStr = null;
+    ghost.style.display = 'none';
+  }
+}
+function onTimelineItemDragUp(){
+  if(!timelineDragState) return;
+  clearTimeout(timelineDragState.timer);
+  const ghost = document.getElementById('timelineDragGhost');
+  if(ghost) ghost.style.display = 'none';
+  if(timelineDragState.active){
+    timelineDragState.chip.style.transform = '';
+    timelineDragState.chip.classList.remove('dragging');
+    document.querySelectorAll('.timeline-daycol.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+    if(timelineDragState.everMoved && timelineDragState.targetDayIdx!==null){
+      const {kind, id, targetDayIdx, targetSlot, targetDateStr} = timelineDragState;
+      justDraggedTimelineItem = id;
+      setTimeout(()=>{ if(justDraggedTimelineItem===id) justDraggedTimelineItem = null; }, 400);
+      timelinePickedItem = {kind, id};
+      commitTimelineMoveTo(targetDayIdx, targetSlot, targetDateStr);
+    }
+  }
+  timelineDragState = null;
+}
+document.addEventListener('pointermove', onTimelineItemDragMove);
+document.addEventListener('pointerup', onTimelineItemDragUp);
+document.addEventListener('pointercancel', onTimelineItemDragUp);
 function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
+  if(justDraggedTimelineItem===id){ justDraggedTimelineItem = null; return; } // the click that fires right after a real drag-drop shouldn't also open the sheet
   if(timelinePickedItem){
     // tapping any item while something is picked up (even a different one) resolves the pending
     // move onto its slot -- the same "tap a target" gesture as tapping empty space, so the picked
@@ -4573,7 +4696,7 @@ function renderTimelineGrid(){
         onblur="commitTimelineAddOnBlur(${d.dayIdx}, '${timelineAddCell.slot}', '${d.dateStr}')">
     </div>` : '';
     const itemsHtml = d.timed.map(it=>timelineChipHtml(it, d.dayIdx, d.dateStr)).join('');
-    return `<div class="timeline-daycol" style="height:${totalHeight}px;" onclick="onTimelineColClick(event, ${d.dayIdx}, '${d.dateStr}')">${itemsHtml}${addBox}</div>`;
+    return `<div class="timeline-daycol" data-day-idx="${d.dayIdx}" data-date-str="${d.dateStr}" style="height:${totalHeight}px;" onclick="onTimelineColClick(event, ${d.dayIdx}, '${d.dateStr}')">${itemsHtml}${addBox}</div>`;
   }).join('');
 
   el.innerHTML = `<div class="timeline-body" style="height:${totalHeight}px; --timeline-hour-px:${TIMELINE_PX_PER_HOUR}px;">${hourCol}${dayCols}</div>`;
@@ -6116,6 +6239,7 @@ function resetAll(){
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
   const keepPossibilities = data.possibilities;
+  const keepCustomTimerPresets = data.customTimerPresets;
   const keepHabits = data.habits;
   const keepLists = data.lists;
   const keepDecisionHelperQuotes = data.decisionHelperQuotes;
@@ -6126,7 +6250,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -6361,8 +6485,13 @@ function deleteFeelChip(bank, id){
   saveData();
   rerenderChipBank(bank);
 }
-function reorderChipBank(bank, fromId, toId){
-  reorderArrayById(chipDefsArray(bank), fromId, toId);
+function reorderChipBank(bank, fromId, toId, newHeaderId){
+  const arr = chipDefsArray(bank);
+  if(newHeaderId!==undefined){
+    const item = arr.find(x=>x.id===fromId);
+    if(item) item.headerId = newHeaderId;
+  }
+  reorderArrayById(arr, fromId, toId);
   saveData();
   rerenderChipBank(bank);
 }
@@ -6377,8 +6506,11 @@ function startChipPress(e, bank, id){
   if(deleteModeBank===bank || editModeBank===bank) return; // tapping acts directly in either mode, no hold needed
   e.stopPropagation();
   const chip = e.currentTarget;
+  const item = chipDefsArray(bank).find(x=>x.id===id);
   chipPressState = {
-    bank, id, chip, active:false, everMoved:false, scrolling:false, targetId:null,
+    bank, id, chip, active:false, everMoved:false, scrolling:false, targetId:null, targetHeaderId:undefined,
+    sourceHeaderId: (item && item.headerId) || '',
+    dragColor: hashChipColor(id),
     startX:e.clientX, startY:e.clientY, lastY:e.clientY,
     timer: setTimeout(()=>{
       if(!chipPressState || chipPressState.scrolling) return;
@@ -6416,12 +6548,25 @@ function onChipPressMove(e){
   const under = document.elementFromPoint(e.clientX, e.clientY);
   chipPressState.chip.style.pointerEvents = '';
   const targetChip = under ? under.closest('.feel-chip[data-drag-id]') : null;
-  document.querySelectorAll('.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+  const targetGroup = under ? under.closest('.chip-group[data-header-id]') : null;
+  document.querySelectorAll('.list-drag-over').forEach(c=>{ c.classList.remove('list-drag-over'); c.style.removeProperty('--drag-color'); });
+  document.querySelectorAll('.list-drag-over-reassign').forEach(c=>{ c.classList.remove('list-drag-over-reassign'); c.style.removeProperty('--drag-color'); });
   if(targetChip && targetChip!==chipPressState.chip){
-    targetChip.classList.add('list-drag-over');
+    const targetHeaderId = targetGroup ? targetGroup.dataset.headerId : undefined;
+    const crossHeader = targetHeaderId!==undefined && targetHeaderId!==chipPressState.sourceHeaderId;
+    targetChip.style.setProperty('--drag-color', chipPressState.dragColor);
+    targetChip.classList.add(crossHeader ? 'list-drag-over-reassign' : 'list-drag-over');
     chipPressState.targetId = targetChip.dataset.dragId;
+    chipPressState.targetHeaderId = crossHeader ? targetHeaderId : undefined;
+  } else if(targetGroup && targetGroup.dataset.headerId!==chipPressState.sourceHeaderId){
+    // hovering an empty header group (or its label/whitespace), no chip under the finger to anchor to
+    targetGroup.style.setProperty('--drag-color', chipPressState.dragColor);
+    targetGroup.classList.add('list-drag-over-reassign');
+    chipPressState.targetId = null;
+    chipPressState.targetHeaderId = targetGroup.dataset.headerId;
   } else {
     chipPressState.targetId = null;
+    chipPressState.targetHeaderId = undefined;
   }
 }
 function onChipPressUp(){
@@ -6430,9 +6575,12 @@ function onChipPressUp(){
   if(chipPressState.active){
     chipPressState.chip.style.transform = '';
     chipPressState.chip.classList.remove('dragging');
-    document.querySelectorAll('.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
+    document.querySelectorAll('.list-drag-over').forEach(c=>{ c.classList.remove('list-drag-over'); c.style.removeProperty('--drag-color'); });
+    document.querySelectorAll('.list-drag-over-reassign').forEach(c=>{ c.classList.remove('list-drag-over-reassign'); c.style.removeProperty('--drag-color'); });
     if(chipPressState.targetId && chipPressState.targetId!==chipPressState.id){
-      reorderChipBank(chipPressState.bank, chipPressState.id, chipPressState.targetId);
+      reorderChipBank(chipPressState.bank, chipPressState.id, chipPressState.targetId, chipPressState.targetHeaderId);
+    } else if(chipPressState.targetHeaderId!==undefined){
+      setChipHeader(chipPressState.bank, chipPressState.id, chipPressState.targetHeaderId);
     }
   }
   chipPressState = null;
@@ -6574,7 +6722,7 @@ function feelChipGridHtml(bank){
   const ungrouped = list.filter(c=>!c.headerId || !headers.some(h=>h.id===c.headerId));
   return `
     ${grouped.map(g => `
-      <div class="chip-group">
+      <div class="chip-group" data-header-id="${g.header.id}">
         <div class="chip-group-header">${escapeHtml(g.header.label)}</div>
         <div class="feel-chip-grid ${modeClass}">
           ${g.chips.map(item=>feelChipHtml(bank, item)).join('')}
@@ -6582,7 +6730,7 @@ function feelChipGridHtml(bank){
       </div>
     `).join('')}
     ${ungrouped.length ? `
-      <div class="chip-group">
+      <div class="chip-group" data-header-id="">
         <div class="chip-group-header chip-group-header-none">ללא כותרת</div>
         <div class="feel-chip-grid ${modeClass}">
           ${ungrouped.map(item=>feelChipHtml(bank, item)).join('')}
@@ -7751,6 +7899,32 @@ function playTimerEndChime(){
 }
 const TOOLS_TIMER_PRESETS = [60, 180, 300, 600];
 let toolsTimerRemaining = 0, toolsTimerInterval = null, toolsTimerPreset = null;
+// custom timer lengths, on top of the 4 built-in presets -- deletion deliberately isn't a tiny ✕
+// glued onto every button (too easy to mistouch); instead a "מחיקת זמנים" mode toggle, same pattern
+// as the delete-mode already used for chip banks, turns a tap on a CUSTOM preset into a delete
+// instead of starting it, and the built-in 4 are never deletable at all.
+let timerDeleteMode = false;
+function toggleTimerDeleteMode(){ timerDeleteMode = !timerDeleteMode; renderToolsView(); }
+function addCustomTimerPreset(){
+  const input = document.getElementById('customTimerMinutesInput');
+  const mins = input ? parseFloat(input.value) : NaN;
+  if(!mins || mins<=0) return;
+  const seconds = Math.round(mins*60);
+  if(!data.customTimerPresets) data.customTimerPresets = [];
+  if(!TOOLS_TIMER_PRESETS.includes(seconds) && !data.customTimerPresets.includes(seconds)) data.customTimerPresets.push(seconds);
+  input.value = '';
+  saveData();
+  renderToolsView();
+}
+function deleteCustomTimerPreset(seconds){
+  data.customTimerPresets = (data.customTimerPresets||[]).filter(s=>s!==seconds);
+  saveData();
+  renderToolsView();
+}
+function onCustomTimerPresetTap(seconds){
+  if(timerDeleteMode){ deleteCustomTimerPreset(seconds); return; }
+  startToolsTimer(seconds);
+}
 function startToolsTimer(seconds){
   stopToolsTimer();
   toolsTimerRemaining = seconds;
@@ -7907,6 +8081,12 @@ function renderToolsView(){
       <p class="hint" style="margin:0 0 10px;">טיימר פשוט לקחת רגע, בלי לחשוב על כלום אחר.</p>
       <div class="timer-presets">
         ${TOOLS_TIMER_PRESETS.map(s=>`<button type="button" class="timer-preset-btn ${toolsTimerPreset===s?'active':''}" onclick="startToolsTimer(${s})">${formatTimerClock(s)}</button>`).join('')}
+        ${(data.customTimerPresets||[]).map(s=>`<button type="button" class="timer-preset-btn ${toolsTimerPreset===s?'active':''} ${timerDeleteMode?'timer-preset-delmode':''}" onclick="onCustomTimerPresetTap(${s})">${formatTimerClock(s)}</button>`).join('')}
+      </div>
+      <div class="add-row" style="margin-top:2px;">
+        <input type="number" id="customTimerMinutesInput" placeholder="דקות" min="1" step="1" style="max-width:90px;" onkeydown="if(event.key==='Enter') addCustomTimerPreset();">
+        <button onclick="addCustomTimerPreset()">+ הוסף זמן משלי</button>
+        ${(data.customTimerPresets||[]).length ? `<button type="button" class="reset-btn ${timerDeleteMode?'active':''}" onclick="toggleTimerDeleteMode()">${timerDeleteMode?'✓ סיום מחיקה':'🗑 מחיקת זמנים'}</button>` : ''}
       </div>
       ${toolsTimerPreset!==null ? `
         <div class="timer-display" id="toolsTimerDisplay">${formatTimerClock(toolsTimerRemaining)}</div>
