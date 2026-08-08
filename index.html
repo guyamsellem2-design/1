@@ -363,6 +363,8 @@
   button:active{ transform:scale(0.96); }
   @media (prefers-reduced-motion: reduce){ button{ transition:background .2s ease, border-color .2s ease, color .2s ease; } button:active{ transform:none; } }
   .add-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .possibility-add-row{align-items:center;}
+  .possibility-prefix{font-size:14px; color:var(--muted); white-space:nowrap;}
   .view-controls{display:flex; flex-direction:column; gap:4px;}
   .view-controls-row{display:flex; gap:5px; flex-wrap:nowrap;}
   .view-controls-row select{flex:1; min-width:0; padding:7px 5px; font-size:12.5px;}
@@ -420,7 +422,6 @@
   .habit-li{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:10px 12px;}
   .habit-li-row{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
   .habit-text{flex:1; font-size:14.5px; color:var(--text); line-height:1.45;}
-  .habit-li-actions{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
   .habit-context-row{margin-top:4px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px;}
   .habit-context-text{font-size:12.5px; color:var(--muted); cursor:pointer;}
   .habit-context-text.habit-context-empty{color:var(--muted2);}
@@ -726,7 +727,7 @@
   .timeline-add-input{width:100%; border:1px solid var(--gold); border-radius:5px; background:var(--surface); color:var(--text); font-family:inherit; font-size:11px; padding:3px 5px;}
   .timeline-untimed{display:flex; flex-direction:column; gap:4px; padding:6px; background:var(--surface2); border-radius:8px; margin-bottom:8px;}
   .timeline-untimed-title{font-size:12px; color:var(--muted); font-weight:600;}
-  .timeline-untimed-chip{background:var(--surface3); border-radius:6px; padding:4px 7px; font-size:12.5px; cursor:pointer; border-right:3px solid var(--gold);}
+  .timeline-untimed-chip{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface3); border-radius:6px; padding:4px 7px; font-size:12.5px; cursor:pointer; border-right:3px solid var(--gold);}
   /* tapping an item opens this instead of anything native -- a real bottom sheet, like the one a
      phone calendar app opens for editing an event, that we fully own and can extend later. */
   .timeline-sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1100;}
@@ -794,8 +795,8 @@
     <div class="options-menu-panel" id="optionsMenuPanel" style="display:none;">
       <button class="reset-btn" id="undoBtn" onclick="performUndo()" disabled title="בטל">↶ בטל</button>
       <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled title="בצע שוב">↷ בצע שוב</button>
-      <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
-      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+      <button class="soft-btn mode-toggle-night" id="nightBtn" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn mode-toggle-soft" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </div>
   <button class="reset-btn" id="collapseAllBtn" onclick="collapseAllOnCurrentView()" disabled title="ממזער הכל בדף הזה, כולל פתקים">🗕 מזער הכל</button>
@@ -811,6 +812,8 @@
     </div>
     <div class="header-actions">
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+      <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </header>
 
@@ -851,8 +854,12 @@
         <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
         <button onclick="addSomeday()">הוסף</button>
       </div>
-      <div id="pendingBodyCheck-someday" style="margin-bottom:8px;"></div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+        <div id="pendingBodyCheck-someday"></div>
+        <div id="pendingSomedayDescWrap"></div>
+      </div>
       <div class="add-row" style="margin-bottom:10px;">
+        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">🗕 מזער</button>
         <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
           <option value="manual">מיון לפי: ידני (גרירה)</option>
           <option value="date">מיון לפי: תאריך הוספה</option>
@@ -1015,7 +1022,11 @@
 <div id="domainPageView" style="display:none;">
   <div class="domain-page-topbar">
     <div class="domain-page-header"><h1>📓 נושאים</h1></div>
-    <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+    <div class="header-actions">
+      <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+      <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+    </div>
   </div>
   <p class="hint" style="margin:0 0 18px;">כל נושא הוא חוצץ במחברת — שם, צבע וסדר ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור · לחיצה על חוצץ פותחת את הפתקים שלו</p>
   <div class="topic-tab-strip" id="topicTabStrip"></div>
@@ -1030,7 +1041,11 @@
 <div id="toolsView" style="display:none;">
   <div class="domain-page-topbar">
     <div class="domain-page-header"><h1>🧰 כלים</h1></div>
-    <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+    <div class="header-actions">
+      <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+      <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+    </div>
   </div>
   <div class="feel-block" id="procrastinationBlock"></div>
   <div id="toolsContent"></div>
@@ -1040,7 +1055,11 @@
 <div id="listsView" style="display:none;">
   <div class="domain-page-topbar">
     <div class="domain-page-header"><h1>🗂 רשימות</h1></div>
-    <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+    <div class="header-actions">
+      <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+      <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+    </div>
   </div>
   <div id="listsContent"></div>
 </div>
@@ -1408,17 +1427,17 @@ function flashStatus(msg){
 }
 
 /* ---------- soft mode ---------- */
+// several instances of each button now exist (top of every tab, plus the options menu) -- update
+// them all in lockstep instead of assuming a single #nightBtn/#softBtn
 function renderModeButtons(){
-  const nightBtn = document.getElementById('nightBtn');
-  const softBtn = document.getElementById('softBtn');
-  if(nightBtn){
+  document.querySelectorAll('.mode-toggle-night').forEach(nightBtn=>{
     nightBtn.classList.toggle('on', data.nightMode);
     nightBtn.innerHTML = data.nightMode ? '<span class="btn-icon">☀️</span> מצב בהיר' : '<span class="btn-icon">🌙</span> מצב לילה';
-  }
-  if(softBtn){
+  });
+  document.querySelectorAll('.mode-toggle-soft').forEach(softBtn=>{
     softBtn.classList.toggle('on', data.softMode);
     softBtn.innerHTML = '<span class="btn-icon">🍃</span> מצב רגוע';
-  }
+  });
 }
 function toggleSoftMode(){
   data.softMode = !data.softMode;
@@ -1780,6 +1799,9 @@ function navigateToDomain(id){ activeNoteDomain = id; switchMainView('topics'); 
 function navigateHome(){ switchMainView('home'); }
 function switchMainView(view){
   if(mainView==='topics' && view!=='topics') collapseUnpinnedNotesForTopic(activeNoteDomain);
+  // leaving a specific list always lands back on the lists overview next time, not wherever she
+  // happened to be -- so "רשימות" never feels like a dead end with only deleting the list as a way out
+  if(mainView==='lists' && view!=='lists') activeListId = null;
   mainView = view;
   data.mainView = view;
   saveData();
@@ -3521,6 +3543,13 @@ function applyListCap(key, itemCount){
   expandRow.style.display = needsCap ? 'flex' : 'none';
   const btn = expandRow.querySelector('.list-expand-btn');
   if(btn) btn.innerHTML = `<span class="chev">${expanded?'▴':'▾'}</span> ${expanded?'כווץ בחזרה':'הצג את כל הרשימה'}`;
+  // a twin of the same toggle, up at the top of the list (next to the sort/filter row) -- so
+  // collapsing back doesn't require scrolling all the way down to the bottom-edge button first
+  const topBtn = document.getElementById(key+'TopMinimizeBtn');
+  if(topBtn){
+    topBtn.style.display = needsCap ? '' : 'none';
+    topBtn.textContent = expanded ? '🗕 כווץ בחזרה' : '🗕 מזער';
+  }
 }
 function renderTasks(){
   const el = document.getElementById('taskList');
@@ -3746,7 +3775,19 @@ function openTaskEdit(id){
   renderTasks();
   if(opening){ const input = document.getElementById(`taskEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
 }
-function closeTaskEdit(){ editingTaskId = null; scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid(); }
+// closing an item's edit re-minimizes every sub inside it (body-check, description, subtask
+// scheduling...) -- so reopening it later always starts fully collapsed instead of reappearing
+// however it happened to be left expanded last time.
+function closeTaskEdit(){
+  const id = editingTaskId || scheduleEditingTaskId;
+  if(id){
+    bodyCheckOpenIds.delete('task:'+id);
+    taskDescOpenIds.delete(id);
+    taskDateOpenIds.delete(id);
+    Array.from(subtaskDateOpenIds).forEach(k=>{ if(k.startsWith(id+':')) subtaskDateOpenIds.delete(k); });
+  }
+  editingTaskId = null; scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid();
+}
 function saveTaskEdit(id){
   const t = data.tasks.find(t=>t.id===id);
   if(!t) return;
@@ -3772,6 +3813,8 @@ function saveTaskEdit(id){
   scheduleEditingTaskId = null;
   taskDateOpenIds.delete(id);
   taskDescOpenIds.delete(id);
+  bodyCheckOpenIds.delete('task:'+id);
+  Array.from(subtaskDateOpenIds).forEach(k=>{ if(k.startsWith(id+':')) subtaskDateOpenIds.delete(k); });
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -4260,10 +4303,14 @@ function timelineChipHtml(it, dayIdx, dateStr){
     <span class="timeline-chip-text" style="--lc:${availableLines};">${escapeHtml(timelineItemLabel(it))}</span>
   </div>`;
 }
+function deleteUntimedTimelineItem(kind, id){
+  if(kind==='task') deleteTask(id); else deleteAnchor(id);
+}
 function timelineUntimedChipHtml(it, dayIdx, dateStr){
   const draft = !!it.data.draft;
   return `<div class="timeline-untimed-chip ${draft?'chip-draft':''}" onclick="openTimelineSheet('${it.kind}','${it.data.id}')">
-    ${DAYS[dayIdx]}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}
+    <span>${DAYS[dayIdx]}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}</span>
+    <span class="del-task" onclick="event.stopPropagation(); deleteUntimedTimelineItem('${it.kind}','${it.data.id}')" title="מחיקה">✕</span>
   </div>`;
 }
 function openTimelineAddCell(dayIdx, slot){
@@ -4765,7 +4812,13 @@ function openSomedayEdit(id){
   const input = document.getElementById(`somedayEditText-${id}`);
   scrollElIntoView(input && input.closest('li'));
 }
-function closeSomedayEdit(){ editingSomedayId = null; renderSomeday(); }
+function closeSomedayEdit(){
+  if(editingSomedayId){
+    bodyCheckOpenIds.delete('someday:'+editingSomedayId);
+    expandedSomeday.delete(editingSomedayId);
+  }
+  editingSomedayId = null; renderSomeday();
+}
 function saveSomedayEdit(id){
   const s = data.someday.find(s=>s.id===id);
   if(!s) return;
@@ -4774,6 +4827,8 @@ function saveSomedayEdit(id){
   s.text = text;
   s.domain = document.getElementById(`somedayEditDomain-${id}`).value;
   editingSomedayId = null;
+  bodyCheckOpenIds.delete('someday:'+id);
+  expandedSomeday.delete(id);
   saveData();
   renderSomeday();
 }
@@ -4829,6 +4884,28 @@ function convertSomedaySubtaskToTask(id, subId){
   renderScheduleGrid();
   openTimelineSheet('task', newTask.id);
 }
+// a description field pre-creation, next to the pending body-check toggle, same idea as the "תיאור"
+// toggle added to the someday EDIT form -- so a description/first-thoughts can be captured right at
+// creation instead of only after saving and reopening to edit.
+let pendingSomedayDescOpen = false;
+let pendingSomedayDesc = '';
+function togglePendingSomedayDesc(){
+  pendingSomedayDescOpen = !pendingSomedayDescOpen;
+  renderPendingSomedayDesc();
+}
+function onPendingSomedayDescInput(val){ pendingSomedayDesc = val; }
+function renderPendingSomedayDesc(){
+  const el = document.getElementById('pendingSomedayDescWrap');
+  if(!el) return;
+  const hasContent = !!pendingSomedayDesc.trim();
+  el.innerHTML = `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="togglePendingSomedayDesc()">${pendingSomedayDescOpen?'▾':'▸'} תיאור</button>
+    ${pendingSomedayDescOpen ? `<textarea class="detail-desc" dir="auto" placeholder="הרחבה, הקשר, פרטים..." oninput="onPendingSomedayDescInput(this.value)">${escapeHtml(pendingSomedayDesc)}</textarea>` : ''}`;
+}
+function resetPendingSomedayDesc(){
+  pendingSomedayDesc = '';
+  pendingSomedayDescOpen = false;
+  renderPendingSomedayDesc();
+}
 function addSomeday(){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
   const input = document.getElementById('somedayInput');
@@ -4837,9 +4914,10 @@ function addSomeday(){
   const domainSel = document.getElementById('somedayDomain');
   const domain = domainSel ? domainSel.value : data.domains[0].id;
   const bodyCheck = {...pendingBodyCheck.someday};
-  data.someday.push({id:uid(), text, domain, description:'', subtasks:[], createdAt:Date.now(), bodyCheck});
+  data.someday.push({id:uid(), text, domain, description:pendingSomedayDesc, subtasks:[], createdAt:Date.now(), bodyCheck});
   input.value='';
   resetPendingBodyCheck('someday');
+  resetPendingSomedayDesc();
   saveData();
   renderSomeday();
 }
@@ -4893,7 +4971,7 @@ function suggestionsSubViewHtml(){
       <button onclick="addSuggestion()">הוסף</button>
     </div>
     <div class="add-row" id="suggDetailsFields" style="display:none;">
-      <label class="field-label">מתשובה עד (לא חובה)<input type="date" id="suggReplyDate"></label>
+      <label class="field-label">תשובה עד (לא חובה)<input type="date" id="suggReplyDate"></label>
       ${timePickerHtml('suggReplyTime', '', 'שעה')}
     </div>
     <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
@@ -4920,7 +4998,7 @@ function bodyCheckStatusBadgesHtml(item, opts){
   const badges = [];
   if(bc.expand==='contract') badges.push('<span class="sugg-status-badge sugg-status-contract">🥀 מכווץ</span>');
   if(bc.expand==='expand') badges.push('<span class="sugg-status-badge sugg-status-expand">🌱 מרחיב</span>');
-  if(opts.urgencyOptions){
+  if(opts.urgencyOptions && !opts.hideUrgency){
     if(bc.urgency==='objective') badges.push('<span class="sugg-status-badge">⏰ דחוף</span>');
     if(bc.urgency==='other') badges.push('<span class="sugg-status-badge">🗣️ דחוף (העדפה של מישהו אחר)</span>');
     if(bc.urgency==='relief') badges.push('<span class="sugg-status-badge">💭 '+URGENCY_LABELS.relief+'</span>');
@@ -4928,6 +5006,12 @@ function bodyCheckStatusBadgesHtml(item, opts){
   }
   if(opts.showEnergy && bc.energy==='no') badges.push('<span class="sugg-status-badge">🔋 אין לי אנרגיה לזה</span>');
   return badges.length ? `<div class="sugg-status-row">${badges.join('')}</div>` : '';
+}
+// short inline version, "· דחוף (...)", meant to sit on the SAME line as a due-date badge
+// ("תשובה עד" / "להחליט עד") instead of a separate row below it -- avoids showing urgency twice
+function urgencyInlineText(item){
+  const u = (item.bodyCheck||{}).urgency;
+  return u ? ' · דחוף ('+URGENCY_LABELS[u]+')' : '';
 }
 function renderSuggestions(){
   const el = document.getElementById('suggestionList');
@@ -4948,8 +5032,8 @@ function renderSuggestions(){
       <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
-      ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due" onclick="openSuggestionEdit('${s.id}')" title="לחיצה לשינוי מועד התשובה">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}</div>` : ''}
-      ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true})}
+      ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due" onclick="openSuggestionEdit('${s.id}')" title="לחיצה לשינוי מועד התשובה">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}${urgencyInlineText(s)}</div>` : ''}
+      ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true, hideUrgency: !!(s.replyDate || s.replyTime)})}
     </li>`;
   }).join('');
   applyListCap('suggestion', data.suggestions.length);
@@ -4962,8 +5046,8 @@ function suggestionEditFormHtml(s){
         <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע? (רשות)">
       </div>
       <div class="edit-form-row">
-        <label class="field-label">מתשובה עד<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}" onchange="onSuggReplyDateChange('${s.id}', this.value)"></label>
-        ${timePickerHtml('suggEditTime-'+s.id, s.replyTime||'', 'שעה')}
+        <label class="field-label">תשובה עד<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}" onchange="onSuggReplyDateChange('${s.id}', this.value)"></label>
+        <label class="field-label">שעה${timePickerHtml('suggEditTime-'+s.id, s.replyTime||'', 'שעה')}</label>
       </div>
       <div class="hint sugg-reply-comfort-hint" id="suggReplyComfortHint-${s.id}" style="display:none;">רגע — זה באמת זמן נוח בשבילי להשיב עד אז?</div>
       <div class="edit-form-row">
@@ -4988,7 +5072,16 @@ function openSuggestionEdit(id){
   renderSuggestions();
   if(opening){ const input = document.getElementById(`suggEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
 }
-function closeSuggestionEdit(){ editingSuggestionId = null; renderSuggestions(); }
+function closeSuggestionEdit(){
+  if(editingSuggestionId){
+    const key = 'suggestion:'+editingSuggestionId;
+    bodyCheckOpenIds.delete(key);
+    decisionHelperOpenIds.delete(key);
+    answerDraftOpenIds.delete(key);
+    decisionHelperMoreOpenIds.delete(key);
+  }
+  editingSuggestionId = null; renderSuggestions();
+}
 // a gentle nudge, not a blocking confirm() -- shows the moment a reply-by date/time is actually
 // set, so committing to a deadline for answering someone always comes with a beat to check whether
 // that's a comfortable pace or just an automatic "sure, I'll get back to you."
@@ -5039,6 +5132,13 @@ function saveSuggestionEdit(id){
   const timeInput = document.getElementById(`suggEditTime-${id}`);
   s.replyTime = timeInput ? timeInput.value : '';
   editingSuggestionId = null;
+  {
+    const key = 'suggestion:'+id;
+    bodyCheckOpenIds.delete(key);
+    decisionHelperOpenIds.delete(key);
+    answerDraftOpenIds.delete(key);
+    decisionHelperMoreOpenIds.delete(key);
+  }
   syncSuggestionReplyToSchedule(s);
   saveData();
   renderSuggestions();
@@ -5230,7 +5330,16 @@ function openDilemmaEdit(id){
   renderGeneralDilemmaList();
   if(opening){ const input = document.getElementById(`dilemmaEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
 }
-function closeDilemmaEdit(){ editingDilemmaId = null; renderGeneralDilemmaList(); }
+function closeDilemmaEdit(){
+  if(editingDilemmaId){
+    const key = 'dilemma:'+editingDilemmaId;
+    bodyCheckOpenIds.delete(key);
+    decisionHelperOpenIds.delete(key);
+    answerDraftOpenIds.delete(key);
+    decisionHelperMoreOpenIds.delete(key);
+  }
+  editingDilemmaId = null; renderGeneralDilemmaList();
+}
 function saveDilemmaEdit(id){
   const d = (data.generalDilemmas||[]).find(d=>d.id===id);
   if(!d) return;
@@ -5241,6 +5350,13 @@ function saveDilemmaEdit(id){
   d.domain = domainSel ? domainSel.value : '';
   d.decisionDate = document.getElementById(`dilemmaEditDate-${id}`).value || '';
   editingDilemmaId = null;
+  {
+    const key = 'dilemma:'+id;
+    bodyCheckOpenIds.delete(key);
+    decisionHelperOpenIds.delete(key);
+    answerDraftOpenIds.delete(key);
+    decisionHelperMoreOpenIds.delete(key);
+  }
   saveData();
   renderGeneralDilemmaList();
 }
@@ -5250,14 +5366,32 @@ function saveDilemmaEdit(id){
    shared between suggestions and general dilemmas -- the content is the same everywhere it's opened
    from, so editing it from one item's panel is visible in every other open panel too. ---------- */
 const decisionHelperOpenIds = new Set();
+// which list container each kind's rows live in, so opening "עוד" can scroll the item's own name
+// up to the top of the screen instead of leaving it wherever it happened to land
+const DECISION_HELPER_LIST_ID = { suggestion:'suggestionList', dilemma:'dilemmaList' };
 function toggleDecisionHelper(kind, id){
   const key = kind+':'+id;
-  if(decisionHelperOpenIds.has(key)) decisionHelperOpenIds.delete(key); else decisionHelperOpenIds.add(key);
+  const opening = !decisionHelperOpenIds.has(key);
+  if(opening) decisionHelperOpenIds.add(key); else decisionHelperOpenIds.delete(key);
+  // opening "עוד" goes straight to reply-scripts + "איך אני אענה?" expanded -- the rest (quotes/
+  // links) stays tucked behind its own further toggle, see decisionHelperMoreOpenIds below
+  if(opening) answerDraftOpenIds.add(key);
   bodyCheckSection(kind).render();
+  if(opening){
+    const listId = DECISION_HELPER_LIST_ID[kind];
+    const row = listId ? document.querySelector(`#${listId} [data-drag-id="${id}"]`) : null;
+    if(row) requestAnimationFrame(()=>{ row.scrollIntoView({behavior:'smooth', block:'start'}); });
+  }
 }
 function decisionHelperToggleBtnHtml(kind, id){
   const isOpen = decisionHelperOpenIds.has(kind+':'+id);
   return `<button type="button" class="subtask-toggle-btn has-content" onclick="toggleDecisionHelper('${kind}','${id}')">💭 עוד... עזרה בקבלת החלטה${isOpen?' ▴':''}</button>`;
+}
+const decisionHelperMoreOpenIds = new Set();
+function toggleDecisionHelperMore(kind, id){
+  const key = kind+':'+id;
+  if(decisionHelperMoreOpenIds.has(key)) decisionHelperMoreOpenIds.delete(key); else decisionHelperMoreOpenIds.add(key);
+  rerenderActiveDilemmaList();
 }
 // any change here can be visible from either sub-tab's currently-open panel, so refresh whichever
 // list is actually on screen right now rather than a specific kind
@@ -5413,6 +5547,7 @@ function decisionHelperPanelHtml(kind, id){
   const quotes = data.decisionHelperQuotes || [];
   const links = data.decisionHelperLinks || [];
   const scripts = data.replyScripts || [];
+  const moreOpen = decisionHelperMoreOpenIds.has(kind+':'+id);
   return `<div class="decision-helper-panel">
     <div class="bc-row-label">תשובות מוכנות להעתקה — למי שמחכה לתשובה ממני</div>
     <div class="decision-quote-list">
@@ -5423,6 +5558,8 @@ function decisionHelperPanelHtml(kind, id){
       <button onclick="addReplyScript()">הוסף</button>
     </div>
     <div style="margin-top:10px;">${answerDraftBoxHtml(kind, id)}</div>
+    <button type="button" class="subtask-toggle-btn" style="margin-top:10px;" onclick="toggleDecisionHelperMore('${kind}','${id}')">${moreOpen?'▴ פחות':'▾ עוד — משפטים וקישורים שעוזרים לי'}</button>
+    ${moreOpen ? `
     <div class="bc-row-label" style="margin-top:10px;">משפטים ושאלות שעוזרים לי לקבל החלטה</div>
     <div class="decision-quote-list">
       ${quotes.map(q=>`<div class="decision-quote-row" data-entry-id="${q.id}">
@@ -5447,6 +5584,7 @@ function decisionHelperPanelHtml(kind, id){
       <input type="text" id="decisionLinkUrlInput" placeholder="קישור" dir="ltr">
       <button onclick="addDecisionHelperLink()">הוסף</button>
     </div>
+    ` : ''}
   </div>`;
 }
 
@@ -6901,11 +7039,9 @@ function renderHabits(){
             <span class="habit-inline-actions">
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">+עוגן</button>
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ הוסף כמשימה</button>
+              <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
+              <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
             </span>
-          </div>
-          <div class="habit-li-actions">
-            <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
-            <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
           </div>
           ${lastDoneLabel ? `<div class="habit-last-done">${lastDoneLabel}</div>` : ''}
           ${stepsOpen ? `
@@ -7756,10 +7892,11 @@ function renderToolsView(){
     </div>
 
     <div class="tools-card">
-      <h3>🌈 הכל אפשרי</h3>
-      <p class="hint" style="margin:0 0 10px;">הכל אפשרי? הכל אפשרי! כל מה שכותבים כאן מופיע כאפשרות פתוחה — לא כמשימה, לא כהתחייבות.</p>
-      <div class="add-row">
-        <input type="text" id="possibilityInput" placeholder="למשל: לצאת לטבע לבד" onkeydown="if(event.key==='Enter') addPossibility();">
+      <h3>🌈 הכל אפשרי? הכל אפשרי!</h3>
+      <p class="hint" style="margin:0 0 10px;">בוא רגע נדמיין שהכל אפשרי, בלי גבולות. פשוט מקום לכתוב בו בלי שיפוטיות את כל מה שאפשרי — תן/י לעצמך לזרום עם זה ופשוט לזרוק לכאן רעיונות, מציאותיים או לא מציאותיים, מחשבות חיוביות, או כל מה שעולה לראש שבא לך לומר שהוא אפשרי. זה מרחב מקבל — אפשר לכתוב פה הכל. זה יכול לעזור לפתוח אותנו לראות מעבר למה שאנחנו לא מודעים שאפשרי בחיים, וזה כלי טוב להשראה.</p>
+      <div class="add-row possibility-add-row">
+        <span class="possibility-prefix">זה לגמרי אפשרי ש...</span>
+        <input type="text" id="possibilityInput" placeholder="לצאת לטבע לבד" onkeydown="if(event.key==='Enter') addPossibility();">
         <button onclick="addPossibility()">הוסף</button>
       </div>
       <ul class="tasks" id="possibilitiesList">${possibilitiesListHtml()}</ul>
@@ -7819,6 +7956,7 @@ function render(){
   renderSomeday();
   renderDilemmasSection();
   renderPendingBodyCheck('someday');
+  renderPendingSomedayDesc();
   renderReflection();
   applyAllSectionCollapse();
   applyMainViewState();
