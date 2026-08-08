@@ -168,8 +168,11 @@
   .keep-note-editor:focus{outline:none;}
   .keep-note-editor.note-clip{max-height:110px;}
   .keep-note-editor:empty::before{content:attr(data-placeholder); color:var(--muted2);}
-  .note-size-btn{cursor:pointer; font-size:13px; color:var(--muted2); padding:3px 6px; border-radius:6px;}
-  .note-size-btn:hover{background:var(--surface3);}
+  .note-size-btn{cursor:pointer; font-size:12.5px; color:var(--muted2); padding:4px 10px; border-radius:999px; border:1px solid var(--border-strong); background:var(--surface3); white-space:nowrap;}
+  .note-size-btn:hover{background:var(--surface2);}
+  .note-pin-btn{cursor:pointer; font-size:12.5px; color:var(--muted2); padding:4px 10px; border-radius:999px; border:1px solid var(--border-strong); background:var(--surface3); white-space:nowrap;}
+  .note-pin-btn.active{background:var(--gold); color:#1a1206; border-color:transparent; font-weight:600;}
+  .keep-note-minimized .note-pin-btn{flex-shrink:0;}
   .keep-note-actions{display:flex; justify-content:space-between; align-items:center; margin-top:8px;}
   .keep-colors{display:flex; gap:5px;}
   .keep-colors span{width:14px; height:14px; border-radius:50%; cursor:pointer; border:1.5px solid rgba(128,128,128,0.25); flex-shrink:0;}
@@ -519,6 +522,10 @@
   .breathing-circle{width:120px; height:120px; border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--gold), var(--surface3)); transform:scale(1); transition:transform 5s linear; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:#1a1a1a;}
   .breathing-controls{display:flex; gap:10px; align-items:center; margin-top:16px;}
   .undo-redo-bar{position:fixed; bottom:12px; left:12px; z-index:90; display:flex; gap:8px;}
+  .options-menu-wrap{position:relative;}
+  .options-menu-panel{position:absolute; bottom:calc(100% + 8px); left:0; display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,0.75); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid var(--border-strong); border-radius:12px; padding:10px; box-shadow:0 8px 24px -8px rgba(0,0,0,0.5); min-width:150px;}
+  body.night-mode .options-menu-panel{background:rgba(20,20,24,0.75);}
+  .options-menu-panel .soft-btn, .options-menu-panel .reset-btn{width:100%; text-align:center;}
   .sync-menu{position:fixed; top:12px; left:12px; z-index:90;}
   .sync-menu-btn{background:var(--surface); border:1px solid var(--border-strong); border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:0 4px 14px -6px rgba(0,0,0,0.4);}
   .sync-menu-panel{display:none; position:absolute; top:calc(100% + 8px); left:0; width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 70px); overflow-y:auto; background:transparent;}
@@ -612,7 +619,7 @@
   .anchor-form input[type="date"]::-webkit-calendar-picker-indicator,
   .anchor-form input[type="time"]::-webkit-calendar-picker-indicator{display:none;}
   .anchor-form input[type="date"], .anchor-form input[type="time"]{padding-left:6px;}
-  ul.tasks li.detail-li{display:block; background:var(--surface2); border-radius:9px; padding:10px 12px; margin:-4px 0 8px; border-bottom:none;}
+  ul.tasks li.detail-li, .video-list li.detail-li{display:block; background:var(--surface2); border-radius:9px; padding:10px 12px; margin:-4px 0 8px; border-bottom:none;}
   .detail-label{font-size:13px; color:var(--muted2); margin-bottom:4px; display:block;}
   .detail-label-row{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; cursor:pointer; user-select:none;}
   .detail-label-row .detail-label{margin-bottom:0;}
@@ -782,8 +789,15 @@
 </div>
 
 <div class="undo-redo-bar">
-  <button class="reset-btn" id="undoBtn" onclick="performUndo()" disabled title="בטל">↶ בטל</button>
-  <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled title="בצע שוב">↷ בצע שוב</button>
+  <div class="options-menu-wrap">
+    <button class="reset-btn" id="optionsMenuBtn" onclick="toggleOptionsMenu()" title="אפשרויות">⚙ אפשרויות</button>
+    <div class="options-menu-panel" id="optionsMenuPanel" style="display:none;">
+      <button class="reset-btn" id="undoBtn" onclick="performUndo()" disabled title="בטל">↶ בטל</button>
+      <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled title="בצע שוב">↷ בצע שוב</button>
+      <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+    </div>
+  </div>
   <button class="reset-btn" id="collapseAllBtn" onclick="collapseAllOnCurrentView()" disabled title="ממזער הכל בדף הזה, כולל פתקים">🗕 מזער הכל</button>
 </div>
 
@@ -797,8 +811,6 @@
     </div>
     <div class="header-actions">
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
-      <button class="soft-btn" id="nightBtn" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
-      <button class="soft-btn" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </header>
 
@@ -1066,7 +1078,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [] };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -1152,6 +1164,7 @@ function loadData(){
         data.goodThingsList = SEED_GOOD_THINGS.map(x=>({...x}));
         data.goodThingsRestoredOnce = true;
       }
+      data.possibilities = parsed.possibilities || [];
       data.todayIdeasDate = parsed.todayIdeasDate || '';
       data.todayIdeasShowFavOnly = !!parsed.todayIdeasShowFavOnly;
       data.todayIdeas = parsed.todayIdeas || [];
@@ -1289,6 +1302,23 @@ function flushSaveData(){
 }
 window.addEventListener('pagehide', flushSaveData);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushSaveData(); });
+let optionsMenuOpen = false;
+function toggleOptionsMenu(){
+  optionsMenuOpen = !optionsMenuOpen;
+  const panel = document.getElementById('optionsMenuPanel');
+  if(panel) panel.style.display = optionsMenuOpen ? 'flex' : 'none';
+}
+function closeOptionsMenu(){
+  if(!optionsMenuOpen) return;
+  optionsMenuOpen = false;
+  const panel = document.getElementById('optionsMenuPanel');
+  if(panel) panel.style.display = 'none';
+}
+document.addEventListener('click', (e)=>{
+  if(!optionsMenuOpen) return;
+  if(e.target.closest('.options-menu-wrap')) return;
+  closeOptionsMenu();
+}, true);
 function updateUndoRedoButtons(){
   const undoBtn = document.getElementById('undoBtn');
   const redoBtn = document.getElementById('redoBtn');
@@ -1749,6 +1779,7 @@ let mainView = 'home';
 function navigateToDomain(id){ activeNoteDomain = id; switchMainView('topics'); }
 function navigateHome(){ switchMainView('home'); }
 function switchMainView(view){
+  if(mainView==='topics' && view!=='topics') collapseUnpinnedNotesForTopic(activeNoteDomain);
   mainView = view;
   data.mainView = view;
   saveData();
@@ -1811,14 +1842,35 @@ let recordingNoteId = null;
 let mediaRecorder = null;
 let recordedChunks = [];
 let recordingStream = null;
-function getNoteLevel(noteId){ return noteSizeLevel.get(noteId) || 0; }
+// unpinned notes default to fully minimized (2) so a topic page opens quiet, not a wall of open
+// text boxes; pinning (📌) is what keeps a note open on its own regardless of that default.
+function getNoteLevel(domainId, noteId){
+  if(noteSizeLevel.has(noteId)) return noteSizeLevel.get(noteId);
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  return (n && n.pinned) ? 0 : 2;
+}
 function setNoteLevel(domainId, noteId, level){
   level = Math.max(0, Math.min(2, level));
-  if(level===0) noteSizeLevel.delete(noteId); else noteSizeLevel.set(noteId, level);
+  noteSizeLevel.set(noteId, level);
   renderKeepGrid(domainId);
 }
-function minimizeNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(noteId)+1); }
-function expandNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(noteId)-1); }
+function minimizeNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(domainId, noteId)+1); }
+function expandNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(domainId, noteId)-1); }
+function toggleNotePin(domainId, noteId){
+  const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
+  if(!n) return;
+  n.pinned = !n.pinned;
+  if(n.pinned) noteSizeLevel.set(noteId, 0); // pinning also opens it right away, not just "will stay open next time"
+  saveData();
+  renderKeepGrid(domainId);
+}
+// leaving a topic's own tab (switching topics, or leaving the נושאים page entirely) minimizes
+// whatever was left open there, unless it's pinned -- an open note is meant to stay in view only
+// while she's actually on that topic, not accumulate as clutter everywhere she's ever visited.
+function collapseUnpinnedNotesForTopic(domainId){
+  if(!domainId) return;
+  ensureDomainNotes(domainId).forEach(n=>{ if(!n.pinned) noteSizeLevel.delete(n.id); });
+}
 function autoGrowNoteTextarea(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
 function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(!data.domainNotes[id]) data.domainNotes[id] = []; return data.domainNotes[id]; }
 function renderKeepGrid(id){
@@ -1829,13 +1881,14 @@ function renderKeepGrid(id){
   withFocusPreserved('keepGrid', ()=>{
   el.innerHTML = notes.map(n=>{
     const isDrawing = drawingNoteId===n.id;
-    const level = getNoteLevel(n.id);
+    const level = getNoteLevel(id, n.id);
     const noteStyle = `background:${n.color||'var(--surface2)'};${n.color?` --note-fg:${contrastTextColor(n.color)}; --note-fg-muted:${contrastMutedColor(n.color)};`:''}`;
     if(level===2){
       const preview = (n.text||'').trim().slice(0,70) || 'פתק ריק';
       return `
       <div class="keep-note keep-note-minimized" style="${noteStyle}" onclick="expandNoteStep('${id}','${n.id}')" title="לחיצה להרחבה">
         <span class="keep-note-preview">${escapeHtml(preview)}${n.drawing?' 🎨':''}</span>
+        <span class="note-pin-btn ${n.pinned?'active':''}" onclick="event.stopPropagation(); toggleNotePin('${id}','${n.id}')" title="${n.pinned?'בטל נעיצה':'נעיצה — נשאר פתוח תמיד'}">📌</span>
         <span class="chev">▸</span>
       </div>`;
     }
@@ -1843,6 +1896,7 @@ function renderKeepGrid(id){
     return `
     <div class="keep-note" style="${noteStyle}">
       <div class="keep-note-topbar">
+        <span class="note-pin-btn ${n.pinned?'active':''}" onclick="toggleNotePin('${id}','${n.id}')" title="${n.pinned?'בטל נעיצה':'נעיצה — נשאר פתוח תמיד'}">📌</span>
         ${isMedium
           ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
           : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
@@ -2014,7 +2068,9 @@ function deleteMemo(domainId, noteId, memoId){
 function addDomainNote(){
   if(!activeNoteDomain) return;
   const notes = ensureDomainNotes(activeNoteDomain);
-  notes.unshift({id:uid(), text:'', color:'', drawing:'', memos:[]});
+  const newNote = {id:uid(), text:'', color:'', drawing:'', memos:[], pinned:false};
+  notes.unshift(newNote);
+  noteSizeLevel.set(newNote.id, 0); // freshly created -- open, not minimized, since it's about to be typed into
   saveData();
   renderKeepGrid(activeNoteDomain);
   requestAnimationFrame(()=>{ const ta = document.querySelector('#keepGrid .keep-note-editor'); if(ta) ta.focus(); });
@@ -2863,10 +2919,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','possibilities'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -4520,6 +4576,7 @@ function quickAddAnchorGeneric(){
 /* ---------- topics notebook: tab strip selects which topic's notes show below ---------- */
 function selectTopicTab(id){
   if(activeNoteDomain===id) return;
+  collapseUnpinnedNotesForTopic(activeNoteDomain);
   activeNoteDomain = id;
   renderDomainEditor();
   renderKeepGrid(id);
@@ -5791,6 +5848,7 @@ function resetAll(){
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
+  const keepPossibilities = data.possibilities;
   const keepHabits = data.habits;
   const keepLists = data.lists;
   const keepDecisionHelperQuotes = data.decisionHelperQuotes;
@@ -5801,7 +5859,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -6509,6 +6567,7 @@ function renderProcrastinationBlock(){
 
 /* ---------- inspiring videos ---------- shown by their own title, never the raw link */
 let videosBlockOpen = false;
+const expandedVideos = new Set();
 function toggleVideosBlock(){ videosBlockOpen = !videosBlockOpen; renderInspiringVideos(); updateCollapseAllButton(); }
 function addInspiringVideo(){
   const titleInput = document.getElementById('videoTitleInput');
@@ -6517,15 +6576,24 @@ function addInspiringVideo(){
   let url = urlInput.value.trim();
   if(!title || !url) return;
   if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  data.inspiringVideos.push({id: uid(), title, url, createdAt: Date.now()});
+  data.inspiringVideos.push({id: uid(), title, url, description:'', createdAt: Date.now()});
   titleInput.value=''; urlInput.value='';
   saveData();
   renderInspiringVideos();
 }
 function deleteInspiringVideo(id){
   data.inspiringVideos = data.inspiringVideos.filter(v=>v.id!==id);
+  expandedVideos.delete(id);
   saveData();
   renderInspiringVideos();
+}
+function toggleVideoExpand(id){
+  if(expandedVideos.has(id)) expandedVideos.delete(id); else expandedVideos.add(id);
+  renderInspiringVideos();
+}
+function onVideoDescInput(id, val){
+  const v = (data.inspiringVideos||[]).find(v=>v.id===id);
+  if(v){ v.description = val; saveData(); }
 }
 function renderInspiringVideos(){
   const el = document.getElementById('inspiringVideosBlock');
@@ -6539,11 +6607,19 @@ function renderInspiringVideos(){
         <input type="text" id="videoUrlInput" placeholder="קישור" dir="ltr">
         <button onclick="addInspiringVideo()">הוסף</button>
       </div>
-      ${videos.length ? `<ul class="video-list">${videos.map(v=>`
+      ${videos.length ? `<ul class="video-list">${videos.map(v=>{
+        const isExpanded = expandedVideos.has(v.id);
+        const hasDesc = !!(v.description||'').trim();
+        return `
         <li class="video-li">
-          <a href="${escapeAttr(v.url)}" target="_blank" rel="noopener">${escapeHtml(v.title)}</a>
+          <a href="${escapeAttr(v.url)}" target="_blank" rel="noopener" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(v.title)}</a>
+          <span class="expand-btn ${hasDesc?'has-content':''}" onclick="toggleVideoExpand('${v.id}')" title="תיאור">${isExpanded?'▾':'▸'} תיאור</span>
           <span class="del-task" onclick="deleteInspiringVideo('${v.id}')">✕</span>
-        </li>`).join('')}</ul>` : '<div class="empty">עדיין אין סרטונים שמורים</div>'}
+        </li>
+        ${isExpanded ? `<li class="detail-li">
+          <textarea class="detail-desc" oninput="onVideoDescInput('${v.id}', this.value)" placeholder="למה זה מעורר השראה, מה לזכור ממנו...">${escapeHtml(v.description||'')}</textarea>
+        </li>` : ''}`;
+      }).join('')}</ul>` : '<div class="empty">עדיין אין סרטונים שמורים</div>'}
     ` : ''}
   `;
 }
@@ -7504,6 +7580,32 @@ function runBreathingPhase(phase, chainId){
   }, dur*1000);
 }
 
+/* ---------- "הכל אפשרי" ---------- an open-ended list of possibilities, not tasks or commitments --
+   each entry is shown wrapped in "זה לגמרי אפשרי ש..." so writing something down never reads as a
+   promise to do it. */
+function possibilitiesListHtml(){
+  const list = data.possibilities || [];
+  if(!list.length) return '<li class="empty">עדיין לא נכתב כלום כאן</li>';
+  return list.slice().reverse().map(p=>`
+    <li class="task-li" data-drag-id="${p.id}">
+      <span class="task-text" style="flex:1">זה לגמרי אפשרי ש${escapeHtml(p.text)}</span>
+      <span class="del-task" onclick="deletePossibility('${p.id}')">✕</span>
+    </li>`).join('');
+}
+function addPossibility(){
+  const input = document.getElementById('possibilityInput');
+  const text = input.value.trim();
+  if(!text) return;
+  data.possibilities.push({id: uid(), text, createdAt: Date.now()});
+  input.value = '';
+  saveData();
+  renderToolsView();
+}
+function deletePossibility(id){
+  data.possibilities = data.possibilities.filter(p=>p.id!==id);
+  saveData();
+  renderToolsView();
+}
 function renderToolsView(){
   const el = document.getElementById('toolsContent');
   if(!el) return;
@@ -7513,6 +7615,16 @@ function renderToolsView(){
       <p class="hint" style="margin:0 0 4px;">תחביבים, דברים מרגיעים, דברים שמטעינים אותי. מסמנים מה בוחרים לעשות עכשיו — נשאר מסומן עד שלוחצים שוב.</p>
       <p class="hint" style="margin:0 0 10px;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</p>
       ${feelChipGridHtml('activeGoodThings')}
+    </div>
+
+    <div class="tools-card">
+      <h3>🌈 הכל אפשרי</h3>
+      <p class="hint" style="margin:0 0 10px;">הכל אפשרי? הכל אפשרי! כל מה שכותבים כאן מופיע כאפשרות פתוחה — לא כמשימה, לא כהתחייבות.</p>
+      <div class="add-row">
+        <input type="text" id="possibilityInput" placeholder="למשל: לצאת לטבע לבד" onkeydown="if(event.key==='Enter') addPossibility();">
+        <button onclick="addPossibility()">הוסף</button>
+      </div>
+      <ul class="tasks" id="possibilitiesList">${possibilitiesListHtml()}</ul>
     </div>
 
     <div class="tools-card">
