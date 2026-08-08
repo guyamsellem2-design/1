@@ -731,8 +731,9 @@
      block; simpler and far more reliable, at the small cost of the day-names row no longer staying
      pinned while scrolling in this mode specifically. */
   .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:5000; border-radius:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; background:var(--bg);}
-  .timeline-toolbar{display:flex; justify-content:flex-end; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
+  .timeline-toolbar{display:flex; justify-content:flex-end; gap:6px; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
   .timeline-fs-btn{background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:5px 10px; font-size:12.5px; font-family:inherit; cursor:pointer;}
+  .timeline-fs-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
   .timeline-daynames{display:flex; background:var(--surface3); border-bottom:1px solid var(--border);}
   .timeline-daynames-spacer{width:32px; flex-shrink:0;}
   .timeline-dayname{flex:1; min-width:0; text-align:center; font-size:10.5px; font-weight:600; padding:4px 1px; line-height:1.3;}
@@ -947,7 +948,10 @@
       <div id="scheduleTabTimeline" style="display:none;">
         <div id="timelineUntimedWrap"></div>
         <div class="timeline-wrap" id="timelineWrap">
-          <div class="timeline-toolbar"><button type="button" class="timeline-fs-btn" id="timelineFsBtn" onclick="toggleTimelineFullscreen()">⤢ מסך מלא</button></div>
+          <div class="timeline-toolbar">
+            <button type="button" class="timeline-fs-btn" id="timelineDragModeBtn" onclick="toggleTimelineDesktopDragMode()" title="במחשב, גרירה בעכבר לא תמיד נתפסת כלחיצה ארוכה -- מצב הזה מדליק גרירה מיידית בלי להחזיק">🖱 מצב גרירה</button>
+            <button type="button" class="timeline-fs-btn" id="timelineFsBtn" onclick="toggleTimelineFullscreen()">⤢ מסך מלא</button>
+          </div>
           <div class="timeline-daynames" id="timelineDaynames"></div>
           <div id="timelineActionBarWrap"></div>
           <div class="timeline-scroll" id="timelineScroll">
@@ -4334,6 +4338,23 @@ function toggleTimelineFullscreen(){
   if(wrap) wrap.classList.toggle('fullscreen', timelineFullscreen);
   if(btn) btn.textContent = timelineFullscreen ? '✕ סגירה' : '⤢ מסך מלא';
 }
+// Escape closes timeline fullscreen from the keyboard, same as the ✕ button -- a mouse user on a
+// desktop has no swipe-back gesture to fall on, so a keyboard escape hatch matters more there.
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && timelineFullscreen) toggleTimelineFullscreen();
+});
+// on a real mouse, a hold-to-arm drag is unreliable (a mousedown that so much as twitches before
+// the timer fires gets read as a scroll instead) -- this mode skips the hold entirely so a plain
+// mousedown-and-move drags immediately, toggled on/off explicitly rather than guessed from input type.
+let timelineDesktopDragMode = false;
+function toggleTimelineDesktopDragMode(){
+  timelineDesktopDragMode = !timelineDesktopDragMode;
+  const btn = document.getElementById('timelineDragModeBtn');
+  if(btn){
+    btn.classList.toggle('active', timelineDesktopDragMode);
+    btn.textContent = timelineDesktopDragMode ? '🖱 גרירה פעילה — לחיצה ליציאה' : '🖱 מצב גרירה';
+  }
+}
 // the block only ever shows the name -- position on the axis already says when it is, exactly
 // like a real calendar's week view; repeating the start time in the label just crowded out the
 // name on narrow blocks (that was the previous version's actual bug, not a display preference).
@@ -4453,6 +4474,16 @@ function startTimelineItemDrag(e, kind, id){
   // gesture that competes with our own pointermove-driven drag -- block it right at pointerdown
   e.preventDefault();
   const chip = e.currentTarget;
+  if(timelineDesktopDragMode){
+    // drag mode is an explicit, already-made decision -- no hold-timer needed, arm right away
+    timelineDragState = {
+      kind, id, chip, active:true, everMoved:false, scrolling:false,
+      targetDayIdx:null, targetSlot:null, targetDateStr:null,
+      startX:e.clientX, startY:e.clientY, lastY:e.clientY, timer:null
+    };
+    chip.classList.add('dragging');
+    return;
+  }
   timelineDragState = {
     kind, id, chip, active:false, everMoved:false, scrolling:false,
     targetDayIdx:null, targetSlot:null, targetDateStr:null,
