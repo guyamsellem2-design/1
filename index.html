@@ -409,6 +409,11 @@
   .dimmed-item{filter:saturate(0.5) brightness(0.92); opacity:.65;}
   .chip-draft{filter:saturate(0.6) brightness(0.97); opacity:.8; border-style:dashed !important;}
   .chip-draft .draft-badge{color:var(--muted2); font-size:11px; margin-inline-start:6px;}
+  /* .chip-draft's dashed border-box reads fine on an actual small chip/pill, but on a full list
+     row (anchors/tasks list) it drew a thick dashed rectangle around the whole row on top of the
+     already-present "🌱 טיוטה" text badge -- messy and redundant. full rows keep only the dimming,
+     the badge stays the sole draft indicator, and the row's own subtle bottom divider is restored. */
+  ul.tasks li.chip-draft{border-style:none !important; border-bottom:1px solid var(--border) !important;}
   .schedule-reminder{font-size:13.5px; color:var(--muted); background:var(--surface2); border-radius:10px; padding:10px 12px; margin-bottom:12px; line-height:1.5;}
   .overdue-divider{display:block; padding:16px 4px 6px; border-bottom:none;}
   .overdue-divider-line{border-top:2px solid var(--gold); opacity:.55; margin-bottom:10px;}
@@ -762,6 +767,10 @@
   .timeline-drop-preview{position:absolute; right:1px; left:1px; border:2px dashed var(--gold); border-radius:5px; background:rgba(201,162,39,.12); pointer-events:none; z-index:3; display:none; box-sizing:border-box;}
   .timeline-item .timeline-chip-text{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--lc,2); overflow:hidden; white-space:normal; word-break:break-word; overflow-wrap:break-word;}
   .timeline-item-add{position:absolute; right:1px; left:1px; z-index:2;}
+  /* first tap on empty space -- just shows where, no keyboard yet; a second tap on this exact
+     marker is what actually opens the write-in input (see onTimelineColClick / openTimelineAddCell) */
+  .timeline-select-marker{position:absolute; right:1px; left:1px; z-index:2; border:2px dashed var(--gold); border-radius:5px; background:rgba(201,162,39,.14); cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden; box-sizing:border-box;}
+  .timeline-select-marker span{font-size:9.5px; color:var(--text); text-align:center; padding:0 3px; line-height:1.2;}
   .timeline-add-input{width:100%; border:1px solid var(--gold); border-radius:5px; background:var(--surface); color:var(--text); font-family:inherit; font-size:11px; padding:3px 5px;}
   .timeline-untimed{display:flex; flex-direction:column; gap:4px; padding:6px; background:var(--surface2); border-radius:8px; margin-bottom:8px;}
   .timeline-untimed-title{font-size:12px; color:var(--muted); font-weight:600;}
@@ -812,6 +821,13 @@
 </head>
 <body>
 <div class="pull-refresh" id="pullRefresh"><span class="pull-refresh-icon">↓</span></div>
+
+<!-- lives at the top level, not inside the "לוח + משימות" section body, so it works as a true
+     overlay no matter which section is collapsed or which tab is active -- opening it from
+     elsewhere (someday, today's ideas, a list item...) must never require that section to already
+     be expanded, and must never move/scroll the person away from wherever they actually are. -->
+<div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="closeTimelineSheet()" style="display:none;"></div>
+<div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
 
 <div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
 <div class="nav-drawer" id="navDrawer">
@@ -1040,8 +1056,6 @@
         </div>
       </div>
 
-      <div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="closeTimelineSheet()" style="display:none;"></div>
-      <div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
     </div>
   </section>
 
@@ -4472,6 +4486,10 @@ function timelinePerDay(){
 }
 let timelinePickedItem = null;  // {kind, id} -- "picked up" via the sheet's quick-move link, waiting for a tap to move to
 let timelineAddCell = null;     // {dayIdx, slot} -- which day currently shows a write-in input, and where
+// a first tap on empty space only marks the spot (shows exactly where, no keyboard yet); a second
+// tap on that same marked spot is what actually opens the write-in input -- so a tap never pops
+// the keyboard up by surprise.
+let timelineSelectedCell = null; // {dayIdx, slot, dateStr}
 let timelineFullscreen = false;
 function timelineItemLabel(it){ return it.kind==='task' ? it.data.text : it.data.label; }
 function toggleTimelineFullscreen(){
@@ -4541,6 +4559,7 @@ function timelineUntimedChipHtml(it, dayIdx, dateStr){
 }
 function openTimelineAddCell(dayIdx, slot){
   timelineAddCell = {dayIdx, slot};
+  timelineSelectedCell = null;
   renderTimelineGrid();
 }
 function cancelTimelineAdd(){ timelineAddCell = null; renderTimelineGrid(); }
@@ -4803,11 +4822,16 @@ function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
   openTimelineSheet(kind, id);
 }
 function onTimelineColClick(e, dayIdx, dateStr){
-  if(e.target !== e.currentTarget) return; // a click that landed on a child (an item, the add input) isn't a click on empty space
+  if(e.target !== e.currentTarget) return; // a click that landed on a child (an item, the add input, the select marker) isn't a click on empty space
   const rect = e.currentTarget.getBoundingClientRect();
   const slot = timelineSlotFromY(e.clientY - rect.top);
   if(timelinePickedItem){ commitTimelineMoveTo(dayIdx, slot, dateStr); return; }
-  openTimelineAddCell(dayIdx, slot);
+  if(timelineSelectedCell && timelineSelectedCell.dayIdx===dayIdx && timelineSelectedCell.slot===slot){
+    openTimelineAddCell(dayIdx, slot); // second tap on the same spot -> now actually open the input
+  } else {
+    timelineSelectedCell = {dayIdx, slot, dateStr}; // first tap (or a tap on a different spot) -> just mark it
+    renderTimelineGrid();
+  }
 }
 function timelineJumpToEdit(kind, id, dayIdx){
   closeTimelineSheet();
@@ -5052,8 +5076,13 @@ function renderTimelineGrid(){
         onkeydown="if(event.key==='Enter') commitTimelineAdd(${d.dayIdx}, '${timelineAddCell.slot}', '${d.dateStr}'); if(event.key==='Escape') cancelTimelineAdd();"
         onblur="commitTimelineAddOnBlur(${d.dayIdx}, '${timelineAddCell.slot}', '${d.dateStr}')">
     </div>` : '';
+    const isSelectedHere = !isAddingHere && timelineSelectedCell && timelineSelectedCell.dayIdx===d.dayIdx;
+    const selectMarker = isSelectedHere ? `<div class="timeline-select-marker" style="top:${timelineTopPx(timelineSelectedCell.slot)}px; height:${Math.max(18, timelinePxPerHour/2)}px;"
+      onclick="event.stopPropagation(); openTimelineAddCell(${d.dayIdx}, '${timelineSelectedCell.slot}')">
+      <span>${timelineSelectedCell.slot} — לחיצה נוספת לכתיבה</span>
+    </div>` : '';
     const itemsHtml = d.timed.map(it=>timelineChipHtml(it, d.dayIdx, d.dateStr)).join('');
-    return `<div class="timeline-daycol" data-day-idx="${d.dayIdx}" data-date-str="${d.dateStr}" style="height:${totalHeight}px;" onclick="onTimelineColClick(event, ${d.dayIdx}, '${d.dateStr}')">${itemsHtml}${addBox}</div>`;
+    return `<div class="timeline-daycol" data-day-idx="${d.dayIdx}" data-date-str="${d.dateStr}" style="height:${totalHeight}px;" onclick="onTimelineColClick(event, ${d.dayIdx}, '${d.dateStr}')">${itemsHtml}${addBox}${selectMarker}</div>`;
   }).join('');
 
   el.innerHTML = `<div class="timeline-body" style="height:${totalHeight}px; --timeline-hour-px:${timelinePxPerHour}px;">${hourCol}${dayCols}</div>`;
