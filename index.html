@@ -4382,10 +4382,23 @@ function timelineChipHtml(it, dayIdx, dateStr){
 function deleteUntimedTimelineItem(kind, id){
   if(kind==='task') deleteTask(id); else deleteAnchor(id);
 }
+// a daily-repeating anchor with no time matches EVERY day of the displayed week (see
+// anchorAppliesToDate), so without de-duping it would show up here once per day -- several
+// chips that all secretly share one underlying id. Deleting any ONE of those looked, from the
+// outside, like "the X deletes everything in this tray": it really deleted the single anchor
+// behind all of them, which made every one of its duplicate chips disappear at once. Callers
+// must de-dupe by kind+id (see renderTimelineGrid) before this ever renders more than one chip
+// per real item -- a repeating anchor shows its repeat pattern here instead of a single day,
+// since picking one specific day to display would be misleading for something that recurs.
 function timelineUntimedChipHtml(it, dayIdx, dateStr){
   const draft = !!it.data.draft;
+  const repeatType = it.kind==='anchor' ? (it.data.repeatType || 'weekly') : null;
+  const repeatLabel = (repeatType && repeatType!=='once' && repeatType!=='weekly')
+    ? ({daily:'🔁 מדי יום', monthly:'🔁 מדי חודש', yearly:'🔁 מדי שנה'}[repeatType])
+    : null;
+  const dayOrRepeat = repeatLabel || DAYS[dayIdx];
   return `<div class="timeline-untimed-chip ${draft?'chip-draft':''}" onclick="openTimelineSheet('${it.kind}','${it.data.id}')">
-    <span>${DAYS[dayIdx]}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}</span>
+    <span>${dayOrRepeat}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}</span>
     <span class="del-task" onclick="event.stopPropagation(); deleteUntimedTimelineItem('${it.kind}','${it.data.id}')" title="מחיקה">✕</span>
   </div>`;
 }
@@ -4803,8 +4816,17 @@ function renderTimelineGrid(){
   }
   if(barWrap) barWrap.innerHTML = timelineActionBarHtml();
 
+  // de-duped by kind+id -- a daily-repeating anchor with no time matches EVERY day (see
+  // anchorAppliesToDate), so without this it would push one entry per day here, all sharing the
+  // same underlying record; see the comment on timelineUntimedChipHtml for what that caused.
   const untimedItems = [];
-  perDay.forEach(d=>{ d.untimed.forEach(it=>untimedItems.push({it, dayIdx:d.dayIdx, dateStr:d.dateStr})); });
+  const seenUntimedIds = new Set();
+  perDay.forEach(d=>{ d.untimed.forEach(it=>{
+    const key = it.kind+':'+it.data.id;
+    if(seenUntimedIds.has(key)) return;
+    seenUntimedIds.add(key);
+    untimedItems.push({it, dayIdx:d.dayIdx, dateStr:d.dateStr});
+  }); });
   if(untimedWrap){
     const visibleItems = timelineUntimedExpanded ? untimedItems : untimedItems.slice(0,2);
     const hiddenCount = untimedItems.length - visibleItems.length;
