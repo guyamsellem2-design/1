@@ -848,6 +848,7 @@
         </select>
         <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
       </div>
+      <div class="section-divider"></div>
       <ul class="tasks scroll-cap" id="somedayList"></ul>
       <div class="list-expand-row" id="somedayListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('someday')"></button></div>
     </div>
@@ -964,6 +965,8 @@
 
       <div id="scheduleTabAnchors" style="display:none;">
         <div class="card">
+          <div class="add-row"><button onclick="quickAddAnchorGeneric()">+ עוגן</button></div>
+          <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="anchorsList"></ul>
         </div>
       </div>
@@ -3202,63 +3205,35 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 setInterval(()=>{ if(currentSyncUser && navigator.onLine) runFullSync(); }, 60000);
 
 /* ---------- week grid ---------- */
-function closeAllScheduleForms(){ openForm = null; editingAnchorId = null; addingTaskDayIdx = null; renderScheduleGrid(); }
-function openAnchorForm(dayIdx){
-  if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
-  // something else is already open — first click just closes it, matching task/someday behavior
-  if(openForm!==null || addingTaskDayIdx!==null){ closeAllScheduleForms(); return; }
-  openForm = dayIdx; editingAnchorId = null; renderScheduleGrid();
-}
+function closeAllScheduleForms(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
+// editAnchor/the inline anchor-form below are no longer reached by tapping a chip directly (that
+// now opens the quick bottom sheet, same as the timeline tab) -- they're kept as the "עוד אפשרויות"
+// escalation target (recurrence type, buffer, per-item gcal sync...) jumped to from the sheet via
+// timelineJumpToEdit, and by quickAddAnchorForDay below for topic-less setups the sheet can't handle.
 function editAnchor(id, dayIdx){
   if(openForm===dayIdx && editingAnchorId===id){ closeForm(); return; }
-  if(openForm!==null || addingTaskDayIdx!==null){ closeAllScheduleForms(); return; }
+  if(openForm!==null){ closeAllScheduleForms(); return; }
   openForm = dayIdx; editingAnchorId = id; renderScheduleGrid();
 }
 function closeForm(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
-let addingTaskDayIdx = null;
-function openAddTaskForm(dayIdx){
+// "+ עוגן" / "+ משימה" in the list tab: create a blank draft record and open the same quick bottom
+// sheet used everywhere else, instead of expanding an inline creation form in the day column. if
+// the sheet gets closed/cancelled while the title is still empty, it cleans the blank record back up.
+function quickAddAnchorForDay(dayIdx){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
-  if(addingTaskDayIdx===dayIdx){ closeAddTaskForm(); return; }
-  if(addingTaskDayIdx!==null || openForm!==null){ closeAllScheduleForms(); return; }
-  addingTaskDayIdx = dayIdx; renderScheduleGrid();
+  const newAnchor = {id:uid(), day:dayIdx, time:'', endTime:'', label:'', domain:data.domains[0].id, buffer:false, draft:true, repeatType:'weekly', date:'', createdAt:Date.now()};
+  data.anchors.push(newAnchor);
+  saveData();
+  renderScheduleGrid();
+  openTimelineSheet('anchor', newAnchor.id, true);
 }
-function closeAddTaskForm(){ addingTaskDayIdx = null; renderScheduleGrid(); }
-function addTaskFormHtml(dayIdx, dateStr){
-  return `<div class="anchor-form">
-    <div class="edit-form-row">
-      <input type="text" id="newTaskText-${dayIdx}" placeholder="משימה קטנה...">
-      <select id="newTaskDomain-${dayIdx}">${domainOptionsWithEmpty()}</select>
-    </div>
-    <div class="edit-form-row">
-      <select id="newTaskEnergy-${dayIdx}">
-        <option value="">ללא רמת אנרגיה</option>
-        <option value="low">🟢 מטעין</option>
-        <option value="mid" selected>🟡 בינוני</option>
-        <option value="high">🔴 מרוקן</option>
-      </select>
-      ${timePickerHtml('newTaskTime-'+dayIdx, '', 'שעה (רשות)')}
-    </div>
-    <label class="buf-label"><input type="checkbox" id="newTaskDraft-${dayIdx}"> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
-    <div class="anchor-form-actions">
-      <button class="save-btn" onclick="saveNewTaskFromSchedule(${dayIdx}, '${dateStr}')">שמור</button>
-      <button class="cancel-btn" onclick="closeAddTaskForm()">בטל</button>
-    </div>
-  </div>`;
-}
-function saveNewTaskFromSchedule(dayIdx, dateStr){
-  const text = document.getElementById(`newTaskText-${dayIdx}`).value.trim();
-  if(!text) return;
-  const domain = document.getElementById(`newTaskDomain-${dayIdx}`).value;
-  const energy = document.getElementById(`newTaskEnergy-${dayIdx}`).value;
-  const time = document.getElementById(`newTaskTime-${dayIdx}`).value || '';
-  const draft = document.getElementById(`newTaskDraft-${dayIdx}`).checked;
-  const newTask = {id:uid(), text, domain, done:false, energy, date:dateStr, time, endTime:'', description:'', subtasks:[], draft, createdAt:Date.now()};
+function quickAddTaskForDay(dayIdx, dateStr){
+  const newTask = {id:uid(), text:'', domain:data.domains[0]?data.domains[0].id:'', done:false, energy:'', date:dateStr, time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
   data.tasks.push(newTask);
-  addingTaskDayIdx = null;
   saveData();
   renderScheduleGrid();
   renderTasks();
-  applyGcalSyncForTask(newTask, true);
+  openTimelineSheet('task', newTask.id, true);
 }
 function toggleAnchorDateField(dayIdx){
   const sel = document.getElementById(`anchorRepeat-${dayIdx}`);
@@ -4012,7 +3987,6 @@ function renderScheduleGrid(){
 
     const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
     const isEditingThisDay = !!(editingAnchorId && openForm===dayIdx);
-    const isAddingThisDay = openForm===dayIdx && !editingAnchorId;
     const currentRepeatType = isEditingThisDay ? (editingHere.repeatType||'weekly') : 'weekly';
     const showDateField = ['once','monthly','yearly'].includes(currentRepeatType);
     const defaultDateVal = (isEditingThisDay && editingHere.date) ? editingHere.date : dateStr;
@@ -4072,7 +4046,7 @@ function renderScheduleGrid(){
         const a = it.data;
         const dom = domainById(a.domain);
         const isEditingThisAnchor = isEditingThisDay && editingHere.id===a.id;
-        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''} ${data.softMode?'soft-dim':''} ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="editAnchor('${a.id}', ${dayIdx})">
+        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''} ${data.softMode?'soft-dim':''} ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="openTimelineSheet('anchor','${a.id}')">
             ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
             ${escapeHtml(a.label)}
             ${a.draft ? '<span class="draft-badge">🌱 טיוטה</span>' : ''}
@@ -4086,7 +4060,7 @@ function renderScheduleGrid(){
       const showTrash = longPressedTaskId===t.id;
       const isEditingThisTask = scheduleEditingTaskId===t.id;
       const softClass = data.softMode ? (t.energy==='low' ? 'soft-emphasize' : 'soft-dim') : '';
-      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''} ${softClass} ${t.draft?'chip-draft':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{editTaskFromSchedule('${t.id}');}">
+      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''} ${softClass} ${t.draft?'chip-draft':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{openTimelineSheet('task','${t.id}');}">
           ${showTrash ? `<span class="task-chip-trash" onclick="event.stopPropagation(); unscheduleTaskFromWeek('${t.id}')" title="הסרה מתצוגת השבוע">🗑</span>` : ''}
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
@@ -4106,9 +4080,8 @@ function renderScheduleGrid(){
     const itemsHtml = entries.join('');
     const moreHtml = hiddenCount>0 ? `<button type="button" class="day-more" onclick="toggleDayMinimize(${dayIdx})">+${hiddenCount} עוד</button>` : '';
 
-    const addAnchorHtml = isAddingThisDay ? anchorFormHtml : `<button class="add-anchor-btn" onclick="openAnchorForm(${dayIdx})">+ עוגן</button>`;
-    const isAddingTaskThisDay = addingTaskDayIdx===dayIdx;
-    const addTaskHtml = isAddingTaskThisDay ? addTaskFormHtml(dayIdx, dateStr) : `<button class="add-anchor-btn" onclick="openAddTaskForm(${dayIdx})">+ משימה</button>`;
+    const addAnchorHtml = `<button class="add-anchor-btn" onclick="quickAddAnchorForDay(${dayIdx})">+ עוגן</button>`;
+    const addTaskHtml = `<button class="add-anchor-btn" onclick="quickAddTaskForDay(${dayIdx}, '${dateStr}')">+ משימה</button>`;
 
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
@@ -4329,21 +4302,38 @@ function timelineActionBarHtml(){
    for a name + day + time together on narrow blocks. */
 let timelineSheetItem = null;    // {kind, id}
 let timelineSheetDayIdx = null;  // staged day selection while the sheet is open, committed on שמירה
+// set when the sheet is opened on a record created blank just for this sheet (quickAddAnchorForDay/
+// quickAddTaskForDay, list-tab "+ עוגן"/"+ משימה") -- if it gets closed without a title ever being
+// typed, the blank placeholder record is removed instead of lingering in the data forever.
+let timelineSheetIsNew = false;
 function dayIdxForDateStr(dateStr){
   const idx = viewedWeekDates().findIndex(d=>ymd(d)===dateStr);
   return idx>=0 ? idx : 0;
 }
-function openTimelineSheet(kind, id){
+function openTimelineSheet(kind, id, isNew){
   const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
   if(!rec) return;
   timelineSheetItem = {kind, id};
+  timelineSheetIsNew = !!isNew;
   timelineSheetDayIdx = kind==='task' ? dayIdxForDateStr(rec.date) : rec.day;
   document.getElementById('timelineSheetOverlay').style.display = '';
   document.getElementById('timelineSheet').style.display = '';
   renderTimelineSheet();
 }
 function closeTimelineSheet(){
+  if(timelineSheetIsNew && timelineSheetItem){
+    const {kind, id} = timelineSheetItem;
+    const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
+    const label = rec ? (kind==='task' ? rec.text : rec.label) : '';
+    if(rec && !label.trim()){
+      if(kind==='task') data.tasks = data.tasks.filter(x=>x.id!==id); else data.anchors = data.anchors.filter(x=>x.id!==id);
+      saveData();
+      renderScheduleGrid();
+      renderTasks();
+    }
+  }
   timelineSheetItem = null;
+  timelineSheetIsNew = false;
   const overlay = document.getElementById('timelineSheetOverlay'), sheet = document.getElementById('timelineSheet');
   if(overlay) overlay.style.display = 'none';
   if(sheet) sheet.style.display = 'none';
@@ -4392,6 +4382,7 @@ function saveTimelineSheet(){
   const time = timeEl ? timeEl.value : '';
   const draft = document.getElementById('timelineSheetDraft').checked;
   const dateStr = ymd(viewedWeekDates()[timelineSheetDayIdx]);
+  const isNew = timelineSheetIsNew;
   if(kind==='task'){
     const t = data.tasks.find(x=>x.id===id);
     if(!t) return;
@@ -4400,7 +4391,7 @@ function saveTimelineSheet(){
     saveData();
     renderScheduleGrid();
     renderTasks();
-    applyGcalSyncForTask(t, t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd);
+    applyGcalSyncForTask(t, isNew || t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd);
   } else {
     const a = data.anchors.find(x=>x.id===id);
     if(!a) return;
@@ -4408,8 +4399,9 @@ function saveTimelineSheet(){
     a.label = text; a.day = timelineSheetDayIdx; a.time = time; a.draft = draft;
     saveData();
     renderScheduleGrid();
-    applyGcalSyncForAnchor(a, a.day!==prevDay || a.time!==prevTime);
+    applyGcalSyncForAnchor(a, isNew || a.day!==prevDay || a.time!==prevTime);
   }
+  timelineSheetIsNew = false;
   closeTimelineSheet();
   flashStatus('נשמר');
 }
@@ -4489,13 +4481,15 @@ function renderTimelineGrid(){
 }
 
 /* ---------- "עוגנים": a flat, day-agnostic list of every recurring commitment -- for reviewing
-   "everything that repeats" in one glance, same list treatment as the משימות tab. editing jumps to
-   the list tab where the existing full anchor form already lives; nothing duplicated here. */
+   "everything that repeats" in one glance, same list treatment as the משימות tab. editing opens
+   the same quick bottom sheet as everywhere else, right here -- never sends you off to the weekly
+   schedule just to change something. "עוד אפשרויות" inside the sheet still reaches the full form
+   (recurrence type, buffer, per-item gcal sync) when that's actually needed. */
 function anchorRowHtml(a){
   const dom = domainById(a.domain);
   const repeatLabel = {once:'חד-פעמי', daily:'מדי יום', weekly:'מדי שבוע', monthly:'מדי חודש', yearly:'מדי שנה'}[a.repeatType||'weekly'] || 'מדי שבוע';
   const dayLabel = (a.repeatType||'weekly')==='weekly' ? DAYS[a.day] : repeatLabel;
-  return `<li class="task-li ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" onclick="timelineJumpToEdit('anchor','${a.id}', ${a.day})">
+  return `<li class="task-li ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" onclick="openTimelineSheet('anchor','${a.id}')">
     <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>
     <span class="task-text" style="flex:1">${escapeHtml(a.label)}${a.draft?' <span class="draft-badge">🌱 טיוטה</span>':''}</span>
     <span class="task-date-badge">${dayLabel}${a.time?' · '+a.time:''}</span>
@@ -4511,6 +4505,16 @@ function renderAnchorsTab(){
     return (a.time||'').localeCompare(b.time||'');
   });
   el.innerHTML = list.length ? list.map(anchorRowHtml).join('') : '<li class="empty">אין עדיין עוגנים קבועים</li>';
+}
+// "+ עוגן" at the top of the עוגנים tab -- same create-blank-then-open-the-sheet pattern as
+// quickAddAnchorForDay, just without a day column to default to, so today's weekday is used.
+function quickAddAnchorGeneric(){
+  if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
+  const newAnchor = {id:uid(), day:new Date().getDay(), time:'', endTime:'', label:'', domain:data.domains[0].id, buffer:false, draft:true, repeatType:'weekly', date:'', createdAt:Date.now()};
+  data.anchors.push(newAnchor);
+  saveData();
+  renderScheduleGrid();
+  openTimelineSheet('anchor', newAnchor.id, true);
 }
 
 /* ---------- topics notebook: tab strip selects which topic's notes show below ---------- */
@@ -4605,12 +4609,19 @@ function somedayRowHtml(s){
   return html;
 }
 function somedayEditFormHtml(s){
+  const isExpanded = expandedSomeday.has(s.id);
   return `<li class="edit-li" data-drag-id="${s.id}">
     <div class="anchor-form">
-      <input type="text" id="somedayEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="הרעיון">
-      <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
-      ${bodyCheckToggleBtnHtml('someday', s.id)}
-      ${bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {}) : ''}
+      <div class="edit-form-row">
+        <input type="text" id="somedayEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="הרעיון">
+        <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
+      </div>
+      <div class="edit-form-row">
+        ${bodyCheckToggleBtnHtml('someday', s.id)}
+        <span class="expand-btn ${isExpanded?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')">${isExpanded?'▾':'▸'} תיאור</span>
+      </div>
+      ${bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {hideNote:true}) : ''}
+      ${isExpanded ? somedayDescSubtasksHtml(s) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSomedayEdit()">בטל</button>
@@ -4630,20 +4641,33 @@ function convertSomedayToTask(id){
   renderSomeday();
   renderTasks();
   renderScheduleGrid();
-  flashStatus('הפך למשימה');
+  openTimelineSheet('task', newTask.id);
 }
 function somedayDetailHtml(s){
+  return `<li class="detail-li">${somedayDescSubtasksHtml(s)}</li>`;
+}
+function somedayDescSubtasksInnerHtml(s, subsHtml){
+  return `
+    <span class="detail-label">תיאור</span>
+    <textarea class="detail-desc" oninput="onSomedayDescInput('${s.id}', this.value)" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(s.description||'')}</textarea>
+    <span class="detail-label">צעדים קטנים — כדי לראות מתי זה מתקרב להיות ממשי</span>
+    ${subsHtml}
+    <div class="subtask-add-row">
+      <input type="text" id="somedaySubInput-${s.id}" placeholder="צעד קטן...">
+      <button onclick="addSomedaySubtask('${s.id}')">+ הוסף</button>
+    </div>`;
+}
+function somedaySubtasksListHtml(s){
   const subs = (s.subtasks||[]).slice().sort((a,b)=>(b.favorite?1:0)-(a.favorite?1:0));
-  let subsHtml;
-  if(subs.length){
-    const parts = [];
-    let dividerInserted = false;
-    subs.forEach((sub,i)=>{
-      if(!dividerInserted && i>0 && subs[i-1].favorite && !sub.favorite){
-        parts.push('<div class="sub-fav-divider"></div>');
-        dividerInserted = true;
-      }
-      parts.push(`
+  if(!subs.length) return '<div class="empty">אין עדיין צעדים קטנים</div>';
+  const parts = [];
+  let dividerInserted = false;
+  subs.forEach((sub,i)=>{
+    if(!dividerInserted && i>0 && subs[i-1].favorite && !sub.favorite){
+      parts.push('<div class="sub-fav-divider"></div>');
+      dividerInserted = true;
+    }
+    parts.push(`
     <div class="subtask-row" data-someday-id="${s.id}" data-drag-id="${sub.id}">
       <span class="grip" onpointerdown="startListDrag(event,'${sub.id}','.subtask-row',(fromId,toId)=>reorderSomedaySubtasks('${s.id}',fromId,toId))" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <span class="fav-star ${sub.favorite?'active':''}" onclick="toggleSomedaySubtaskFavorite('${s.id}','${sub.id}')" title="${sub.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${sub.favorite?'★':'☆'}</span>
@@ -4654,21 +4678,11 @@ function somedayDetailHtml(s){
       <span class="promote" onclick="convertSomedaySubtaskToTask('${s.id}','${sub.id}')">→ משימה</span>
       <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')">✕</span>
     </div>`);
-    });
-    subsHtml = parts.join('');
-  } else {
-    subsHtml = '<div class="empty">אין עדיין צעדים קטנים</div>';
-  }
-  return `<li class="detail-li">
-    <span class="detail-label">תיאור</span>
-    <textarea class="detail-desc" oninput="onSomedayDescInput('${s.id}', this.value)" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(s.description||'')}</textarea>
-    <span class="detail-label">צעדים קטנים — כדי לראות מתי זה מתקרב להיות ממשי</span>
-    ${subsHtml}
-    <div class="subtask-add-row">
-      <input type="text" id="somedaySubInput-${s.id}" placeholder="צעד קטן...">
-      <button onclick="addSomedaySubtask('${s.id}')">+ הוסף</button>
-    </div>
-  </li>`;
+  });
+  return parts.join('');
+}
+function somedayDescSubtasksHtml(s){
+  return somedayDescSubtasksInnerHtml(s, somedaySubtasksListHtml(s));
 }
 function toggleSomedayExpand(id){
   const opening = !expandedSomeday.has(id);
@@ -4756,7 +4770,7 @@ function convertSomedaySubtaskToTask(id, subId){
   renderSomeday();
   renderTasks();
   renderScheduleGrid();
-  flashStatus('הפך למשימה');
+  openTimelineSheet('task', newTask.id);
 }
 function addSomeday(){
   if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
@@ -4966,7 +4980,7 @@ function convertSuggestionToTask(id){
   saveData();
   renderTasks();
   renderScheduleGrid();
-  flashStatus('נוספה כמשימה');
+  openTimelineSheet('task', newTask.id);
 }
 function deleteSuggestion(id){
   data.suggestions = data.suggestions.filter(s=>s.id!==id);
@@ -5041,7 +5055,7 @@ function convertDilemmaToTask(id){
   saveData();
   renderTasks();
   renderScheduleGrid();
-  flashStatus('נוספה כמשימה');
+  openTimelineSheet('task', newTask.id);
 }
 function renderGeneralDilemmaList(){
   const el = document.getElementById('dilemmaList');
@@ -5317,10 +5331,10 @@ function bodyCheckPanelHtml(kind, id, opts){
         ${energyBtn('no','אין אנרגיה')}
       </div>
     </div>` : ''}
-    <div class="bc-row">
+    ${opts.hideNote ? '' : `<div class="bc-row">
       <span class="bc-row-label">איפה זה פוגש אותי?</span>
       <textarea class="detail-desc" dir="auto" placeholder="איפה בגוף / בחיים זה פוגש אותי..." oninput="setBodyCheckNote('${kind}','${id}', this.value)">${escapeHtml(bc.note||'')}</textarea>
-    </div>
+    </div>`}
     ${showReminderBtn ? `
       <button type="button" class="bc-reminder-btn" onclick="showSelfChoiceReminder('${kind}','${id}')">❤️‍🩹 תזכורת לבחור בעצמי</button>
       ${shown!==null ? `<div class="bc-reminder-shown">${shown ? escapeHtml(shown) : 'עוד אין תזכורות בבנק — אפשר להוסיף אחת בסקירה השבועית (03).'}</div>` : ''}
@@ -5341,17 +5355,17 @@ function bodyCheckToggleBtnHtml(kind, id){
 const pendingBodyCheck = { task:{}, someday:{}, suggestion:{}, dilemma:{} };
 const PENDING_BODY_CHECK_OPTS = {
   task: {urgencyOptions:['objective','other','relief'], showEnergy:true},
-  someday: {},
+  someday: {hideNote:true},
   suggestion: {urgencyOptions:['objective','other','waitDiscomfort'], showEnergy:true},
   dilemma: {}
 };
 // task's panel lives inside the already-secondary "עוד.." section, and suggestion's create form is
 // dense enough that the panel should stay tucked behind its own button too -- same ❤️‍🩹 בדיקת גוף
 // button edit mode already uses, just wired to the pending (not-yet-real) holding object instead.
-// someday's create row has nothing else in it, so its panel stays directly visible, no button needed.
+// someday's panel is collapsed behind a toggle too, kept minimal by design (no note field either).
 // a general dilemma is body-check-first by design (it's the one mandatory field there), so its panel
 // also stays directly visible rather than tucked behind a toggle.
-const PENDING_BODY_CHECK_USE_TOGGLE = { task:true, someday:false, suggestion:true, dilemma:false };
+const PENDING_BODY_CHECK_USE_TOGGLE = { task:true, someday:true, suggestion:true, dilemma:false };
 let pendingBodyCheckOpen = { task:false, someday:false, suggestion:false, dilemma:false };
 function togglePendingBodyCheck(kind){
   pendingBodyCheckOpen[kind] = !pendingBodyCheckOpen[kind];
@@ -5397,10 +5411,10 @@ function pendingBodyCheckPanelHtml(kind){
         ${energyBtn('no','אין אנרגיה')}
       </div>
     </div>` : ''}
-    <div class="bc-row">
+    ${opts.hideNote ? '' : `<div class="bc-row">
       <span class="bc-row-label">איפה זה פוגש אותי?</span>
       <textarea class="detail-desc" dir="auto" placeholder="איפה בגוף / בחיים זה פוגש אותי..." oninput="setPendingBodyCheckNote('${kind}', this.value)">${escapeHtml(bc.note||'')}</textarea>
-    </div>
+    </div>`}
   </div>`;
 }
 function renderPendingBodyCheck(kind){
@@ -6128,14 +6142,13 @@ document.addEventListener('click', (e)=>{
   const prevTask = editingTaskId, prevSchedTask = scheduleEditingTaskId;
   const prevSomeday = editingSomedayId, prevSuggestion = editingSuggestionId;
   const prevDilemma = editingDilemmaId;
-  const prevOpenForm = openForm, prevAddTask = addingTaskDayIdx;
+  const prevOpenForm = openForm;
   const outsideTask = prevTask !== null && clickIsOutsideEl(document.querySelector(`#taskList [data-drag-id="${prevTask}"]`), target);
   const outsideSchedTask = prevSchedTask !== null && clickIsOutsideEl(document.getElementById('scheduleGrid'), target);
   const outsideSomeday = prevSomeday !== null && clickIsOutsideEl(document.querySelector(`#somedayList [data-drag-id="${prevSomeday}"]`), target);
   const outsideSuggestion = prevSuggestion !== null && clickIsOutsideEl(document.querySelector(`#suggestionList [data-drag-id="${prevSuggestion}"]`), target);
   const outsideDilemma = prevDilemma !== null && clickIsOutsideEl(document.querySelector(`#dilemmaList [data-drag-id="${prevDilemma}"]`), target);
-  const scheduleFormDayIdx = prevOpenForm !== null ? prevOpenForm : prevAddTask;
-  const outsideScheduleForm = scheduleFormDayIdx !== null && clickIsOutsideEl(document.querySelector(`.day-col[data-day-idx="${scheduleFormDayIdx}"]`), target);
+  const outsideScheduleForm = prevOpenForm !== null && clickIsOutsideEl(document.querySelector(`.day-col[data-day-idx="${prevOpenForm}"]`), target);
   if(!outsideTask && !outsideSchedTask && !outsideSomeday && !outsideSuggestion && !outsideDilemma && !outsideScheduleForm) return;
   setTimeout(()=>{
     if(outsideTask && editingTaskId===prevTask) closeTaskEdit();
@@ -6143,7 +6156,7 @@ document.addEventListener('click', (e)=>{
     if(outsideSomeday && editingSomedayId===prevSomeday) closeSomedayEdit();
     if(outsideSuggestion && editingSuggestionId===prevSuggestion) closeSuggestionEdit();
     if(outsideDilemma && editingDilemmaId===prevDilemma) closeDilemmaEdit();
-    if(outsideScheduleForm && (openForm===prevOpenForm && addingTaskDayIdx===prevAddTask)) closeAllScheduleForms();
+    if(outsideScheduleForm && openForm===prevOpenForm) closeAllScheduleForms();
   }, 0);
 }, true);
 function toggleDeleteMode(bank){
@@ -6651,7 +6664,7 @@ function renderHabits(){
     <div class="feel-block-header" onclick="toggleHabitsBlock()">${habitsBlockOpen?'▾':'▸'} 🌱 דברים שהייתי רוצה להתמיד בהם${habits.length?' ('+habits.length+')':''}</div>
     ${habitsBlockOpen ? `
       <div class="add-row" style="margin-bottom:10px;">
-        <input type="text" id="habitInput" placeholder="פעולה קטנה שאני יכול להתחיל ליישם באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
+        <input type="text" id="habitInput" placeholder="פעולה קטנה לעשות באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
         <button onclick="addHabit()">הוסף</button>
       </div>
       ${habits.length ? `<ul class="habit-list">${habits.map(h=>{
@@ -6672,8 +6685,8 @@ function renderHabits(){
               ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
               : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ אחרי מה זה קורה? (רשות)'}</span>`}
             <span class="habit-inline-actions">
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">📌 הוסף כעוגן</button>
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">➕ הוסף כמשימה חד-פעמית</button>
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">+עוגן</button>
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ הוסף כמשימה</button>
             </span>
           </div>
           <div class="habit-li-actions">
@@ -6868,9 +6881,11 @@ function createTaskFromText(text){
   const task = {id:uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false, createdAt:Date.now()};
   data.tasks.push(task);
   saveData();
+  renderTasks();
+  renderScheduleGrid();
   switchMainView('home');
-  openSection('tasks');
-  openTaskEdit(task.id);
+  openSection('schedule');
+  openTimelineSheet('task', task.id);
 }
 function convertListItemToTask(listId, itemId){
   const item = listItemById(listId, itemId);
@@ -7173,8 +7188,10 @@ function promoteTodayIdeaToTask(id){
   data.tasks.push(task);
   saveData();
   renderTodayIdeas();
-  openSection('tasks');
-  openTaskEdit(task.id);
+  renderTasks();
+  renderScheduleGrid();
+  openSection('schedule');
+  openTimelineSheet('task', task.id);
 }
 // belt-and-suspenders alongside the cloud-sync defer above: if a render of this container ever
 // does happen to run while its own field is focused (any trigger, found or not), put the cursor
