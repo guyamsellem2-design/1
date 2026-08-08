@@ -318,7 +318,7 @@
   .domain-chip.drag-over{ outline:2px dashed var(--gold); outline-offset:2px; }
   .grip{cursor:grab; color:var(--muted2); font-size:15px; padding:2px 4px; touch-action:none; user-select:none; flex-shrink:0;}
   .grip:hover{color:var(--text);}
-  ul.tasks li{transition:transform .15s ease, box-shadow .15s ease; touch-action:pan-y;}
+  ul.tasks li{transition:transform .15s ease, box-shadow .15s ease; touch-action:pan-y pinch-zoom;}
   ul.tasks li.dragging{z-index:50; box-shadow:0 10px 24px rgba(0,0,0,0.45); position:relative; background:var(--surface2);}
   ul.tasks li.list-drag-over{outline:2px dashed var(--gold); outline-offset:-2px;}
   .domain-chip .grip{cursor:grab; color:var(--muted2); font-size:15px; padding:2px 4px; touch-action:none; user-select:none;}
@@ -353,7 +353,7 @@
   .anchor-chip.soft-dim{opacity:.5; filter:saturate(.65);}
 
   /* swipe-to-delete: drag a row right to reveal a trash panel, past a threshold asks to confirm */
-  .task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip{touch-action:pan-y;}
+  .task-li, .someday-li, .suggestion-li, .bank-entry, .anchor-chip{touch-action:pan-y pinch-zoom;}
   .swipe-trash-reveal{position:absolute; border-radius:inherit; box-sizing:border-box; pointer-events:none; background:linear-gradient(to right, rgba(199,116,107,0.85) 0, rgba(199,116,107,0.85) 34px, rgba(199,116,107,0) 120px);}
   .swipe-trash-reveal.armed{background:linear-gradient(to right, rgba(165,47,47,0.92) 0, rgba(165,47,47,0.92) 34px, rgba(165,47,47,0) 140px);}
   .swipe-trash-icon{position:absolute; top:50%; left:16px; transform:translateY(-50%); color:#fff; font-size:19px;}
@@ -790,6 +790,10 @@
   .timeline-sheet-daypicker{display:flex; gap:4px; margin-bottom:10px;}
   .timeline-sheet-day-btn{flex:1; background:var(--surface2); border:1px solid var(--border-strong); color:var(--muted); border-radius:8px; padding:7px 2px; font-size:12.5px; font-family:inherit; cursor:pointer;}
   .timeline-sheet-day-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
+  .timeline-sheet-time-row{margin-top:8px;}
+  .timeline-sheet-freq-wrap{display:flex; align-items:center; gap:4px; flex:1; min-width:0; background:var(--surface3); border:1px solid var(--border); border-radius:6px; padding:0 6px; box-sizing:border-box;}
+  .timeline-sheet-freq-label{font-size:12.5px; color:var(--muted); white-space:nowrap; flex-shrink:0;}
+  .timeline-sheet-freq{flex:1; min-width:0; background:transparent; border:none; color:var(--text); padding:6px 2px; font-size:13.5px; font-family:inherit; cursor:pointer;}
   .timeline-sheet-actions{display:flex; gap:8px; margin-top:12px;}
   .timeline-sheet-more{width:100%; margin-top:8px; text-align:center;}
   .dilemma-subtab-btn:not(.active):hover{color:var(--text); border-color:var(--muted);}
@@ -2550,12 +2554,12 @@ function anchorCalendarUrl(a){
   endH = Math.floor(endTotal/60)%24; endM = endTotal%60;
   const repeatType = a.repeatType || 'weekly';
   let start, end, recur;
-  if(repeatType==='daily'){
+  if(repeatType==='daily' || repeatType==='every2days'){
     const refDateStr = a.date || ymd(new Date());
     const [y,m,d] = refDateStr.split('-').map(Number);
     start = new Date(y, m-1, d, sh, sm, 0);
     end = new Date(y, m-1, d, endH, endM, 0);
-    recur = 'RRULE:FREQ=DAILY';
+    recur = repeatType==='every2days' ? 'RRULE:FREQ=DAILY;INTERVAL=2' : 'RRULE:FREQ=DAILY';
   } else if(repeatType!=='weekly' && a.date){
     const [y,m,d] = a.date.split('-').map(Number);
     start = new Date(y, m-1, d, sh, sm, 0);
@@ -2804,6 +2808,7 @@ function pushTaskToGcal(t){
 function anchorRecurrenceRule(a){
   const repeatType = a.repeatType || 'weekly';
   if(repeatType==='daily') return 'RRULE:FREQ=DAILY';
+  if(repeatType==='every2days') return 'RRULE:FREQ=DAILY;INTERVAL=2';
   if(repeatType==='monthly') return 'RRULE:FREQ=MONTHLY';
   if(repeatType==='yearly') return 'RRULE:FREQ=YEARLY';
   if(repeatType==='once') return null;
@@ -2820,7 +2825,7 @@ function pushAnchorToGcal(a){
     endH = Math.floor(endTotal/60)%24; endM = endTotal%60;
     const repeatType = a.repeatType || 'weekly';
     let start, end;
-    if(repeatType==='daily'){
+    if(repeatType==='daily' || repeatType==='every2days'){
       const refDateStr = a.date || ymd(new Date());
       const [y,m,d] = refDateStr.split('-').map(Number);
       start = new Date(y, m-1, d, sh, sm, 0);
@@ -3515,7 +3520,7 @@ function toggleAnchorDateField(dayIdx){
   const wrap = document.getElementById(`anchorDateWrap-${dayIdx}`);
   const dayWrap = document.getElementById(`anchorDayWrap-${dayIdx}`);
   if(!sel || !wrap) return;
-  wrap.style.display = ['once','monthly','yearly'].includes(sel.value) ? 'block' : 'none';
+  wrap.style.display = ['once','every2days','monthly','yearly'].includes(sel.value) ? 'block' : 'none';
   if(dayWrap) dayWrap.style.display = sel.value==='weekly' ? 'block' : 'none';
 }
 function anchorAppliesToDate(a, dateObj, dayIdx){
@@ -3523,6 +3528,12 @@ function anchorAppliesToDate(a, dateObj, dayIdx){
   const dateStr = ymd(dateObj);
   if((a.skippedDates||[]).includes(dateStr)) return false;
   if(repeatType==='daily') return true;
+  if(repeatType==='every2days'){
+    const refStr = a.date || ymd(new Date(a.createdAt||Date.now()));
+    const start = new Date(refStr+'T00:00:00');
+    const diffDays = Math.round((dateObj - start) / 86400000);
+    return diffDays>=0 && diffDays % 2 === 0;
+  }
   if(repeatType==='monthly') return !!a.date && Number(a.date.split('-')[2])===dateObj.getDate();
   if(repeatType==='yearly') return !!a.date && a.date.slice(5)===dateStr.slice(5);
   if(repeatType==='once') return a.date===dateStr;
@@ -3537,7 +3548,7 @@ function saveAnchor(dayIdx){
   const draft = document.getElementById(`anchorDraft-${dayIdx}`).checked;
   const repeatType = document.getElementById(`anchorRepeat-${dayIdx}`).value;
   const dateEl = document.getElementById(`anchorDate-${dayIdx}`);
-  const date = (['once','monthly','yearly'].includes(repeatType) && dateEl) ? dateEl.value : '';
+  const date = (['once','every2days','monthly','yearly'].includes(repeatType) && dateEl) ? dateEl.value : '';
   const dayEl = document.getElementById(`anchorDay-${dayIdx}`);
   const day = (repeatType==='weekly' && dayEl) ? +dayEl.value : dayIdx;
   if(!label) return;
@@ -4286,7 +4297,7 @@ function renderScheduleGrid(){
     const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
     const isEditingThisDay = !!(editingAnchorId && openForm===dayIdx);
     const currentRepeatType = isEditingThisDay ? (editingHere.repeatType||'weekly') : 'weekly';
-    const showDateField = ['once','monthly','yearly'].includes(currentRepeatType);
+    const showDateField = ['once','every2days','monthly','yearly'].includes(currentRepeatType);
     const defaultDateVal = (isEditingThisDay && editingHere.date) ? editingHere.date : dateStr;
 
     const anchorFormHtml = `
@@ -4296,6 +4307,7 @@ function renderScheduleGrid(){
           <select id="anchorRepeat-${dayIdx}" onchange="toggleAnchorDateField(${dayIdx})">
             <option value="once" ${currentRepeatType==='once'?'selected':''}>חד-פעמי</option>
             <option value="daily" ${currentRepeatType==='daily'?'selected':''}>מדי יום</option>
+            <option value="every2days" ${currentRepeatType==='every2days'?'selected':''}>כל יומיים</option>
             <option value="weekly" ${currentRepeatType==='weekly'?'selected':''}>מדי שבוע</option>
             <option value="monthly" ${currentRepeatType==='monthly'?'selected':''}>מדי חודש</option>
             <option value="yearly" ${currentRepeatType==='yearly'?'selected':''}>מדי שנה</option>
@@ -4810,6 +4822,20 @@ function endTimelinePinchPointer(e){
 }
 document.addEventListener('pointerup', endTimelinePinchPointer);
 document.addEventListener('pointercancel', endTimelinePinchPointer);
+// clicking anywhere that isn't the select-marker itself, while a marker is showing, should ONLY
+// cancel the marker -- not also act on whatever was clicked (open an item, mark a new spot, jump
+// to another tab, etc). capture phase + stopPropagation so the click never reaches its normal
+// target at all; the very next click then behaves completely normally, wherever it lands. writing
+// mode (timelineAddCell) is unaffected -- openTimelineAddCell already clears timelineSelectedCell,
+// so this never fires while typing, and the existing blur handler keeps saving what was typed.
+document.addEventListener('click', (e)=>{
+  if(!timelineSelectedCell) return;
+  if(e.target.closest('.timeline-select-marker')) return; // let the marker's own click open the input
+  timelineSelectedCell = null;
+  renderTimelineGrid();
+  e.stopPropagation();
+  e.preventDefault();
+}, true);
 function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
   if(justDraggedTimelineItem===id){ justDraggedTimelineItem = null; return; } // the click that fires right after a real drag-drop shouldn't also open the sheet
   if(timelinePickedItem){
@@ -4853,7 +4879,8 @@ function timelineActionBarHtml(){
    panel -- opens on tapping any item instead of the old thin inline action bar, which had no room
    for a name + day + time together on narrow blocks. */
 let timelineSheetItem = null;    // {kind, id}
-let timelineSheetDayIdx = null;  // staged day selection while the sheet is open, committed on שמירה
+let timelineSheetDayIdx = null;  // primary staged day (the record's own day/date), committed on שמירה
+let timelineSheetSelectedDays = null; // Set<number> -- every day-of-week this record should also apply to; extra selected days become cloned records on save
 // set when the sheet is opened on a record created blank just for this sheet (quickAddAnchorForDay/
 // quickAddTaskForDay, list-tab "+ עוגן"/"+ משימה") -- if it gets closed without a title ever being
 // typed, the blank placeholder record is removed instead of lingering in the data forever.
@@ -4866,12 +4893,25 @@ function dayIdxForDateStr(dateStr){
   const idx = viewedWeekDates().findIndex(d=>ymd(d)===dateStr);
   return idx>=0 ? idx : 0;
 }
+// for repeat types that don't follow a.day (every2days/monthly/yearly/once), a.day can be a stale
+// leftover that doesn't match any day the anchor's chip actually renders on in the viewed week --
+// find the real day so "עוד אפשרויות" (which reopens the full form under a specific day column)
+// doesn't silently fail to find anywhere to attach itself. falls back to a.day when nothing in the
+// current week matches (e.g. a one-time event in a different week).
+function anchorDayIdxInViewedWeek(a){
+  const repeatType = a.repeatType || 'weekly';
+  if(repeatType==='weekly' || repeatType==='daily') return a.day;
+  const dates = viewedWeekDates();
+  const idx = dates.findIndex((d,i)=>anchorAppliesToDate(a, d, i));
+  return idx>=0 ? idx : a.day;
+}
 function openTimelineSheet(kind, id, isNew){
   const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
   if(!rec) return;
   timelineSheetItem = {kind, id};
   timelineSheetIsNew = !!isNew;
-  timelineSheetDayIdx = kind==='task' ? dayIdxForDateStr(rec.date) : rec.day;
+  timelineSheetDayIdx = kind==='task' ? dayIdxForDateStr(rec.date) : anchorDayIdxInViewedWeek(rec);
+  timelineSheetSelectedDays = new Set([timelineSheetDayIdx]);
   document.getElementById('timelineSheetOverlay').style.display = '';
   document.getElementById('timelineSheet').style.display = '';
   renderTimelineSheet();
@@ -4914,10 +4954,17 @@ function deleteConvertedSourceItem(){
 }
 // deliberately does NOT call renderTimelineSheet() -- a full re-render would rebuild the title
 // input and time picker from the underlying record again, silently discarding whatever the user
-// had already typed/picked but not yet saved. just toggle which day button looks active.
-function setTimelineSheetDay(dayIdx){
-  timelineSheetDayIdx = dayIdx;
-  document.querySelectorAll('.timeline-sheet-day-btn').forEach((btn,i)=>btn.classList.toggle('active', i===dayIdx));
+// had already typed/picked but not yet saved. just toggle which day buttons look active. multiple
+// days can be selected at once -- an anchor/task that happens more than once a week -- the record
+// itself keeps its original day, and every OTHER selected day becomes a cloned record on שמירה.
+function toggleTimelineSheetDay(dayIdx){
+  if(timelineSheetSelectedDays.has(dayIdx)){
+    if(timelineSheetSelectedDays.size===1) return; // at least one day must always stay selected
+    timelineSheetSelectedDays.delete(dayIdx);
+  } else {
+    timelineSheetSelectedDays.add(dayIdx);
+  }
+  document.querySelectorAll('.timeline-sheet-day-btn').forEach((btn,i)=>btn.classList.toggle('active', timelineSheetSelectedDays.has(i)));
 }
 // a brand-new task with no time yet defaults to right now (rounded to the grid's half-hour
 // step, clamped into the visible hour range) instead of sitting with no time at all -- she can
@@ -4940,6 +4987,21 @@ function renderTimelineSheet(){
   // doesn't grow the sheet -- shown for both tasks and anchors now
   const domainPickerHtml = `<select id="timelineSheetDomain" class="timeline-sheet-domain">${domainOptions(rec.domain)}</select>`;
   const timeValue = (kind==='task' && !rec.time) ? currentRoundedTimeSlot() : (rec.time||'');
+  // frequency shortcut -- anchors only (tasks have no repeat concept). includes ALL existing
+  // repeatType values, not just the four requested ones, so opening this small sheet and saving
+  // without touching the field can never silently downgrade a חד-פעמי/שנתי anchor to something else.
+  const freqValue = kind==='anchor' ? (rec.repeatType || 'weekly') : null;
+  const freqHtml = kind==='anchor' ? `<div class="timeline-sheet-freq-wrap">
+      <span class="timeline-sheet-freq-label">פעם ב־</span>
+      <select id="timelineSheetFreq" class="timeline-sheet-freq">
+        <option value="daily" ${freqValue==='daily'?'selected':''}>יום</option>
+        <option value="every2days" ${freqValue==='every2days'?'selected':''}>יומיים</option>
+        <option value="weekly" ${freqValue==='weekly'?'selected':''}>שבוע</option>
+        <option value="monthly" ${freqValue==='monthly'?'selected':''}>חודש</option>
+        <option value="once" ${freqValue==='once'?'selected':''}>פעם אחת בלבד</option>
+        <option value="yearly" ${freqValue==='yearly'?'selected':''}>שנה</option>
+      </select>
+    </div>` : '';
   sheet.innerHTML = `
     <div class="timeline-sheet-handle"></div>
     <div class="timeline-sheet-title-row">
@@ -4947,9 +5009,12 @@ function renderTimelineSheet(){
       ${domainPickerHtml}
     </div>
     <div class="timeline-sheet-daypicker">
-      ${DAYS.map((dn,di)=>`<button type="button" class="timeline-sheet-day-btn ${timelineSheetDayIdx===di?'active':''}" onclick="setTimelineSheetDay(${di})">${dn}</button>`).join('')}
+      ${DAYS.map((dn,di)=>`<button type="button" class="timeline-sheet-day-btn ${timelineSheetSelectedDays.has(di)?'active':''}" onclick="toggleTimelineSheetDay(${di})">${dn}</button>`).join('')}
     </div>
-    ${timePickerHtml('timelineSheetTime', timeValue, 'שעה')}
+    <div class="edit-form-row timeline-sheet-time-row">
+      ${timePickerHtml('timelineSheetTime', timeValue, 'שעה')}
+      ${freqHtml}
+    </div>
     <label class="buf-label" style="margin-top:10px;"><input type="checkbox" id="timelineSheetDraft" ${rec.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
     <div class="timeline-sheet-actions">
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
@@ -4973,7 +5038,13 @@ function saveTimelineSheet(){
   const timeEl = document.getElementById('timelineSheetTime');
   const time = timeEl ? timeEl.value : '';
   const draft = document.getElementById('timelineSheetDraft').checked;
-  const dateStr = ymd(viewedWeekDates()[timelineSheetDayIdx]);
+  // the record itself always takes the FIRST selected day; any other selected days become cloned
+  // records (one per extra day) rather than trying to cram "applies to several days" into a single
+  // record -- keeps every existing per-record assumption elsewhere in the app (one day/date each) intact
+  const selectedDays = Array.from(timelineSheetSelectedDays).sort((x,y)=>x-y);
+  const primaryDay = selectedDays[0];
+  const extraDays = selectedDays.slice(1);
+  const dateStr = ymd(viewedWeekDates()[primaryDay]);
   const isNew = timelineSheetIsNew;
   const domainEl = document.getElementById('timelineSheetDomain');
   if(kind==='task'){
@@ -4982,22 +5053,41 @@ function saveTimelineSheet(){
     const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
     t.text = text; t.date = dateStr; t.time = time; t.draft = draft;
     if(domainEl) t.domain = domainEl.value;
-    saveData();
-    renderScheduleGrid();
-    renderTasks();
     // the gcal push is a best-effort network call -- if it throws for any reason, the save itself
     // (already committed above) must still visibly finish: close the sheet and show "נשמר", not
     // leave her tapping a "שמירה" button that silently does nothing.
     try{ applyGcalSyncForTask(t, isNew || t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd); }catch(e){ console.error('gcal sync failed', e); }
+    extraDays.forEach(di=>{
+      const newTask = {...t, id:uid(), date:ymd(viewedWeekDates()[di]), subtasks:(t.subtasks||[]).map(s=>({...s})), createdAt:Date.now()};
+      data.tasks.push(newTask);
+      try{ applyGcalSyncForTask(newTask, true); }catch(e){ console.error('gcal sync failed', e); }
+    });
+    saveData();
+    renderScheduleGrid();
+    renderTasks();
   } else {
     const a = data.anchors.find(x=>x.id===id);
     if(!a) return;
-    const prevDay = a.day, prevTime = a.time;
-    a.label = text; a.day = timelineSheetDayIdx; a.time = time; a.draft = draft;
+    const prevDay = a.day, prevTime = a.time, prevRepeat = a.repeatType, prevAnchorDate = a.date;
+    const freqEl = document.getElementById('timelineSheetFreq');
+    a.label = text; a.day = primaryDay; a.time = time; a.draft = draft;
     if(domainEl) a.domain = domainEl.value;
+    if(freqEl){
+      a.repeatType = freqEl.value;
+      if(['daily','every2days','monthly'].includes(freqEl.value)) a.date = dateStr;
+    }
+    try{ applyGcalSyncForAnchor(a, isNew || a.day!==prevDay || a.time!==prevTime || a.repeatType!==prevRepeat || a.date!==prevAnchorDate); }catch(e){ console.error('gcal sync failed', e); }
+    // multi-day cloning only makes sense for the plain weekly case -- daily/every2days/monthly/yearly
+    // already repeat on their own terms and aren't tied to a specific day-of-week
+    if(extraDays.length && a.repeatType==='weekly'){
+      extraDays.forEach(di=>{
+        const newAnchor = {...a, id:uid(), day:di, createdAt:Date.now()};
+        data.anchors.push(newAnchor);
+        try{ applyGcalSyncForAnchor(newAnchor, true); }catch(e){ console.error('gcal sync failed', e); }
+      });
+    }
     saveData();
     renderScheduleGrid();
-    try{ applyGcalSyncForAnchor(a, isNew || a.day!==prevDay || a.time!==prevTime); }catch(e){ console.error('gcal sync failed', e); }
   }
   timelineSheetIsNew = false;
   closeTimelineSheet();
