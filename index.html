@@ -714,7 +714,7 @@
   .timeline-item{position:absolute; right:1px; left:1px; background:var(--surface2); border-radius:5px; padding:1px 3px; font-size:10.5px; line-height:1.25; overflow:hidden; border-right:3px solid var(--gold); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:1;}
   .timeline-item.chip-picked{outline:2px solid var(--gold); outline-offset:1px; z-index:2;}
   .timeline-item.chip-active{outline:2px solid var(--text); outline-offset:1px; z-index:2;}
-  .timeline-item .timeline-chip-text{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .timeline-item .timeline-chip-text{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--lc,2); overflow:hidden; white-space:normal; word-break:break-word; overflow-wrap:break-word;}
   .timeline-item-add{position:absolute; right:1px; left:1px; z-index:2;}
   .timeline-add-input{width:100%; border:1px solid var(--gold); border-radius:5px; background:var(--surface); color:var(--text); font-family:inherit; font-size:11px; padding:3px 5px;}
   .timeline-untimed{display:flex; flex-direction:column; gap:4px; padding:6px; background:var(--surface2); border-radius:8px; margin-bottom:8px;}
@@ -4222,9 +4222,13 @@ function timelineChipHtml(it, dayIdx, dateStr){
   const draft = !!it.data.draft;
   const top = timelineTopPx(it.time);
   const height = timelineHeightPx(it.time, it.data.endTime);
+  // as many lines as actually fit the block's real height get to show the full name, wrapping
+  // (breaking mid-word if a single word is too long for the width) -- only once even that isn't
+  // enough does the browser's own line-clamp ellipsis kick in, on the last visible line.
+  const availableLines = Math.max(1, Math.floor((height-2)/13));
   return `<div class="timeline-item ${picked?'chip-picked':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;"
     onclick="event.stopPropagation(); onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${it.time}', '${dateStr}')">
-    <span class="timeline-chip-text">${escapeHtml(timelineItemLabel(it))}</span>
+    <span class="timeline-chip-text" style="--lc:${availableLines};">${escapeHtml(timelineItemLabel(it))}</span>
   </div>`;
 }
 function timelineUntimedChipHtml(it, dayIdx, dateStr){
@@ -6264,7 +6268,7 @@ function toggleFeelNoteMinimize(key){
   if(feelNoteMinimized.has(key)) feelNoteMinimized.delete(key); else feelNoteMinimized.add(key);
   rerenderFeelNoteOwner(key);
 }
-function feelNoteHtml(key, value, oninputFn, placeholder){
+function feelNoteHtml(key, value, oninputFn, placeholder, clearFn){
   if(feelNoteMinimized.has(key)){
     const preview = (value||'').trim().slice(0,70) || placeholder;
     return `<div class="feel-note-minimized" onclick="toggleFeelNoteMinimize('${key}')" title="לחיצה להרחבה">
@@ -6276,7 +6280,26 @@ function feelNoteHtml(key, value, oninputFn, placeholder){
     <textarea class="feel-note-textarea" data-field-key="${key}-note" oninput="${oninputFn}(this.value); autoGrowNoteTextarea(this);" placeholder="${placeholder}">${escapeHtml(value||'')}</textarea>
     <span class="feel-note-min-btn" onclick="toggleFeelNoteMinimize('${key}')" title="מזער">⌄ מזער</span>
     <span class="feel-note-min-btn" onclick="openSaveAsNote('${key}')" title="שמירת הטקסט כפתק בנושא">📝 הפוך לפתק</span>
+    ${clearFn && value && value.trim() ? `<span class="feel-note-min-btn" onclick="${clearFn}('${key}')" title="ניקוי הטקסט כדי לכתוב מחדש">🧹 ניקוי</span>` : ''}
   </div>`;
+}
+// scoped to the "איך אני מרגיש/ה" feel-notes specifically (not the shared feelNoteHtml usages
+// elsewhere like task/someday descriptions) -- clearing one field there just to write into it
+// again fresh, nothing more.
+function clearFeelNoteField(key){
+  data[key+'Note'] = '';
+  saveData();
+  renderFeelBar();
+}
+function resetFeelBar(){
+  if(!confirm('לאפס את כל החלק של "איך אני מרגיש/ה עכשיו"? זה ינקה את כל הבחירות והטקסטים שם (רמת אנרגיה, רגשות, צרכים, גוף, והשאלות הפתוחות) - לא משפיע על שום מקום אחר באתר. לא ניתן לביטול.')) return;
+  data.activeEmotions = []; data.activeNeeds = []; data.activeBodyLocations = [];
+  data.emotionNote = ''; data.bodyNote = ''; data.needNote = '';
+  data.qSoulNote = ''; data.qPowerNote = ''; data.qHealingNote = ''; data.qFreeSelfNote = ''; data.qExpressNote = '';
+  data.homeEnergy = 60;
+  saveData();
+  renderFeelBar();
+  flashStatus('החלק אופס');
 }
 // true if the textarea's current text is short enough to render on one visual line -- checked by
 // actually measuring it (font + available width), not just "no newline character", so a short line
@@ -6378,7 +6401,10 @@ function renderFeelBar(){
     el.innerHTML = `
       <div class="feel-block-header" onclick="toggleFeelBlock()">${feelBlockOpen?'▾':'▸'} 🌤️ איך אני מרגיש/ה עכשיו</div>
       ${feelBlockOpen ? `
-      <p class="hint" style="margin:0 0 10px;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</p>
+      <div class="hint" style="margin:0 0 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+        <span>הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</span>
+        <button type="button" class="reset-btn" onclick="resetFeelBar()">🧹 איפוס הכל</button>
+      </div>
       <div class="feel-energy-row">
         <span class="feel-energy-label">🔋 רמת אנרגיה</span>
         <input type="range" min="0" max="100" value="${data.homeEnergy}" oninput="setHomeEnergy(this.value)">
@@ -6388,21 +6414,21 @@ function renderFeelBar(){
         <div class="feel-bank-header" onclick="toggleEmotionsBank()">${emotionsBankOpen?'▾':'▸'} רגשות${emotionsCount?' ('+emotionsCount+')':''}</div>
         ${emotionsBankOpen ? `
           ${feelChipGridHtml('activeEmotions')}
-          ${feelNoteHtml('emotion', data.emotionNote, 'onEmotionNoteInput', 'מה עובר עלי עכשיו...')}
+          ${feelNoteHtml('emotion', data.emotionNote, 'onEmotionNoteInput', 'מה עובר עלי עכשיו...', 'clearFeelNoteField')}
         ` : ''}
       </div>
       <div class="feel-bank">
         <div class="feel-bank-header" onclick="toggleBodyBank()">${bodyBankOpen?'▾':'▸'} איפה אני מרגיש/ה את זה בגוף?${bodyCount?' ('+bodyCount+')':''}</div>
         ${bodyBankOpen ? `
           ${feelChipGridHtml('activeBodyLocations')}
-          ${feelNoteHtml('body', data.bodyNote, 'onBodyNoteInput', 'איפה בגוף אני מרגיש/ה את זה...')}
+          ${feelNoteHtml('body', data.bodyNote, 'onBodyNoteInput', 'איפה בגוף אני מרגיש/ה את זה...', 'clearFeelNoteField')}
         ` : ''}
       </div>
       <div class="feel-bank">
         <div class="feel-bank-header" onclick="toggleNeedsBank()">${needsBankOpen?'▾':'▸'} מה אני צריך/ה עכשיו?${needsCount?' ('+needsCount+')':''}</div>
         ${needsBankOpen ? `
           ${feelChipGridHtml('activeNeeds')}
-          ${feelNoteHtml('need', data.needNote, 'onNeedNoteInput', 'מה אני צריך/ה עכשיו...')}
+          ${feelNoteHtml('need', data.needNote, 'onNeedNoteInput', 'מה אני צריך/ה עכשיו...', 'clearFeelNoteField')}
         ` : ''}
       </div>
       <div class="feel-bank">
@@ -6410,23 +6436,23 @@ function renderFeelBar(){
         ${moreQuestionsOpen ? `
           <div class="feel-open-q">
             <div class="feel-open-q-label">מה הנפש שלי צריכה? מה הנשמה שלי צריכה? מה הלב שלי צריך?</div>
-            ${feelNoteHtml('qSoul', data.qSoulNote, 'onQSoulNoteInput', 'לכתוב מה שעולה...')}
+            ${feelNoteHtml('qSoul', data.qSoulNote, 'onQSoulNoteInput', 'לכתוב מה שעולה...', 'clearFeelNoteField')}
           </div>
           <div class="feel-open-q">
             <div class="feel-open-q-label">מה יעניק לי כוח עכשיו?</div>
-            ${feelNoteHtml('qPower', data.qPowerNote, 'onQPowerNoteInput', 'לכתוב מה שעולה...')}
+            ${feelNoteHtml('qPower', data.qPowerNote, 'onQPowerNoteInput', 'לכתוב מה שעולה...', 'clearFeelNoteField')}
           </div>
           <div class="feel-open-q">
             <div class="feel-open-q-label">מה יעניק לי ריפוי?</div>
-            ${feelNoteHtml('qHealing', data.qHealingNote, 'onQHealingNoteInput', 'לכתוב מה שעולה...')}
+            ${feelNoteHtml('qHealing', data.qHealingNote, 'onQHealingNoteInput', 'לכתוב מה שעולה...', 'clearFeelNoteField')}
           </div>
           <div class="feel-open-q">
             <div class="feel-open-q-label">איך הגירסה החופשית שלי מרגישה?</div>
-            ${feelNoteHtml('qFreeSelf', data.qFreeSelfNote, 'onQFreeSelfNoteInput', 'לכתוב מה שעולה...')}
+            ${feelNoteHtml('qFreeSelf', data.qFreeSelfNote, 'onQFreeSelfNoteInput', 'לכתוב מה שעולה...', 'clearFeelNoteField')}
           </div>
           <div class="feel-open-q">
             <div class="feel-open-q-label">מה רוצה להתבטא דרכי כרגע?</div>
-            ${feelNoteHtml('qExpress', data.qExpressNote, 'onQExpressNoteInput', 'לכתוב מה שעולה...')}
+            ${feelNoteHtml('qExpress', data.qExpressNote, 'onQExpressNoteInput', 'לכתוב מה שעולה...', 'clearFeelNoteField')}
           </div>
         ` : ''}
       </div>
