@@ -813,6 +813,13 @@
 <body>
 <div class="pull-refresh" id="pullRefresh"><span class="pull-refresh-icon">↓</span></div>
 
+<!-- lives at the top level, not inside the "לוח + משימות" section body, so it works as a true
+     overlay no matter which section is collapsed or which tab is active -- opening it from
+     elsewhere (someday, today's ideas, a list item...) must never require that section to already
+     be expanded, and must never move/scroll the person away from wherever they actually are. -->
+<div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="closeTimelineSheet()" style="display:none;"></div>
+<div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
+
 <div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
 <div class="nav-drawer" id="navDrawer">
   <h3>ניווט</h3>
@@ -1040,8 +1047,6 @@
         </div>
       </div>
 
-      <div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="closeTimelineSheet()" style="display:none;"></div>
-      <div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
     </div>
   </section>
 
