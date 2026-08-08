@@ -732,7 +732,7 @@
      block; simpler and far more reliable, at the small cost of the day-names row no longer staying
      pinned while scrolling in this mode specifically. */
   .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:5000; border-radius:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; background:var(--bg);}
-  .timeline-toolbar{display:flex; justify-content:flex-end; gap:6px; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
+  .timeline-toolbar{display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
   /* the day grid in fullscreen is much taller than the screen (see the comment above) -- without this,
      scrolling down to reach a later hour scrolls the toolbar (and its drag-mode / close buttons) away too */
   .timeline-wrap.fullscreen .timeline-toolbar{position:sticky; top:0; z-index:10;}
@@ -743,7 +743,9 @@
   .timeline-dayname{flex:1; min-width:0; text-align:center; font-size:10.5px; font-weight:600; padding:4px 1px; line-height:1.3;}
   .timeline-actionbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--gold); color:#241a06; font-size:12.5px; font-weight:600; padding:7px 10px;}
   .timeline-actionbar span{cursor:pointer; text-decoration:underline;}
-  .timeline-scroll{overflow-y:auto; overflow-x:hidden; max-height:58vh; -webkit-overflow-scrolling:touch;}
+  /* pan-y (not none) -- single-finger vertical scroll still works natively, but a two-finger pinch
+     is no longer claimed by the browser's own page-zoom, so our JS pinch-to-zoom handler gets it instead */
+  .timeline-scroll{overflow-y:auto; overflow-x:hidden; max-height:58vh; -webkit-overflow-scrolling:touch; touch-action:pan-y;}
   .timeline-wrap.fullscreen .timeline-scroll{max-height:none; overflow:visible;}
   .timeline-body{display:flex; position:relative; background-image:repeating-linear-gradient(to bottom, var(--border) 0, var(--border) 1px, transparent 1px, transparent var(--timeline-hour-px, 52px));}
   .timeline-hourcol{width:32px; flex-shrink:0; position:relative;}
@@ -956,6 +958,8 @@
         <div id="timelineUntimedWrap"></div>
         <div class="timeline-wrap" id="timelineWrap">
           <div class="timeline-toolbar">
+            <button type="button" class="timeline-fs-btn" onclick="zoomTimelineOut()" title="הקטנת תצוגה">🔍−</button>
+            <button type="button" class="timeline-fs-btn" onclick="zoomTimelineIn()" title="הגדלת תצוגה — יותר מקום לכיתוב של כל משימה/עוגן">🔍+</button>
             <button type="button" class="timeline-fs-btn" id="timelineDragModeBtn" onclick="toggleTimelineDesktopDragMode()" title="במחשב, גרירה בעכבר לא תמיד נתפסת כלחיצה ארוכה -- מצב הזה מדליק גרירה מיידית בלי להחזיק">🖱 מצב גרירה</button>
             <button type="button" class="timeline-fs-btn" id="timelineFsBtn" onclick="toggleTimelineFullscreen()">⤢ מסך מלא</button>
           </div>
@@ -4414,7 +4418,17 @@ function renderScheduleTabs(){
    task first. becoming a recurring anchor is a later, optional upgrade on the item itself, never
    a decision required at the moment of writing something down. editing an item never leaves this
    view for a native-feeling text box -- only our own compact action bar. */
-const TIMELINE_START_HOUR = 5, TIMELINE_END_HOUR = 23, TIMELINE_PX_PER_HOUR = 52;
+const TIMELINE_START_HOUR = 5, TIMELINE_END_HOUR = 23;
+// zoom changes ONLY the row height (px per hour) -- font-size never changes, so a taller block
+// simply has more room for its own text to wrap into, exactly like Google Calendar's zoom.
+const TIMELINE_PX_PER_HOUR_MIN = 28, TIMELINE_PX_PER_HOUR_MAX = 160, TIMELINE_PX_PER_HOUR_DEFAULT = 52;
+let timelinePxPerHour = TIMELINE_PX_PER_HOUR_DEFAULT;
+function setTimelineZoom(px){
+  timelinePxPerHour = Math.round(Math.max(TIMELINE_PX_PER_HOUR_MIN, Math.min(TIMELINE_PX_PER_HOUR_MAX, px)));
+  renderTimelineGrid();
+}
+function zoomTimelineIn(){ setTimelineZoom(timelinePxPerHour + 12); }
+function zoomTimelineOut(){ setTimelineZoom(timelinePxPerHour - 12); }
 function timelineSlotForTime(timeStr){
   if(!timeStr) return null;
   const parts = timeStr.split(':');
@@ -4424,7 +4438,7 @@ function timelineSlotForTime(timeStr){
 }
 function timelineTopPx(timeStr){
   const [h,m] = timeStr.split(':').map(Number);
-  return ((h-TIMELINE_START_HOUR) + (m||0)/60) * TIMELINE_PX_PER_HOUR;
+  return ((h-TIMELINE_START_HOUR) + (m||0)/60) * timelinePxPerHour;
 }
 function timelineHeightPx(startTime, endTime){
   let durMin = 30;
@@ -4434,10 +4448,10 @@ function timelineHeightPx(startTime, endTime){
     const d = (eh*60+em) - (sh*60+sm);
     if(d>0) durMin = d;
   }
-  return Math.max(18, durMin/60*TIMELINE_PX_PER_HOUR);
+  return Math.max(18, durMin/60*timelinePxPerHour);
 }
 function timelineSlotFromY(y){
-  const totalMinutes = TIMELINE_START_HOUR*60 + (y/TIMELINE_PX_PER_HOUR)*60;
+  const totalMinutes = TIMELINE_START_HOUR*60 + (y/timelinePxPerHour)*60;
   let rounded = Math.round(totalMinutes/30)*30;
   rounded = Math.max(TIMELINE_START_HOUR*60, Math.min(rounded, TIMELINE_END_HOUR*60 - 30));
   return pad(Math.floor(rounded/60))+':'+pad(rounded%60);
@@ -4697,7 +4711,7 @@ function onTimelineItemDragMove(e){
     // the exact same top/height coordinate system as the real timeline chips
     if(preview.parentElement !== col) col.appendChild(preview);
     preview.style.top = timelineTopPx(timelineDragState.targetSlot)+'px';
-    preview.style.height = Math.max(18, timelineDragState.durationMin/60*TIMELINE_PX_PER_HOUR)+'px';
+    preview.style.height = Math.max(18, timelineDragState.durationMin/60*timelinePxPerHour)+'px';
     preview.style.display = 'block';
   } else {
     timelineDragState.targetDayIdx = null;
@@ -4730,6 +4744,53 @@ function onTimelineItemDragUp(){
 document.addEventListener('pointermove', onTimelineItemDragMove);
 document.addEventListener('pointerup', onTimelineItemDragUp);
 document.addEventListener('pointercancel', onTimelineItemDragUp);
+/* two-finger pinch zoom on the timeline, same idea as Google Calendar -- tracked as a plain map of
+   active touch pointers rather than any gesture API (broadest support), scoped to #timelineGrid so
+   it never fires while pinching somewhere else on the page. */
+const timelinePinchPointers = new Map(); // pointerId -> {x,y}
+let timelinePinchStartDist = null, timelinePinchStartPx = null;
+function timelinePinchDist(){
+  const pts = Array.from(timelinePinchPointers.values());
+  return pts.length<2 ? null : Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+}
+// capture phase, not bubble -- startTimelineItemDrag calls stopPropagation() on a finger that
+// lands on an item, which would stop a bubble-phase listener here from ever seeing that finger.
+// capture runs BEFORE the item's own handler, so it always sees every touch that starts inside
+// the grid regardless of what happens to the event afterward.
+document.addEventListener('pointerdown', (e)=>{
+  if(e.pointerType!=='touch') return;
+  if(!e.target.closest('#timelineGrid')) return;
+  timelinePinchPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(timelinePinchPointers.size===2){
+    // a second finger just landed -- a pinch is starting, so any single-finger item drag that may
+    // have just armed from the first finger needs to stand down instead of also being live
+    if(timelineDragState){
+      clearTimeout(timelineDragState.timer);
+      if(timelineDragState.chip){ timelineDragState.chip.style.transform=''; timelineDragState.chip.classList.remove('dragging'); }
+      timelineDragState = null;
+      const ghost = document.getElementById('timelineDragGhost'); if(ghost) ghost.style.display='none';
+      const preview = document.getElementById('timelineDropPreview'); if(preview) preview.style.display='none';
+    }
+    timelinePinchStartDist = timelinePinchDist();
+    timelinePinchStartPx = timelinePxPerHour;
+  }
+}, true);
+document.addEventListener('pointermove', (e)=>{
+  if(!timelinePinchPointers.has(e.pointerId)) return;
+  timelinePinchPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(timelinePinchPointers.size===2 && timelinePinchStartDist){
+    e.preventDefault();
+    const dist = timelinePinchDist();
+    setTimelineZoom(timelinePinchStartPx * (dist/timelinePinchStartDist));
+  }
+});
+function endTimelinePinchPointer(e){
+  if(!timelinePinchPointers.has(e.pointerId)) return;
+  timelinePinchPointers.delete(e.pointerId);
+  if(timelinePinchPointers.size<2){ timelinePinchStartDist = null; timelinePinchStartPx = null; }
+}
+document.addEventListener('pointerup', endTimelinePinchPointer);
+document.addEventListener('pointercancel', endTimelinePinchPointer);
 function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
   if(justDraggedTimelineItem===id){ justDraggedTimelineItem = null; return; } // the click that fires right after a real drag-drop shouldn't also open the sheet
   if(timelinePickedItem){
@@ -4976,10 +5037,10 @@ function renderTimelineGrid(){
       </div>` : '';
   }
 
-  const totalHeight = (TIMELINE_END_HOUR-TIMELINE_START_HOUR)*TIMELINE_PX_PER_HOUR;
+  const totalHeight = (TIMELINE_END_HOUR-TIMELINE_START_HOUR)*timelinePxPerHour;
   const hourLabels = [];
   for(let h=TIMELINE_START_HOUR; h<=TIMELINE_END_HOUR; h++){
-    hourLabels.push(`<div class="timeline-hourlabel" style="top:${(h-TIMELINE_START_HOUR)*TIMELINE_PX_PER_HOUR}px">${pad(h)}:00</div>`);
+    hourLabels.push(`<div class="timeline-hourlabel" style="top:${(h-TIMELINE_START_HOUR)*timelinePxPerHour}px">${pad(h)}:00</div>`);
   }
   const hourCol = `<div class="timeline-hourcol" style="height:${totalHeight}px;">${hourLabels.join('')}</div>`;
 
@@ -4995,7 +5056,7 @@ function renderTimelineGrid(){
     return `<div class="timeline-daycol" data-day-idx="${d.dayIdx}" data-date-str="${d.dateStr}" style="height:${totalHeight}px;" onclick="onTimelineColClick(event, ${d.dayIdx}, '${d.dateStr}')">${itemsHtml}${addBox}</div>`;
   }).join('');
 
-  el.innerHTML = `<div class="timeline-body" style="height:${totalHeight}px; --timeline-hour-px:${TIMELINE_PX_PER_HOUR}px;">${hourCol}${dayCols}</div>`;
+  el.innerHTML = `<div class="timeline-body" style="height:${totalHeight}px; --timeline-hour-px:${timelinePxPerHour}px;">${hourCol}${dayCols}</div>`;
   requestAnimationFrame(()=>{
     const inp = document.getElementById('timelineAddInput') || document.getElementById('timelineRenameInput');
     if(inp) inp.focus();
