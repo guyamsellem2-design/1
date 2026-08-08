@@ -752,8 +752,11 @@
   .timeline-item.chip-picked{outline:2px solid var(--gold); outline-offset:1px; z-index:2;}
   .timeline-item.chip-active{outline:2px solid var(--text); outline-offset:1px; z-index:2;}
   .timeline-item.dragging{opacity:.85; box-shadow:0 4px 14px rgba(0,0,0,.35); z-index:5;}
-  .timeline-daycol.list-drag-over{background:rgba(201,162,39,.14); outline:2px dashed var(--gold); outline-offset:-2px;}
   .timeline-drag-ghost{position:fixed; z-index:999; pointer-events:none; background:var(--text); color:var(--bg); font-size:12px; padding:3px 9px; border-radius:6px; transform:translate(-50%,-135%); white-space:nowrap; display:none; box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  /* the precise drop target -- outlines just the slot the item will actually land in (snapped to
+     the same half-hour grid commitTimelineMoveTo uses), sized to the dragged item's real duration,
+     instead of highlighting the whole day column. */
+  .timeline-drop-preview{position:absolute; right:1px; left:1px; border:2px dashed var(--gold); border-radius:5px; background:rgba(201,162,39,.12); pointer-events:none; z-index:3; display:none; box-sizing:border-box;}
   .timeline-item .timeline-chip-text{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--lc,2); overflow:hidden; white-space:normal; word-break:break-word; overflow-wrap:break-word;}
   .timeline-item-add{position:absolute; right:1px; left:1px; z-index:2;}
   .timeline-add-input{width:100%; border:1px solid var(--gold); border-radius:5px; background:var(--surface); color:var(--text); font-family:inherit; font-size:11px; padding:3px 5px;}
@@ -4470,6 +4473,27 @@ function timelineDragGhostEl(){
   }
   return el;
 }
+// the box that shows exactly where the item will land -- snapped to the same half-hour slot
+// commitTimelineMoveTo will actually use, and sized to the item's own real duration (not a fixed
+// generic box) so what she sees while dragging is exactly what she gets on drop.
+function timelineDropPreviewEl(){
+  let el = document.getElementById('timelineDropPreview');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'timelineDropPreview';
+    el.className = 'timeline-drop-preview';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function timelineItemDurationMin(kind, id){
+  const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
+  if(!rec || !rec.time || !rec.endTime) return 30;
+  const [sh,sm] = rec.time.split(':').map(Number);
+  const [eh,em] = rec.endTime.split(':').map(Number);
+  const d = (eh*60+em)-(sh*60+sm);
+  return d>0 ? d : 30;
+}
 function startTimelineItemDrag(e, kind, id){
   if(timelinePickedItem) return; // already mid-move via the 2-tap flow -- don't also start a drag
   e.stopPropagation();
@@ -4477,10 +4501,11 @@ function startTimelineItemDrag(e, kind, id){
   // gesture that competes with our own pointermove-driven drag -- block it right at pointerdown
   e.preventDefault();
   const chip = e.currentTarget;
+  const durationMin = timelineItemDurationMin(kind, id);
   if(timelineDesktopDragMode){
     // drag mode is an explicit, already-made decision -- no hold-timer needed, arm right away
     timelineDragState = {
-      kind, id, chip, active:true, everMoved:false, scrolling:false,
+      kind, id, chip, durationMin, active:true, everMoved:false, scrolling:false,
       targetDayIdx:null, targetSlot:null, targetDateStr:null,
       startX:e.clientX, startY:e.clientY, lastY:e.clientY, timer:null
     };
@@ -4488,7 +4513,7 @@ function startTimelineItemDrag(e, kind, id){
     return;
   }
   timelineDragState = {
-    kind, id, chip, active:false, everMoved:false, scrolling:false,
+    kind, id, chip, durationMin, active:false, everMoved:false, scrolling:false,
     targetDayIdx:null, targetSlot:null, targetDateStr:null,
     startX:e.clientX, startY:e.clientY, lastY:e.clientY,
     timer: setTimeout(()=>{
@@ -4520,11 +4545,10 @@ function onTimelineItemDragMove(e){
   timelineDragState.chip.style.pointerEvents = 'none';
   const under = document.elementFromPoint(e.clientX, e.clientY);
   timelineDragState.chip.style.pointerEvents = '';
-  document.querySelectorAll('.timeline-daycol.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
   const col = under ? under.closest('.timeline-daycol[data-day-idx]') : null;
   const ghost = timelineDragGhostEl();
+  const preview = timelineDropPreviewEl();
   if(col){
-    col.classList.add('list-drag-over');
     const rect = col.getBoundingClientRect();
     timelineDragState.targetDayIdx = +col.dataset.dayIdx;
     timelineDragState.targetDateStr = col.dataset.dateStr;
@@ -4533,11 +4557,18 @@ function onTimelineItemDragMove(e){
     ghost.style.left = e.clientX+'px';
     ghost.style.top = e.clientY+'px';
     ghost.style.display = 'block';
+    // re-parent into whichever day column is currently hovered -- position:absolute inside it uses
+    // the exact same top/height coordinate system as the real timeline chips
+    if(preview.parentElement !== col) col.appendChild(preview);
+    preview.style.top = timelineTopPx(timelineDragState.targetSlot)+'px';
+    preview.style.height = Math.max(18, timelineDragState.durationMin/60*TIMELINE_PX_PER_HOUR)+'px';
+    preview.style.display = 'block';
   } else {
     timelineDragState.targetDayIdx = null;
     timelineDragState.targetSlot = null;
     timelineDragState.targetDateStr = null;
     ghost.style.display = 'none';
+    preview.style.display = 'none';
   }
 }
 function onTimelineItemDragUp(){
@@ -4545,10 +4576,11 @@ function onTimelineItemDragUp(){
   clearTimeout(timelineDragState.timer);
   const ghost = document.getElementById('timelineDragGhost');
   if(ghost) ghost.style.display = 'none';
+  const preview = document.getElementById('timelineDropPreview');
+  if(preview) preview.style.display = 'none';
   if(timelineDragState.active){
     timelineDragState.chip.style.transform = '';
     timelineDragState.chip.classList.remove('dragging');
-    document.querySelectorAll('.timeline-daycol.list-drag-over').forEach(c=>c.classList.remove('list-drag-over'));
     if(timelineDragState.everMoved && timelineDragState.targetDayIdx!==null){
       const {kind, id, targetDayIdx, targetSlot, targetDateStr} = timelineDragState;
       justDraggedTimelineItem = id;
