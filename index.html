@@ -732,6 +732,9 @@
      pinned while scrolling in this mode specifically. */
   .timeline-wrap.fullscreen{position:fixed; inset:0; z-index:5000; border-radius:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; background:var(--bg);}
   .timeline-toolbar{display:flex; justify-content:flex-end; gap:6px; padding:5px 8px; background:var(--surface3); border-bottom:1px solid var(--border);}
+  /* the day grid in fullscreen is much taller than the screen (see the comment above) -- without this,
+     scrolling down to reach a later hour scrolls the toolbar (and its drag-mode / close buttons) away too */
+  .timeline-wrap.fullscreen .timeline-toolbar{position:sticky; top:0; z-index:10;}
   .timeline-fs-btn{background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:5px 10px; font-size:12.5px; font-family:inherit; cursor:pointer;}
   .timeline-fs-btn.active{background:var(--gold); color:#241a06; border-color:transparent; font-weight:600;}
   .timeline-daynames{display:flex; background:var(--surface3); border-bottom:1px solid var(--border);}
