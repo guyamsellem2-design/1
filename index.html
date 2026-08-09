@@ -7640,7 +7640,7 @@ function renderHabits(){
               <div class="habit-detail-label">אחרי מה זה קורה?</div>
               ${inlineEditIds.has('habitctx:'+h.id)
                 ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
-                : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ מה קדם לזה?'}</span>`}
+                : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ אחרי מה זה קורה?'}</span>`}
             </div>
           </div>` : ''}
         </li>`;
