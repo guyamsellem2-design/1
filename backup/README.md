@@ -17,7 +17,7 @@
 **להחזיר את כל העיצוב הישן:**
 
 ```
-git checkout v1-original-design -- index.html
+git checkout cea7c8c -- index.html
 ```
 
 **להחזיר רק פריט אחד** (צבע, מרווח, כפתור מסוים): אפשר להעתיק את הכלל הרלוונטי
@@ -25,11 +25,12 @@ git checkout v1-original-design -- index.html
 
 ## נקודת השחזור ב-git
 
-התג `v1-original-design` מצביע על הקומיט האחרון לפני העיצוב:
+הקומיט `cea7c8c` הוא האחרון לפני העיצוב, והוא נשאר בהיסטוריה לתמיד:
 
 ```
-git show v1-original-design
-git diff v1-original-design -- index.html
+git show cea7c8c
+git diff cea7c8c -- index.html
 ```
 
-התג נשאר גם אם התיקייה הזאת תימחק, אז אין דרך לאבד את הגרסה הישנה.
+כלומר יש שתי דרכים בלתי תלויות לחזור אחורה — הקובץ בתיקייה הזאת, וההיסטוריה
+עצמה. גם אם התיקייה תימחק, `cea7c8c` עדיין שם.
