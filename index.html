@@ -1063,36 +1063,7 @@
 
       <div id="scheduleTabTasks" style="display:none;">
         <div class="card">
-          <button type="button" class="list-expand-btn" id="taskAddToggleBtn" onclick="toggleTaskAddOpen()" style="margin-bottom:10px;"><span class="chev">▸</span> הוספת משימה</button>
-          <div id="taskAddBody" style="display:none;">
-          <div class="add-row">
-            <input type="text" id="taskInput" placeholder="משימה קטנה לשבוע הזה...">
-            <select id="taskDomain" onchange="onTaskDomainChange(this.value)"></select>
-            <select id="taskEnergy">
-              <option value="low">🟢 מטעין</option>
-              <option value="mid" selected>🟡 בינוני</option>
-              <option value="high">🔴 מרוקן</option>
-            </select>
-            <button type="button" class="add-domain-btn" onclick="toggleTaskSchedule()" id="taskSchedToggle">📅 לתזמן</button>
-            <button type="button" class="add-domain-btn" onclick="toggleTaskMore()" id="taskMoreToggle">עוד..</button>
-            <button onclick="addTask()">הוסף</button>
-          </div>
-          <div class="add-row" id="taskSchedFields" style="display:none;">
-            <input type="date" id="taskDate">
-            <div class="time-picker-wrap">
-              <input type="hidden" id="taskTime" value="">
-              <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת התחלה" onclick="toggleTimePicker('taskTime', event)">🕐 <span dir="ltr">שעת התחלה</span></button>
-            </div>
-            <div class="time-picker-wrap">
-              <input type="hidden" id="taskEndTime" value="">
-              <button type="button" class="time-picker-btn time-picker-empty" data-placeholder="שעת סיום (רשות)" onclick="toggleTimePicker('taskEndTime', event)">🕐 <span dir="ltr">שעת סיום (רשות)</span></button>
-            </div>
-          </div>
-          <div id="taskMoreFields" style="display:none; margin-top:8px;">
-            <textarea id="taskNewDescription" class="detail-desc" placeholder="הרחבה, הקשר, פרטים..."></textarea>
-            <div id="pendingBodyCheck-task"></div>
-          </div>
-          </div>
+          <div class="add-row"><button onclick="quickAddTaskGeneric()">+ משימה</button></div>
           <div class="section-divider"></div>
           <div class="view-controls">
             <span class="control-label">תצוגה</span>
@@ -1388,7 +1359,6 @@ function loadData(){
   data.collapsedSections = {};
   SECTION_KEYS.forEach(k=>{ data.collapsedSections[k] = true; });
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
-  taskAddOpen = false; // collapsed by default like every other add-row on the page, not a special case
   migrateOldNotesToDomainNotes();
   lastSnapshotJSON = JSON.stringify(data);
   render();
@@ -1590,7 +1560,7 @@ function restoreSnapshot(json){
   data = JSON.parse(json);
   lastSnapshotJSON = json;
   try{ localStorage.setItem(STORAGE_KEY, json); }catch(e){}
-  editingTaskId = null; scheduleEditingTaskId = null; editingSuggestionId = null; editingSomedayId = null;
+  scheduleEditingTaskId = null; editingSuggestionId = null; editingSomedayId = null;
   editingDilemmaId = null; editingAnchorId = null; openForm = null; drawingNoteId = null; colorPickerForId = null;
   longPressedTaskId = null;
   render();
@@ -1638,8 +1608,6 @@ function toggleSoftMode(){
   saveData();
   renderTasks();
   renderScheduleGrid();
-  taskAddOpen = false;
-  renderTaskAddState();
 }
 function toggleNightMode(){
   data.nightMode = !data.nightMode;
@@ -3723,7 +3691,6 @@ function deleteAnchorOccurrence(id, dateStr){
 }
 
 /* ---------- tasks ---------- */
-let editingTaskId = null;
 let scheduleEditingTaskId = null;
 let taskLongPressState = null;
 let longPressedTaskId = null;
@@ -3766,7 +3733,6 @@ function unscheduleTaskFromWeek(id){
   renderTasks();
 }
 const expandedTasks = new Set();
-function renderTaskDomainSelect(){ document.getElementById('taskDomain').innerHTML = domainOptions(taskFilterDomain || undefined); }
 let taskSortBy = 'time';
 function setTaskSortBy(val){ taskSortBy = val; renderTasks(); }
 let taskFilterDomain = '';
@@ -3774,12 +3740,6 @@ let taskFilterRange = 'all';
 function setTaskFilterDomain(val){
   taskFilterDomain = val;
   renderTasks();
-  // single-topic view mode: keep the "new task" topic selector in sync with what's being viewed
-  if(val){ const sel = document.getElementById('taskDomain'); if(sel) sel.value = val; }
-}
-function onTaskDomainChange(val){
-  // already viewing a single topic — switching the new-task topic switches the view to match
-  if(taskFilterDomain && taskFilterDomain!==val) setTaskFilterDomain(val);
 }
 function setTaskFilterRange(val){ taskFilterRange = val; renderTasks(); }
 function renderTaskFilterSelect(){
@@ -3891,13 +3851,11 @@ function renderTasks(){
   let list = data.tasks;
   const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
   if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
-  // a task currently open for editing must never disappear mid-edit just because the active
-  // filters no longer match it (e.g. she reschedules it out of the current week's range)
-  if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain || t.id===editingTaskId);
+  if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain);
   const today = ymd(new Date());
   const isTucked = t => t.done || !!(t.date && t.date < today);
   const sorted = sortTasksForDisplay(list);
-  const regular = sorted.filter(t=>!isTucked(t) && (t.id===editingTaskId || taskMatchesDateRange(t, taskFilterRange)));
+  const regular = sorted.filter(t=>!isTucked(t) && taskMatchesDateRange(t, taskFilterRange));
   const overdue = sorted.filter(isTucked);
   let html = notice;
   if(regular.length===0 && overdue.length===0){
@@ -3920,7 +3878,6 @@ function renderTasks(){
   applyListCap('task', regular.length);
 }
 function taskRowHtml(t){
-  if(editingTaskId===t.id) return taskEditFormHtml(t);
   const dom = t.domain ? domainById(t.domain) : null;
   const energy = t.energy||'';
   const subCount = (t.subtasks||[]).length;
@@ -3935,7 +3892,7 @@ function taskRowHtml(t){
     <div class="task-row-main">
       ${canDrag ? `<span class="grip" onpointerdown="startListDrag(event,'${t.id}','.task-li',reorderTasks)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>` : ''}
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
-      <span class="task-text ${t.done?'done':''} ${(!t.done && energy==='low')?'task-text-energizing':''}" onclick="taskTextClick('${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
+      <span class="task-text ${t.done?'done':''} ${(!t.done && energy==='low')?'task-text-energizing':''}" onclick="openTimelineSheet('task','${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
       <select class="tag ${dom?'':'tag-empty'} ${t.done?'tag-dimmed':''}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
       <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
     </div>
@@ -3951,14 +3908,17 @@ function taskRowHtml(t){
   return html;
 }
 const taskDescOpenIds = new Set();
+// the deep-edit form these two toggle now only ever renders inside the schedule grid (opened via
+// the floating sheet's "עוד אפשרויות"), never in the plain משימות list -- must re-render the grid,
+// not the list, or the toggle silently has no visible effect
 function toggleTaskDescOpen(id){
   if(taskDescOpenIds.has(id)) taskDescOpenIds.delete(id); else taskDescOpenIds.add(id);
-  renderTasks();
+  renderScheduleGrid();
 }
 const taskDateOpenIds = new Set();
 function toggleTaskDateOpen(id){
   if(taskDateOpenIds.has(id)) taskDateOpenIds.delete(id); else taskDateOpenIds.add(id);
-  renderTasks();
+  renderScheduleGrid();
 }
 function taskEditFormInner(t){
   const descOpen = taskDescOpenIds.has(t.id);
@@ -4094,33 +4054,18 @@ function toggleTaskExpand(id){
   renderTasks();
   if(opening) scrollElIntoView(document.querySelector(`.task-li[data-drag-id="${id}"]`));
 }
-function taskTextClick(id){
-  // if the subtasks panel is open, the first click just minimizes it — editing needs a second, deliberate click
-  if(expandedTasks.has(id)){ toggleTaskExpand(id); return; }
-  // editing a different task is already open — first click just closes it (no data lost, nothing
-  // saved without pressing שמור), so switching between tasks never happens by accident in one click
-  if(editingTaskId && editingTaskId!==id){ closeTaskEdit(); return; }
-  openTaskEdit(id);
-}
-function openTaskEdit(id){
-  const opening = editingTaskId!==id;
-  editingTaskId = (editingTaskId===id) ? null : id;
-  if(editingTaskId) ensureListExpanded('task');
-  renderTasks();
-  if(opening){ const input = document.getElementById(`taskEditText-${id}`); scrollElIntoView(input && input.closest('li')); }
-}
 // closing an item's edit re-minimizes every sub inside it (body-check, description, subtask
 // scheduling...) -- so reopening it later always starts fully collapsed instead of reappearing
 // however it happened to be left expanded last time.
 function closeTaskEdit(){
-  const id = editingTaskId || scheduleEditingTaskId;
+  const id = scheduleEditingTaskId;
   if(id){
     bodyCheckOpenIds.delete('task:'+id);
     taskDescOpenIds.delete(id);
     taskDateOpenIds.delete(id);
     Array.from(subtaskDateOpenIds).forEach(k=>{ if(k.startsWith(id+':')) subtaskDateOpenIds.delete(k); });
   }
-  editingTaskId = null; scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid();
+  scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid();
 }
 function saveTaskEdit(id){
   const t = data.tasks.find(t=>t.id===id);
@@ -4143,7 +4088,6 @@ function saveTaskEdit(id){
   if(gcalSyncEl) t.gcalSync = gcalSyncEl.checked;
   const draftEl = document.getElementById(`taskEditDraft-${id}`);
   if(draftEl) t.draft = draftEl.checked;
-  editingTaskId = null;
   scheduleEditingTaskId = null;
   taskDateOpenIds.delete(id);
   taskDescOpenIds.delete(id);
@@ -4253,65 +4197,6 @@ function toggleSubtaskFavorite(taskId, subId){
   const s = t && (t.subtasks||[]).find(s=>s.id===subId);
   if(s){ s.favorite = !s.favorite; saveData(); renderTasks(); }
 }
-let taskSchedFieldsOpen = false;
-let taskMoreFieldsOpen = false;
-function toggleTaskSchedule(){
-  taskSchedFieldsOpen = !taskSchedFieldsOpen;
-  applyTaskComposeToggles();
-}
-function toggleTaskMore(){
-  taskMoreFieldsOpen = !taskMoreFieldsOpen;
-  applyTaskComposeToggles();
-  if(taskMoreFieldsOpen) renderPendingBodyCheck('task');
-}
-// a plain DOM style toggle here (instead of state checked on every render, like everything else
-// in this file) silently loses "open" the moment ANYTHING re-renders the page around her -- a
-// background cloud sync tick, a totally unrelated click -- because that re-render never knew to
-// re-apply it. tracking it as real state and reapplying it inside render() every time makes it
-// immune to that regardless of what triggered the re-render.
-function applyTaskComposeToggles(){
-  const sched = document.getElementById('taskSchedFields');
-  if(sched) sched.style.display = taskSchedFieldsOpen ? 'flex' : 'none';
-  const more = document.getElementById('taskMoreFields');
-  if(more) more.style.display = taskMoreFieldsOpen ? '' : 'none';
-}
-let taskAddOpen = false;
-function toggleTaskAddOpen(){ taskAddOpen = !taskAddOpen; renderTaskAddState(); }
-function renderTaskAddState(){
-  const btn = document.getElementById('taskAddToggleBtn');
-  const body = document.getElementById('taskAddBody');
-  if(!btn || !body) return;
-  btn.querySelector('.chev').textContent = taskAddOpen ? '▾' : '▸';
-  body.style.display = taskAddOpen ? '' : 'none';
-  applyTaskComposeToggles();
-}
-function addTask(){
-  if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
-  const input = document.getElementById('taskInput');
-  const text = input.value.trim();
-  if(!text) return;
-  const domain = document.getElementById('taskDomain').value;
-  const energy = document.getElementById('taskEnergy').value;
-  const date = document.getElementById('taskDate').value || '';
-  const time = document.getElementById('taskTime').value || '';
-  const endTime = document.getElementById('taskEndTime').value || '';
-  const description = document.getElementById('taskNewDescription').value.trim();
-  const bodyCheck = {...pendingBodyCheck.task};
-  const newTask = {id:uid(), text, domain, done:false, energy, date, time, endTime, description, subtasks:[], createdAt:Date.now(), bodyCheck};
-  data.tasks.push(newTask);
-  input.value='';
-  document.getElementById('taskDate').value='';
-  setTimePickerValue('taskTime', '');
-  setTimePickerValue('taskEndTime', '');
-  document.getElementById('taskNewDescription').value='';
-  taskMoreFieldsOpen = false;
-  applyTaskComposeToggles();
-  resetPendingBodyCheck('task');
-  saveData();
-  renderTasks();
-  renderScheduleGrid();
-  applyGcalSyncForTask(newTask, true);
-}
 function toggleTask(id){
   const t=data.tasks.find(t=>t.id===id);
   if(!t) return;
@@ -4333,7 +4218,6 @@ function deleteTask(id){
   const removed = data.tasks.find(t=>t.id===id);
   data.tasks = data.tasks.filter(t=>t.id!==id);
   expandedTasks.delete(id);
-  if(editingTaskId===id) editingTaskId = null;
   if(scheduleEditingTaskId===id) scheduleEditingTaskId = null;
   saveData();
   renderTasks();
@@ -5360,6 +5244,16 @@ function quickAddAnchorGeneric(){
   renderScheduleGrid();
   openTimelineSheet('anchor', newAnchor.id, true);
 }
+// same floating-sheet quick-add pattern as anchors/timeline/grid, so the משימות tab's "new task"
+// flow never diverges into its own separate inline form again
+function quickAddTaskGeneric(){
+  const newTask = {id:uid(), text:'', domain:data.domains[0]?data.domains[0].id:'', done:false, energy:'', date:ymd(new Date()), time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
+  data.tasks.push(newTask);
+  saveData();
+  renderScheduleGrid();
+  renderTasks();
+  openTimelineSheet('task', newTask.id, true);
+}
 
 /* ---------- topics notebook: tab strip selects which topic's notes show below ---------- */
 function selectTopicTab(id){
@@ -6363,8 +6257,11 @@ function decisionHelperPanelHtml(kind, id){
 const bodyCheckOpenIds = new Set();
 const bodyCheckShownReminder = new Map(); // "kind:id" -> reminder text, or '' if the bank is empty
 const URGENCY_LABELS = { objective:'אובייקטיבית', other:'כי זו העדפה של מישהו אחר', relief:'כי משהו בי רוצה הקלה/בריחה', waitDiscomfort:'דחוף כי קשה לי לתת למישהו לחכות' };
+// the task deep-edit form (where the body-check toggle lives) only ever renders inside the schedule
+// grid now (opened via the floating sheet's "עוד אפשרויות") -- renderScheduleGrid is what actually
+// needs to redraw; renderTasks is also called so the plain משימות list's badges stay fresh too
 function bodyCheckSection(kind){
-  if(kind==='task') return {arr:data.tasks, render:renderTasks};
+  if(kind==='task') return {arr:data.tasks, render:()=>{ renderScheduleGrid(); renderTasks(); }};
   if(kind==='someday') return {arr:data.someday, render:renderSomeday};
   if(kind==='dilemma') return {arr:data.generalDilemmas, render:renderGeneralDilemmaList};
   return {arr:data.suggestions, render:renderSuggestions};
@@ -6886,7 +6783,7 @@ document.addEventListener('click', (e)=>{
   if(openTimePickerId && !e.target.closest('.time-picker-wrap')) closeTimePicker();
 });
 function renderAllDependent(){
-  renderTaskDomainSelect(); renderTasks(); renderScheduleGrid();
+  renderTasks(); renderScheduleGrid();
   renderDomainEditor(); renderKeepGrid(activeNoteDomain); updateAddNoteBtnColor(); renderSomedayDomainSelect(); renderSomeday();
 }
 
@@ -7260,8 +7157,8 @@ document.addEventListener('pointerdown', (e)=>{
   commitEditChip(editingChipBank, editingChipId);
 });
 /* ---------- click anywhere else closes whatever "big form" edit is open ----------
-   task edit (list + schedule grid), anchor edit/add, add-task-in-schedule, someday edit, and
-   suggestion edit all stay open until an explicit save/cancel today -- she wants them to also
+   task edit in the schedule grid's list view, anchor edit/add, add-task-in-schedule, someday edit,
+   and suggestion edit all stay open until an explicit save/cancel today -- she wants them to also
    close the moment she clicks literally anywhere else (another item, the background, a totally
    different part of the site), so an old edit never lingers open by accident. feel-notes (emotion/
    need/body/the "עוד" open questions) are deliberately NOT touched here -- those only minimize via
@@ -7269,29 +7166,27 @@ document.addEventListener('pointerdown', (e)=>{
    this runs in the CAPTURE phase, before the actually-clicked element's own onclick fires, so the
    "is this click outside the open edit's container" check reads the DOM/state as it stood before
    that click did anything -- otherwise, the very click that OPENS an edit (e.g. a first tap on a
-   task, which sets editingTaskId and re-renders that row into its edit form) would immediately
-   read back as "outside" against its own freshly-rebuilt container and undo itself. the actual
-   closing is then deferred a tick (matching the fix already used for the sync-render/focusout
-   race elsewhere in this file) so it runs only after the click's own handler -- which might itself
-   already be closing things, or opening something else entirely -- has fully finished; the
-   still-equals-snapshot guard skips closing anything that already moved on by then. */
+   task chip in the schedule grid, which sets scheduleEditingTaskId and re-renders it into its edit
+   form) would immediately read back as "outside" against its own freshly-rebuilt container and undo
+   itself. the actual closing is then deferred a tick (matching the fix already used for the
+   sync-render/focusout race elsewhere in this file) so it runs only after the click's own handler --
+   which might itself already be closing things, or opening something else entirely -- has fully
+   finished; the still-equals-snapshot guard skips closing anything that already moved on by then. */
 function clickIsOutsideEl(el, target){ return !el || !el.contains(target); }
 document.addEventListener('click', (e)=>{
   const target = e.target;
-  const prevTask = editingTaskId, prevSchedTask = scheduleEditingTaskId;
+  const prevSchedTask = scheduleEditingTaskId;
   const prevSomeday = editingSomedayId, prevSuggestion = editingSuggestionId;
   const prevDilemma = editingDilemmaId;
   const prevOpenForm = openForm;
-  const outsideTask = prevTask !== null && clickIsOutsideEl(document.querySelector(`#taskList [data-drag-id="${prevTask}"]`), target);
   const outsideSchedTask = prevSchedTask !== null && clickIsOutsideEl(document.getElementById('scheduleGrid'), target);
   const outsideSomeday = prevSomeday !== null && clickIsOutsideEl(document.querySelector(`#somedayList [data-drag-id="${prevSomeday}"]`), target);
   const outsideSuggestion = prevSuggestion !== null && clickIsOutsideEl(document.querySelector(`#suggestionList [data-drag-id="${prevSuggestion}"]`), target);
   const outsideDilemma = prevDilemma !== null && clickIsOutsideEl(document.querySelector(`#dilemmaList [data-drag-id="${prevDilemma}"]`), target);
   const outsideScheduleForm = prevOpenForm !== null && clickIsOutsideEl(document.querySelector(`.day-col[data-day-idx="${prevOpenForm}"]`), target);
-  if(!outsideTask && !outsideSchedTask && !outsideSomeday && !outsideSuggestion && !outsideDilemma && !outsideScheduleForm) return;
+  if(!outsideSchedTask && !outsideSomeday && !outsideSuggestion && !outsideDilemma && !outsideScheduleForm) return;
   setTimeout(()=>{
-    if(outsideTask && editingTaskId===prevTask) closeTaskEdit();
-    else if(outsideSchedTask && scheduleEditingTaskId===prevSchedTask) closeTaskEdit();
+    if(outsideSchedTask && scheduleEditingTaskId===prevSchedTask) closeTaskEdit();
     if(outsideSomeday && editingSomedayId===prevSomeday) closeSomedayEdit();
     if(outsideSuggestion && editingSuggestionId===prevSuggestion) closeSuggestionEdit();
     if(outsideDilemma && editingDilemmaId===prevDilemma) closeDilemmaEdit();
@@ -9039,9 +8934,7 @@ function render(){
   document.body.classList.toggle('soft', data.softMode);
   document.body.classList.toggle('night-mode', data.nightMode);
   renderModeButtons();
-  renderTaskAddState();
   renderDomainEditor();
-  renderTaskDomainSelect();
   renderTasks();
   renderScheduleGrid();
   renderGcalStatus();
