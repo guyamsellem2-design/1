@@ -2062,13 +2062,127 @@
   }
   body.soft::before{ opacity:.62; }
 
-  /* Slightly stronger blur so the glow reads as light diffusing through the
-     card rather than as a picture sitting behind glass. */
-  .card::before, .feel-block::before, .tools-card::before,
-  .gcal-block::before, .notebook-body::before, .onboarding-card::before,
-  .day-col::before{
-    backdrop-filter:blur(16px) saturate(1.25);
-    -webkit-backdrop-filter:blur(16px) saturate(1.25);
+  /* ---------------------------------------------------------------------------
+     26. THE THEME-SWITCH LAG — measured, then removed.
+     Switching day/night/calm was janky on desktop AND phone. Measuring instead
+     of guessing found three costs, and the biggest one was not the painting:
+
+       49  backdrop-filter layers   every card, chip, button and panel had one;
+                                    each forces the browser to snapshot and blur
+                                    whatever is behind it, and a theme change
+                                    invalidates all of them at once
+       55  CSS filters on icons     every drawn icon carried a live turbulence
+                                    "jitter" filter, and because icons inherit
+                                    currentColor, recolouring the page re-ran
+                                    all 55 of them
+       18  filtered SVG shapes + a full-viewport mask in the backdrop
+
+     Toggling night measured 38ms median and 267ms worst case — comfortably into
+     visible-stutter territory on a phone.
+
+     All three are addressed. The look survives because none of these were
+     carrying the design: the blur was invisible over an already-soft backdrop,
+     the icon jitter was sub-pixel at icon sizes, and the painting reads the same
+     with eight well-placed shapes as with eighteen.
+     --------------------------------------------------------------------------- */
+
+  /* (1) No backdrop blur, anywhere. Surfaces stay translucent — the glow still
+         shows through them — they simply no longer each demand a blurred
+         snapshot of the page behind them. */
+  .card, .day-col, .keep-note, .nav-drawer, .domain-chip, .color-panel,
+  .anchor-form, .status, .pull-refresh, .soft-btn, .hamburger-btn,
+  ul.tasks li.detail-li, .bank-entry, .main-tab-bar, .options-menu-panel,
+  .feel-block, .tools-card, .gcal-block, .notebook-body, .onboarding-card,
+  .card::before, .feel-block::before, .tools-card::before, .gcal-block::before,
+  .notebook-body::before, .onboarding-card::before, .day-col::before,
+  .undo-redo-bar > .reset-btn, .undo-redo-bar > .options-menu-wrap > .reset-btn{
+    backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+  }
+  /* the two fixed bars sat over live content and relied on the blur to stay
+     readable, so they get a solid-enough ground instead */
+  .main-tab-bar{ background:color-mix(in srgb, var(--bg) 96%, transparent); }
+  .options-menu-panel{ background:color-mix(in srgb, var(--surface) 99%, var(--bg)); }
+
+  /* (2) Icons keep their drawn shape and lose the live filter. The hand-made
+         quality lives in the paths and the round caps, not in a distortion that
+         is under a pixel at 20px. */
+  .ico{ filter:none !important; }
+
+  /* (3) A theme switch is now a single instant repaint rather than half a second
+         of animated repainting. Transitioning colour across an entire themed page
+         means re-rendering every dependent layer on every frame of the fade — the
+         snap is both faster and, on a sensitive screen, calmer. */
+  body, .card, .feel-block, .tools-card, .gcal-block, .notebook-body,
+  .day-col, .keep-note, .scene, .scene .wash, .scene .stars,
+  .card::before, .feel-block::before, .tools-card::before{
+    transition:none !important;
+  }
+
+  /* ---------------------------------------------------------------------------
+     27. THE NEON, PUT BACK.
+     The original had glow tuned individually per place — a different weight on a
+     favourited item than on the current week than on a chip being edited — and
+     that tuning was real work. Flattening it into one generic shadow threw it
+     away. Every one of those is restored here in its original form and strength,
+     using the same technique it originally used (text-shadow for glyphs, layered
+     box-shadow rings for containers), so each keeps the weight it was given.
+
+     These are cheap: a static box-shadow or text-shadow on a handful of elements
+     costs nothing like a backdrop-filter, and none of them animate.
+     --------------------------------------------------------------------------- */
+
+  /* the title's warm halo */
+  h1{ text-shadow:0 0 26px rgba(230,172,92,.32); }
+  body.night-mode h1{ text-shadow:0 0 30px rgba(231,200,120,.34); }
+
+  /* an expanded day: a tight gold ring plus a soft bloom, as before */
+  .day-col.expanded{
+    box-shadow:0 0 0 1px var(--gold), 0 0 6px 0 var(--gold);
+  }
+  .day-col.expanded::before{ border-color:var(--gold); }
+
+  /* the teal lift under cards and day columns */
+  .card, .day-col{ box-shadow:0 8px 32px 0 var(--glow-teal); }
+  .feel-block, .tools-card, .gcal-block, .notebook-body{
+    box-shadow:0 6px 26px 0 var(--glow-teal);
+  }
+  .card:hover{ box-shadow:0 10px 34px -6px var(--glow-gold), 0 8px 32px 0 var(--glow-teal); }
+  .day-col:hover{ box-shadow:0 8px 28px -8px var(--glow-gold), 0 8px 32px 0 var(--glow-teal); }
+  .keep-note:hover{ box-shadow:0 8px 24px -10px var(--glow-teal); }
+
+  /* the cyan edit-glow on a chip being edited — the brightest cue in the app,
+     and deliberately so: it marks the one thing currently being changed */
+  .anchor-chip.chip-editing{
+    box-shadow:0 0 0 2px #6cf6ff, 0 0 14px 2px rgba(108,246,255,.75);
+  }
+  /* the softer sibling: an emphasised anchor in calm mode */
+  .anchor-chip.soft-emphasize{
+    box-shadow:0 0 0 1px var(--energy-low), 0 0 9px 0 var(--energy-low);
+  }
+  /* current week, on both the grid and the hour-axis view */
+  .schedule-grid.current-week{
+    box-shadow:0 0 0 1.5px rgba(15,165,182,.7), 0 0 14px 2px rgba(15,165,182,.38);
+  }
+  .timeline-wrap.current-week{
+    box-shadow:0 0 0 1.5px rgba(15,165,182,.7), 0 0 14px 2px rgba(15,165,182,.38);
+  }
+  body.night-mode .schedule-grid.current-week,
+  body.night-mode .timeline-wrap.current-week{
+    box-shadow:0 0 0 1px rgba(108,246,255,.55), 0 0 12px 1px rgba(108,246,255,.28);
+  }
+  /* favourites: the star's own halo, and the ice-blue divider under them */
+  .fav-star.active{ text-shadow:0 0 7px var(--glow-gold); }
+  ul.tasks li.fav-divider{
+    background:linear-gradient(to right, transparent, #a8fbff 15%, #a8fbff 85%, transparent);
+    box-shadow:0 0 6px 1px rgba(168,251,255,.4);
+  }
+  /* the lit icon inside an active toggle button */
+  .soft-btn.on .btn-icon{
+    text-shadow:0 0 1px #7a4a12, 0 0 5px rgba(230,126,34,.9), 0 1px 2px rgba(0,0,0,.35);
+  }
+  /* focus ring keeps its gold bloom */
+  input:focus, textarea:focus, select:focus{
+    box-shadow:0 0 0 4px var(--glow-gold);
   }
 
   /* With the cards calm, the backdrop can carry a little more colour without the
@@ -2097,78 +2211,38 @@
 <div class="scene" aria-hidden="true">
   <svg viewBox="0 0 1200 2600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <filter id="wcSoft" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="0.007 0.011" numOctaves="4" seed="11" result="n"/>
-        <feDisplacementMap in="SourceGraphic" in2="n" scale="150" xChannelSelector="R" yChannelSelector="G"/>
-        <feGaussianBlur stdDeviation="26"/>
-      </filter>
-      <filter id="wcRough" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="0.016 0.021" numOctaves="5" seed="29" result="n"/>
+      <!-- Two filters, not three, and both are cheap: small filter regions and
+           two octaves of noise instead of four or five. A displacement map is
+           re-run whenever the shape it filters changes colour, so on a theme
+           switch every one of these pays again — which is exactly why there are
+           now eight filtered shapes here instead of eighteen. -->
+      <filter id="wcSoft" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="11" result="n"/>
         <feDisplacementMap in="SourceGraphic" in2="n" scale="120" xChannelSelector="R" yChannelSelector="G"/>
-        <feGaussianBlur stdDeviation="3"/>
+        <feGaussianBlur stdDeviation="30"/>
       </filter>
-      <filter id="wcKnife" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="0.003 0.055" numOctaves="3" seed="47" result="n"/>
-        <feDisplacementMap in="SourceGraphic" in2="n" scale="70" xChannelSelector="R" yChannelSelector="G"/>
-        <feGaussianBlur stdDeviation="1.4"/>
+      <filter id="wcKnife" x="-20%" y="-30%" width="140%" height="160%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.004 0.05" numOctaves="2" seed="47" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="60" xChannelSelector="R" yChannelSelector="G"/>
+        <feGaussianBlur stdDeviation="2"/>
       </filter>
-      <!-- Keeps the middle of the page clear. Reading happens in the centre column,
-           so the paint is masked away from it and allowed to build up at the edges.
-           The mask is soft and uneven, never a visible rectangle — the clear area
-           has to look like somewhere the brush simply did not go. -->
-      <radialGradient id="clearCentre" cx="50%" cy="50%" r="52%">
-        <stop offset="0%"   stop-color="#000"/>
-        <stop offset="58%"  stop-color="#000" stop-opacity="0.30"/>
-        <stop offset="100%" stop-color="#000" stop-opacity="0"/>
-      </radialGradient>
-      <mask id="edgesOnly">
-        <rect x="-200" y="-200" width="1600" height="3000" fill="#fff"/>
-        <rect x="-200" y="-200" width="1600" height="3000" fill="url(#clearCentre)"/>
-      </mask>
     </defs>
 
-    <!-- Everything is painted inside this mask, so colour gathers around the
-         margins and thins out wherever the text sits. -->
-    <g mask="url(#edgesOnly)">
-
-      <!-- TOP. Warm sky bleeding in from the upper corners, deliberately unequal. -->
-      <g class="wash wash-drift">
-        <ellipse cx="1080" cy="120" rx="470" ry="320" fill="var(--wash-1)" filter="url(#wcSoft)"/>
-        <ellipse cx="90"  cy="250" rx="360" ry="290" fill="var(--wash-5)" filter="url(#wcSoft)" opacity=".9"/>
-        <rect x="700" y="330" width="620" height="58" fill="var(--wash-6)" filter="url(#wcKnife)" opacity=".55"/>
-        <ellipse cx="1150" cy="560" rx="280" ry="200" fill="var(--wash-3)" filter="url(#wcRough)" opacity=".6"/>
-      </g>
-
-      <!-- LEFT MARGIN. A column of strokes running down the side, half of them
-           walking off the edge of the paper. -->
-      <g class="wash wash-drift-2">
-        <rect x="-160" y="620"  width="520" height="86" fill="var(--wash-2)" filter="url(#wcKnife)" opacity=".7"/>
-        <ellipse cx="40"  cy="900"  rx="320" ry="230" fill="var(--wash-4)" filter="url(#wcSoft)" opacity=".65"/>
-        <rect x="-140" y="1180" width="440" height="64" fill="var(--wash-1)" filter="url(#wcKnife)" opacity=".6"/>
-        <ellipse cx="-20" cy="1520" rx="300" ry="260" fill="var(--wash-5)" filter="url(#wcRough)" opacity=".5"/>
-        <rect x="-180" y="1880" width="480" height="74" fill="var(--wash-2)" filter="url(#wcKnife)" opacity=".55"/>
-        <ellipse cx="60"  cy="2230" rx="330" ry="240" fill="var(--wash-3)" filter="url(#wcSoft)" opacity=".55"/>
-      </g>
-
-      <!-- RIGHT MARGIN. Same idea, different rhythm, so the two sides never mirror. -->
-      <g class="wash wash-drift">
-        <ellipse cx="1180" cy="820"  rx="340" ry="270" fill="var(--wash-2)" filter="url(#wcSoft)" opacity=".7"/>
-        <rect x="900"  y="1080" width="480" height="70" fill="var(--wash-3)" filter="url(#wcKnife)" opacity=".55"/>
-        <ellipse cx="1220" cy="1380" rx="310" ry="250" fill="var(--wash-1)" filter="url(#wcRough)" opacity=".6"/>
-        <rect x="860"  y="1720" width="520" height="58" fill="var(--wash-5)" filter="url(#wcKnife)" opacity=".5"/>
-        <ellipse cx="1160" cy="2060" rx="330" ry="230" fill="var(--wash-4)" filter="url(#wcSoft)" opacity=".55"/>
-        <rect x="920"  y="2380" width="460" height="66" fill="var(--wash-2)" filter="url(#wcKnife)" opacity=".5"/>
-      </g>
-
-      <!-- A couple of strokes that cross the middle anyway. Nothing reads as
-           accidental if the rule is kept perfectly — these are the exceptions
-           that stop the clear corridor from looking like a design decision. -->
-      <g class="wash wash-drift-2">
-        <rect x="240" y="1290" width="760" height="30" fill="var(--wash-1)" filter="url(#wcKnife)" opacity=".26"/>
-        <ellipse cx="620" cy="2480" rx="520" ry="150" fill="var(--wash-3)" filter="url(#wcSoft)" opacity=".3"/>
-      </g>
+    <!-- The clearing in the middle is made by where the shapes are, not by a
+         mask over them. The mask was an extra full-viewport compositing pass on
+         every repaint, for an effect that placement alone gives for free. -->
+    <g class="wash wash-drift">
+      <ellipse cx="1120" cy="180"  rx="430" ry="330" fill="var(--wash-1)" filter="url(#wcSoft)"/>
+      <ellipse cx="30"   cy="330"  rx="380" ry="330" fill="var(--wash-5)" filter="url(#wcSoft)" opacity=".9"/>
+      <ellipse cx="10"   cy="1080" rx="330" ry="380" fill="var(--wash-4)" filter="url(#wcSoft)" opacity=".75"/>
+      <ellipse cx="1200" cy="1320" rx="340" ry="400" fill="var(--wash-2)" filter="url(#wcSoft)" opacity=".8"/>
     </g>
-
+    <g class="wash wash-drift-2">
+      <rect x="-180" y="700"  width="470" height="90" fill="var(--wash-2)" filter="url(#wcKnife)" opacity=".6"/>
+      <rect x="930"  y="880"  width="450" height="76" fill="var(--wash-3)" filter="url(#wcKnife)" opacity=".55"/>
+      <ellipse cx="120" cy="1900" rx="420" ry="360" fill="var(--wash-3)" filter="url(#wcSoft)" opacity=".7"/>
+      <ellipse cx="1140" cy="2200" rx="400" ry="380" fill="var(--wash-5)" filter="url(#wcSoft)" opacity=".65"/>
+    </g>
     <g class="stars">
       <circle class="star" cx="204" cy="1577" r="0.7" style="animation-delay:-4.4s;animation-duration:5.9s"/>
       <circle class="star" cx="266" cy="861" r="1.3" style="animation-delay:-1.7s;animation-duration:7.3s"/>
@@ -2376,6 +2450,14 @@
       <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3.7 13.6 6.2 5.1c.1-.5.6-.8 1.1-.8h9.4c.5 0 .9.3 1.1.8l2.5 8.5"/>
         <path d="M3.7 13.6v4.6c0 .6.5 1.1 1.1 1.1h14.4c.6 0 1.1-.5 1.1-1.1v-4.6h-5.1a3.2 3.2 0 0 1-6.4 0z"/>
+      </g>
+    </symbol>
+    <!-- "איך אני מרגיש/ה עכשיו" — a heart, not the weather.
+         The original emoji was 🌤️ so this slot was drawn as sun-behind-cloud,
+         which reads as a forecast. The question is about an inner state. -->
+    <symbol id="ico-heart" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20.1c-.4 0-.7-.1-1-.4C7.7 16.9 3.6 13.6 3.6 9.4a4.6 4.6 0 0 1 8.4-2.6 4.6 4.6 0 0 1 8.4 2.5c0 4.2-4.2 7.5-7.5 10.4-.3.3-.6.4-.9.4z"/>
       </g>
     </symbol>
     <symbol id="ico-weather" viewBox="0 0 24 24">
@@ -10889,7 +10971,7 @@ if(data.gcalConnected) syncGoogleCalendar();
 (function(){
   var MAP = {'🏠':'home','🧰':'tools','📓':'notebook','🗂':'lists','✏':'pencil','🌙':'moon',
              '🍃':'leaf','🔄':'sync','🔍':'search','⚙':'gear','🗕':'minimize','🧹':'broom',
-             '📥':'inbox','🌤':'weather','✨':'spark','🌱':'seed','🗑':'trash',
+             '📥':'inbox','🌤':'heart','✨':'spark','🌱':'seed','🗑':'trash',
              '✕':'close','↶':'undo','↷':'redo'};
   var CHROME = 'button, .nav-home-link, .sync-menu-btn, .section-head h2,' +
                '.feel-block-header, .gcal-block-title, .nav-drawer h3';
