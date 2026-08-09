@@ -359,6 +359,10 @@
   .swipe-trash-icon{position:absolute; top:50%; left:16px; transform:translateY(-50%); color:#fff; font-size:19px;}
   .add-anchor-btn{margin-top:auto; background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:8px; padding:6px; font-size:13.5px; cursor:pointer; font-family:inherit;}
   .add-anchor-btn:hover{color:var(--text); border-color:var(--muted);}
+  .convert-menu-wrap{display:block; width:100%;}
+  .convert-menu{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; padding:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px;}
+  .convert-menu-btn{background:var(--surface3); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:6px 10px; font-size:13px; font-family:inherit; cursor:pointer;}
+  .convert-menu-btn:hover{border-color:var(--gold); color:var(--gold);}
   .anchor-form{margin-top:8px; display:flex; flex-direction:column; gap:6px; background:var(--surface2); padding:8px; border-radius:8px;}
   .anchor-form-spaced{gap:11px; padding:12px 10px;}
   .anchor-form input, .anchor-form select{background:var(--surface3); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:14px; font-family:inherit;}
@@ -1072,7 +1076,7 @@
 
       <div id="scheduleTabTasks" style="display:none;">
         <div class="card">
-          <div class="add-row"><button onclick="quickAddTaskGeneric()">+ משימה</button></div>
+          <div class="add-row" id="taskAddRowWrap"></div>
           <div class="section-divider"></div>
           <div class="view-controls">
             <span class="control-label">תצוגה</span>
@@ -1100,7 +1104,7 @@
 
       <div id="scheduleTabAnchors" style="display:none;">
         <div class="card">
-          <div class="add-row"><button onclick="quickAddAnchorGeneric()">+ עוגן</button></div>
+          <div class="add-row" id="anchorAddRowWrap"></div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="anchorsList"></ul>
         </div>
@@ -3584,25 +3588,6 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 setInterval(()=>{ if(currentSyncUser && navigator.onLine) runFullSync(); }, 60000);
 
 /* ---------- week grid ---------- */
-// "+ עוגן" / "+ משימה" in the list tab: create a blank draft record and open the same quick bottom
-// sheet used everywhere else, instead of expanding an inline creation form in the day column. if
-// the sheet gets closed/cancelled while the title is still empty, it cleans the blank record back up.
-function quickAddAnchorForDay(dayIdx){
-  if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
-  const newAnchor = {id:uid(), day:dayIdx, time:'', endTime:'', label:'', domain:data.domains[0].id, buffer:false, draft:true, repeatType:'weekly', date:'', createdAt:Date.now()};
-  data.anchors.push(newAnchor);
-  saveData();
-  renderScheduleGrid();
-  openTimelineSheet('anchor', newAnchor.id, true);
-}
-function quickAddTaskForDay(dayIdx, dateStr){
-  const newTask = {id:uid(), text:'', domain:data.domains[0]?data.domains[0].id:'', done:false, energy:'', date:dateStr, time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
-  data.tasks.push(newTask);
-  saveData();
-  renderScheduleGrid();
-  renderTasks();
-  openTimelineSheet('task', newTask.id, true);
-}
 function anchorAppliesToDate(a, dateObj, dayIdx){
   const repeatType = a.repeatType || 'weekly';
   const dateStr = ymd(dateObj);
@@ -3791,6 +3776,8 @@ function applyListCap(key, itemCount){
 }
 function renderTasks(){
   const el = document.getElementById('taskList');
+  const addRowWrap = document.getElementById('taskAddRowWrap');
+  if(addRowWrap) addRowWrap.innerHTML = convertMenuHtml('tasks:add', null, ymd(new Date()));
   renderTaskFilterSelect();
   let list = data.tasks;
   const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
@@ -4182,16 +4169,12 @@ function renderScheduleGrid(){
     const itemsHtml = entries.join('');
     const moreHtml = hiddenCount>0 ? `<button type="button" class="day-more" onclick="toggleDayMinimize(${dayIdx})">+${hiddenCount} עוד</button>` : '';
 
-    const addAnchorHtml = `<button class="add-anchor-btn" onclick="quickAddAnchorForDay(${dayIdx})">+ עוגן</button>`;
-    const addTaskHtml = `<button class="add-anchor-btn" onclick="quickAddTaskForDay(${dayIdx}, '${dateStr}')">+ משימה</button>`;
-
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
     return `<div class="day-col ${isMinimized?'minimized':'expanded'}" data-day-idx="${dayIdx}">
       <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
       ${emptyNote}${itemsHtml}
-      ${addAnchorHtml}
-      ${addTaskHtml}
+      ${convertMenuHtml('schedule:'+dayIdx, dayIdx, dateStr)}
       ${moreHtml}
     </div>`;
   }).join('');
@@ -4667,9 +4650,9 @@ function timelineActionBarHtml(){
 let timelineSheetItem = null;    // {kind, id}
 let timelineSheetDayIdx = null;  // primary staged day (the record's own day/date), committed on שמירה
 let timelineSheetSelectedDays = null; // Set<number> -- every day-of-week this record should also apply to; extra selected days become cloned records on save
-// set when the sheet is opened on a record created blank just for this sheet (quickAddAnchorForDay/
-// quickAddTaskForDay, list-tab "+ עוגן"/"+ משימה") -- if it gets closed without a title ever being
-// typed, the blank placeholder record is removed instead of lingering in the data forever.
+// set when the sheet is opened on a record created blank just for this sheet (via the "+ הפוך ל..."
+// menu's task/anchor options) -- if it gets closed without a title ever being typed, the blank
+// placeholder record is removed instead of lingering in the data forever.
 let timelineSheetIsNew = false;
 // set when the sheet was opened via a "→ הפוך למשימה" conversion (someday item or someday small
 // step) -- the source item is deliberately NOT deleted at conversion time, only offered here as an
@@ -5088,8 +5071,8 @@ function renderTimelineGrid(){
 /* ---------- "עוגנים": a flat, day-agnostic list of every recurring commitment -- for reviewing
    "everything that repeats" in one glance, same list treatment as the משימות tab. editing opens
    the same quick bottom sheet as everywhere else, right here -- never sends you off to the weekly
-   schedule just to change something. "עוד אפשרויות" inside the sheet still reaches the full form
-   (recurrence type, buffer, per-item gcal sync) when that's actually needed. */
+   schedule just to change something. "עוד אפשרויות" inside the sheet expands in place (recurrence
+   type, buffer, per-item gcal sync) when that's actually needed. */
 function anchorRowHtml(a){
   const dom = domainById(a.domain);
   const repeatLabel = {once:'חד-פעמי', daily:'מדי יום', weekly:'מדי שבוע', monthly:'מדי חודש', yearly:'מדי שנה'}[a.repeatType||'weekly'] || 'מדי שבוע';
@@ -5103,6 +5086,8 @@ function anchorRowHtml(a){
 function renderAnchorsTab(){
   const el = document.getElementById('anchorsList');
   if(!el) return;
+  const addRowWrap = document.getElementById('anchorAddRowWrap');
+  if(addRowWrap) addRowWrap.innerHTML = convertMenuHtml('anchors:add', new Date().getDay(), '');
   const list = data.anchors.slice().sort((a,b)=>{
     const da = (a.repeatType||'weekly')==='weekly' ? a.day : 7;
     const db = (b.repeatType||'weekly')==='weekly' ? b.day : 7;
@@ -5110,26 +5095,6 @@ function renderAnchorsTab(){
     return (a.time||'').localeCompare(b.time||'');
   });
   el.innerHTML = list.length ? list.map(anchorRowHtml).join('') : '<li class="empty">אין עדיין עוגנים קבועים</li>';
-}
-// "+ עוגן" at the top of the עוגנים tab -- same create-blank-then-open-the-sheet pattern as
-// quickAddAnchorForDay, just without a day column to default to, so today's weekday is used.
-function quickAddAnchorGeneric(){
-  if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
-  const newAnchor = {id:uid(), day:new Date().getDay(), time:'', endTime:'', label:'', domain:data.domains[0].id, buffer:false, draft:true, repeatType:'weekly', date:'', createdAt:Date.now()};
-  data.anchors.push(newAnchor);
-  saveData();
-  renderScheduleGrid();
-  openTimelineSheet('anchor', newAnchor.id, true);
-}
-// same floating-sheet quick-add pattern as anchors/timeline/grid, so the משימות tab's "new task"
-// flow never diverges into its own separate inline form again
-function quickAddTaskGeneric(){
-  const newTask = {id:uid(), text:'', domain:data.domains[0]?data.domains[0].id:'', done:false, energy:'', date:ymd(new Date()), time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
-  data.tasks.push(newTask);
-  saveData();
-  renderScheduleGrid();
-  renderTasks();
-  openTimelineSheet('task', newTask.id, true);
 }
 
 /* ---------- topics notebook: tab strip selects which topic's notes show below ---------- */
@@ -8086,12 +8051,16 @@ function renderOnboardingCard(){
    for whenever there's more clarity/capacity than there was in the moment of writing it down. */
 let inboxBlockOpen = false;
 function toggleInboxBlock(){ inboxBlockOpen = !inboxBlockOpen; renderInbox(); updateCollapseAllButton(); }
+// set by convertBlankTo for the four "+ הפוך ל..." kinds without their own quick-open sheet --
+// when set, committing this capture creates that kind directly instead of landing in the inbox
+let quickCaptureTarget = null;
 function openInboxCapture(){
   document.getElementById('inboxCaptureOverlay').style.display = '';
   document.getElementById('inboxCaptureSheet').style.display = '';
   requestAnimationFrame(()=>{ const el = document.getElementById('inboxCaptureInput'); if(el) el.focus(); });
 }
 function closeInboxCapture(){
+  quickCaptureTarget = null;
   const overlay = document.getElementById('inboxCaptureOverlay'), sheet = document.getElementById('inboxCaptureSheet');
   if(overlay) overlay.style.display = 'none';
   if(sheet) sheet.style.display = 'none';
@@ -8100,8 +8069,10 @@ function closeInboxCapture(){
 function commitInboxCapture(){
   const el = document.getElementById('inboxCaptureInput');
   const text = el ? el.value.trim() : '';
+  const target = quickCaptureTarget;
   closeInboxCapture();
   if(!text) return;
+  if(target){ finishConvert(target, text, ''); return; }
   data.inbox.push({id:uid(), text, createdAt:Date.now()});
   saveData();
   renderInbox();
@@ -8118,6 +8089,97 @@ function saveInboxItemEdit(id, val){
   const it = data.inbox.find(x=>x.id===id);
   if(it && val.trim()){ it.text = val.trim(); saveData(); }
   renderInbox();
+}
+/* ---------- "+ הפוך ל..." — a small picker replacing the old separate "+ עוגן"/"+ משימה" buttons
+   wherever something brand new is being created (schedule grid day columns, the עוגנים/משימות tab
+   add-rows). deliberately scoped to blank creation only -- NOT retrofitted onto items that already
+   have a home (an existing habit/someday item/suggestion/dilemma), since those already only offer
+   the one or two conversions that actually make sense for them; a full 6-option menu on every
+   existing item would just be more decisions dangling in front of her, not fewer. */
+const CONVERT_KINDS = [
+  {kind:'task', label:'משימה'},
+  {kind:'anchor', label:'עוגן'},
+  {kind:'suggestion', label:'העדפה של מישהו אחר'},
+  {kind:'dilemma', label:'התלבטות'},
+  {kind:'note', label:'פתק'},
+  {kind:'todayIdea', label:'דבר שבא לי לעשות היום'},
+];
+let convertMenuOpenKey = null;
+function convertMenuRerender(key){
+  const prefix = key.split(':')[0];
+  if(prefix==='schedule') renderScheduleGrid();
+  else if(prefix==='anchors') renderAnchorsTab();
+  else if(prefix==='tasks') renderTasks();
+}
+function toggleConvertMenu(key){
+  convertMenuOpenKey = (convertMenuOpenKey===key) ? null : key;
+  convertMenuRerender(key);
+}
+function closeConvertMenu(){
+  if(!convertMenuOpenKey) return;
+  const key = convertMenuOpenKey;
+  convertMenuOpenKey = null;
+  convertMenuRerender(key);
+}
+function convertMenuHtml(key, dayIdx, dateStr){
+  const isOpen = convertMenuOpenKey === key;
+  return `<span class="convert-menu-wrap">
+    <button type="button" class="add-anchor-btn" onclick="event.stopPropagation(); toggleConvertMenu('${key}')">+ הפוך ל...${isOpen?' ▴':' ▾'}</button>
+    ${isOpen ? `<div class="convert-menu">${CONVERT_KINDS.map(o=>`<button type="button" class="convert-menu-btn" onclick="event.stopPropagation(); convertBlankTo('${o.kind}', ${dayIdx!=null?dayIdx:'null'}, '${dateStr||''}')">${o.label}</button>`).join('')}</div>` : ''}
+  </span>`;
+}
+// task/anchor open the same familiar floating sheet empty, exactly like the old dedicated "+ עוגן"/
+// "+ משימה" buttons already did -- typing the name happens there. the other four kinds don't have
+// their own "open blank and type" sheet, so this reuses the global inbox capture's minimal textarea,
+// just pointed directly at that kind instead of always landing in the inbox tray.
+function convertBlankTo(destKind, dayIdx, dateStr){
+  closeConvertMenu();
+  if(destKind==='task'){
+    finishConvert('task', '', '', {dateStr: dateStr||''});
+  } else if(destKind==='anchor'){
+    finishConvert('anchor', '', '', {dayIdx});
+  } else {
+    quickCaptureTarget = destKind;
+    openInboxCapture();
+  }
+}
+function finishConvert(destKind, text, domain, extra={}){
+  text = (text||'').trim();
+  if(destKind==='task'){
+    const newTask = {id:uid(), text, domain: domain||(data.domains[0]?data.domains[0].id:''), done:false, energy:'', date:extra.dateStr||'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
+    data.tasks.push(newTask);
+    saveData(); renderTasks(); renderScheduleGrid();
+    openTimelineSheet('task', newTask.id, true);
+  } else if(destKind==='anchor'){
+    if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
+    const newAnchor = {id:uid(), day: extra.dayIdx!=null?extra.dayIdx:new Date().getDay(), time:'', endTime:'', label:text, domain: domain||data.domains[0].id, buffer:false, draft:true, repeatType:'weekly', date:'', createdAt:Date.now()};
+    data.anchors.push(newAnchor);
+    saveData(); renderScheduleGrid();
+    openTimelineSheet('anchor', newAnchor.id, true);
+  } else if(!text){
+    return; // the other four kinds always need real text, typed in the capture sheet before this runs
+  } else if(destKind==='suggestion'){
+    data.suggestions.push({id:uid(), who:'', text, answered:false, done:false, replyDate:'', replyTime:'', bodyCheck:{}});
+    saveData(); renderSuggestions();
+    flashStatus('נוסף ל"העדפות של אחרים"');
+  } else if(destKind==='dilemma'){
+    if(!data.generalDilemmas) data.generalDilemmas = [];
+    data.generalDilemmas.push({id:uid(), text, domain: domain||'', decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()});
+    saveData(); renderGeneralDilemmaList();
+    flashStatus('נוסף ל"התלבטויות כלליות"');
+  } else if(destKind==='todayIdea'){
+    data.todayIdeas.push({id:uid(), text, done:false, favorite:false});
+    saveData(); renderTodayIdeas();
+    flashStatus('נוסף ל"מה בא לי לעשות היום"');
+  } else if(destKind==='note'){
+    const domainId = domain || activeNoteDomain || (data.domains[0] && data.domains[0].id);
+    if(!domainId) return;
+    const notes = ensureDomainNotes(domainId);
+    notes.unshift({id:uid(), text, color:'', drawing:'', memos:[], pinned:false});
+    saveData();
+    if(activeNoteDomain===domainId) renderKeepGrid(domainId);
+    flashStatus('נוסף לפתקים');
+  }
 }
 // each route both creates the real record in its destination system (same shape the destination's
 // own "add" function already uses) AND removes the raw item from the inbox -- never both places
