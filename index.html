@@ -2368,6 +2368,17 @@
   .habit-inline-actions{ flex-wrap:wrap; gap:7px; }
   .habit-context-row .inline-text-edit{ flex:1 1 180px; min-width:0; }
 
+  /* The inbox item's ✕ used to sit at the end of the action buttons, where it
+     wrapped onto a line of its own and added height to every captured thought.
+     It now sits top-left of the item — the same place delete lives everywhere
+     else in the app, so there is one habit to learn instead of two. */
+  .inbox-item-top{
+    display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;
+  }
+  .inbox-item-top .inbox-item-text{ flex:1; min-width:0; margin-bottom:0; }
+  .inbox-item-top .inline-text-edit{ flex:1; min-width:0; }
+  .inbox-item-top .del-task{ flex-shrink:0; margin-top:-2px; }
+
   /* ---------------------------------------------------------------------------
      31. BLOCK HEADINGS — legible on the first pass.
      Amatic is drawn narrow and light. At a 50px page title that reads as
@@ -5323,6 +5334,10 @@ async function runFullSync(){
     // letting a stale write land.
     const preSyncSnapshot = JSON.parse(JSON.stringify(data));
     let merged;
+    // exactly what the transaction actually committed to the cloud. this has to be tracked
+    // separately from `merged`, because `merged` can be re-merged below with edits that landed
+    // while the transaction was in flight -- and those edits are NOT in the cloud yet.
+    let committedToCloud = null;
     await fbDb.runTransaction(async (tx)=>{
       const snap = await tx.get(syncDoc());
       const remote = snap.exists ? (snap.data().plannerData || emptySyncSkeleton()) : emptySyncSkeleton();
@@ -5336,6 +5351,9 @@ async function runFullSync(){
       const base = storedBase || remote;
       merged = mergePlannerData(data, base, remote);
       const mergedSnapshot = JSON.parse(JSON.stringify(merged));
+      // Firestore may run this callback more than once (it retries on contention); the last run
+      // is the one that commits, so this always ends up holding what really landed in the cloud.
+      committedToCloud = mergedSnapshot;
       tx.set(syncDoc(), { plannerData: mergedSnapshot, updatedAt: Date.now() });
     });
     // she may have kept editing (most notably: deleting something) WHILE the transaction above was
@@ -5353,7 +5371,23 @@ async function runFullSync(){
     saveData();
     renderOrDeferIfTyping();
     applyingSyncedData = false;
-    saveSyncBase(JSON.parse(JSON.stringify(merged)));
+    // THE BASE MUST ONLY EVER DESCRIBE WHAT THE CLOUD ACTUALLY HAS.
+    //
+    // This used to save `merged`, which is wrong whenever something was added during the sync:
+    // the block above re-merges those in-flight edits into `merged` so they are not lost from the
+    // screen, but the transaction had already written the PRE-re-merge snapshot. Recording the
+    // re-merged version as the base therefore claimed the cloud held an item it had never
+    // received.
+    //
+    // On the next sync that item is then present locally, present in the base, and absent from
+    // the remote -- which the 3-way merge reads, entirely correctly, as "deleted on another
+    // device", and deletes it here too. That is the bug where something vanishes moments after
+    // being added and has to be typed a second time (the second time works because by then the
+    // item is genuinely absent from the base, so it reads as new-and-unpushed instead).
+    //
+    // Saving the committed snapshot instead makes the in-flight item read as "brand-new locally,
+    // not pushed yet" next time round, so it is kept and uploaded rather than deleted.
+    saveSyncBase(JSON.parse(JSON.stringify(committedToCloud || merged)));
     lastSyncAt = Date.now();
     lastSyncError = null;
     if(changedDuringSync) scheduleCloudSync();
@@ -10089,9 +10123,12 @@ function routeInboxToDilemma(id, kind){
 function inboxItemHtml(it){
   const key = 'inbox:'+it.id;
   return `<div class="inbox-item-row" data-drag-id="${it.id}">
-    ${inlineEditIds.has(key)
-      ? `<textarea class="inline-text-edit" dir="auto" data-inline-key="${key}" onblur="this.dataset.cancelled ? cancelInlineEdit('${key}', renderInbox) : (saveInboxItemEdit('${it.id}', this.value), cancelInlineEdit('${key}', renderInbox))" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(it.text)}</textarea>`
-      : `<span class="inbox-item-text" data-inline-key="${key}" onclick="inlineEditToggle('${key}', renderInbox)" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>`}
+    <div class="inbox-item-top">
+      ${inlineEditIds.has(key)
+        ? `<textarea class="inline-text-edit" dir="auto" data-inline-key="${key}" onblur="this.dataset.cancelled ? cancelInlineEdit('${key}', renderInbox) : (saveInboxItemEdit('${it.id}', this.value), cancelInlineEdit('${key}', renderInbox))" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(it.text)}</textarea>`
+        : `<span class="inbox-item-text" data-inline-key="${key}" onclick="inlineEditToggle('${key}', renderInbox)" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>`}
+      <span class="del-task" onclick="deleteInboxItem('${it.id}')" title="מחיקה">✕</span>
+    </div>
     <div class="inbox-item-actions">
       <button type="button" class="subtask-toggle-btn" onclick="routeInboxItem('someday','${it.id}')">→ דברים לעשות</button>
       <button type="button" class="subtask-toggle-btn" onclick="routeInboxItem('todayIdea','${it.id}')">→ מה בא לי היום</button>
@@ -10106,7 +10143,6 @@ function inboxItemHtml(it){
         <option value="dilemma">התלבטות כללית</option>
         <option value="suggestion">העדפה של מישהו אחר</option>
       </select>
-      <span class="del-task" onclick="deleteInboxItem('${it.id}')" title="מחיקה">✕</span>
     </div>
   </div>`;
 }
