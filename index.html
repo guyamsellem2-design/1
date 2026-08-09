@@ -2351,6 +2351,47 @@
     .card, .tools-card, .gcal-block, .notebook-body{ padding:16px 15px; margin-bottom:16px; }
   }
 
+  /* ---------------------------------------------------------------------------
+     30. HABIT ROW — the requested order.
+     Title, then one row of actions (עשיתי היום · +עוגן · +משימה · הרחב), and the
+     two deeper questions only once expanded, side by side on their own row.
+     --------------------------------------------------------------------------- */
+  /* "עשיתי היום" is the one thing you press daily, so it sits on the title row
+     where the thumb already is — nothing to expand, nothing to hunt for. */
+  .habit-li-row{ align-items:center; gap:9px; }
+  .habit-done-btn{ flex-shrink:0; }
+  .habit-done-btn.has-content{ border-style:solid; }
+  /* the remaining actions wrap onto their own line rather than scrolling
+     sideways — four Hebrew buttons never fit one phone row, and a hidden
+     horizontal scroll is worse than an honest second line */
+  .habit-context-row{ margin-top:8px; flex-wrap:wrap; overflow:visible; }
+  .habit-inline-actions{ flex-wrap:wrap; gap:7px; }
+  .habit-context-row .inline-text-edit{ flex:1 1 180px; min-width:0; }
+
+  /* ---------------------------------------------------------------------------
+     31. BLOCK HEADINGS — legible on the first pass.
+     Amatic is drawn narrow and light. At a 50px page title that reads as
+     character; at 21px on a heading you are scanning for, it costs you a beat
+     before you know what you are looking at — and this app gets used on days
+     when that beat matters. The big display type keeps the drawn face; the
+     headings you actually navigate by move to the UI face at a weight that
+     carries them.
+     --------------------------------------------------------------------------- */
+  .feel-block-header, .gcal-block-title, .inbox-capture-label,
+  .tools-card h3, .nav-drawer h3, .list-detail-name{
+    font-family:var(--font-ui);
+    font-weight:600;
+    letter-spacing:-.01em;
+  }
+  .feel-block-header{ font-size:17.5px; line-height:1.35; }
+  .gcal-block-title, .inbox-capture-label{ font-size:17px; }
+  .tools-card h3{ font-size:18px; }
+  .nav-drawer h3{ font-size:18px; }
+  .list-detail-name{ font-size:20px; font-weight:600; }
+  /* section headings sit between the two: still drawn, but large enough that the
+     drawn face stays instantly readable */
+  h2{ font-size:clamp(26px,5vw,32px); }
+
   /* With the cards calm, the backdrop can carry a little more colour without the
      page ever feeling busy — the art moves fully to the background. */
   :root{ --wash-opacity:.40; }
@@ -9423,18 +9464,18 @@ function renderHabits(){
             ${inlineEditIds.has('habit:'+h.id)
               ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
               : `<span class="habit-text" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
+            <button type="button" class="subtask-toggle-btn habit-done-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי היום'}</button>
             ${lastDoneLabel ? `<span class="habit-last-done-inline">${lastDoneLabel}</span>` : ''}
             <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
           </div>
           <div class="habit-context-row">
-            ${inlineEditIds.has('habitctx:'+h.id)
-              ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
-              : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ אחרי מה זה קורה? (רשות)'}</span>`}
             <span class="habit-inline-actions">
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">+עוגן</button>
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ משימה</button>
-              <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
-              <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
+              <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">נתחיל בקטן</button>
+              ${inlineEditIds.has('habitctx:'+h.id)
+                ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+                : `<button type="button" class="subtask-toggle-btn ${h.contextAnchor?'has-content':''}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : 'אחרי מה זה קורה?'}</button>`}
             </span>
           </div>
           ${stepsOpen ? `
