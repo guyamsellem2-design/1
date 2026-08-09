@@ -481,7 +481,8 @@
   .habit-context-row::-webkit-scrollbar{display:none;}
   .habit-context-text{font-size:12.5px; color:var(--muted); cursor:pointer; flex-shrink:0; white-space:nowrap;}
   .habit-context-text.habit-context-empty{color:var(--muted2);}
-  .habit-inline-actions{display:flex; flex-wrap:nowrap; gap:6px;}
+  .habit-inline-actions{display:flex; flex-wrap:nowrap; gap:5px; width:100%;}
+  .habit-inline-actions .subtask-toggle-btn{padding:4px 8px; font-size:12px; flex:0 1 auto; text-align:center; min-width:0; overflow:hidden; text-overflow:ellipsis;}
   .habit-last-done-inline{font-size:11.5px; color:var(--muted2); white-space:nowrap; flex-shrink:0;}
   .habit-small-starts{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
   .habit-detail-label{font-size:12px; color:var(--muted2); margin-bottom:4px;}
@@ -7619,7 +7620,7 @@ function renderHabits(){
           </div>
           <div class="habit-context-row">
             <span class="habit-inline-actions">
-              <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
+              <button type="button" class="subtask-toggle-btn habit-done-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי היום'}</button>
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי">+עוגן</button>
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ משימה</button>
               <button type="button" class="subtask-toggle-btn ${steps.length||h.contextAnchor?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">${stepsOpen?'סגור ▴':'הרחב ›'}</button>
