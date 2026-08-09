@@ -1421,15 +1421,46 @@ function updateUndoRedoButtons(){
 // "מזער הכל": a one-press reset for whichever tab she's currently on, for the moment things feel
 // like too much on screen at once -- greyed out (a no-op) once everything on this tab is already
 // collapsed, and lights back up the moment anything gets expanded again. only tracks the top-level
-// accordions here (section headers, the feel/today-ideas/habits/procrastination/videos blocks) --
-// those alone already answer "is anything open on this tab", so sub-toggles inside an already-closed
-// block don't need their own separate tracking for this check.
+// accordions here (section headers, the feel/today-ideas/habits/procrastination/videos blocks, and
+// on topics/lists -- which have no enclosing section to begin with -- the notes/note-headers or
+// chip-headers/item-sublists themselves, since those ARE the top level there) -- those alone already
+// answer "is anything open on this tab", so sub-toggles inside an already-closed block don't need
+// their own separate tracking for this check.
 function isEverythingCollapsedOnCurrentView(){
   if(mainView==='home'){
     if(SECTION_KEYS.some(k=>!isSectionCollapsed(k))) return false;
     return !feelBlockOpen && !todayIdeasOpen && !habitsBlockOpen;
   }
   if(mainView==='tools') return !procBlockOpen && !videosBlockOpen;
+  if(mainView==='topics'){
+    if(!activeNoteDomain) return true;
+    const notes = ensureDomainNotes(activeNoteDomain);
+    const notesCollapsed = notes.every(n => n.pinned || getNoteLevel(activeNoteDomain, n.id)===2);
+    const headers = ensureDomainNoteHeaders(activeNoteDomain);
+    // the "ללא כותרת" catch-all group (and any header UI at all) only renders once at least one
+    // real header exists (renderKeepGrid falls back to a flat list otherwise) -- with zero headers
+    // there's nothing to collapse here, so don't require the never-rendered catch-all key
+    const hasUngrouped = notes.some(n => !n.headerId || !headers.some(h=>h.id===n.headerId));
+    const headersCollapsed = headers.length===0 ? true : (
+      headers.every(h=>collapsedNoteHeaders.has(activeNoteDomain+':'+h.id))
+      && (!hasUngrouped || collapsedNoteHeaders.has(activeNoteDomain+':'))
+    );
+    return notesCollapsed && headersCollapsed;
+  }
+  if(mainView==='lists'){
+    if(!activeListId) return true;
+    const l = listById(activeListId);
+    if(!l) return true;
+    if(l.kind==='chipbank'){
+      const bank = 'list:'+l.id;
+      const headers = chipHeaders(bank);
+      if(headers.length===0) return true; // flat, no group UI at all until a real header exists (feelChipGridHtml)
+      const chips = chipDefsArray(bank) || [];
+      const hasUngrouped = chips.some(c=>!c.headerId || !headers.some(h=>h.id===c.headerId));
+      return headers.every(h=>collapsedChipHeaders.has(bank+':'+h.id)) && (!hasUngrouped || collapsedChipHeaders.has(bank+':'));
+    }
+    return (l.items||[]).every(i => !listItemSubOpen.has(l.id+':'+i.id));
+  }
   return true;
 }
 function updateCollapseAllButton(){
@@ -1461,6 +1492,26 @@ function collapseAllOnCurrentView(){
     feelNoteMinimized.add('procTrueWant');
     renderProcrastinationBlock();
     renderInspiringVideos();
+  } else if(mainView==='topics'){
+    if(activeNoteDomain){
+      collapseUnpinnedNotesForTopic(activeNoteDomain);
+      const headers = ensureDomainNoteHeaders(activeNoteDomain);
+      headers.forEach(h=>collapsedNoteHeaders.add(activeNoteDomain+':'+h.id));
+      collapsedNoteHeaders.add(activeNoteDomain+':');
+      renderKeepGrid(activeNoteDomain);
+    }
+  } else if(mainView==='lists'){
+    if(activeListId){
+      const l = listById(activeListId);
+      if(l && l.kind==='chipbank'){
+        const bank = 'list:'+l.id;
+        (l.chipHeaders||[]).forEach(h=>collapsedChipHeaders.add(bank+':'+h.id));
+        collapsedChipHeaders.add(bank+':');
+      } else if(l){
+        (l.items||[]).forEach(i=>listItemSubOpen.delete(l.id+':'+i.id));
+      }
+      renderListsView();
+    }
   }
   updateCollapseAllButton();
 }
@@ -1952,6 +2003,7 @@ function setNoteLevel(domainId, noteId, level){
   level = Math.max(0, Math.min(2, level));
   noteSizeLevel.set(noteId, level);
   renderKeepGrid(domainId);
+  updateCollapseAllButton();
 }
 function minimizeNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(domainId, noteId)+1); }
 function expandNoteStep(domainId, noteId){ setNoteLevel(domainId, noteId, getNoteLevel(domainId, noteId)-1); }
@@ -1962,6 +2014,7 @@ function toggleNotePin(domainId, noteId){
   if(n.pinned) noteSizeLevel.set(noteId, 0); // pinning also opens it right away, not just "will stay open next time"
   saveData();
   renderKeepGrid(domainId);
+  updateCollapseAllButton();
 }
 // leaving a topic's own tab (switching topics, or leaving the נושאים page entirely) minimizes
 // whatever was left open there, unless it's pinned -- an open note is meant to stay in view only
@@ -2060,6 +2113,7 @@ function toggleNoteHeaderCollapse(domainId, headerId){
   const key = domainId+':'+headerId;
   if(collapsedNoteHeaders.has(key)) collapsedNoteHeaders.delete(key); else collapsedNoteHeaders.add(key);
   renderKeepGrid(domainId);
+  updateCollapseAllButton();
 }
 function keepNoteHtml(id, n){
     const isDrawing = drawingNoteId===n.id;
@@ -7286,6 +7340,7 @@ function toggleChipHeaderCollapse(bank, headerId){
   const key = bank+':'+headerId;
   if(collapsedChipHeaders.has(key)) collapsedChipHeaders.delete(key); else collapsedChipHeaders.add(key);
   rerenderChipBank(bank);
+  updateCollapseAllButton();
 }
 function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); updateCollapseAllButton(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
@@ -7809,8 +7864,8 @@ function deleteList(id){
   saveData();
   renderListsView();
 }
-function openList(id){ activeListId = id; renderListsView(); window.scrollTo(0,0); }
-function closeList(){ activeListId = null; applyPickerFor = null; renderListsView(); }
+function openList(id){ activeListId = id; renderListsView(); window.scrollTo(0,0); updateCollapseAllButton(); }
+function closeList(){ activeListId = null; applyPickerFor = null; renderListsView(); updateCollapseAllButton(); }
 function saveListNameEdit(id, value){
   const l = listById(id);
   if(l && value.trim()) l.name = value.trim();
@@ -7858,6 +7913,7 @@ function toggleListItemSub(listId, itemId){
   const key = listId+':'+itemId;
   if(listItemSubOpen.has(key)) listItemSubOpen.delete(key); else listItemSubOpen.add(key);
   renderListsView();
+  updateCollapseAllButton();
 }
 function addListSubitem(listId, itemId){
   const input = document.getElementById('newSubitemInput-'+listId+'-'+itemId);
