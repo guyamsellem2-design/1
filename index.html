@@ -2185,6 +2185,172 @@
     box-shadow:0 0 0 4px var(--glow-gold);
   }
 
+  /* ---------------------------------------------------------------------------
+     28. DAYLIGHT LEGIBILITY — white on white was the mistake.
+     Two changes had quietly cancelled each other out. The cards were made
+     near-white and translucent, AND a bright ambient glow was laid over a
+     already-pale paper. Both moved toward white, so card and page ended up at
+     almost the same value and the eye had nothing to separate them by. That is
+     why it got harder to parse — not too much colour, too little CONTRAST.
+
+     The original got this relationship right and it is worth naming: a fairly
+     deep cream paper (#F8F3E6) under a genuinely white card (72% white). The
+     card is the light thing; the page is not. That gap is restored here.
+
+     Light mode only — night was never affected, and calm keeps its softer gap.
+     --------------------------------------------------------------------------- */
+
+  /* (a) The paper goes back to real cream, so white has something to sit on. */
+  :root{ --bg:#F4EDDC; }
+  body.soft{ --bg:#F3EEE1; }
+
+  /* (b) Cards become properly white and much more opaque. They still let the
+         painting glow through — just no longer so much that they dissolve. */
+  :root{
+    --cw-1:rgba(255,255,255,.88); --cw-2:rgba(255,255,255,.88);
+    --cw-3:rgba(255,255,255,.88); --cw-4:rgba(255,255,255,.88);
+    --cw-5:rgba(255,255,255,.88);
+  }
+  body.soft{
+    --cw-1:rgba(255,255,255,.90); --cw-2:rgba(255,255,255,.90);
+    --cw-3:rgba(255,255,255,.90); --cw-4:rgba(255,255,255,.90);
+    --cw-5:rgba(255,255,255,.90);
+  }
+  /* each block keeps a hint of its own hue, laid over the white rather than
+     replacing it — enough to tell them apart, never enough to tint the text */
+  body:not(.night-mode) #inboxBlock::before{ box-shadow:inset 0 0 0 999px rgba(120,190,225,.055); }
+  body:not(.night-mode) #feelBar::before{ box-shadow:inset 0 0 0 999px rgba(126,196,150,.055); }
+  body:not(.night-mode) #todayPicksBlock::before{ box-shadow:inset 0 0 0 999px rgba(230,180,105,.06); }
+  body:not(.night-mode) #habitsBlock::before{ box-shadow:inset 0 0 0 999px rgba(226,150,135,.055); }
+  body:not(.night-mode) .onboarding-card::before{ box-shadow:inset 0 0 0 999px rgba(150,155,220,.055); }
+
+  /* (c) A border you can actually see. A white card on cream needs a real edge,
+         not a hint of one. */
+  :root{ --card-line:rgba(44,92,110,.30); }
+  body.soft{ --card-line:rgba(44,92,110,.22); }
+
+  /* (d) The ambient light stops adding brightness and starts adding colour.
+         Pale gradients over pale paper were the other half of the wash-out. */
+  body:not(.night-mode)::before{
+    background:
+      radial-gradient(620px 540px at 4% 10%, rgba(226,124,102,.20), transparent 68%),
+      radial-gradient(680px 580px at 99% 26%, rgba(38,142,180,.18), transparent 68%),
+      radial-gradient(560px 500px at 92% 78%, rgba(136,96,180,.13), transparent 70%),
+      radial-gradient(760px 620px at 36% 106%, rgba(224,164,72,.20), transparent 70%);
+    opacity:.9;
+  }
+  body.soft::before{ opacity:.5; }
+
+  /* (e) The painting sits behind a page that is no longer pale, so it needs less
+         of its own strength to register. */
+  :root{ --wash-opacity:.34; }
+  body.soft{ --wash-opacity:.22; }
+
+  /* (f) A slightly firmer shadow: the last bit of separation, and the cheapest. */
+  body:not(.night-mode) .card, body:not(.night-mode) .feel-block,
+  body:not(.night-mode) .tools-card, body:not(.night-mode) .gcal-block,
+  body:not(.night-mode) .notebook-body, body:not(.night-mode) .onboarding-card,
+  body:not(.night-mode) .day-col{
+    box-shadow:0 1px 2px rgba(46,74,84,.06), 0 10px 24px -14px rgba(46,74,84,.26);
+  }
+
+  /* Secondary surfaces inside a white card need to read as recessed, which they
+     cannot do if they are also near-white. */
+  body:not(.night-mode) .card .list-item, body:not(.night-mode) .card .habit-li,
+  body:not(.night-mode) .card .video-li, body:not(.night-mode) .card .inbox-item-row,
+  body:not(.night-mode) .feel-block .list-item, body:not(.night-mode) .feel-block .habit-li,
+  body:not(.night-mode) .feel-block .inbox-item-row, body:not(.night-mode) .feel-block .memo-row,
+  body:not(.night-mode) .card .memo-row, body:not(.night-mode) .card .bank-entry,
+  body:not(.night-mode) .feel-block .bank-entry, body:not(.night-mode) .body-check-panel,
+  body:not(.night-mode) .proc-explain-text, body:not(.night-mode) .memo-row{
+    background:#F1F5F4; border:1px solid rgba(44,92,110,.12);
+  }
+  body:not(.night-mode) .add-row input[type=text], body:not(.night-mode) .add-row select,
+  body:not(.night-mode) .search-input, body:not(.night-mode) .inbox-capture-textarea,
+  body:not(.night-mode) .today-idea-input, body:not(.night-mode) .feel-note-textarea,
+  body:not(.night-mode) textarea.note-area, body:not(.night-mode) .reflect-q textarea,
+  body:not(.night-mode) .detail-desc{
+    background:#F4F8F7; border-color:rgba(44,92,110,.20);
+  }
+
+  /* ---------------------------------------------------------------------------
+     29. LINES — the thing that was actually missing.
+     Measuring settled the question: the old design's card-to-page brightness
+     ratio was about 1.04, LOWER than the 1.17 here. So fill was never what made
+     it readable. What made it readable was line work — the original drew a
+     visible edge around every card, every row, every field and every chip, and
+     the redesign traded almost all of them for whitespace and soft gradients.
+     Whitespace groups things, but only a line says exactly where something ends.
+     For a page you scan quickly on a hard day, that edge is the whole thing.
+
+     So the lines come back — thin, quiet, but genuinely visible.
+     --------------------------------------------------------------------------- */
+
+  /* THE BUG behind "everything is white and hard to read":
+     the card silhouettes were still being run through the watercolour
+     displacement filter. Turning it off earlier used `.feel-block::before`,
+     but the rules that switched between filter variants were written as
+     `.feel-block:nth-of-type(even)::before` — an extra pseudo-class, so higher
+     specificity, so they kept winning. The filter was smearing the 1.5px border
+     into nothing, which is exactly why no card had a visible edge no matter how
+     dark the line got. Same specificity here, declared later, so these win. */
+  .feel-block:nth-of-type(even)::before, .card:nth-of-type(even)::before,
+  .feel-block:nth-of-type(3n)::before, .card:nth-of-type(3n)::before,
+  .day-col:nth-child(even)::before, .day-col:nth-child(odd)::before{
+    filter:none;
+  }
+
+  /* a real edge on every card, in both themes */
+  :root{ --card-line:rgba(40,86,104,.42); }
+  body.soft{ --card-line:rgba(40,86,104,.30); }
+  body.night-mode{ --card-line:rgba(150,196,226,.30); }
+  body.night-mode.soft{ --card-line:rgba(150,196,226,.22); }
+  .card::before, .feel-block::before, .tools-card::before,
+  .gcal-block::before, .notebook-body::before, .onboarding-card::before{
+    border-width:1.5px;
+  }
+  .day-col::before{ border-width:1.5px; opacity:1; }
+
+  /* corners that read as a card rather than a lozenge */
+  :root{ --r-card:18px; --r-soft:14px; }
+
+  /* structural rules elsewhere, restored to something you can see */
+  :root{ --border:rgba(40,86,104,.26); --border-strong:rgba(40,86,104,.42); }
+  body.soft{ --border:rgba(40,86,104,.18); --border-strong:rgba(40,86,104,.30); }
+  body.night-mode{ --border:rgba(150,196,226,.20); --border-strong:rgba(150,196,226,.34); }
+  body.night-mode.soft{ --border:rgba(150,196,226,.15); --border-strong:rgba(150,196,226,.26); }
+  :root{ --ink-line:rgba(40,86,104,.34); }
+  body.night-mode{ --ink-line:rgba(180,214,236,.24); }
+
+  /* rows inside a list need their divider back — this is what turns a block of
+     text into a list you can count */
+  ul.tasks li{ border-bottom:1px solid var(--border); }
+  .list-items > li, .habit-list > li{ border:1px solid var(--border); }
+
+  /* the rule between sections, no longer a barely-there gradient */
+  section::before, .section-divider{
+    background:linear-gradient(to left, transparent, var(--ink-line) 10%, var(--ink-line) 90%, transparent);
+  }
+
+  /* fields look like fields again */
+  .add-row input[type=text], .add-row select, .search-input, .inbox-capture-textarea,
+  .today-idea-input, .feel-note-textarea, textarea.note-area, .reflect-q textarea,
+  .detail-desc, .subtask-add-row input, .spark-row input, .anchor-form input,
+  .anchor-form select, .list-name-edit{
+    border-width:1.5px;
+  }
+
+  /* Collapsed blocks were tall panels holding one line of text, which spread the
+     page out and made it harder to see at a glance. Tightened — same content,
+     less hunting. */
+  .feel-block{ padding:13px 16px; }
+  .feel-block-header{ font-size:21px; line-height:1.2; }
+  .card, .tools-card, .gcal-block, .notebook-body{ padding:18px 18px; }
+  @media (max-width:760px){
+    .feel-block{ padding:12px 14px; margin-bottom:12px; }
+    .card, .tools-card, .gcal-block, .notebook-body{ padding:16px 15px; margin-bottom:16px; }
+  }
+
   /* With the cards calm, the backdrop can carry a little more colour without the
      page ever feeling busy — the art moves fully to the background. */
   :root{ --wash-opacity:.40; }
