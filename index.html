@@ -442,11 +442,14 @@
   .habit-li{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:10px 12px;}
   .habit-li-row{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
   .habit-text{flex:1; font-size:14.5px; color:var(--text); line-height:1.45;}
-  .habit-context-row{margin-top:4px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px;}
-  .habit-context-text{font-size:12.5px; color:var(--muted); cursor:pointer;}
+  /* one single row, never wrapping to a second line -- on a narrow phone it scrolls horizontally
+     instead, so the actions stay together as one unit rather than breaking into an odd 2-3 line stack */
+  .habit-context-row{margin-top:4px; display:flex; align-items:center; flex-wrap:nowrap; gap:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .habit-context-row::-webkit-scrollbar{display:none;}
+  .habit-context-text{font-size:12.5px; color:var(--muted); cursor:pointer; flex-shrink:0; white-space:nowrap;}
   .habit-context-text.habit-context-empty{color:var(--muted2);}
-  .habit-inline-actions{display:flex; flex-wrap:wrap; gap:6px; margin-inline-start:auto;}
-  .habit-last-done{font-size:12px; color:var(--muted2); margin-top:6px;}
+  .habit-inline-actions{display:flex; flex-wrap:nowrap; gap:6px;}
+  .habit-last-done-inline{font-size:11.5px; color:var(--muted2); white-space:nowrap; flex-shrink:0;}
   .habit-small-starts{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
   .habit-small-start-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0;}
   .habit-small-start-text{font-size:13.5px; color:var(--muted);}
@@ -5002,6 +5005,13 @@ function renderTimelineSheet(){
         <option value="yearly" ${freqValue==='yearly'?'selected':''}>שנה</option>
       </select>
     </div>` : '';
+  // repeating anchors (anything but חד-פעמי) get the same once/forever delete choice the full form
+  // already offers, instead of a single button that always deletes the whole recurring anchor
+  const isRepeatingAnchor = kind==='anchor' && (rec.repeatType||'weekly')!=='once';
+  const deleteButtonsHtml = isRepeatingAnchor
+    ? `<button type="button" class="delete-btn" onclick="deleteOccurrenceFromTimelineSheet()">🗑 מחיקה חד-פעמית</button>
+       <button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה לתמיד</button>`
+    : `<button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה</button>`;
   sheet.innerHTML = `
     <div class="timeline-sheet-handle"></div>
     <div class="timeline-sheet-title-row">
@@ -5019,7 +5029,9 @@ function renderTimelineSheet(){
     <div class="timeline-sheet-actions">
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
       <button type="button" class="cancel-btn" onclick="closeTimelineSheet()">ביטול</button>
-      <button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה</button>
+    </div>
+    <div class="timeline-sheet-actions" style="margin-top:8px;">
+      ${deleteButtonsHtml}
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
@@ -5098,6 +5110,15 @@ function deleteFromTimelineSheet(){
   const {kind, id} = timelineSheetItem;
   closeTimelineSheet();
   if(kind==='task') deleteTask(id); else deleteAnchor(id);
+}
+// anchors only -- skips just the occurrence currently being viewed (the day/date the sheet was
+// opened on within this week) instead of removing the whole recurring anchor
+function deleteOccurrenceFromTimelineSheet(){
+  if(!timelineSheetItem || timelineSheetItem.kind!=='anchor') return;
+  const {id} = timelineSheetItem;
+  const dateStr = ymd(viewedWeekDates()[timelineSheetDayIdx]);
+  closeTimelineSheet();
+  deleteAnchorOccurrence(id, dateStr);
 }
 function quickMoveFromSheet(){
   if(!timelineSheetItem) return;
@@ -7724,6 +7745,7 @@ function renderHabits(){
             ${inlineEditIds.has('habit:'+h.id)
               ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
               : `<span class="habit-text" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
+            ${lastDoneLabel ? `<span class="habit-last-done-inline">${lastDoneLabel}</span>` : ''}
             <span class="del-task" onclick="deleteHabit('${h.id}')">✕</span>
           </div>
           <div class="habit-context-row">
@@ -7732,12 +7754,11 @@ function renderHabits(){
               : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ אחרי מה זה קורה? (רשות)'}</span>`}
             <span class="habit-inline-actions">
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">+עוגן</button>
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ הוסף כמשימה</button>
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ משימה</button>
               <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
               <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
             </span>
           </div>
-          ${lastDoneLabel ? `<div class="habit-last-done">${lastDoneLabel}</div>` : ''}
           ${stepsOpen ? `
           <div class="habit-small-starts">
             ${steps.map(s=>`<div class="habit-small-start-row">
