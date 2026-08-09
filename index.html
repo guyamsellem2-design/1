@@ -425,6 +425,32 @@
 
   .feel-block{background:var(--surface); border:1px solid var(--border-strong); border-radius:16px; padding:16px 18px; margin-bottom:22px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
   .feel-block-header{cursor:pointer; font-size:15px; font-weight:700; color:var(--text); user-select:none; margin-bottom:10px;}
+  /* global quick-capture FAB + sheet -- fixed above ordinary content, below the nav drawer/overlay
+     (opening nav should cover it) and below true modals like the timeline sheet */
+  /* bottom-right, not bottom-left -- the existing undo-redo-bar (⚙/מזער הכל/חיפוש) already lives
+     fixed at bottom-left, so this claims the opposite corner instead of overlapping it */
+  .inbox-fab{position:fixed; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:190; width:52px; height:52px; border-radius:50%; background:var(--gold); color:#1a1206; border:none; font-size:20px; box-shadow:0 6px 18px rgba(0,0,0,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center;}
+  .inbox-capture-overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:5100;}
+  .inbox-capture-sheet{position:fixed; left:0; right:0; bottom:0; z-index:5101; background:var(--surface); border-radius:16px 16px 0 0; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); box-shadow:0 -8px 30px rgba(0,0,0,.4);}
+  .inbox-capture-label{font-size:15px; font-weight:700; color:var(--text); margin:6px 0 8px;}
+  .inbox-capture-textarea{width:100%; min-height:90px; font-size:15px; font-family:inherit; background:var(--surface3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); box-sizing:border-box; resize:vertical;}
+  .inbox-capture-textarea:focus{outline:none; border-color:var(--gold);}
+  .inbox-badge{display:inline-block; background:var(--gold); color:#1a1206; font-size:11.5px; font-weight:700; border-radius:999px; padding:1px 7px; margin-inline-start:4px;}
+  .inbox-item-row{background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:8px 10px; margin-bottom:8px;}
+  .inbox-item-text{font-size:14.5px; color:var(--text); line-height:1.45; display:block; margin-bottom:6px; cursor:pointer;}
+  .inbox-item-actions{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  .inbox-item-actions select{font-size:12.5px; font-family:inherit; background:var(--surface3); border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:3px 8px;}
+  .onboarding-card{background:var(--surface); border:1px solid var(--gold); border-radius:14px; padding:14px 16px; margin-bottom:18px; display:flex; align-items:flex-start; gap:10px; box-shadow:0 6px 18px -10px rgba(0,0,0,0.35);}
+  .onboarding-card-text{flex:1; font-size:14px; line-height:1.6; color:var(--text);}
+  .onboarding-card-close{cursor:pointer; color:var(--muted2); font-size:15px; padding:2px 4px; flex-shrink:0;}
+  .search-sheet{max-height:82vh; display:flex; flex-direction:column;}
+  .search-input{width:100%; font-size:15px; font-family:inherit; background:var(--surface3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); box-sizing:border-box; margin-bottom:10px;}
+  .search-input:focus{outline:none; border-color:var(--gold);}
+  .search-results{overflow-y:auto; flex:1; min-height:0;}
+  .search-result-row{display:flex; flex-direction:column; gap:2px; padding:9px 10px; border-radius:9px; cursor:pointer; margin-bottom:4px;}
+  .search-result-row:hover, .search-result-row:active{background:var(--surface2);}
+  .search-result-label{font-size:11.5px; color:var(--gold); font-weight:600;}
+  .search-result-text{font-size:14px; color:var(--text); line-height:1.4;}
   .feel-energy-row{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
   .feel-energy-label{font-size:14.5px; font-weight:600; color:var(--text); white-space:nowrap;}
   .feel-energy-row input[type=range]{flex:1; accent-color:var(--gold);}
@@ -622,6 +648,7 @@
   .body-check-panel{background:var(--surface3); border-radius:9px; padding:10px 10px 8px; margin:2px 0 0; display:flex; flex-direction:column; gap:9px;}
   .bc-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
   .bc-row-label{font-size:13px; color:var(--muted); flex-shrink:0;}
+  .bc-bodynote-bridge{width:100%; font-size:12.5px; color:var(--muted); background:var(--surface3); border:1px dashed var(--border-strong); border-radius:8px; padding:6px 9px; cursor:pointer; line-height:1.4;}
   .bc-btn-group{display:flex; gap:6px; flex-wrap:wrap;}
   .bc-toggle-btn{background:transparent; border:1px dashed var(--border-strong); color:var(--muted); border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit; white-space:nowrap;}
   .bc-toggle-btn:hover{color:var(--text); border-color:var(--muted);}
@@ -836,6 +863,34 @@
 <div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="closeTimelineSheet()" style="display:none;"></div>
 <div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
 
+<!-- global quick-capture: reachable from any tab, any scroll position, any collapsed section --
+     catching a raw thought should take zero decisions (just text -> save); deciding where it
+     belongs (a task, a topic note, someday, a habit...) is a separate, later, optional action. -->
+<button type="button" class="inbox-fab" id="inboxFab" onclick="openInboxCapture()" title="תפיסת מחשבה מהירה">✏️</button>
+<div class="inbox-capture-overlay" id="inboxCaptureOverlay" onclick="closeInboxCapture()" style="display:none;"></div>
+<div class="inbox-capture-sheet" id="inboxCaptureSheet" style="display:none;">
+  <div class="timeline-sheet-handle"></div>
+  <div class="inbox-capture-label">מה עולה לך?</div>
+  <textarea id="inboxCaptureInput" class="inbox-capture-textarea" dir="auto" placeholder="אין צורך לדעת עדיין איפה זה שייך — זה נשמר בתיבת קליטה, ואפשר למיין אחר כך." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); commitInboxCapture(); } else if(event.key==='Escape'){ closeInboxCapture(); }"></textarea>
+  <div class="timeline-sheet-actions">
+    <button type="button" class="save-btn" onclick="commitInboxCapture()">שמירה בתיבת הקליטה</button>
+    <button type="button" class="cancel-btn" onclick="closeInboxCapture()">ביטול</button>
+  </div>
+</div>
+
+<!-- global search: same top-level placement as the inbox capture sheet, reachable from any tab --
+     one place to find a task/note/list-item/someday-item/habit without remembering which of the
+     several places it might have ended up in. -->
+<div class="inbox-capture-overlay" id="searchOverlay" onclick="closeSearch()" style="display:none;"></div>
+<div class="inbox-capture-sheet search-sheet" id="searchSheet" style="display:none;">
+  <div class="timeline-sheet-handle"></div>
+  <input type="text" id="globalSearchInput" class="search-input" dir="auto" placeholder="חיפוש בכל מקום — משימות, פתקים, רשימות, דברים לעשות, הרגלים..." oninput="onSearchInput(this.value)">
+  <div class="search-results" id="searchResults"></div>
+  <div class="timeline-sheet-actions">
+    <button type="button" class="cancel-btn" onclick="closeSearch()">סגירה</button>
+  </div>
+</div>
+
 <div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
 <div class="nav-drawer" id="navDrawer">
   <h3>ניווט</h3>
@@ -867,6 +922,7 @@
     </div>
   </div>
   <button class="reset-btn" id="collapseAllBtn" onclick="collapseAllOnCurrentView()" disabled title="ממזער הכל בדף הזה, כולל פתקים">🗕 מזער הכל</button>
+  <button class="reset-btn" onclick="openSearch()" title="חיפוש בכל האפליקציה">🔍 חיפוש</button>
 </div>
 
 <div id="homeView">
@@ -883,6 +939,10 @@
       <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </header>
+
+  <div id="onboardingCard"></div>
+
+  <div class="feel-block" id="inboxBlock"></div>
 
   <div class="feel-block" id="feelBar"></div>
 
@@ -1169,7 +1229,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [] };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 let openForm = null;
 let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
@@ -1283,6 +1343,8 @@ function loadData(){
       data.inspiringVideos = parsed.inspiringVideos || [];
       data.habits = (parsed.habits || []).map(h=>({smallStarts:[], ...h}));
       data.lists = (parsed.lists || []).map(l=>({...l, items:(l.items||[]).map(i=>({favorite:false, subitems:[], ...i}))}));
+      data.inbox = parsed.inbox || [];
+      data.onboardingDismissed = !!parsed.onboardingDismissed;
       data.generalDilemmas = parsed.generalDilemmas || [];
       data.decisionHelperLinks = parsed.decisionHelperLinks || [];
       data.decisionHelperQuotes = parsed.decisionHelperQuotes || [];
@@ -1323,7 +1385,7 @@ function loadData(){
   data.collapsedSections = {};
   SECTION_KEYS.forEach(k=>{ data.collapsedSections[k] = true; });
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
-  taskAddOpen = !data.softMode;
+  taskAddOpen = false; // collapsed by default like every other add-row on the page, not a special case
   migrateOldNotesToDomainNotes();
   lastSnapshotJSON = JSON.stringify(data);
   render();
@@ -1429,7 +1491,7 @@ function updateUndoRedoButtons(){
 function isEverythingCollapsedOnCurrentView(){
   if(mainView==='home'){
     if(SECTION_KEYS.some(k=>!isSectionCollapsed(k))) return false;
-    return !feelBlockOpen && !todayIdeasOpen && !habitsBlockOpen;
+    return !feelBlockOpen && !todayIdeasOpen && !habitsBlockOpen && !inboxBlockOpen;
   }
   if(mainView==='tools') return !procBlockOpen && !videosBlockOpen;
   if(mainView==='topics'){
@@ -1482,9 +1544,11 @@ function collapseAllOnCurrentView(){
     bodyBankOpen = false;
     moreQuestionsOpen = false;
     ['emotion','body','need','qSoul','qPower','qHealing','qFreeSelf','qExpress'].forEach(k=>feelNoteMinimized.add(k));
+    inboxBlockOpen = false;
     renderFeelBar();
     renderTodayIdeas();
     renderHabits();
+    renderInbox();
   } else if(mainView==='tools'){
     procBlockOpen = false;
     videosBlockOpen = false;
@@ -1571,7 +1635,7 @@ function toggleSoftMode(){
   saveData();
   renderTasks();
   renderScheduleGrid();
-  taskAddOpen = !data.softMode;
+  taskAddOpen = false;
   renderTaskAddState();
 }
 function toggleNightMode(){
@@ -1910,7 +1974,7 @@ function renderNavList(){
              onchange="renameDomainCommit('${d.id}', this.value)"
              oninput="updateDomainNameLive('${d.id}', this.value)">`
         : `<span class="nav-domain-name-text">${escapeHtml(d.name)}</span>`}
-      ${!navDragMode ? `<span class="del-task" onclick="event.stopPropagation(); deleteDomain('${d.id}')">✕</span>` : ''}
+      ${!navDragMode ? `<span class="del-task" onclick="event.stopPropagation(); deleteDomain('${d.id}')" title="מחיקה">✕</span>` : ''}
     </div>
     ${colorPickerForId===d.id ? renderColorPanel(d.id) : ''}
   `).join('') + `
@@ -2137,7 +2201,7 @@ function keepNoteHtml(id, n){
         ${isMedium
           ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
           : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
-        <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')">✕</span>
+        <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')" title="מחיקה">✕</span>
       </div>
       <div class="keep-note-toolbar">
         <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
@@ -2251,7 +2315,7 @@ function renderMemoRow(domainId, noteId, m){
     <div class="memo-row-head" onclick="toggleMemoPlayer('${m.id}')" title="נגן/כווץ">
       <span class="memo-icon">🎙</span>
       <span class="memo-label">הקלטה</span>
-      <span class="del-task" onclick="event.stopPropagation(); deleteMemo('${domainId}','${noteId}','${m.id}')">✕</span>
+      <span class="del-task" onclick="event.stopPropagation(); deleteMemo('${domainId}','${noteId}','${m.id}')" title="מחיקה">✕</span>
     </div>
     ${isOpen ? `
     <div class="memo-player">
@@ -3146,7 +3210,7 @@ function renderGcalStatus(){
       ${selectedIds.length ? selectedIds.map(calId=>`
         <div class="gcal-cal-row">
           <span style="flex:1">${escapeHtml(gcalCalendarLabel(calId))}</span>
-          <span class="del-task" onclick="removeGcalCalendar('${escapeAttr(calId)}')">✕ נתק</span>
+          <span class="del-task" onclick="removeGcalCalendar('${escapeAttr(calId)}')" title="מחיקה">✕ נתק</span>
         </div>`).join('') : '<div class="empty">לא נבחרו יומנים</div>'}
       <div class="add-row" style="margin:8px 0 0;">
         <input type="text" id="gcalAddCalendarInput" placeholder="מייל/מזהה של יומן נוסף...">
@@ -3198,10 +3262,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','possibilities','customTimerPresets'];
-const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','possibilities','customTimerPresets','inbox'];
+const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote','onboardingDismissed'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], customTimerPresets:[], activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], customTimerPresets:[], inbox:[], onboardingDismissed:false, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -3981,7 +4045,7 @@ function taskDetailHtml(t){
           : `<span class="subtask-text ${s.done?'done':''}" data-inline-key="subtask:${t.id}:${s.id}" onclick="inlineEditToggle('subtask:${t.id}:${s.id}', renderTasks)">${escapeHtml(s.text)}</span>`}
         ${s.date ? `<span class="task-date-badge">${formatDateHe(s.date)}${s.time?' · '+s.time:''}</span>` : ''}
         <span class="sched-link ${hasSchedule?'active':''}" onclick="toggleSubtaskDateOpen('${t.id}','${s.id}')" title="תזמון">🕐</span>
-        <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')">✕</span>
+        <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')" title="מחיקה">✕</span>
       </div>`;
       if(isOpen) html += subtaskScheduleFormHtml(t, s);
       parts.push(html);
@@ -4208,7 +4272,7 @@ function applyTaskComposeToggles(){
   const more = document.getElementById('taskMoreFields');
   if(more) more.style.display = taskMoreFieldsOpen ? '' : 'none';
 }
-let taskAddOpen = true;
+let taskAddOpen = false;
 function toggleTaskAddOpen(){ taskAddOpen = !taskAddOpen; renderTaskAddState(); }
 function renderTaskAddState(){
   const btn = document.getElementById('taskAddToggleBtn');
@@ -5380,7 +5444,7 @@ function somedayRowHtml(s){
     <span class="task-text" style="flex:1" onclick="somedayTextClick('${s.id}')">${escapeHtml(s.text)}</span>
     <select class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};" onclick="event.stopPropagation()" onchange="quickChangeSomedayDomain('${s.id}', this.value)" title="שינוי נושא">${domainOptions(s.domain)}</select>
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
-    <span class="del-task" onclick="deleteSomeday('${s.id}')">✕</span>
+    <span class="del-task" onclick="deleteSomeday('${s.id}')" title="מחיקה">✕</span>
     ${bodyCheckStatusBadgesHtml(s, {})}
   </li>`;
   if(isExpanded) html += somedayDetailHtml(s);
@@ -5457,7 +5521,7 @@ function somedaySubtasksListHtml(s){
         ? `<input type="text" class="inline-text-edit" value="${escapeAttr(sub.text)}" data-inline-key="somedaystep:${s.id}:${sub.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('somedaystep:${s.id}:${sub.id}', renderSomeday) : saveSomedaySubtaskTextEdit('${s.id}','${sub.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
         : `<span class="subtask-text ${sub.done?'done':''}" data-inline-key="somedaystep:${s.id}:${sub.id}" onclick="inlineEditToggle('somedaystep:${s.id}:${sub.id}', renderSomeday)">${escapeHtml(sub.text)}</span>`}
       <span class="promote" onclick="convertSomedaySubtaskToTask('${s.id}','${sub.id}')">→ משימה</span>
-      <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')">✕</span>
+      <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')" title="מחיקה">✕</span>
     </div>`);
   });
   return parts.join('');
@@ -5611,7 +5675,7 @@ function renderPendingSomedaySubtasks(){
   const rowsHtml = pendingSomedaySubtasks.map(sub=>`
     <div class="subtask-row">
       <span class="subtask-text">${escapeHtml(sub.text)}</span>
-      <span class="del-task" onclick="deletePendingSomedaySubtask('${sub.id}')">✕</span>
+      <span class="del-task" onclick="deletePendingSomedaySubtask('${sub.id}')" title="מחיקה">✕</span>
     </div>`).join('');
   el.innerHTML = `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="togglePendingSomedaySubtasks()">${pendingSomedaySubtasksOpen?'▾':'▸'} צעדים קטנים</button>
     ${pendingSomedaySubtasksOpen ? `
@@ -5752,7 +5816,7 @@ function renderSuggestions(){
       <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
       <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
-      <span class="del-task" onclick="deleteSuggestion('${s.id}')">✕</span>
+      <span class="del-task" onclick="deleteSuggestion('${s.id}')" title="מחיקה">✕</span>
       ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due" onclick="openSuggestionEdit('${s.id}')" title="לחיצה לשינוי מועד התשובה">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}${urgencyInlineText(s)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true, hideUrgency: !!(s.replyDate || s.replyTime)})}
     </li>`;
@@ -5799,7 +5863,6 @@ function closeSuggestionEdit(){
     bodyCheckOpenIds.delete(key);
     decisionHelperOpenIds.delete(key);
     answerDraftOpenIds.delete(key);
-    decisionHelperMoreOpenIds.delete(key);
   }
   editingSuggestionId = null; renderSuggestions();
 }
@@ -5858,7 +5921,6 @@ function saveSuggestionEdit(id){
     bodyCheckOpenIds.delete(key);
     decisionHelperOpenIds.delete(key);
     answerDraftOpenIds.delete(key);
-    decisionHelperMoreOpenIds.delete(key);
   }
   syncSuggestionReplyToSchedule(s);
   saveData();
@@ -6017,7 +6079,7 @@ function renderGeneralDilemmaList(){
       ${dom ? `<span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>` : ''}
       <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
-      <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')">✕</span>
+      <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')" title="מחיקה">✕</span>
       ${d.decisionDate ? `<div class="sugg-reply-due">⏰ להחליט עד: ${formatDateHe(d.decisionDate)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(d, {urgencyOptions:['objective','other','relief']})}
     </li>`;
@@ -6057,7 +6119,6 @@ function closeDilemmaEdit(){
     bodyCheckOpenIds.delete(key);
     decisionHelperOpenIds.delete(key);
     answerDraftOpenIds.delete(key);
-    decisionHelperMoreOpenIds.delete(key);
   }
   editingDilemmaId = null; renderGeneralDilemmaList();
 }
@@ -6076,7 +6137,6 @@ function saveDilemmaEdit(id){
     bodyCheckOpenIds.delete(key);
     decisionHelperOpenIds.delete(key);
     answerDraftOpenIds.delete(key);
-    decisionHelperMoreOpenIds.delete(key);
   }
   saveData();
   renderGeneralDilemmaList();
@@ -6094,8 +6154,8 @@ function toggleDecisionHelper(kind, id){
   const key = kind+':'+id;
   const opening = !decisionHelperOpenIds.has(key);
   if(opening) decisionHelperOpenIds.add(key); else decisionHelperOpenIds.delete(key);
-  // opening "עוד" goes straight to reply-scripts + "איך אני אענה?" expanded -- the rest (quotes/
-  // links) stays tucked behind its own further toggle, see decisionHelperMoreOpenIds below
+  // opening "עוד" goes straight to everything expanded together (reply-scripts, "איך אני אענה?",
+  // quotes, links) -- flattened on purpose, see decisionHelperPanelHtml's comment
   if(opening) answerDraftOpenIds.add(key);
   bodyCheckSection(kind).render();
   if(opening){
@@ -6107,12 +6167,6 @@ function toggleDecisionHelper(kind, id){
 function decisionHelperToggleBtnHtml(kind, id){
   const isOpen = decisionHelperOpenIds.has(kind+':'+id);
   return `<button type="button" class="subtask-toggle-btn has-content" onclick="toggleDecisionHelper('${kind}','${id}')">💭 עוד... עזרה בקבלת החלטה${isOpen?' ▴':''}</button>`;
-}
-const decisionHelperMoreOpenIds = new Set();
-function toggleDecisionHelperMore(kind, id){
-  const key = kind+':'+id;
-  if(decisionHelperMoreOpenIds.has(key)) decisionHelperMoreOpenIds.delete(key); else decisionHelperMoreOpenIds.add(key);
-  rerenderActiveDilemmaList();
 }
 // any change here can be visible from either sub-tab's currently-open panel, so refresh whichever
 // list is actually on screen right now rather than a specific kind
@@ -6235,7 +6289,7 @@ function replyScriptRowHtml(kind, id, s){
   return `<div class="decision-quote-row" data-entry-id="${s.id}">
     <span onclick="startReplyScriptOverride('${kind}','${id}','${s.id}')" title="לחיצה לעריכה מותאמת כאן">${escapeHtml(s.text)}</span>
     <span class="copy-script-btn" onclick="copyReplyScript('${s.id}')" title="העתקה ללוח כמו שהוא">📋 העתק</span>
-    <span class="del-task" onclick="deleteReplyScript('${s.id}')">✕</span>
+    <span class="del-task" onclick="deleteReplyScript('${s.id}')" title="מחיקה">✕</span>
   </div>`;
 }
 // "איך אני אענה?" -- a free-write draft per suggestion/dilemma, auto-minimized so it doesn't add
@@ -6258,11 +6312,13 @@ function answerDraftBoxHtml(kind, id){
   return `<button type="button" class="subtask-toggle-btn ${hasContent?'has-content':''}" onclick="toggleAnswerDraft('${kind}','${id}')">💬 איך אני אענה?${isOpen?' ▴':''}</button>
     ${isOpen ? `<textarea class="detail-desc" dir="auto" placeholder="טיוטה חופשית — איך בא לי לענות..." oninput="setAnswerDraft('${kind}','${id}', this.value)">${escapeHtml(item.answerDraft||'')}</textarea>` : ''}`;
 }
+// flattened on purpose -- quotes/links used to sit behind their own extra "עוד" toggle nested
+// inside this already-toggled panel (3 taps deep to reach the content meant to help in a hard
+// moment). now everything here shows together as soon as the one "עזרה בקבלת החלטה" toggle opens.
 function decisionHelperPanelHtml(kind, id){
   const quotes = data.decisionHelperQuotes || [];
   const links = data.decisionHelperLinks || [];
   const scripts = data.replyScripts || [];
-  const moreOpen = decisionHelperMoreOpenIds.has(kind+':'+id);
   return `<div class="decision-helper-panel">
     <div class="bc-row-label">תשובות מוכנות להעתקה — למי שמחכה לתשובה ממני</div>
     <div class="decision-quote-list">
@@ -6273,15 +6329,13 @@ function decisionHelperPanelHtml(kind, id){
       <button onclick="addReplyScript()">הוסף</button>
     </div>
     <div style="margin-top:10px;">${answerDraftBoxHtml(kind, id)}</div>
-    <button type="button" class="subtask-toggle-btn" style="margin-top:10px;" onclick="toggleDecisionHelperMore('${kind}','${id}')">${moreOpen?'▴ פחות':'▾ עוד — משפטים וקישורים שעוזרים לי'}</button>
-    ${moreOpen ? `
     <div class="bc-row-label" style="margin-top:10px;">משפטים ושאלות שעוזרים לי לקבל החלטה</div>
     <div class="decision-quote-list">
       ${quotes.map(q=>`<div class="decision-quote-row" data-entry-id="${q.id}">
         ${inlineEditIds.has('dhquote:'+q.id)
           ? `<textarea class="inline-text-edit" data-inline-key="dhquote:${q.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('dhquote:${q.id}', rerenderActiveDilemmaList) : saveDecisionHelperQuoteEdit('${q.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(q.text)}</textarea>`
           : `<span data-inline-key="dhquote:${q.id}" onclick="inlineEditToggle('dhquote:${q.id}', rerenderActiveDilemmaList)">${escapeHtml(q.text)}</span>`}
-        <span class="del-task" onclick="deleteDecisionHelperQuote('${q.id}')">✕</span>
+        <span class="del-task" onclick="deleteDecisionHelperQuote('${q.id}')" title="מחיקה">✕</span>
       </div>`).join('') || '<div class="empty">אין עדיין משפטים בבנק הזה</div>'}
     </div>
     <div class="add-row">
@@ -6292,14 +6346,13 @@ function decisionHelperPanelHtml(kind, id){
     ${links.length ? `<ul class="video-list">${links.map(l=>`
       <li class="video-li">
         <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.title)}</a>
-        <span class="del-task" onclick="deleteDecisionHelperLink('${l.id}')">✕</span>
+        <span class="del-task" onclick="deleteDecisionHelperLink('${l.id}')" title="מחיקה">✕</span>
       </li>`).join('')}</ul>` : '<div class="empty">עדיין אין קישורים שמורים</div>'}
     <div class="add-row" style="margin-top:6px;">
       <input type="text" id="decisionLinkTitleInput" placeholder="כותרת הקישור">
       <input type="text" id="decisionLinkUrlInput" placeholder="קישור" dir="ltr">
       <button onclick="addDecisionHelperLink()">הוסף</button>
     </div>
-    ` : ''}
   </div>`;
 }
 
@@ -6333,6 +6386,13 @@ function setBodyCheckNote(kind, id, value){
   if(!item.bodyCheck) item.bodyCheck = {};
   item.bodyCheck.note = value;
   saveData();
+}
+// light bridge, not a merge -- the feel bar's own "איפה אני מרגיש/ה את זה בגוף" free text
+// (data.bodyNote) and this per-item note ask the same question into two disconnected fields; this
+// just offers to copy across on request instead of silently duplicating the same typing twice.
+function copyBodyNoteIntoBodyCheck(kind, id){
+  setBodyCheckNote(kind, id, data.bodyNote || '');
+  bodyCheckSection(kind).render();
 }
 function showSelfChoiceReminder(kind, id){
   const key = kind+':'+id;
@@ -6372,11 +6432,12 @@ function bodyCheckPanelHtml(kind, id, opts){
     </div>` : ''}
     ${opts.hideNote ? '' : `<div class="bc-row">
       <span class="bc-row-label">איפה זה פוגש אותי?</span>
+      ${(!bc.note && (data.bodyNote||'').trim()) ? `<div class="bc-bodynote-bridge" onclick="copyBodyNoteIntoBodyCheck('${kind}','${id}')" title="לחיצה להעתקה לכאן">🌤 גם כתבת בפס ההרגשה: "${escapeHtml(data.bodyNote.trim().slice(0,60))}${data.bodyNote.trim().length>60?'…':''}" — להעתיק לכאן?</div>` : ''}
       <textarea class="detail-desc" dir="auto" placeholder="איפה בגוף / בחיים זה פוגש אותי..." oninput="setBodyCheckNote('${kind}','${id}', this.value)">${escapeHtml(bc.note||'')}</textarea>
     </div>`}
     ${showReminderBtn ? `
       <button type="button" class="bc-reminder-btn" onclick="showSelfChoiceReminder('${kind}','${id}')">❤️‍🩹 תזכורת לבחור בעצמי</button>
-      ${shown!==null ? `<div class="bc-reminder-shown">${shown ? escapeHtml(shown) : 'עוד אין תזכורות בבנק — אפשר להוסיף אחת בסקירה השבועית (03).'}</div>` : ''}
+      ${shown!==null ? `<div class="bc-reminder-shown">${shown ? escapeHtml(shown) : 'עוד אין תזכורות בבנק — אפשר להוסיף אחת בסקציה "תזכורות לעצמי" (01).'}</div>` : ''}
     ` : ''}
   </div>`;
 }
@@ -6474,7 +6535,7 @@ function resetPendingBodyCheck(kind){
 /* ---------- reflection (insight banks) ---------- */
 const REFLECT_QUESTIONS = [
   {key:'fed', icon:'🟢', label:'מה הזין אותי היום/השבוע?'},
-  {key:'hard', icon:'🔴', label:'איפה הרגשתי עומס יתר / התרוקנות של אנרגיה?'},
+  {key:'hard', icon:'🪫', label:'איפה הרגשתי עומס יתר / התרוקנות של אנרגיה?'},
   {key:'insights', icon:'💡', label:'תובנות מהיום/השבוע'}
 ];
 const expandedBanks = new Set();
@@ -6492,7 +6553,7 @@ function renderReflection(){
           ${inlineEditIds.has('bank:'+q.key+':'+e.id)
             ? `<textarea class="inline-text-edit" data-inline-key="bank:${q.key}:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('bank:${q.key}:${e.id}', renderReflection) : saveBankEntryEdit('${q.key}','${e.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(e.text)}</textarea>`
             : `<span data-inline-key="bank:${q.key}:${e.id}" onclick="inlineEditToggle('bank:${q.key}:${e.id}', renderReflection)">${escapeHtml(e.text)}</span>`}
-          <span class="del-task" onclick="deleteBankEntry('${q.key}','${e.id}')">✕</span>
+          <span class="del-task" onclick="deleteBankEntry('${q.key}','${e.id}')" title="מחיקה">✕</span>
         </div>`).join('')}</div>` : '<div class="empty">עוד אין תובנות בבנק הזה</div>') : '';
     return `<div class="reflect-q">
       <label>${q.icon} ${q.label}</label>
@@ -6540,7 +6601,7 @@ function renderSelfChoiceRemindersSection(){
         ${inlineEditIds.has('selfchoice:'+e.id)
           ? `<textarea class="inline-text-edit" data-inline-key="selfchoice:${e.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('selfchoice:${e.id}', renderReflection) : saveSelfChoiceReminderEdit('${e.id}', this.value)" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(e.text)}</textarea>`
           : `<span data-inline-key="selfchoice:${e.id}" onclick="inlineEditToggle('selfchoice:${e.id}', renderReflection)">${escapeHtml(e.text)}</span>`}
-        <span class="del-task" onclick="deleteSelfChoiceReminder('${e.id}')">✕</span>
+        <span class="del-task" onclick="deleteSelfChoiceReminder('${e.id}')" title="מחיקה">✕</span>
       </div>`).join('')}</div>` : '<div class="empty">עוד אין תזכורות בבנק הזה</div>') : '';
   return `<div class="reflect-q">
     <label>❤️‍🩹 תזכורות לבחור בעצמי</label>
@@ -6827,7 +6888,7 @@ function renderAllDependent(){
 }
 
 function resetAll(){
-  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ההתלבטויות הכלליות, ורעיונות ומשימות לעתיד? בנק התובנות, בנק התזכורות לבחור בעצמי, ובנק המשפטים/הקישורים/התשובות המוכנות לעזרה בקבלת החלטה יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
+  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ההתלבטויות הכלליות, תיבת הקליטה, ורעיונות ומשימות לעתיד? בנק התובנות, בנק התזכורות לבחור בעצמי, ובנק המשפטים/הקישורים/התשובות המוכנות לעזרה בקבלת החלטה יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
@@ -6843,7 +6904,7 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], onboardingDismissed:true};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -7658,7 +7719,7 @@ function renderInspiringVideos(){
         <li class="video-li">
           <a href="${escapeAttr(v.url)}" target="_blank" rel="noopener" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(v.title)}</a>
           <span class="expand-btn ${hasDesc?'has-content':''}" onclick="toggleVideoExpand('${v.id}')" title="תיאור">${isExpanded?'▾':'▸'} תיאור</span>
-          <span class="del-task" onclick="deleteInspiringVideo('${v.id}')">✕</span>
+          <span class="del-task" onclick="deleteInspiringVideo('${v.id}')" title="מחיקה">✕</span>
         </li>
         ${isExpanded ? `<li class="detail-li">
           <textarea class="detail-desc" oninput="onVideoDescInput('${v.id}', this.value)" placeholder="למה זה מעורר השראה, מה לזכור ממנו...">${escapeHtml(v.description||'')}</textarea>
@@ -7801,7 +7862,7 @@ function renderHabits(){
               ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
               : `<span class="habit-text" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
             ${lastDoneLabel ? `<span class="habit-last-done-inline">${lastDoneLabel}</span>` : ''}
-            <span class="del-task" onclick="deleteHabit('${h.id}')">✕</span>
+            <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
           </div>
           <div class="habit-context-row">
             ${inlineEditIds.has('habitctx:'+h.id)
@@ -7818,7 +7879,7 @@ function renderHabits(){
           <div class="habit-small-starts">
             ${steps.map(s=>`<div class="habit-small-start-row">
               <span class="habit-small-start-text">${escapeHtml(s.text)}</span>
-              <span class="del-task" onclick="deleteHabitSmallStart('${h.id}','${s.id}')">✕</span>
+              <span class="del-task" onclick="deleteHabitSmallStart('${h.id}','${s.id}')" title="מחיקה">✕</span>
             </div>`).join('')}
             <div class="add-row habit-small-start-add">
               <input type="text" id="habitSmallStartInput-${h.id}" placeholder="למשל: 5 דק' ביום" onkeydown="if(event.key==='Enter') addHabitSmallStart('${h.id}');">
@@ -8173,7 +8234,7 @@ function listItemHtml(l, item){
         ? `<input type="text" class="inline-text-edit" value="${escapeAttr(item.text)}" data-inline-key="${editKey}" onblur="this.dataset.cancelled ? cancelInlineEdit('${editKey}', renderListsView) : (saveListItemTextEdit('${l.id}','${item.id}', this.value), cancelInlineEdit('${editKey}', renderListsView))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
         : `<span class="list-item-text ${item.done?'done':''}" data-inline-key="${editKey}" onclick="inlineEditToggle('${editKey}', renderListsView)">${escapeHtml(item.text)}</span>`}
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleListItemFavorite('${l.id}','${item.id}')" title="${item.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${item.favorite?'★':'☆'}</span>
-      <span class="del-task" onclick="deleteListItem('${l.id}','${item.id}')">✕</span>
+      <span class="del-task" onclick="deleteListItem('${l.id}','${item.id}')" title="מחיקה">✕</span>
     </div>
     <div class="list-item-actions">
       <button type="button" class="subtask-toggle-btn ${subitems.length?'has-content':''}" onclick="toggleListItemSub('${l.id}','${item.id}')">${subOpen?'▾':'▸'} תת-רשימה${subitems.length?' ('+subitems.length+')':''}</button>
@@ -8187,7 +8248,7 @@ function listItemHtml(l, item){
         <span class="list-subitem-text ${s.done?'done':''}">${escapeHtml(s.text)}</span>
         <span class="list-subitem-actions">
           <span class="list-to-task-btn" onclick="convertListSubitemToTask('${l.id}','${item.id}','${s.id}')" title="יצירת משימה חדשה מהטקסט הזה">➜ משימה</span>
-          <span class="del-task" onclick="deleteListSubitem('${l.id}','${item.id}','${s.id}')">✕</span>
+          <span class="del-task" onclick="deleteListSubitem('${l.id}','${item.id}','${s.id}')" title="מחיקה">✕</span>
         </span>
       </div>`).join('')}
       <div class="add-row habit-small-start-add">
@@ -8212,6 +8273,224 @@ function applyPickerHtml(item, others){
       <button class="cancel-btn" onclick="closeApplyPicker()">ביטול</button>
     </div>
   </div>`;
+}
+
+/* ---------- one-time onboarding nudge -- not a tutorial, just a single gentle pointer at the
+   easiest possible starting point (the new inbox capture), dismissible forever with one tap. */
+function dismissOnboarding(){
+  data.onboardingDismissed = true;
+  saveData();
+  renderOnboardingCard();
+}
+function renderOnboardingCard(){
+  const el = document.getElementById('onboardingCard');
+  if(!el) return;
+  if(data.onboardingDismissed){ el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="onboarding-card">
+    <div class="onboarding-card-text">👋 לא יודע/ת מאיפה להתחיל? הכי פשוט: לחיצה על ✏️ בפינה למטה תופסת כל מחשבה, בלי צורך להחליט עכשיו כלום. אפשר למיין אותה למקום המתאים לה אחר כך, מתי שבא.</div>
+    <span class="onboarding-card-close" onclick="dismissOnboarding()" title="הבנתי, לא להראות שוב">✕</span>
+  </div>`;
+}
+
+/* ---------- inbox (תיבת קליטה): the single always-reachable capture surface, separate on purpose
+   from the 5 existing "what do I want" surfaces (today-ideas/someday/habits/procrastination-loop/
+   feel-bar open questions) -- catching a raw thought here takes zero decisions (just text -> save).
+   sorting it into one of those five, a task, or a topic note is a separate, later, optional action,
+   for whenever there's more clarity/capacity than there was in the moment of writing it down. */
+let inboxBlockOpen = false;
+function toggleInboxBlock(){ inboxBlockOpen = !inboxBlockOpen; renderInbox(); updateCollapseAllButton(); }
+function openInboxCapture(){
+  document.getElementById('inboxCaptureOverlay').style.display = '';
+  document.getElementById('inboxCaptureSheet').style.display = '';
+  requestAnimationFrame(()=>{ const el = document.getElementById('inboxCaptureInput'); if(el) el.focus(); });
+}
+function closeInboxCapture(){
+  const overlay = document.getElementById('inboxCaptureOverlay'), sheet = document.getElementById('inboxCaptureSheet');
+  if(overlay) overlay.style.display = 'none';
+  if(sheet) sheet.style.display = 'none';
+  const el = document.getElementById('inboxCaptureInput'); if(el) el.value = '';
+}
+function commitInboxCapture(){
+  const el = document.getElementById('inboxCaptureInput');
+  const text = el ? el.value.trim() : '';
+  closeInboxCapture();
+  if(!text) return;
+  data.inbox.push({id:uid(), text, createdAt:Date.now()});
+  saveData();
+  renderInbox();
+  flashStatus('נשמר בתיבת הקליטה 📥');
+}
+function deleteInboxItem(id){
+  data.inbox = data.inbox.filter(x=>x.id!==id);
+  saveData();
+  renderInbox();
+}
+function saveInboxItemEdit(id, val){
+  const key = 'inbox:'+id;
+  inlineEditIds.delete(key);
+  const it = data.inbox.find(x=>x.id===id);
+  if(it && val.trim()){ it.text = val.trim(); saveData(); }
+  renderInbox();
+}
+// each route both creates the real record in its destination system (same shape the destination's
+// own "add" function already uses) AND removes the raw item from the inbox -- never both places
+// at once, so the inbox stays a true "not yet sorted" tray, not a permanent duplicate copy.
+function routeInboxItem(kind, id){
+  const it = data.inbox.find(x=>x.id===id);
+  if(!it) return;
+  if(kind==='someday'){
+    data.someday.push({id:uid(), text:it.text, domain:'', description:'', subtasks:[], draft:true, createdAt:Date.now()});
+    data.inbox = data.inbox.filter(x=>x.id!==id);
+    saveData(); renderInbox(); renderSomeday();
+    flashStatus('הועבר ל"דברים לעשות"');
+  } else if(kind==='todayIdea'){
+    data.todayIdeas.push({id:uid(), text:it.text, done:false, favorite:false});
+    data.inbox = data.inbox.filter(x=>x.id!==id);
+    saveData(); renderInbox(); renderTodayIdeas();
+    flashStatus('הועבר ל"מה בא לי לעשות היום"');
+  } else if(kind==='habit'){
+    data.habits.push({id:uid(), text:it.text, smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
+    data.inbox = data.inbox.filter(x=>x.id!==id);
+    saveData(); renderInbox(); renderHabits();
+    flashStatus('הועבר ל"דברים שהייתי רוצה להתמיד בהם"');
+  } else if(kind==='task'){
+    const newTask = {id:uid(), text:it.text, domain:'', done:false, energy:'', date:'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
+    data.tasks.push(newTask);
+    data.inbox = data.inbox.filter(x=>x.id!==id);
+    saveData(); renderInbox(); renderTasks(); renderScheduleGrid();
+    flashStatus('הועבר למשימות');
+    openTimelineSheet('task', newTask.id, true);
+  }
+}
+function routeInboxToNote(id, domainId){
+  if(!domainId) return;
+  const it = data.inbox.find(x=>x.id===id);
+  if(!it) return;
+  const notes = ensureDomainNotes(domainId);
+  notes.unshift({id:uid(), text:it.text, color:'', drawing:'', memos:[], pinned:false});
+  data.inbox = data.inbox.filter(x=>x.id!==id);
+  saveData();
+  renderInbox();
+  if(activeNoteDomain===domainId) renderKeepGrid(domainId);
+  flashStatus('הועבר לפתקים');
+}
+function inboxItemHtml(it){
+  const key = 'inbox:'+it.id;
+  return `<div class="inbox-item-row" data-drag-id="${it.id}">
+    ${inlineEditIds.has(key)
+      ? `<textarea class="inline-text-edit" dir="auto" data-inline-key="${key}" onblur="this.dataset.cancelled ? cancelInlineEdit('${key}', renderInbox) : (saveInboxItemEdit('${it.id}', this.value), cancelInlineEdit('${key}', renderInbox))" onkeydown="if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">${escapeHtml(it.text)}</textarea>`
+      : `<span class="inbox-item-text" data-inline-key="${key}" onclick="inlineEditToggle('${key}', renderInbox)" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>`}
+    <div class="inbox-item-actions">
+      <button type="button" class="subtask-toggle-btn" onclick="routeInboxItem('someday','${it.id}')">→ דברים לעשות</button>
+      <button type="button" class="subtask-toggle-btn" onclick="routeInboxItem('todayIdea','${it.id}')">→ מה בא לי היום</button>
+      <button type="button" class="subtask-toggle-btn" onclick="routeInboxItem('task','${it.id}')">→ משימה</button>
+      <button type="button" class="subtask-toggle-btn" onclick="routeInboxItem('habit','${it.id}')">→ הרגל</button>
+      <select onchange="if(this.value){ routeInboxToNote('${it.id}', this.value); this.value=''; }">
+        <option value="">→ פתק בנושא...</option>
+        ${data.domains.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}
+      </select>
+      <span class="del-task" onclick="deleteInboxItem('${it.id}')" title="מחיקה">✕</span>
+    </div>
+  </div>`;
+}
+function renderInbox(){
+  const el = document.getElementById('inboxBlock');
+  if(!el) return;
+  const items = data.inbox || [];
+  el.innerHTML = `
+    <div class="feel-block-header" onclick="toggleInboxBlock()">${inboxBlockOpen?'▾':'▸'} 📥 תיבת קליטה${items.length?`<span class="inbox-badge">${items.length}</span>`:''}</div>
+    ${inboxBlockOpen ? `
+      <p class="hint" style="margin:0 0 12px;">כל מה שנתפס דרך כפתור ה-✏️ הצף נוחת כאן קודם, בלי שום החלטה. כשיש כוח, אפשר למיין כל פריט למקום שמתאים לו — או פשוט להשאיר אותו כאן.</p>
+      ${items.length ? items.map(inboxItemHtml).join('') : '<div class="empty">עדיין ריק — לחיצה על ✏️ בפינה תופסת מחשבה בכל רגע</div>'}
+    ` : ''}
+  `;
+}
+
+/* ---------- global search -- one place to find a task/note/list-item/someday-item/habit without
+   having to remember which of the several places it might have ended up in. reachable from any
+   tab, same top-level placement as the inbox capture sheet. */
+let searchQuery = '';
+function openSearch(){
+  document.getElementById('searchOverlay').style.display = '';
+  document.getElementById('searchSheet').style.display = '';
+  renderSearchResults();
+  requestAnimationFrame(()=>{ const el = document.getElementById('globalSearchInput'); if(el) el.focus(); });
+}
+function closeSearch(){
+  document.getElementById('searchOverlay').style.display = 'none';
+  document.getElementById('searchSheet').style.display = 'none';
+  searchQuery = '';
+  const el = document.getElementById('globalSearchInput'); if(el) el.value = '';
+}
+function onSearchInput(val){
+  searchQuery = val;
+  renderSearchResults();
+}
+function searchAll(q){
+  q = (q||'').trim().toLowerCase();
+  if(!q) return [];
+  const results = [];
+  data.tasks.forEach(t=>{ if((t.text||'').toLowerCase().includes(q)) results.push({type:'task', id:t.id, label:'משימה', text:t.text}); });
+  data.someday.forEach(s=>{ if((s.text||'').toLowerCase().includes(q)) results.push({type:'someday', id:s.id, label:'דברים לעשות', text:s.text}); });
+  data.habits.forEach(h=>{ if((h.text||'').toLowerCase().includes(q)) results.push({type:'habit', id:h.id, label:'הרגל', text:h.text}); });
+  (data.todayIdeas||[]).forEach(t=>{ if((t.text||'').trim() && t.text.toLowerCase().includes(q)) results.push({type:'todayIdea', id:t.id, label:'מה בא לי היום', text:t.text}); });
+  (data.inbox||[]).forEach(it=>{ if((it.text||'').toLowerCase().includes(q)) results.push({type:'inbox', id:it.id, label:'תיבת קליטה', text:it.text}); });
+  data.domains.forEach(d=>{
+    (data.domainNotes[d.id]||[]).forEach(n=>{ if((n.text||'').toLowerCase().includes(q)) results.push({type:'note', id:n.id, domainId:d.id, label:'פתק ב'+d.name, text:n.text}); });
+  });
+  (data.lists||[]).forEach(l=>{
+    if(l.kind==='chipbank'){
+      (l.chips||[]).forEach(c=>{ if((c.label||'').toLowerCase().includes(q)) results.push({type:'listChip', id:c.id, listId:l.id, label:'ברשימה '+l.name, text:c.label}); });
+    } else {
+      (l.items||[]).forEach(i=>{ if((i.text||'').toLowerCase().includes(q)) results.push({type:'listItem', id:i.id, listId:l.id, label:'ברשימה '+l.name, text:i.text}); });
+    }
+  });
+  return results.slice(0, 40); // capped so a broad query stays scannable, not a wall of results
+}
+function renderSearchResults(){
+  const el = document.getElementById('searchResults');
+  if(!el) return;
+  const results = searchAll(searchQuery);
+  if(!searchQuery.trim()){ el.innerHTML = '<div class="empty">להתחיל להקליד...</div>'; return; }
+  if(!results.length){ el.innerHTML = '<div class="empty">לא נמצא כלום</div>'; return; }
+  el.innerHTML = results.map(r=>`
+    <div class="search-result-row" onclick="jumpToSearchResult('${r.type}','${r.id}','${r.domainId||r.listId||''}')">
+      <span class="search-result-label">${escapeHtml(r.label)}</span>
+      <span class="search-result-text">${escapeHtml(r.text)}</span>
+    </div>`).join('');
+}
+// closes the panel then brings her to the item's real location -- switch tab/section/block open as
+// needed, same "expand what's needed, nothing more" spirit as everywhere else in the app.
+function jumpToSearchResult(type, id, extra){
+  closeSearch();
+  if(type==='task'){
+    switchMainView('home');
+    if(isSectionCollapsed('schedule')) toggleSection('schedule');
+    setScheduleTab('tasks');
+    render();
+    requestAnimationFrame(()=>openTimelineSheet('task', id));
+  } else if(type==='someday'){
+    switchMainView('home');
+    if(isSectionCollapsed('someday')) toggleSection('someday');
+    render();
+    requestAnimationFrame(()=>scrollElIntoView(document.querySelector(`.someday-li[data-drag-id="${id}"]`)));
+  } else if(type==='habit'){
+    switchMainView('home');
+    if(!habitsBlockOpen) toggleHabitsBlock();
+  } else if(type==='todayIdea'){
+    switchMainView('home');
+    if(!todayIdeasOpen) toggleTodayIdeasBlock();
+  } else if(type==='inbox'){
+    switchMainView('home');
+    if(!inboxBlockOpen) toggleInboxBlock();
+  } else if(type==='note'){
+    switchMainView('topics');
+    navigateToDomain(extra);
+    setNoteLevel(extra, id, 0);
+  } else if(type==='listChip' || type==='listItem'){
+    switchMainView('lists');
+    openList(extra);
+  }
 }
 
 /* ---------- today's ideas: brain dump, then choose ----------
@@ -8660,7 +8939,7 @@ function possibilitiesListHtml(){
   return list.slice().reverse().map(p=>`
     <li class="task-li" data-drag-id="${p.id}">
       <span class="task-text" style="flex:1">זה לגמרי אפשרי ש${escapeHtml(p.text)}</span>
-      <span class="del-task" onclick="deletePossibility('${p.id}')">✕</span>
+      <span class="del-task" onclick="deletePossibility('${p.id}')" title="מחיקה">✕</span>
     </li>`).join('');
 }
 function addPossibility(){
@@ -8749,6 +9028,8 @@ function render(){
   renderScheduleGrid();
   renderGcalStatus();
   renderSyncBlock();
+  renderOnboardingCard();
+  renderInbox();
   renderFeelBar();
   renderProcrastinationBlock();
   renderInspiringVideos();
