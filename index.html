@@ -992,9 +992,7 @@
   h1{ font-size:clamp(46px,9.4vw,68px); line-height:1.02; margin:0 0 6px; text-shadow:none; }
   h2{ font-size:clamp(32px,6.2vw,40px); font-weight:700; line-height:1.08; gap:10px; }
   h2 .chev{ font-size:12px; font-family:var(--font-ui); transition:transform var(--dur) var(--ease-water); }
-  /* the 01 / 02 / 03 section numbering reads as a marketing landing page, not an
-     app. hidden rather than deleted — the markup and every behaviour stay intact. */
-  h2 .num{ display:none; }
+  /* the 01 / 02 / 03 section numbering is gone from the markup entirely now. */
   .sub{ font-size:17px; line-height:1.7; color:var(--muted); max-width:60ch; }
   .eyebrow{ font-size:12px; letter-spacing:.2em; font-weight:600; color:var(--muted2); }
   .hint{ font-size:14px; line-height:1.6; color:var(--muted2); }
@@ -1786,6 +1784,112 @@
   @media (prefers-reduced-motion: reduce){
     .scene svg{ transform:none; height:100%; }
   }
+
+  /* ---------------------------------------------------------------------------
+     20. CALMING THE EDGE + BREATHING ROOM
+     The drawn outline was doing too much: at high displacement it read as zigzag
+     noise and the eye kept catching on it instead of on the content. The noise
+     frequency and amplitude are both way down (in the filters themselves), and
+     the line is thinner. It still wobbles like a pen line — it just no longer
+     vibrates.
+     --------------------------------------------------------------------------- */
+  .card::before, .feel-block::before, .tools-card::before,
+  .gcal-block::before, .notebook-body::before, .onboarding-card::before{
+    border-width:1.6px;
+    opacity:.9;
+  }
+  .day-col::before{ border-width:1.3px; }
+
+  /* A little air between the stacked blocks — enough to read them as separate
+     pieces of paper, not so much that the page starts to feel sparse. */
+  .feel-block{ margin-bottom:20px; }
+  .card, .tools-card, .gcal-block, .notebook-body{ margin-bottom:24px; }
+  @media (max-width:760px){
+    .feel-block{ margin-bottom:18px; }
+    .card, .tools-card, .gcal-block, .notebook-body{ margin-bottom:20px; }
+  }
+
+  /* The floating tool bar overlapped page content on desktop (it only got the
+     compact treatment on phones). Same icon cluster everywhere now — smaller
+     footprint, consistent, and it stops colliding with the buttons underneath. */
+  .undo-redo-bar{ gap:8px; }
+  .undo-redo-bar > .reset-btn,
+  .undo-redo-bar > .options-menu-wrap > .reset-btn{
+    font-size:0; width:44px; height:44px; min-height:0; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:50%; background:var(--surface); border:1px solid var(--border-strong);
+    box-shadow:var(--lift-2); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  }
+  .undo-redo-bar > .reset-btn .ico,
+  .undo-redo-bar > .options-menu-wrap > .reset-btn .ico{ width:20px; height:20px; }
+  .undo-redo-bar > .reset-btn:hover,
+  .undo-redo-bar > .options-menu-wrap > .reset-btn:hover{ border-color:var(--gold); }
+
+  /* ---------------------------------------------------------------------------
+     21. THE DIVIDERS
+     Tabs drawn as the tabs of notebook dividers: rounded on top, sitting on the
+     page rather than floating over it, with the active one lifted forward and
+     tinted the same colour as the tool it opens. Wraps to two rows on a phone —
+     six Hebrew labels cannot share one 390px row and stay comfortable, and
+     hiding half of them behind a sideways scroll would have been worse than
+     honest wrapping.
+     --------------------------------------------------------------------------- */
+  .tools-drawer{ margin:0 0 26px; }
+  .tools-tabs{
+    display:flex; flex-wrap:wrap; gap:7px;
+    padding:0 2px 0; margin-bottom:-2px; position:relative; z-index:2;
+  }
+  .tools-tab{
+    flex:1 1 auto; min-width:0;
+    font-family:var(--font-ui); font-size:13.5px; font-weight:600; line-height:1.25;
+    color:var(--muted); cursor:pointer;
+    background:color-mix(in srgb, var(--surface2) 88%, transparent);
+    border:1.4px solid var(--border); border-bottom-color:transparent;
+    border-radius:15px 15px 5px 5px;
+    padding:11px 12px 13px; min-height:46px;
+    text-align:center; white-space:normal;
+    transition:background var(--dur) var(--ease-water), color var(--dur) var(--ease-water),
+               border-color var(--dur) var(--ease-water), transform var(--dur) var(--ease-water);
+  }
+  .tools-tab:hover{ color:var(--text); border-color:var(--border-strong); }
+  .tools-tab.is-active{
+    color:var(--text); font-weight:700;
+    background:var(--cw-1);
+    border-color:var(--card-line);
+    transform:translateY(1px);
+  }
+  /* each divider carries the colour of the tool behind it, like tabs cut from
+     different sheets — same rotation the cards already use */
+  .tools-tab:nth-child(1).is-active{ background:var(--cw-2); }
+  .tools-tab:nth-child(2).is-active{ background:var(--cw-3); }
+  .tools-tab:nth-child(3).is-active{ background:var(--cw-4); }
+  .tools-tab:nth-child(4).is-active{ background:var(--cw-1); }
+  .tools-tab:nth-child(5).is-active{ background:var(--cw-5); }
+  .tools-tab:nth-child(6).is-active{ background:var(--cw-2); }
+
+  /* only the chosen tool is on screen; the rest wait behind their dividers */
+  .tools-panel{ display:none; }
+  .tools-panel.is-active{ display:block; animation:panelIn .42s var(--ease-water); }
+  @keyframes panelIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce){ .tools-panel.is-active{ animation:none; } }
+
+  /* sections inside the drawer are pages of the drawer, not top-level sections:
+     no rule above them, no giant gap, no stagger animation. */
+  .tools-panels section{ margin-bottom:0; padding-top:0; animation:none; }
+  .tools-panels section::before{ display:none; }
+  .tools-panels .feel-block{ margin-bottom:0; }
+  .tools-panels .card{ margin-bottom:0; }
+
+  @media (max-width:760px){
+    /* exactly three per row, equal width, so the two rows line up as a grid of
+       dividers instead of a ragged wrap */
+    .tools-tabs{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .tools-tab{ font-size:12.5px; padding:10px 7px 12px; min-height:52px;
+                display:flex; align-items:center; justify-content:center; }
+  }
+  @media (min-width:900px){
+    .tools-tab{ font-size:14px; padding:12px 14px 14px; }
+  }
 </style>
 </head>
 <body>
@@ -1980,18 +2084,18 @@
          share the same silhouette. Applied to a pseudo-element BEHIND the text,
          never to the card itself — the words stay perfectly sharp. -->
     <filter id="wcCard1" x="-18%" y="-30%" width="136%" height="160%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="4" seed="17" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="19" xChannelSelector="R" yChannelSelector="G"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="3" seed="17" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="8" xChannelSelector="R" yChannelSelector="G"/>
       <feGaussianBlur stdDeviation="1.1"/>
     </filter>
     <filter id="wcCard2" x="-18%" y="-30%" width="136%" height="160%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.014 0.012" numOctaves="4" seed="63" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="16" xChannelSelector="R" yChannelSelector="G"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.007 0.006" numOctaves="3" seed="63" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/>
       <feGaussianBlur stdDeviation="1.3"/>
     </filter>
     <filter id="wcCard3" x="-18%" y="-30%" width="136%" height="160%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.009 0.02" numOctaves="5" seed="91" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="G"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.005 0.010" numOctaves="3" seed="91" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/>
       <feGaussianBlur stdDeviation="0.9"/>
     </filter>
     <filter id="sketchJitter" x="-20%" y="-20%" width="140%" height="140%">
@@ -2237,7 +2341,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('reflection')"><span class="num">01</span> תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
+      <h2 onclick="toggleSection('reflection')">תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
       <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת, ממלאים מתי שבא</div>
     </div>
     <div id="secbody-reflection">
@@ -2247,7 +2351,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('someday')"><span class="num">02</span> דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
+      <h2 onclick="toggleSection('someday')">דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
       <div class="hint">רעיונות ומשימות ללא מועד, לא מחייבות — כל דבר שאפשר לגעת בו מתי שבא לך, בלי לחץ</div>
       <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
     </div>
@@ -2281,7 +2385,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('suggestions')"><span class="num">03</span> התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
+      <h2 onclick="toggleSection('suggestions')">התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
       <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך, וגם מקום לדברים שאת/ה מתלבט/ת עליהם בכלל — בלי שזה יילחץ עליך ישר</div>
       <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
     </div>
@@ -2298,7 +2402,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('schedule')"><span class="num">04</span> לוח + משימות <span class="chev" id="chev-schedule">▾</span></h2>
+      <h2 onclick="toggleSection('schedule')">לוח + משימות <span class="chev" id="chev-schedule">▾</span></h2>
       <div class="hint">הכל במקום אחד — לוח שעות חופשי, רשימה לפי יום, משימות לפי נושא, ועוגנים קבועים</div>
     </div>
     <div id="secbody-schedule">
@@ -2376,7 +2480,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('backup')"><span class="num">05</span> גיבוי והעברה <span class="chev" id="chev-backup">▾</span></h2>
+      <h2 onclick="toggleSection('backup')">גיבוי והעברה <span class="chev" id="chev-backup">▾</span></h2>
       <div class="hint">לפני שינוי גדול או מעבר בין גרסאות — הורדת גיבוי מבטיחה שלא תאבד כלום · אם הדפדפן תומך, תוכל לבחור בעצמך שם ומיקום; אחרת הקובץ יורד לתיקיית ההורדות (Downloads) עם שם הכולל תאריך ושעה</div>
     </div>
     <div id="secbody-backup">
@@ -10702,6 +10806,169 @@ if(data.gcalConnected) syncGoogleCalendar();
   window.addEventListener('scroll', onScroll, { passive:true });
   window.addEventListener('resize', onScroll, { passive:true });
   apply();
+})();
+
+/* ============================================================================
+   NOTEBOOK DIVIDERS — grouping the six coping tools.
+
+   The insight this implements is not mine, it is the right one:
+   "תיבת קליטה" is capture — you throw something in without deciding anything.
+   The other six are all the same KIND of thing, tools for coping:
+     איך אני מרגיש/ה · מה בא לי לעשות · דברים שהייתי רוצה להתמיד בהם ·
+     תזכורות לעצמי · דברים לעשות · התלבטויות
+   Stacked as six full-width blocks they read as six unrelated chores. As one
+   labelled set of dividers they read as what they are: a drawer you open when
+   you need it, and one thing at a time instead of everything at once.
+
+   Six Hebrew labels do NOT fit one phone-width row without shrinking the text
+   past comfort or hiding half of them behind a horizontal scroll, so the strip
+   wraps — three and three on a phone, one row on a wide screen. Nothing is ever
+   hidden, nothing scrolls sideways.
+
+   Constraints honoured:
+   - No feature is removed and no wording is invented: every tab label is READ
+     from the block's own existing heading at runtime.
+   - Nothing is rebuilt. The six blocks are MOVED, not recreated, so every
+     handler, id and piece of app state keeps working untouched — the app still
+     re-renders #feelBar and friends by id exactly as before.
+   - Each block keeps its own header, which is still its minimise control:
+     picking a tab opens that tool, its own header collapses it again.
+   ============================================================================ */
+(function(){
+  var STORE = 'toolsTabActive';
+
+  /* feel-blocks expose their open/closed state only through the chevron their
+     own renderer prints, so that is what we read — no app internals touched. */
+  var BLOCKS = [
+    { id:'feelBar',         toggle:'toggleFeelBlock' },
+    { id:'todayPicksBlock', toggle:'toggleTodayIdeasBlock' },
+    { id:'habitsBlock',     toggle:'toggleHabitsBlock' },
+    { section:'reflection' },
+    { section:'someday' },
+    { section:'suggestions' }
+  ];
+
+  function nodeFor(spec){
+    if(spec.id) return document.getElementById(spec.id);
+    var body = document.getElementById('secbody-' + spec.section);
+    return body ? body.closest('section') : null;
+  }
+
+  function labelFor(spec, el){
+    var src = spec.id ? el.querySelector('.feel-block-header')
+                      : el.querySelector('.section-head h2');
+    if(!src) return '';
+    /* textContent already skips the drawn <svg> icons; strip the chevrons the
+       renderers print and any stray emoji that has not been swapped yet. */
+    return src.textContent
+      .replace(/[▸▾▶▼]/g, '')
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]/gu, '')
+      /* headings append a live count like "(2)"; the tab label is read once at
+         build time, so keeping it would leave a number that silently goes stale */
+      .replace(/\s*\(\d+\)\s*$/, '')
+      .trim();
+  }
+
+  function isOpen(spec, el){
+    if(spec.section){
+      return !(window.isSectionCollapsed && window.isSectionCollapsed(spec.section));
+    }
+    var h = el.querySelector('.feel-block-header');
+    if(!h) return true;
+    return h.textContent.trim().charAt(0) !== '▸';   /* ▸ = collapsed */
+  }
+
+  function ensureOpen(spec, el){
+    if(isOpen(spec, el)) return;
+    if(spec.section){
+      if(window.openSection) window.openSection(spec.section);
+    } else if(typeof window[spec.toggle] === 'function'){
+      window[spec.toggle]();
+    }
+  }
+
+  function build(){
+    var first = document.getElementById('feelBar');
+    if(!first || !first.parentNode) return false;
+
+    var found = [];
+    for(var i=0;i<BLOCKS.length;i++){
+      var el = nodeFor(BLOCKS[i]);
+      if(!el) return false;                       /* not rendered yet — retry */
+      var label = labelFor(BLOCKS[i], el);
+      if(!label) return false;                    /* heading not printed yet */
+      found.push({ spec:BLOCKS[i], el:el, label:label });
+    }
+
+    var wrap = document.createElement('div');
+    wrap.className = 'tools-drawer';
+    var strip = document.createElement('div');
+    strip.className = 'tools-tabs';
+    strip.setAttribute('role', 'tablist');
+    var panels = document.createElement('div');
+    panels.className = 'tools-panels';
+    wrap.appendChild(strip);
+    wrap.appendChild(panels);
+    first.parentNode.insertBefore(wrap, first);
+
+    found.forEach(function(item, idx){
+      panels.appendChild(item.el);              /* moved, never recreated */
+      item.el.classList.add('tools-panel');
+
+      var tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'tools-tab';
+      tab.setAttribute('role', 'tab');
+      tab.textContent = item.label;             /* the block's own wording */
+      tab.addEventListener('click', function(){ select(idx); });
+      strip.appendChild(tab);
+      item.tab = tab;
+    });
+
+    function select(idx){
+      found.forEach(function(item, i){
+        var on = (i === idx);
+        item.el.classList.toggle('is-active', on);
+        item.tab.classList.toggle('is-active', on);
+        item.tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      try { localStorage.setItem(STORE, String(idx)); } catch(e){}
+      ensureOpen(found[idx].spec, found[idx].el);
+    }
+
+    var start = 0;
+    try {
+      var saved = parseInt(localStorage.getItem(STORE), 10);
+      if(saved >= 0 && saved < found.length) start = saved;
+    } catch(e){}
+    select(start);
+
+    /* "מזער הכל" collapses every tool; reflect that instead of leaving a tab
+       looking selected while its content is shut. */
+    document.addEventListener('click', function(e){
+      if(e.target && e.target.id === 'collapseAllBtn'){
+        setTimeout(function(){
+          found.forEach(function(item){
+            if(!isOpen(item.spec, item.el)) item.tab.classList.remove('is-open');
+          });
+        }, 0);
+      }
+    }, true);
+
+    return true;
+  }
+
+  function boot(tries){
+    if(build()) return;
+    if(tries <= 0) return;                       /* give up quietly, app intact */
+    setTimeout(function(){ boot(tries - 1); }, 120);
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){ boot(40); });
+  } else {
+    boot(40);
+  }
 })();
 </script>
 </body>
