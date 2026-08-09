@@ -8223,6 +8223,18 @@ function routeInboxToNote(id, domainId){
   if(activeNoteDomain===domainId) renderKeepGrid(domainId);
   flashStatus('הועבר לפתקים');
 }
+// same "→ פתק בנושא..." pattern as routeInboxToNote just above, one dropdown step instead of a
+// separate button per kind -- kind is either 'dilemma' (התלבטויות כלליות) or 'suggestion' (העדפות
+// של אחרים), reusing finishConvert so the created record matches those sections' own native shape
+function routeInboxToDilemma(id, kind){
+  if(!kind) return;
+  const it = data.inbox.find(x=>x.id===id);
+  if(!it) return;
+  finishConvert(kind, it.text, '');
+  data.inbox = data.inbox.filter(x=>x.id!==id);
+  saveData();
+  renderInbox();
+}
 function inboxItemHtml(it){
   const key = 'inbox:'+it.id;
   return `<div class="inbox-item-row" data-drag-id="${it.id}">
@@ -8237,6 +8249,11 @@ function inboxItemHtml(it){
       <select onchange="if(this.value){ routeInboxToNote('${it.id}', this.value); this.value=''; }">
         <option value="">→ פתק בנושא...</option>
         ${data.domains.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}
+      </select>
+      <select onchange="if(this.value){ routeInboxToDilemma('${it.id}', this.value); this.value=''; }">
+        <option value="">→ התלבטות...</option>
+        <option value="dilemma">התלבטות כללית</option>
+        <option value="suggestion">העדפה של מישהו אחר</option>
       </select>
       <span class="del-task" onclick="deleteInboxItem('${it.id}')" title="מחיקה">✕</span>
     </div>
