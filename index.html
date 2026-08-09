@@ -484,9 +484,11 @@
   .habit-inline-actions{display:flex; flex-wrap:nowrap; gap:6px;}
   .habit-last-done-inline{font-size:11.5px; color:var(--muted2); white-space:nowrap; flex-shrink:0;}
   .habit-small-starts{margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
+  .habit-detail-label{font-size:12px; color:var(--muted2); margin-bottom:4px;}
   .habit-small-start-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0;}
   .habit-small-start-text{font-size:13.5px; color:var(--muted);}
   .habit-small-start-add{margin:6px 0 0; gap:6px;}
+  .habit-context-row2{margin-top:10px; padding-top:8px; border-top:1px solid var(--border);}
   .habits-footnote{font-size:13px; color:var(--muted); line-height:1.5; margin-top:10px; padding-top:8px; border-top:1px solid var(--border);}
   .lists-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px;}
   .list-card{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:12px; transition:box-shadow .15s ease, transform .15s ease;}
@@ -7616,18 +7618,16 @@ function renderHabits(){
             <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
           </div>
           <div class="habit-context-row">
-            ${inlineEditIds.has('habitctx:'+h.id)
-              ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
-              : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ אחרי מה זה קורה? (רשות)'}</span>`}
             <span class="habit-inline-actions">
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">+עוגן</button>
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ משימה</button>
-              <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">+ איך אני מתחיל בקטן?</button>
               <button type="button" class="subtask-toggle-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי את זה היום'}</button>
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי">+עוגן</button>
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ משימה</button>
+              <button type="button" class="subtask-toggle-btn ${steps.length||h.contextAnchor?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">${stepsOpen?'סגור ▴':'הרחב ›'}</button>
             </span>
           </div>
           ${stepsOpen ? `
           <div class="habit-small-starts">
+            <div class="habit-detail-label">איך אני מתחיל בקטן?</div>
             ${steps.map(s=>`<div class="habit-small-start-row">
               <span class="habit-small-start-text">${escapeHtml(s.text)}</span>
               <span class="del-task" onclick="deleteHabitSmallStart('${h.id}','${s.id}')" title="מחיקה">✕</span>
@@ -7635,6 +7635,12 @@ function renderHabits(){
             <div class="add-row habit-small-start-add">
               <input type="text" id="habitSmallStartInput-${h.id}" placeholder="למשל: 5 דק' ביום" onkeydown="if(event.key==='Enter') addHabitSmallStart('${h.id}');">
               <button onclick="addHabitSmallStart('${h.id}')">הוסף</button>
+            </div>
+            <div class="habit-context-row2">
+              <div class="habit-detail-label">אחרי מה זה קורה?</div>
+              ${inlineEditIds.has('habitctx:'+h.id)
+                ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+                : `<span class="habit-context-text ${h.contextAnchor?'':'habit-context-empty'}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : '+ מה קדם לזה?'}</span>`}
             </div>
           </div>` : ''}
         </li>`;
