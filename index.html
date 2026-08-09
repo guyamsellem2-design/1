@@ -1826,70 +1826,263 @@
   .undo-redo-bar > .options-menu-wrap > .reset-btn:hover{ border-color:var(--gold); }
 
   /* ---------------------------------------------------------------------------
-     21. THE DIVIDERS
-     Tabs drawn as the tabs of notebook dividers: rounded on top, sitting on the
-     page rather than floating over it, with the active one lifted forward and
-     tinted the same colour as the tool it opens. Wraps to two rows on a phone —
-     six Hebrew labels cannot share one 390px row and stay comfortable, and
-     hiding half of them behind a sideways scroll would have been worse than
-     honest wrapping.
+     21. STILLNESS — and the lag fix.
+     Two separate problems that turned out to share one cause.
+
+     The lag: `body.soft .scene { filter: saturate(.8) }` put a CSS filter on top
+     of a layer that is already full of SVG filters and blend modes, so every
+     switch into calm mode forced the browser to re-rasterise the entire
+     painting — and `transition: filter .4s` on <body> made it keep doing that
+     for the length of the transition. Saturation is baked into the wash colours
+     per theme now, which costs nothing at runtime.
+     The same trap was running permanently in the background: the wash groups
+     were animated AND blended, and an animated transform on a filtered, blended
+     layer re-rasterises that filter every single frame.
+
+     The stimulation: a sensitive brain does not need a sky that is always
+     moving. The whole backdrop is now completely still — stars, motes, washes,
+     ambient glow. Nothing in the scenery moves on its own any more. The only
+     motion left is motion you caused: a section opening, a button pressing, and
+     the parallax that follows your own scrolling.
      --------------------------------------------------------------------------- */
-  .tools-drawer{ margin:0 0 26px; }
-  .tools-tabs{
-    display:flex; flex-wrap:wrap; gap:7px;
-    padding:0 2px 0; margin-bottom:-2px; position:relative; z-index:2;
-  }
-  .tools-tab{
-    flex:1 1 auto; min-width:0;
-    font-family:var(--font-ui); font-size:13.5px; font-weight:600; line-height:1.25;
-    color:var(--muted); cursor:pointer;
-    background:color-mix(in srgb, var(--surface2) 88%, transparent);
-    border:1.4px solid var(--border); border-bottom-color:transparent;
-    border-radius:15px 15px 5px 5px;
-    padding:11px 12px 13px; min-height:46px;
-    text-align:center; white-space:normal;
-    transition:background var(--dur) var(--ease-water), color var(--dur) var(--ease-water),
-               border-color var(--dur) var(--ease-water), transform var(--dur) var(--ease-water);
-  }
-  .tools-tab:hover{ color:var(--text); border-color:var(--border-strong); }
-  .tools-tab.is-active{
-    color:var(--text); font-weight:700;
-    background:var(--cw-1);
-    border-color:var(--card-line);
-    transform:translateY(1px);
-  }
-  /* each divider carries the colour of the tool behind it, like tabs cut from
-     different sheets — same rotation the cards already use */
-  .tools-tab:nth-child(1).is-active{ background:var(--cw-2); }
-  .tools-tab:nth-child(2).is-active{ background:var(--cw-3); }
-  .tools-tab:nth-child(3).is-active{ background:var(--cw-4); }
-  .tools-tab:nth-child(4).is-active{ background:var(--cw-1); }
-  .tools-tab:nth-child(5).is-active{ background:var(--cw-5); }
-  .tools-tab:nth-child(6).is-active{ background:var(--cw-2); }
 
-  /* only the chosen tool is on screen; the rest wait behind their dividers */
-  .tools-panel{ display:none; }
-  .tools-panel.is-active{ display:block; animation:panelIn .42s var(--ease-water); }
-  @keyframes panelIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
-  @media (prefers-reduced-motion: reduce){ .tools-panel.is-active{ animation:none; } }
-
-  /* sections inside the drawer are pages of the drawer, not top-level sections:
-     no rule above them, no giant gap, no stagger animation. */
-  .tools-panels section{ margin-bottom:0; padding-top:0; animation:none; }
-  .tools-panels section::before{ display:none; }
-  .tools-panels .feel-block{ margin-bottom:0; }
-  .tools-panels .card{ margin-bottom:0; }
-
-  @media (max-width:760px){
-    /* exactly three per row, equal width, so the two rows line up as a grid of
-       dividers instead of a ragged wrap */
-    .tools-tabs{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-    .tools-tab{ font-size:12.5px; padding:10px 7px 12px; min-height:52px;
-                display:flex; align-items:center; justify-content:center; }
+  .scene .wash-drift, .scene .wash-drift-2,
+  .scene .stars circle, .scene .mote, body::before{
+    animation:none !important;
   }
-  @media (min-width:900px){
-    .tools-tab{ font-size:14px; padding:12px 14px 14px; }
+  /* blending was the expensive half of the watercolour effect; plain alpha gets
+     within a hair of the same look for a fraction of the cost */
+  .scene .wash{ mix-blend-mode:normal; }
+  /* calm mode desaturates through its own colour tokens, never a live filter */
+  body.soft .scene{ filter:none; }
+  /* and <body> no longer transitions `filter` — nothing sets one on it any more */
+  body{ transition:background .5s ease, color .5s ease; }
+
+  /* stars: still there, just still. Fixed but varied opacities read as depth,
+     which is what the twinkling was faking. */
+  .scene .stars circle{ opacity:.55; }
+  .scene .stars circle:nth-child(3n){ opacity:.85; }
+  .scene .stars circle:nth-child(4n){ opacity:.35; }
+  .scene .stars circle:nth-child(5n){ opacity:.7; }
+  .scene .star-bright{ opacity:.9 !important; }
+  .scene .mote{ opacity:.3; }
+  body.night-mode .scene .mote{ opacity:.5; }
+
+  /* ---------------------------------------------------------------------------
+     22. MORE ALIVE, STILL GENTLE.
+     Colour had been pulled back so far the page went quiet to the point of grey.
+     The washes get real saturation back, the cards get their pigment, and the
+     ambient light turns warmer. None of it costs anything, because all of it is
+     static.
+     --------------------------------------------------------------------------- */
+  :root{
+    --wash-1:#8FC6DC; --wash-2:#5FA3BF; --wash-3:#E8CB9A; --wash-4:#8CBFA6;
+    --wash-5:#EFB3A6; --wash-6:#F6D9BE;
+    --wash-opacity:.34;
+    --cw-1:#CFE6F1; --cw-2:#D7E9CE; --cw-3:#F5E3C4; --cw-4:#F3DAD2; --cw-5:#DCE0F2;
   }
+  body.soft{
+    /* the calm palette is the same hues at lower chroma — not a grey filter */
+    --wash-1:#B4D6E4; --wash-2:#96BDCE; --wash-3:#EBDCBE; --wash-4:#AFCDBE;
+    --wash-5:#EFCCC3; --wash-6:#F6E6D6;
+    --wash-opacity:.24;
+    --cw-1:#DEEBF2; --cw-2:#E3EDDD; --cw-3:#F6EBD9; --cw-4:#F4E5DF; --cw-5:#E6E9F4;
+  }
+  body:not(.night-mode)::before{
+    background:
+      radial-gradient(620px 540px at 6% 12%, rgba(240,179,166,.22), transparent 70%),
+      radial-gradient(660px 560px at 97% 30%, rgba(95,163,191,.20), transparent 70%),
+      radial-gradient(720px 600px at 50% 104%, rgba(232,203,154,.22), transparent 72%);
+    opacity:1;
+  }
+  .card::before, .feel-block::before, .tools-card::before,
+  .gcal-block::before, .notebook-body::before, .onboarding-card::before{ opacity:.85; }
+
+  /* ---------------------------------------------------------------------------
+     23. NIGHT LEGIBILITY.
+     Muted text at night was too dim — low-contrast grey on a dark ground is the
+     first thing to fail on a tired evening. Every tier is lifted, and the gap
+     between normal and muted is narrowed so secondary text stops disappearing.
+     --------------------------------------------------------------------------- */
+  body.night-mode{ --text:#F6F1FF; --muted:#C4D0E4; --muted2:#A3B1C9; }
+  body.night-mode.soft{ --text:#F2EDFA; --muted:#C7D1E6; --muted2:#A8B4CB; }
+  body.night-mode .hint, body.night-mode .sub, body.night-mode .empty,
+  body.night-mode .sched-empty, body.night-mode .control-label,
+  body.night-mode .task-date-badge, body.night-mode .list-card-meta,
+  body.night-mode .habit-last-done-inline, body.night-mode .memo-label,
+  body.night-mode .bank-entry .bank-date{ color:var(--muted); }
+  /* placeholders were the worst offenders — nearly invisible on a dark field */
+  body.night-mode ::placeholder{ color:#9DAABF; opacity:1; }
+  body.night-mode .keep-note-editor:empty::before{ color:#9DAABF; }
+
+  /* ---------------------------------------------------------------------------
+     24. CLEAN SHAPES, KEPT COLOURFUL.
+     The old design was cleaner and easier to look at, and it is worth being
+     precise about WHY, because the answer is not "it had less colour".
+
+     It had less NOISE. The painted cards carried three competing irregular
+     things at once — a torn silhouette, a second offset wash bleeding out from
+     under it, and a hand-drawn outline that wobbled. Every one of those is an
+     edge the eye tries to resolve, on every card, all the way down the page.
+     That is genuinely tiring, and it is exactly the wrong cost for a tool that
+     gets opened on hard days.
+
+     So the noise goes and the colour stays. Cards become calm, even shapes with
+     one soft edge — and they keep their pastel fills, so the page is more
+     colourful than the old design ever was, not less. The painting stays in the
+     background where it belongs: atmosphere you feel, not texture you have to
+     read past.
+     --------------------------------------------------------------------------- */
+
+  /* one clean silhouette instead of a torn one */
+  .card::before, .feel-block::before, .tools-card::before,
+  .gcal-block::before, .notebook-body::before, .onboarding-card::before{
+    inset:0;
+    border-radius:var(--r-card);
+    filter:none;                 /* no displacement — a card is a card */
+    border:1px solid var(--card-line);
+    opacity:1;
+  }
+  /* the second offset wash was the main source of visual mess */
+  .card::after, .feel-block::after, .tools-card::after,
+  .gcal-block::after, .notebook-body::after{ display:none; }
+  .card:hover::before, .feel-block:hover::before, .tools-card:hover::before{ opacity:1; }
+
+  /* a quiet, even border — present enough to separate, too soft to catch on */
+  :root{ --card-line:rgba(38,86,104,.16); }
+  body.night-mode{ --card-line:rgba(168,200,224,.16); }
+  body.soft{ --card-line:rgba(38,86,104,.11); }
+
+  /* one soft shadow, no coloured glow */
+  .card, .feel-block, .tools-card, .gcal-block, .notebook-body, .onboarding-card{
+    filter:none;
+    box-shadow:0 1px 2px rgba(24,52,64,.04), 0 8px 20px -14px rgba(24,52,64,.16);
+    border-radius:var(--r-card);
+  }
+  body.night-mode .card, body.night-mode .feel-block, body.night-mode .tools-card,
+  body.night-mode .gcal-block, body.night-mode .notebook-body, body.night-mode .onboarding-card{
+    box-shadow:0 1px 2px rgba(0,0,0,.18), 0 10px 24px -16px rgba(0,0,0,.42);
+  }
+
+  /* day columns: same treatment, so the week grid stops shimmering too */
+  .day-col::before{
+    inset:0; border-radius:var(--r-soft); filter:none;
+    border:1px solid var(--card-line); opacity:.85;
+  }
+  .day-col:nth-child(even)::before{ filter:none; }
+  .keep-note{ border-radius:var(--r-soft); }
+
+  /* TRANSLUCENT, like the original.
+     The old design's whole lightness came from one property: `--surface:
+     rgba(255,255,255,0.72)` over a blur. The card was never a solid slab — the
+     page showed through it, and a clear thin border was what defined its shape.
+     That is restored exactly, with colour in place of white: the pastel is an
+     alpha wash, the painted background reads through every card, and the border
+     does the work of separating it. It is why the old one felt light, and it is
+     what makes colour affordable here without the page getting heavy. */
+  :root{
+    --cw-1:rgba(186,222,240,.52); --cw-2:rgba(200,228,188,.50);
+    --cw-3:rgba(244,222,180,.52); --cw-4:rgba(242,208,196,.50);
+    --cw-5:rgba(204,212,242,.48);
+  }
+  body.soft{
+    --cw-1:rgba(200,228,242,.40); --cw-2:rgba(212,232,204,.38);
+    --cw-3:rgba(246,232,206,.40); --cw-4:rgba(244,224,214,.38);
+    --cw-5:rgba(216,222,244,.36);
+  }
+  body.night-mode{
+    --cw-1:rgba(28,66,104,.58); --cw-2:rgba(30,74,100,.56);
+    --cw-3:rgba(60,52,104,.56); --cw-4:rgba(68,54,98,.54);
+    --cw-5:rgba(34,68,108,.56);
+  }
+
+  /* the blur behind the translucency — the other half of why the original felt
+     airy rather than merely see-through */
+  .card::before, .feel-block::before, .tools-card::before,
+  .gcal-block::before, .notebook-body::before, .onboarding-card::before,
+  .day-col::before{
+    backdrop-filter:blur(12px) saturate(1.1);
+    -webkit-backdrop-filter:blur(12px) saturate(1.1);
+  }
+  /* a slightly firmer line, since a translucent fill leans on its border to
+     hold the shape */
+  :root{ --card-line:rgba(38,86,104,.22); }
+  body.night-mode{ --card-line:rgba(168,200,224,.22); }
+  body.soft{ --card-line:rgba(38,86,104,.15); }
+
+  /* ---------------------------------------------------------------------------
+     25. WHITE CARDS, GLOWING BACKGROUND.
+     "לבן עם רקע ניאן" — that is the missing half, and it resolves the tension
+     between wanting more colour and wanting less weight.
+
+     The colour does not belong IN the cards. It belongs BEHIND them, glowing
+     through. A near-white translucent card over a saturated background is
+     bright and alive and still completely calm to read on, because the text
+     always sits on a light, even field. A pastel-filled card, however pretty,
+     puts colour underneath the words — which is precisely the thing that makes
+     a page tiring.
+
+     So: cards go back to white with barely a whisper of hue (just enough that
+     each one keeps its own identity), and all the saturation moves into the
+     backdrop, which now glows.
+     --------------------------------------------------------------------------- */
+  :root{
+    --cw-1:rgba(246,252,255,.66); --cw-2:rgba(248,253,245,.66);
+    --cw-3:rgba(255,252,244,.66); --cw-4:rgba(255,249,246,.66);
+    --cw-5:rgba(249,250,255,.66);
+  }
+  body.soft{
+    --cw-1:rgba(250,253,255,.72); --cw-2:rgba(251,254,249,.72);
+    --cw-3:rgba(255,253,248,.72); --cw-4:rgba(255,251,249,.72);
+    --cw-5:rgba(252,253,255,.72);
+  }
+  body.night-mode{
+    --cw-1:rgba(20,48,80,.62); --cw-2:rgba(20,54,78,.62);
+    --cw-3:rgba(40,42,84,.62); --cw-4:rgba(46,44,80,.62);
+    --cw-5:rgba(24,50,84,.62);
+  }
+
+  /* the glow. brighter, more saturated, and still perfectly still — this is the
+     "neon" the original night mode had, now present in daylight too. */
+  :root{ --wash-opacity:.52; }
+  body.night-mode{ --wash-opacity:.50; }
+  body.soft{ --wash-opacity:.34; }
+  body:not(.night-mode)::before{
+    background:
+      radial-gradient(620px 540px at 6% 12%, rgba(255,158,140,.30), transparent 70%),
+      radial-gradient(680px 580px at 97% 28%, rgba(56,168,208,.28), transparent 70%),
+      radial-gradient(600px 520px at 88% 76%, rgba(168,120,208,.20), transparent 72%),
+      radial-gradient(760px 620px at 40% 104%, rgba(255,198,110,.28), transparent 72%);
+  }
+  body.night-mode::before{
+    background:
+      radial-gradient(640px 540px at 18% 14%, rgba(64,224,232,.20), transparent 70%),
+      radial-gradient(600px 520px at 92% 32%, rgba(214,120,196,.18), transparent 70%),
+      radial-gradient(800px 660px at 55% 94%, rgba(255,206,120,.20), transparent 72%);
+  }
+  body.soft::before{ opacity:.62; }
+
+  /* Slightly stronger blur so the glow reads as light diffusing through the
+     card rather than as a picture sitting behind glass. */
+  .card::before, .feel-block::before, .tools-card::before,
+  .gcal-block::before, .notebook-body::before, .onboarding-card::before,
+  .day-col::before{
+    backdrop-filter:blur(16px) saturate(1.25);
+    -webkit-backdrop-filter:blur(16px) saturate(1.25);
+  }
+
+  /* With the cards calm, the backdrop can carry a little more colour without the
+     page ever feeling busy — the art moves fully to the background. */
+  :root{ --wash-opacity:.40; }
+  body.night-mode{ --wash-opacity:.42; }
+  body.soft{ --wash-opacity:.26; }
+
+  /* the paper ruling inside cards was one more competing texture */
+  .card::before, .notebook-body::before{
+    background-image:none;
+    -webkit-mask-image:none; mask-image:none;
+  }
+
 </style>
 </head>
 <body>
@@ -2168,11 +2361,15 @@
         <path d="M19.1 14.2a1.5 1.5 0 0 0 .3 1.7l.1.1a1.8 1.8 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-2.6 1.1v.2a1.8 1.8 0 1 1-3.6 0v-.1a1.5 1.5 0 0 0-2.6-1.1l-.1.1a1.8 1.8 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0-1.1-2.6h-.2a1.8 1.8 0 0 1 0-3.6h.1a1.5 1.5 0 0 0 1.1-2.6l-.1-.1a1.8 1.8 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.8 1.8 0 0 1 3.6 0v.1a1.5 1.5 0 0 0 2.6 1.1l.1-.1a1.8 1.8 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0-.3 1.7v.1a1.5 1.5 0 0 0 1.4.9h.2a1.8 1.8 0 0 1 0 3.6h-.1a1.5 1.5 0 0 0-1.4.9z"/>
       </g>
     </symbol>
+    <!-- "collapse all": two chevrons folding in toward a centre line.
+         The previous drawing was a line with a single arrow pointing down at it,
+         which is the universal download glyph — it read as "save a file", not
+         "fold everything shut". -->
     <symbol id="ico-minimize" viewBox="0 0 24 24">
       <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5.4 16.6h13.2"/>
-        <path d="M8.6 11.4 12 14.6l3.4-3.2"/>
-        <path d="M12 4.4v9.8"/>
+        <path d="M4.8 12h14.4"/>
+        <path d="M8.4 6.1 12 9.5l3.6-3.4"/>
+        <path d="M8.4 17.9 12 14.5l3.6 3.4"/>
       </g>
     </symbol>
     <symbol id="ico-inbox" viewBox="0 0 24 24">
@@ -10808,168 +11005,7 @@ if(data.gcalConnected) syncGoogleCalendar();
   apply();
 })();
 
-/* ============================================================================
-   NOTEBOOK DIVIDERS — grouping the six coping tools.
 
-   The insight this implements is not mine, it is the right one:
-   "תיבת קליטה" is capture — you throw something in without deciding anything.
-   The other six are all the same KIND of thing, tools for coping:
-     איך אני מרגיש/ה · מה בא לי לעשות · דברים שהייתי רוצה להתמיד בהם ·
-     תזכורות לעצמי · דברים לעשות · התלבטויות
-   Stacked as six full-width blocks they read as six unrelated chores. As one
-   labelled set of dividers they read as what they are: a drawer you open when
-   you need it, and one thing at a time instead of everything at once.
-
-   Six Hebrew labels do NOT fit one phone-width row without shrinking the text
-   past comfort or hiding half of them behind a horizontal scroll, so the strip
-   wraps — three and three on a phone, one row on a wide screen. Nothing is ever
-   hidden, nothing scrolls sideways.
-
-   Constraints honoured:
-   - No feature is removed and no wording is invented: every tab label is READ
-     from the block's own existing heading at runtime.
-   - Nothing is rebuilt. The six blocks are MOVED, not recreated, so every
-     handler, id and piece of app state keeps working untouched — the app still
-     re-renders #feelBar and friends by id exactly as before.
-   - Each block keeps its own header, which is still its minimise control:
-     picking a tab opens that tool, its own header collapses it again.
-   ============================================================================ */
-(function(){
-  var STORE = 'toolsTabActive';
-
-  /* feel-blocks expose their open/closed state only through the chevron their
-     own renderer prints, so that is what we read — no app internals touched. */
-  var BLOCKS = [
-    { id:'feelBar',         toggle:'toggleFeelBlock' },
-    { id:'todayPicksBlock', toggle:'toggleTodayIdeasBlock' },
-    { id:'habitsBlock',     toggle:'toggleHabitsBlock' },
-    { section:'reflection' },
-    { section:'someday' },
-    { section:'suggestions' }
-  ];
-
-  function nodeFor(spec){
-    if(spec.id) return document.getElementById(spec.id);
-    var body = document.getElementById('secbody-' + spec.section);
-    return body ? body.closest('section') : null;
-  }
-
-  function labelFor(spec, el){
-    var src = spec.id ? el.querySelector('.feel-block-header')
-                      : el.querySelector('.section-head h2');
-    if(!src) return '';
-    /* textContent already skips the drawn <svg> icons; strip the chevrons the
-       renderers print and any stray emoji that has not been swapped yet. */
-    return src.textContent
-      .replace(/[▸▾▶▼]/g, '')
-      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]/gu, '')
-      /* headings append a live count like "(2)"; the tab label is read once at
-         build time, so keeping it would leave a number that silently goes stale */
-      .replace(/\s*\(\d+\)\s*$/, '')
-      .trim();
-  }
-
-  function isOpen(spec, el){
-    if(spec.section){
-      return !(window.isSectionCollapsed && window.isSectionCollapsed(spec.section));
-    }
-    var h = el.querySelector('.feel-block-header');
-    if(!h) return true;
-    return h.textContent.trim().charAt(0) !== '▸';   /* ▸ = collapsed */
-  }
-
-  function ensureOpen(spec, el){
-    if(isOpen(spec, el)) return;
-    if(spec.section){
-      if(window.openSection) window.openSection(spec.section);
-    } else if(typeof window[spec.toggle] === 'function'){
-      window[spec.toggle]();
-    }
-  }
-
-  function build(){
-    var first = document.getElementById('feelBar');
-    if(!first || !first.parentNode) return false;
-
-    var found = [];
-    for(var i=0;i<BLOCKS.length;i++){
-      var el = nodeFor(BLOCKS[i]);
-      if(!el) return false;                       /* not rendered yet — retry */
-      var label = labelFor(BLOCKS[i], el);
-      if(!label) return false;                    /* heading not printed yet */
-      found.push({ spec:BLOCKS[i], el:el, label:label });
-    }
-
-    var wrap = document.createElement('div');
-    wrap.className = 'tools-drawer';
-    var strip = document.createElement('div');
-    strip.className = 'tools-tabs';
-    strip.setAttribute('role', 'tablist');
-    var panels = document.createElement('div');
-    panels.className = 'tools-panels';
-    wrap.appendChild(strip);
-    wrap.appendChild(panels);
-    first.parentNode.insertBefore(wrap, first);
-
-    found.forEach(function(item, idx){
-      panels.appendChild(item.el);              /* moved, never recreated */
-      item.el.classList.add('tools-panel');
-
-      var tab = document.createElement('button');
-      tab.type = 'button';
-      tab.className = 'tools-tab';
-      tab.setAttribute('role', 'tab');
-      tab.textContent = item.label;             /* the block's own wording */
-      tab.addEventListener('click', function(){ select(idx); });
-      strip.appendChild(tab);
-      item.tab = tab;
-    });
-
-    function select(idx){
-      found.forEach(function(item, i){
-        var on = (i === idx);
-        item.el.classList.toggle('is-active', on);
-        item.tab.classList.toggle('is-active', on);
-        item.tab.setAttribute('aria-selected', on ? 'true' : 'false');
-      });
-      try { localStorage.setItem(STORE, String(idx)); } catch(e){}
-      ensureOpen(found[idx].spec, found[idx].el);
-    }
-
-    var start = 0;
-    try {
-      var saved = parseInt(localStorage.getItem(STORE), 10);
-      if(saved >= 0 && saved < found.length) start = saved;
-    } catch(e){}
-    select(start);
-
-    /* "מזער הכל" collapses every tool; reflect that instead of leaving a tab
-       looking selected while its content is shut. */
-    document.addEventListener('click', function(e){
-      if(e.target && e.target.id === 'collapseAllBtn'){
-        setTimeout(function(){
-          found.forEach(function(item){
-            if(!isOpen(item.spec, item.el)) item.tab.classList.remove('is-open');
-          });
-        }, 0);
-      }
-    }, true);
-
-    return true;
-  }
-
-  function boot(tries){
-    if(build()) return;
-    if(tries <= 0) return;                       /* give up quietly, app intact */
-    setTimeout(function(){ boot(tries - 1); }, 120);
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){ boot(40); });
-  } else {
-    boot(40);
-  }
-})();
 </script>
 </body>
 </html>
