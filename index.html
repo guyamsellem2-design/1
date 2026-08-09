@@ -813,8 +813,17 @@
   /* above .timeline-wrap.fullscreen's z-index:5000 -- otherwise the sheet opens visually BEHIND the
      fullscreen timeline and is invisible until fullscreen is closed again. */
   .timeline-sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:5100;}
-  .timeline-sheet{position:fixed; left:0; right:0; bottom:0; z-index:5101; background:var(--surface); border-radius:16px 16px 0 0; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); box-shadow:0 -8px 30px rgba(0,0,0,.4); max-height:82vh; overflow-y:auto;}
-  .timeline-sheet-handle{width:40px; height:4px; background:var(--border-strong); border-radius:2px; margin:0 auto 12px;}
+  .timeline-sheet{position:fixed; left:0; right:0; bottom:0; z-index:5101; background:var(--surface); border-radius:16px 16px 0 0; padding:0 16px calc(14px + env(safe-area-inset-bottom)); box-shadow:0 -8px 30px rgba(0,0,0,.4); max-height:82vh; overflow-y:auto; transition:transform .18s ease;}
+  .timeline-sheet.expanded{max-height:64vh;}
+  .timeline-sheet.dragging{transition:none;}
+  /* sticky so the handle + close button stay reachable without scrolling down through the
+     expanded fields -- position:sticky works fine on the scroll container's own direct child */
+  .timeline-sheet-topbar{position:sticky; top:0; z-index:2; background:var(--surface); display:flex; align-items:center; justify-content:center; padding:10px 0 2px; margin:0 -16px 10px; border-radius:16px 16px 0 0;}
+  .timeline-sheet-handle-hit{display:flex; justify-content:center; align-items:center; padding:8px 40px; cursor:grab; touch-action:none;}
+  .timeline-sheet-handle-hit:active{cursor:grabbing;}
+  .timeline-sheet-handle-bar{width:40px; height:4px; background:var(--border-strong); border-radius:2px;}
+  .timeline-sheet-close-btn{position:absolute; left:8px; top:6px; background:transparent; border:none; color:var(--muted); font-size:19px; line-height:1; padding:6px 10px; cursor:pointer;}
+  .timeline-sheet-extra{margin-top:2px;}
   .timeline-sheet-title-row{display:flex; align-items:center; gap:8px; margin-bottom:12px;}
   .timeline-sheet-title-row .timeline-sheet-title{flex:1; margin-bottom:0;}
   .timeline-sheet-domain{flex-shrink:0; max-width:38%; font-size:13.5px; font-family:inherit; background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:6px 6px;}
@@ -1204,8 +1213,6 @@ const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
 let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
-let openForm = null;
-let editingAnchorId = null;
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -1560,8 +1567,8 @@ function restoreSnapshot(json){
   data = JSON.parse(json);
   lastSnapshotJSON = json;
   try{ localStorage.setItem(STORAGE_KEY, json); }catch(e){}
-  scheduleEditingTaskId = null; editingSuggestionId = null; editingSomedayId = null;
-  editingDilemmaId = null; editingAnchorId = null; openForm = null; drawingNoteId = null; colorPickerForId = null;
+  editingSuggestionId = null; editingSomedayId = null;
+  editingDilemmaId = null; drawingNoteId = null; colorPickerForId = null;
   longPressedTaskId = null;
   render();
   window.scrollTo(0, scrollY);
@@ -3577,17 +3584,6 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 setInterval(()=>{ if(currentSyncUser && navigator.onLine) runFullSync(); }, 60000);
 
 /* ---------- week grid ---------- */
-function closeAllScheduleForms(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
-// editAnchor/the inline anchor-form below are no longer reached by tapping a chip directly (that
-// now opens the quick bottom sheet, same as the timeline tab) -- they're kept as the "עוד אפשרויות"
-// escalation target (recurrence type, buffer, per-item gcal sync...) jumped to from the sheet via
-// timelineJumpToEdit, and by quickAddAnchorForDay below for topic-less setups the sheet can't handle.
-function editAnchor(id, dayIdx){
-  if(openForm===dayIdx && editingAnchorId===id){ closeForm(); return; }
-  if(openForm!==null){ closeAllScheduleForms(); return; }
-  openForm = dayIdx; editingAnchorId = id; renderScheduleGrid();
-}
-function closeForm(){ openForm = null; editingAnchorId = null; renderScheduleGrid(); }
 // "+ עוגן" / "+ משימה" in the list tab: create a blank draft record and open the same quick bottom
 // sheet used everywhere else, instead of expanding an inline creation form in the day column. if
 // the sheet gets closed/cancelled while the title is still empty, it cleans the blank record back up.
@@ -3607,14 +3603,6 @@ function quickAddTaskForDay(dayIdx, dateStr){
   renderTasks();
   openTimelineSheet('task', newTask.id, true);
 }
-function toggleAnchorDateField(dayIdx){
-  const sel = document.getElementById(`anchorRepeat-${dayIdx}`);
-  const wrap = document.getElementById(`anchorDateWrap-${dayIdx}`);
-  const dayWrap = document.getElementById(`anchorDayWrap-${dayIdx}`);
-  if(!sel || !wrap) return;
-  wrap.style.display = ['once','every2days','monthly','yearly'].includes(sel.value) ? 'block' : 'none';
-  if(dayWrap) dayWrap.style.display = sel.value==='weekly' ? 'block' : 'none';
-}
 function anchorAppliesToDate(a, dateObj, dayIdx){
   const repeatType = a.repeatType || 'weekly';
   const dateStr = ymd(dateObj);
@@ -3631,51 +3619,9 @@ function anchorAppliesToDate(a, dateObj, dayIdx){
   if(repeatType==='once') return a.date===dateStr;
   return a.day===dayIdx;
 }
-function saveAnchor(dayIdx){
-  const time = document.getElementById(`anchorTime-${dayIdx}`).value;
-  const endTime = document.getElementById(`anchorEnd-${dayIdx}`).value;
-  const label = document.getElementById(`anchorLabel-${dayIdx}`).value.trim();
-  const domain = document.getElementById(`anchorDomain-${dayIdx}`).value;
-  const buffer = document.getElementById(`anchorBuffer-${dayIdx}`).checked;
-  const draft = document.getElementById(`anchorDraft-${dayIdx}`).checked;
-  const repeatType = document.getElementById(`anchorRepeat-${dayIdx}`).value;
-  const dateEl = document.getElementById(`anchorDate-${dayIdx}`);
-  const date = (['once','every2days','monthly','yearly'].includes(repeatType) && dateEl) ? dateEl.value : '';
-  const dayEl = document.getElementById(`anchorDay-${dayIdx}`);
-  const day = (repeatType==='weekly' && dayEl) ? +dayEl.value : dayIdx;
-  if(!label) return;
-  const gcalSyncEl = document.getElementById(`anchorGcalSync-${dayIdx}`);
-  let anchorRef, changedTiming, prevGcalSync;
-  if(editingAnchorId){
-    const idx = data.anchors.findIndex(a=>a.id===editingAnchorId);
-    if(idx>-1){
-      const prev = data.anchors[idx];
-      prevGcalSync = prev.gcalSync;
-      // day matters for the RRULE Google Calendar push (weekly anchors encode their day-of-week into
-      // the recurrence rule) -- a day-only move must still be treated as a timing change, or the sync
-      // silently keeps pushing the OLD day to Google forever.
-      changedTiming = prev.time!==time || prev.endTime!==endTime || prev.repeatType!==repeatType || prev.date!==date || prev.day!==day;
-      const gcalSync = gcalSyncEl ? gcalSyncEl.checked : prev.gcalSync;
-      data.anchors[idx] = {...prev, day, time, endTime, label, domain, buffer, draft, repeatType, date, gcalSync};
-      anchorRef = data.anchors[idx];
-    }
-  } else {
-    anchorRef = {id:uid(), day, time, endTime, label, domain, buffer, draft, repeatType, date, createdAt:Date.now()};
-    data.anchors.push(anchorRef);
-    changedTiming = true;
-  }
-  openForm = null; editingAnchorId = null;
-  saveData();
-  renderScheduleGrid();
-  if(anchorRef){
-    const syncFlagChanged = prevGcalSync===false ? anchorRef.gcalSync!==false : anchorRef.gcalSync===false;
-    applyGcalSyncForAnchor(anchorRef, changedTiming || syncFlagChanged);
-  }
-}
 function deleteAnchor(id){
   const removed = data.anchors.find(a=>a.id===id);
   data.anchors = data.anchors.filter(a=>a.id!==id);
-  openForm = null; editingAnchorId = null;
   saveData();
   renderScheduleGrid();
   if(data.gcalConnected && removed && removed.googleRecurringEventId) deleteEventFromGcal(removed.googleRecurringEventId, ()=>{});
@@ -3685,13 +3631,11 @@ function deleteAnchorOccurrence(id, dateStr){
   if(!a) return;
   if(!a.skippedDates) a.skippedDates = [];
   if(!a.skippedDates.includes(dateStr)) a.skippedDates.push(dateStr);
-  openForm = null; editingAnchorId = null;
   saveData();
   renderScheduleGrid();
 }
 
 /* ---------- tasks ---------- */
-let scheduleEditingTaskId = null;
 let taskLongPressState = null;
 let longPressedTaskId = null;
 let justLongPressedTaskId = null;
@@ -3907,62 +3851,6 @@ function taskRowHtml(t){
   if(isSubtasksOpen) html += taskDetailHtml(t);
   return html;
 }
-const taskDescOpenIds = new Set();
-// the deep-edit form these two toggle now only ever renders inside the schedule grid (opened via
-// the floating sheet's "עוד אפשרויות"), never in the plain משימות list -- must re-render the grid,
-// not the list, or the toggle silently has no visible effect
-function toggleTaskDescOpen(id){
-  if(taskDescOpenIds.has(id)) taskDescOpenIds.delete(id); else taskDescOpenIds.add(id);
-  renderScheduleGrid();
-}
-const taskDateOpenIds = new Set();
-function toggleTaskDateOpen(id){
-  if(taskDateOpenIds.has(id)) taskDateOpenIds.delete(id); else taskDateOpenIds.add(id);
-  renderScheduleGrid();
-}
-function taskEditFormInner(t){
-  const descOpen = taskDescOpenIds.has(t.id);
-  const dateOpen = taskDateOpenIds.has(t.id) || !!t.date || !!t.time;
-  const dateBtnLabel = (t.date || t.time) ? `📅 ${t.date?formatDateHe(t.date):''}${t.time?' · '+t.time:''}` : '📅 תזמון';
-  return `<div class="anchor-form">
-      <div class="edit-form-row">
-        <input type="text" id="taskEditText-${t.id}" value="${escapeAttr(t.text)}" placeholder="טקסט המשימה">
-        <select id="taskEditDomain-${t.id}">${domainOptionsWithEmpty(t.domain)}</select>
-      </div>
-      <div class="edit-form-row">
-        <select id="taskEditEnergy-${t.id}">
-          <option value="" ${!t.energy?'selected':''}>ללא רמת אנרגיה</option>
-          <option value="low" ${t.energy==='low'?'selected':''}>🟢 מטעין</option>
-          <option value="mid" ${t.energy==='mid'?'selected':''}>🟡 בינוני</option>
-          <option value="high" ${t.energy==='high'?'selected':''}>🔴 מרוקן</option>
-        </select>
-        <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDateOpen('${t.id}')">${dateBtnLabel}</button>
-      </div>
-      ${dateOpen ? `
-      <label class="field-label">תאריך<input type="date" id="taskEditDate-${t.id}" value="${t.date||''}"></label>
-      <div class="edit-form-row">
-        <label class="field-label">התחלה${timePickerHtml('taskEditTime-'+t.id, t.time||'', 'שעה')}</label>
-        <label class="field-label">סיום${timePickerHtml('taskEditEnd-'+t.id, t.endTime||'', 'שעה')}</label>
-      </div>
-      ${data.gcalConnected
-        ? `<label class="buf-label"><input type="checkbox" id="taskEditGcalSync-${t.id}" ${t.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
-        : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${taskCalendarUrl(t)}" target="_blank">📅 הוספה ליומן</a>`}
-      ` : ''}
-      <button type="button" class="subtask-toggle-btn" onclick="toggleTaskDescOpen('${t.id}')">${descOpen?'▾ תיאור':'▸ תיאור'}</button>
-      ${descOpen ? `<textarea class="detail-desc" id="taskEditDesc-${t.id}" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(t.description||'')}</textarea>` : ''}
-      <label class="buf-label"><input type="checkbox" id="taskEditDraft-${t.id}" ${t.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
-      ${bodyCheckToggleBtnHtml('task', t.id)}
-      ${bodyCheckOpenIds.has('task:'+t.id) ? bodyCheckPanelHtml('task', t.id, {urgencyOptions:['objective','other','relief'], showEnergy:true}) : ''}
-      <div class="anchor-form-actions">
-        <button class="save-btn" onclick="saveTaskEdit('${t.id}')">שמור</button>
-        <button class="cancel-btn" onclick="closeTaskEdit()">בטל</button>
-        <button class="delete-btn" onclick="deleteTask('${t.id}')">🗑 מחק</button>
-      </div>
-    </div>`;
-}
-function taskEditFormHtml(t){
-  return `<li class="edit-li" data-drag-id="${t.id}">${taskEditFormInner(t)}</li>`;
-}
 const subtaskDateOpenIds = new Set();
 function toggleSubtaskDateOpen(taskId, subId){
   const key = taskId+':'+subId;
@@ -4053,52 +3941,6 @@ function toggleTaskExpand(id){
   if(expandedTasks.has(id)){ expandedTasks.delete(id); } else { expandedTasks.add(id); ensureListExpanded('task'); }
   renderTasks();
   if(opening) scrollElIntoView(document.querySelector(`.task-li[data-drag-id="${id}"]`));
-}
-// closing an item's edit re-minimizes every sub inside it (body-check, description, subtask
-// scheduling...) -- so reopening it later always starts fully collapsed instead of reappearing
-// however it happened to be left expanded last time.
-function closeTaskEdit(){
-  const id = scheduleEditingTaskId;
-  if(id){
-    bodyCheckOpenIds.delete('task:'+id);
-    taskDescOpenIds.delete(id);
-    taskDateOpenIds.delete(id);
-    Array.from(subtaskDateOpenIds).forEach(k=>{ if(k.startsWith(id+':')) subtaskDateOpenIds.delete(k); });
-  }
-  scheduleEditingTaskId = null; renderTasks(); renderScheduleGrid();
-}
-function saveTaskEdit(id){
-  const t = data.tasks.find(t=>t.id===id);
-  if(!t) return;
-  const text = document.getElementById(`taskEditText-${id}`).value.trim();
-  if(!text) return;
-  const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime, prevGcalSync = t.gcalSync;
-  t.text = text;
-  t.domain = document.getElementById(`taskEditDomain-${id}`).value;
-  t.energy = document.getElementById(`taskEditEnergy-${id}`).value;
-  const dateEl = document.getElementById(`taskEditDate-${id}`);
-  const timeEl = document.getElementById(`taskEditTime-${id}`);
-  const endEl = document.getElementById(`taskEditEnd-${id}`);
-  if(dateEl) t.date = dateEl.value || '';
-  if(timeEl) t.time = timeEl.value || '';
-  if(endEl) t.endTime = endEl.value || '';
-  const descEl = document.getElementById(`taskEditDesc-${id}`);
-  if(descEl) t.description = descEl.value || '';
-  const gcalSyncEl = document.getElementById(`taskEditGcalSync-${id}`);
-  if(gcalSyncEl) t.gcalSync = gcalSyncEl.checked;
-  const draftEl = document.getElementById(`taskEditDraft-${id}`);
-  if(draftEl) t.draft = draftEl.checked;
-  scheduleEditingTaskId = null;
-  taskDateOpenIds.delete(id);
-  taskDescOpenIds.delete(id);
-  bodyCheckOpenIds.delete('task:'+id);
-  Array.from(subtaskDateOpenIds).forEach(k=>{ if(k.startsWith(id+':')) subtaskDateOpenIds.delete(k); });
-  saveData();
-  renderTasks();
-  renderScheduleGrid();
-  const changedTiming = t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd;
-  const syncFlagChanged = prevGcalSync===false ? t.gcalSync!==false : t.gcalSync===false;
-  applyGcalSyncForTask(t, changedTiming || syncFlagChanged);
 }
 function addSubtask(taskId){
   const input = document.getElementById(`subtaskInput-${taskId}`);
@@ -4218,16 +4060,10 @@ function deleteTask(id){
   const removed = data.tasks.find(t=>t.id===id);
   data.tasks = data.tasks.filter(t=>t.id!==id);
   expandedTasks.delete(id);
-  if(scheduleEditingTaskId===id) scheduleEditingTaskId = null;
   saveData();
   renderTasks();
   renderScheduleGrid();
   if(data.gcalConnected && removed && removed.googleEventId) deleteEventFromGcal(removed.googleEventId, ()=>{});
-}
-function editTaskFromSchedule(id){
-  scheduleEditingTaskId = (scheduleEditingTaskId===id) ? null : id;
-  longPressedTaskId = null;
-  renderScheduleGrid();
 }
 
 /* ---------- weekly schedule (anchors + dated tasks together) ---------- */
@@ -4302,54 +4138,6 @@ function renderScheduleGrid(){
     const anchorsForDay = data.anchors.filter(a=>anchorAppliesToDate(a, dateObj, dayIdx)).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     const tasksForDay = data.tasks.filter(t=>t.date===dateStr).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
 
-    const editingHere = editingAnchorId ? data.anchors.find(a=>a.id===editingAnchorId) : null;
-    const isEditingThisDay = !!(editingAnchorId && openForm===dayIdx);
-    const currentRepeatType = isEditingThisDay ? (editingHere.repeatType||'weekly') : 'weekly';
-    const showDateField = ['once','every2days','monthly','yearly'].includes(currentRepeatType);
-    const defaultDateVal = (isEditingThisDay && editingHere.date) ? editingHere.date : dateStr;
-
-    const anchorFormHtml = `
-      <div class="anchor-form anchor-form-spaced">
-        <input type="text" id="anchorLabel-${dayIdx}" placeholder="למשל: תרגול גיטרה" value="${isEditingThisDay?escapeAttr(editingHere.label):''}">
-        <div class="edit-form-row">
-          <select id="anchorRepeat-${dayIdx}" onchange="toggleAnchorDateField(${dayIdx})">
-            <option value="once" ${currentRepeatType==='once'?'selected':''}>חד-פעמי</option>
-            <option value="daily" ${currentRepeatType==='daily'?'selected':''}>מדי יום</option>
-            <option value="every2days" ${currentRepeatType==='every2days'?'selected':''}>כל יומיים</option>
-            <option value="weekly" ${currentRepeatType==='weekly'?'selected':''}>מדי שבוע</option>
-            <option value="monthly" ${currentRepeatType==='monthly'?'selected':''}>מדי חודש</option>
-            <option value="yearly" ${currentRepeatType==='yearly'?'selected':''}>מדי שנה</option>
-          </select>
-          <select id="anchorDomain-${dayIdx}">${domainOptions(isEditingThisDay?editingHere.domain:null)}</select>
-        </div>
-        <div id="anchorDayWrap-${dayIdx}" style="display:${currentRepeatType==='weekly'?'block':'none'};">
-          <select id="anchorDay-${dayIdx}">${DAYS.map((dn,di)=>`<option value="${di}" ${(isEditingThisDay?editingHere.day:dayIdx)===di?'selected':''}>${dn}</option>`).join('')}</select>
-        </div>
-        <div id="anchorDateWrap-${dayIdx}" style="display:${showDateField?'block':'none'};">
-          <input type="date" id="anchorDate-${dayIdx}" value="${defaultDateVal}">
-        </div>
-        <div class="edit-form-row">
-          ${timePickerHtml('anchorTime-'+dayIdx, isEditingThisDay?editingHere.time||'':'', 'שעה')}
-          ${timePickerHtml('anchorEnd-'+dayIdx, isEditingThisDay?editingHere.endTime||'':'', 'שעת סיום')}
-        </div>
-        <label class="buf-label"><input type="checkbox" id="anchorBuffer-${dayIdx}" ${isEditingThisDay&&editingHere.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
-        <label class="buf-label"><input type="checkbox" id="anchorDraft-${dayIdx}" ${isEditingThisDay&&editingHere.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
-        <div class="anchor-form-actions">
-          <button class="save-btn" onclick="saveAnchor(${dayIdx})">שמור</button>
-          <button class="cancel-btn" onclick="closeForm()">בטל</button>
-        </div>
-        ${isEditingThisDay ? `
-        ${data.gcalConnected
-          ? `<label class="buf-label"><input type="checkbox" id="anchorGcalSync-${dayIdx}" ${editingHere.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
-          : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${anchorCalendarUrl(editingHere)}" target="_blank">📅 הוספה ליומן</a>`}
-        <div class="anchor-form-actions">
-          ${currentRepeatType==='once'
-            ? `<button class="delete-btn" onclick="deleteAnchor('${editingHere.id}')">🗑 מחק עוגן</button>`
-            : `<button class="delete-btn" onclick="deleteAnchorOccurrence('${editingHere.id}','${dateStr}')">🗑 מחיקה חד-פעמית</button>
-               <button class="delete-btn" onclick="deleteAnchor('${editingHere.id}')">🗑 מחיקה לתמיד</button>`}
-        </div>` : ''}
-      </div>`;
-
     const chronoItems = anchorsForDay.map(a=>({type:'anchor', time:a.time||'', createdAt:a.createdAt||0, data:a}))
       .concat(tasksForDay.map(t=>({type:'task', time:t.time||'', createdAt:t.createdAt||0, data:t})))
       .sort((x,y)=>{
@@ -4363,28 +4151,24 @@ function renderScheduleGrid(){
       if(it.type==='anchor'){
         const a = it.data;
         const dom = domainById(a.domain);
-        const isEditingThisAnchor = isEditingThisDay && editingHere.id===a.id;
-        const chip = `<div class="anchor-chip ${isEditingThisAnchor?'chip-editing':''} ${data.softMode?'soft-dim':''} ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="openTimelineSheet('anchor','${a.id}')">
+        return `<div class="anchor-chip ${data.softMode?'soft-dim':''} ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" data-item-kind="anchor" style="border-right-color:${dom.color}" onclick="openTimelineSheet('anchor','${a.id}')">
             ${a.time ? `<span class="time" dir="ltr">${a.time}${a.endTime?'–'+a.endTime:''}</span>` : ''}
             ${escapeHtml(a.label)}
             ${a.draft ? '<span class="draft-badge">🌱 טיוטה</span>' : ''}
             ${a.buffer ? '<span class="buf">+ 15 דק׳ נשימה אחרי</span>' : ''}
         </div>`;
-        return chip + (isEditingThisAnchor ? anchorFormHtml : '');
       }
       const t = it.data;
       const dom = t.domain ? domainById(t.domain) : null;
       const isTaskOverdue = t.date && !t.done && t.date < ymd(new Date());
       const showTrash = longPressedTaskId===t.id;
-      const isEditingThisTask = scheduleEditingTaskId===t.id;
       const softClass = data.softMode ? (t.energy==='low' ? 'soft-emphasize' : 'soft-dim') : '';
-      const chip = `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${isEditingThisTask?'chip-editing':''} ${softClass} ${t.draft?'chip-draft':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{openTimelineSheet('task','${t.id}');}">
+      return `<div class="anchor-chip ${isTaskOverdue?'dimmed-item':''} ${softClass} ${t.draft?'chip-draft':''}" data-drag-id="${t.id}" data-item-kind="task" style="border-right-color:${dom?dom.color:'var(--border-strong)'}; border-right-style:dashed; ${showTrash?'padding-left:36px;':''}" onpointerdown="startTaskLongPress(event,'${t.id}')" onclick="if(justLongPressedTaskId==='${t.id}'){justLongPressedTaskId=null;}else{openTimelineSheet('task','${t.id}');}">
           ${showTrash ? `<span class="task-chip-trash" onclick="event.stopPropagation(); unscheduleTaskFromWeek('${t.id}')" title="הסרה מתצוגת השבוע">🗑</span>` : ''}
           ${t.time ? `<span class="time" dir="ltr">${t.time}${t.endTime?'–'+t.endTime:''}</span>` : '<span class="time">כל היום</span>'}
           ${escapeHtml(t.text)}
           ${t.draft ? '<span class="draft-badge">🌱 טיוטה</span>' : ''}
       </div>`;
-      return chip + (isEditingThisTask ? taskEditFormInner(t) : '');
     });
 
     let entries = chronoEntries;
@@ -4867,12 +4651,6 @@ function onTimelineColClick(e, dayIdx, dateStr){
     renderTimelineGrid();
   }
 }
-function timelineJumpToEdit(kind, id, dayIdx){
-  closeTimelineSheet();
-  setScheduleTab('list');
-  if(kind==='task') editTaskFromSchedule(id);
-  else editAnchor(id, dayIdx!==null ? dayIdx : (data.anchors.find(a=>a.id===id)||{day:0}).day);
-}
 // only ever shown while something is mid-move (picked up from the sheet's quick-move link) --
 // everything else about editing now lives in the bottom sheet itself.
 function timelineActionBarHtml(){
@@ -4897,15 +4675,18 @@ let timelineSheetIsNew = false;
 // step) -- the source item is deliberately NOT deleted at conversion time, only offered here as an
 // explicit choice, so promoting something to a task never also silently removes it from its list.
 let timelineSheetConvertedFrom = null; // {kind:'someday', id} | {kind:'somedaySubtask', somedayId, subId}
+// whether the "עוד אפשרויות" extra-fields block (energy/end-time/description/gcal-sync/body-check
+// for tasks; end-time/buffer/gcal-sync for anchors) is showing -- replaces the old behavior of
+// closing the sheet and jumping to a completely different, clunkier inline form elsewhere on the page
+let timelineSheetExpanded = false;
 function dayIdxForDateStr(dateStr){
   const idx = viewedWeekDates().findIndex(d=>ymd(d)===dateStr);
   return idx>=0 ? idx : 0;
 }
 // for repeat types that don't follow a.day (every2days/monthly/yearly/once), a.day can be a stale
 // leftover that doesn't match any day the anchor's chip actually renders on in the viewed week --
-// find the real day so "עוד אפשרויות" (which reopens the full form under a specific day column)
-// doesn't silently fail to find anywhere to attach itself. falls back to a.day when nothing in the
-// current week matches (e.g. a one-time event in a different week).
+// falls back to a.day when nothing in the current week matches (e.g. a one-time event in a
+// different week).
 function anchorDayIdxInViewedWeek(a){
   const repeatType = a.repeatType || 'weekly';
   if(repeatType==='weekly' || repeatType==='daily') return a.day;
@@ -4920,6 +4701,7 @@ function openTimelineSheet(kind, id, isNew){
   timelineSheetIsNew = !!isNew;
   timelineSheetDayIdx = kind==='task' ? dayIdxForDateStr(rec.date) : anchorDayIdxInViewedWeek(rec);
   timelineSheetSelectedDays = new Set([timelineSheetDayIdx]);
+  timelineSheetExpanded = false;
   document.getElementById('timelineSheetOverlay').style.display = '';
   document.getElementById('timelineSheet').style.display = '';
   renderTimelineSheet();
@@ -5017,8 +4799,35 @@ function renderTimelineSheet(){
     ? `<button type="button" class="delete-btn" onclick="deleteOccurrenceFromTimelineSheet()">🗑 מחיקה חד-פעמית</button>
        <button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה לתמיד</button>`
     : `<button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה</button>`;
+  // everything that used to live behind "עוד אפשרויות" jumping away to the old, separate inline
+  // edit form now renders right here, toggled open/closed in place -- see toggleTimelineSheetExpanded
+  const gcalFieldHtml = data.gcalConnected
+    ? `<label class="buf-label"><input type="checkbox" id="timelineSheetGcalSync" ${rec.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
+    : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${kind==='task'?taskCalendarUrl(rec):anchorCalendarUrl(rec)}" target="_blank">📅 הוספה ליומן</a>`;
+  const extraFieldsHtml = kind==='task' ? `
+      <div class="edit-form-row">
+        <select id="timelineSheetEnergy">
+          <option value="" ${!rec.energy?'selected':''}>ללא רמת אנרגיה</option>
+          <option value="low" ${rec.energy==='low'?'selected':''}>🟢 מטעין</option>
+          <option value="mid" ${rec.energy==='mid'?'selected':''}>🟡 בינוני</option>
+          <option value="high" ${rec.energy==='high'?'selected':''}>🔴 מרוקן</option>
+        </select>
+        ${timePickerHtml('timelineSheetEndTime', rec.endTime||'', 'שעת סיום')}
+      </div>
+      ${gcalFieldHtml}
+      <textarea class="detail-desc" id="timelineSheetDesc" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(rec.description||'')}</textarea>
+      ${bodyCheckToggleBtnHtml('task', id)}
+      ${bodyCheckOpenIds.has('task:'+id) ? bodyCheckPanelHtml('task', id, {urgencyOptions:['objective','other','relief'], showEnergy:true}) : ''}
+    ` : `
+      ${timePickerHtml('timelineSheetEndTime', rec.endTime||'', 'שעת סיום')}
+      <label class="buf-label"><input type="checkbox" id="timelineSheetBuffer" ${rec.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
+      ${gcalFieldHtml}
+    `;
   sheet.innerHTML = `
-    <div class="timeline-sheet-handle"></div>
+    <div class="timeline-sheet-topbar">
+      <button type="button" class="timeline-sheet-close-btn" onclick="closeTimelineSheet()" title="ביטול">✕</button>
+      <div class="timeline-sheet-handle-hit" id="timelineSheetHandle"><span class="timeline-sheet-handle-bar"></span></div>
+    </div>
     <div class="timeline-sheet-title-row">
       <input type="text" class="timeline-sheet-title" id="timelineSheetTitleInput" value="${escapeAttr(label)}" placeholder="שם...">
       ${domainPickerHtml}
@@ -5030,6 +4839,7 @@ function renderTimelineSheet(){
       ${timePickerHtml('timelineSheetTime', timeValue, 'שעה')}
       ${freqHtml}
     </div>
+    <div class="timeline-sheet-extra" id="timelineSheetExtra" style="display:none;">${extraFieldsHtml}</div>
     <label class="buf-label" style="margin-top:10px;"><input type="checkbox" id="timelineSheetDraft" ${rec.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
     <div class="timeline-sheet-actions">
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
@@ -5040,11 +4850,71 @@ function renderTimelineSheet(){
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
-    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="timelineSheetMoreOptions()">עוד אפשרויות (חזרתיות, סנכרון גוגל...) ›</button>
+    <button type="button" class="subtask-toggle-btn timeline-sheet-more" id="timelineSheetExpandBtn" onclick="toggleTimelineSheetExpanded()">עוד אפשרויות ›</button>
   `;
   // deliberately no auto-focus here -- opening an item is first and foremost "look at what this
   // is," not an implicit "start typing now." the keyboard should only appear once the person
   // actually taps into a field on their own.
+  applyTimelineSheetExpandedState();
+  setupTimelineSheetHandleDrag();
+}
+// the extra-fields block and its own toggle button are rebuilt on every renderTimelineSheet, but
+// TOGGLING it (tap on the button, or an up-drag on the handle) deliberately does NOT call
+// renderTimelineSheet() again -- see toggleTimelineSheetDay's comment just above for why a full
+// re-render mid-edit would silently discard anything typed but not yet saved.
+function applyTimelineSheetExpandedState(){
+  const extra = document.getElementById('timelineSheetExtra');
+  const btn = document.getElementById('timelineSheetExpandBtn');
+  const sheet = document.getElementById('timelineSheet');
+  if(extra) extra.style.display = timelineSheetExpanded ? '' : 'none';
+  if(sheet) sheet.classList.toggle('expanded', timelineSheetExpanded);
+  if(btn) btn.textContent = timelineSheetExpanded ? '‹ פחות אפשרויות' : 'עוד אפשרויות ›';
+}
+function toggleTimelineSheetExpanded(){
+  timelineSheetExpanded = !timelineSheetExpanded;
+  applyTimelineSheetExpandedState();
+}
+// drag the handle down past where the day-picker used to sit to close the sheet (same as "ביטול");
+// release above that line and it snaps back with nothing happening; drag it up and it expands, same
+// as tapping "עוד אפשרויות". pointer events (not separate touch/mouse listeners) so one code path
+// covers phone and desktop; touch-action:none on the handle keeps this from also triggering the
+// page's own pull-to-refresh gesture.
+function setupTimelineSheetHandleDrag(){
+  const handle = document.getElementById('timelineSheetHandle');
+  const sheet = document.getElementById('timelineSheet');
+  if(!handle || !sheet) return;
+  let startY = null, closeThreshold = 100;
+  const onMove = (e)=>{
+    if(startY===null) return;
+    const dy = e.clientY - startY;
+    sheet.style.transform = dy>0 ? `translateY(${dy}px)` : `translateY(${Math.max(dy,-14)}px)`;
+  };
+  const onUp = (e)=>{
+    if(startY===null) return;
+    const dy = e.clientY - startY;
+    startY = null;
+    sheet.classList.remove('dragging');
+    if(dy > closeThreshold){
+      sheet.style.transform = 'translateY(120%)';
+      setTimeout(()=>{ sheet.style.transform=''; closeTimelineSheet(); }, 180);
+    } else if(dy < -18){
+      sheet.style.transform = '';
+      if(!timelineSheetExpanded) toggleTimelineSheetExpanded();
+    } else {
+      sheet.style.transform = '';
+    }
+  };
+  handle.onpointerdown = (e)=>{
+    startY = e.clientY;
+    const daypicker = sheet.querySelector('.timeline-sheet-daypicker');
+    const handleRect = handle.getBoundingClientRect();
+    closeThreshold = daypicker ? Math.max(50, daypicker.getBoundingClientRect().bottom - handleRect.top) : 100;
+    sheet.classList.add('dragging');
+    handle.setPointerCapture(e.pointerId);
+  };
+  handle.onpointermove = onMove;
+  handle.onpointerup = onUp;
+  handle.onpointercancel = onUp;
 }
 function saveTimelineSheet(){
   if(!timelineSheetItem) return;
@@ -5055,6 +4925,11 @@ function saveTimelineSheet(){
   const timeEl = document.getElementById('timelineSheetTime');
   const time = timeEl ? timeEl.value : '';
   const draft = document.getElementById('timelineSheetDraft').checked;
+  // these live in the "עוד אפשרויות" block -- always present in the DOM (just hidden while
+  // collapsed), so reading them here is safe whether or not it was ever opened this time
+  const endTimeEl = document.getElementById('timelineSheetEndTime');
+  const endTime = endTimeEl ? endTimeEl.value : '';
+  const gcalSyncEl = document.getElementById('timelineSheetGcalSync');
   // the record itself always takes the FIRST selected day; any other selected days become cloned
   // records (one per extra day) rather than trying to cram "applies to several days" into a single
   // record -- keeps every existing per-record assumption elsewhere in the app (one day/date each) intact
@@ -5068,8 +4943,13 @@ function saveTimelineSheet(){
     const t = data.tasks.find(x=>x.id===id);
     if(!t) return;
     const prevDate = t.date, prevTime = t.time, prevEnd = t.endTime;
-    t.text = text; t.date = dateStr; t.time = time; t.draft = draft;
+    const energyEl = document.getElementById('timelineSheetEnergy');
+    const descEl = document.getElementById('timelineSheetDesc');
+    t.text = text; t.date = dateStr; t.time = time; t.endTime = endTime; t.draft = draft;
     if(domainEl) t.domain = domainEl.value;
+    if(energyEl) t.energy = energyEl.value;
+    if(descEl) t.description = descEl.value;
+    if(gcalSyncEl) t.gcalSync = gcalSyncEl.checked;
     // the gcal push is a best-effort network call -- if it throws for any reason, the save itself
     // (already committed above) must still visibly finish: close the sheet and show "נשמר", not
     // leave her tapping a "שמירה" button that silently does nothing.
@@ -5087,8 +4967,11 @@ function saveTimelineSheet(){
     if(!a) return;
     const prevDay = a.day, prevTime = a.time, prevRepeat = a.repeatType, prevAnchorDate = a.date;
     const freqEl = document.getElementById('timelineSheetFreq');
-    a.label = text; a.day = primaryDay; a.time = time; a.draft = draft;
+    const bufferEl = document.getElementById('timelineSheetBuffer');
+    a.label = text; a.day = primaryDay; a.time = time; a.endTime = endTime; a.draft = draft;
     if(domainEl) a.domain = domainEl.value;
+    if(bufferEl) a.buffer = bufferEl.checked;
+    if(gcalSyncEl) a.gcalSync = gcalSyncEl.checked;
     if(freqEl){
       a.repeatType = freqEl.value;
       if(['daily','every2days','monthly'].includes(freqEl.value)) a.date = dateStr;
@@ -5130,12 +5013,6 @@ function quickMoveFromSheet(){
   const {kind, id} = timelineSheetItem;
   closeTimelineSheet();
   pickTimelineItem(kind, id);
-}
-function timelineSheetMoreOptions(){
-  if(!timelineSheetItem) return;
-  const {kind, id} = timelineSheetItem;
-  const dayIdx = timelineSheetDayIdx;
-  timelineJumpToEdit(kind, id, kind==='task' ? null : dayIdx);
 }
 let timelineUntimedExpanded = false;
 function renderTimelineGrid(){
@@ -6260,8 +6137,11 @@ const URGENCY_LABELS = { objective:'אובייקטיבית', other:'כי זו ה
 // the task deep-edit form (where the body-check toggle lives) only ever renders inside the schedule
 // grid now (opened via the floating sheet's "עוד אפשרויות") -- renderScheduleGrid is what actually
 // needs to redraw; renderTasks is also called so the plain משימות list's badges stay fresh too
+// the task body-check panel now only ever renders inside the floating timeline sheet's "עוד
+// אפשרויות" block -- renderTimelineSheet is what actually needs to redraw it; renderTasks also
+// runs so the plain משימות list's read-only badges (bodyCheckStatusBadgesHtml) stay fresh too
 function bodyCheckSection(kind){
-  if(kind==='task') return {arr:data.tasks, render:()=>{ renderScheduleGrid(); renderTasks(); }};
+  if(kind==='task') return {arr:data.tasks, render:()=>{ renderTimelineSheet(); renderTasks(); }};
   if(kind==='someday') return {arr:data.someday, render:renderSomeday};
   if(kind==='dilemma') return {arr:data.generalDilemmas, render:renderGeneralDilemmaList};
   return {arr:data.suggestions, render:renderSuggestions};
@@ -7157,40 +7037,34 @@ document.addEventListener('pointerdown', (e)=>{
   commitEditChip(editingChipBank, editingChipId);
 });
 /* ---------- click anywhere else closes whatever "big form" edit is open ----------
-   task edit in the schedule grid's list view, anchor edit/add, add-task-in-schedule, someday edit,
-   and suggestion edit all stay open until an explicit save/cancel today -- she wants them to also
-   close the moment she clicks literally anywhere else (another item, the background, a totally
-   different part of the site), so an old edit never lingers open by accident. feel-notes (emotion/
-   need/body/the "עוד" open questions) are deliberately NOT touched here -- those only minimize via
-   their own button, since it's nice to keep them visible while working elsewhere on the page.
+   someday edit and suggestion edit stay open until an explicit save/cancel today -- she wants them
+   to also close the moment she clicks literally anywhere else (another item, the background, a
+   totally different part of the site), so an old edit never lingers open by accident. feel-notes
+   (emotion/need/body/the "עוד" open questions) are deliberately NOT touched here -- those only
+   minimize via their own button, since it's nice to keep them visible while working elsewhere on
+   the page. task/anchor editing lives in the floating timeline sheet instead, which already closes
+   the same way via its own backdrop overlay (see #timelineSheetOverlay's onclick).
    this runs in the CAPTURE phase, before the actually-clicked element's own onclick fires, so the
    "is this click outside the open edit's container" check reads the DOM/state as it stood before
-   that click did anything -- otherwise, the very click that OPENS an edit (e.g. a first tap on a
-   task chip in the schedule grid, which sets scheduleEditingTaskId and re-renders it into its edit
-   form) would immediately read back as "outside" against its own freshly-rebuilt container and undo
-   itself. the actual closing is then deferred a tick (matching the fix already used for the
-   sync-render/focusout race elsewhere in this file) so it runs only after the click's own handler --
-   which might itself already be closing things, or opening something else entirely -- has fully
-   finished; the still-equals-snapshot guard skips closing anything that already moved on by then. */
+   that click did anything -- otherwise, the very click that OPENS an edit would immediately read
+   back as "outside" against its own freshly-rebuilt container and undo itself. the actual closing
+   is then deferred a tick (matching the fix already used for the sync-render/focusout race
+   elsewhere in this file) so it runs only after the click's own handler -- which might itself
+   already be closing things, or opening something else entirely -- has fully finished; the
+   still-equals-snapshot guard skips closing anything that already moved on by then. */
 function clickIsOutsideEl(el, target){ return !el || !el.contains(target); }
 document.addEventListener('click', (e)=>{
   const target = e.target;
-  const prevSchedTask = scheduleEditingTaskId;
   const prevSomeday = editingSomedayId, prevSuggestion = editingSuggestionId;
   const prevDilemma = editingDilemmaId;
-  const prevOpenForm = openForm;
-  const outsideSchedTask = prevSchedTask !== null && clickIsOutsideEl(document.getElementById('scheduleGrid'), target);
   const outsideSomeday = prevSomeday !== null && clickIsOutsideEl(document.querySelector(`#somedayList [data-drag-id="${prevSomeday}"]`), target);
   const outsideSuggestion = prevSuggestion !== null && clickIsOutsideEl(document.querySelector(`#suggestionList [data-drag-id="${prevSuggestion}"]`), target);
   const outsideDilemma = prevDilemma !== null && clickIsOutsideEl(document.querySelector(`#dilemmaList [data-drag-id="${prevDilemma}"]`), target);
-  const outsideScheduleForm = prevOpenForm !== null && clickIsOutsideEl(document.querySelector(`.day-col[data-day-idx="${prevOpenForm}"]`), target);
-  if(!outsideSchedTask && !outsideSomeday && !outsideSuggestion && !outsideDilemma && !outsideScheduleForm) return;
+  if(!outsideSomeday && !outsideSuggestion && !outsideDilemma) return;
   setTimeout(()=>{
-    if(outsideSchedTask && scheduleEditingTaskId===prevSchedTask) closeTaskEdit();
     if(outsideSomeday && editingSomedayId===prevSomeday) closeSomedayEdit();
     if(outsideSuggestion && editingSuggestionId===prevSuggestion) closeSuggestionEdit();
     if(outsideDilemma && editingDilemmaId===prevDilemma) closeDilemmaEdit();
-    if(outsideScheduleForm && openForm===prevOpenForm) closeAllScheduleForms();
   }, 0);
 }, true);
 function toggleDeleteMode(bank){
