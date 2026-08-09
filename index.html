@@ -5002,6 +5002,13 @@ function renderTimelineSheet(){
         <option value="yearly" ${freqValue==='yearly'?'selected':''}>שנה</option>
       </select>
     </div>` : '';
+  // repeating anchors (anything but חד-פעמי) get the same once/forever delete choice the full form
+  // already offers, instead of a single button that always deletes the whole recurring anchor
+  const isRepeatingAnchor = kind==='anchor' && (rec.repeatType||'weekly')!=='once';
+  const deleteButtonsHtml = isRepeatingAnchor
+    ? `<button type="button" class="delete-btn" onclick="deleteOccurrenceFromTimelineSheet()">🗑 מחיקה חד-פעמית</button>
+       <button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה לתמיד</button>`
+    : `<button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה</button>`;
   sheet.innerHTML = `
     <div class="timeline-sheet-handle"></div>
     <div class="timeline-sheet-title-row">
@@ -5019,7 +5026,9 @@ function renderTimelineSheet(){
     <div class="timeline-sheet-actions">
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
       <button type="button" class="cancel-btn" onclick="closeTimelineSheet()">ביטול</button>
-      <button type="button" class="delete-btn" onclick="deleteFromTimelineSheet()">🗑 מחיקה</button>
+    </div>
+    <div class="timeline-sheet-actions" style="margin-top:8px;">
+      ${deleteButtonsHtml}
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
@@ -5098,6 +5107,15 @@ function deleteFromTimelineSheet(){
   const {kind, id} = timelineSheetItem;
   closeTimelineSheet();
   if(kind==='task') deleteTask(id); else deleteAnchor(id);
+}
+// anchors only -- skips just the occurrence currently being viewed (the day/date the sheet was
+// opened on within this week) instead of removing the whole recurring anchor
+function deleteOccurrenceFromTimelineSheet(){
+  if(!timelineSheetItem || timelineSheetItem.kind!=='anchor') return;
+  const {id} = timelineSheetItem;
+  const dateStr = ymd(viewedWeekDates()[timelineSheetDayIdx]);
+  closeTimelineSheet();
+  deleteAnchorOccurrence(id, dateStr);
 }
 function quickMoveFromSheet(){
   if(!timelineSheetItem) return;
