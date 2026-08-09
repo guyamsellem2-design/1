@@ -460,6 +460,9 @@
   .feel-open-q:last-child{margin-bottom:0;}
   .feel-open-q-label{font-size:13.5px; color:var(--muted); line-height:1.45; padding:0 2px;}
   .hint-inline{color:var(--muted2); font-weight:400;}
+  .cross-link-hint{margin-top:10px; padding-top:8px; border-top:1px dashed var(--border);}
+  .cross-link-hint .link-like{font-size:13px; color:var(--gold); cursor:pointer; text-decoration:underline; text-underline-offset:2px;}
+  .cross-link-hint .link-like:hover{opacity:0.85;}
   .video-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
   .video-li{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:9px 12px;}
   .video-li a{color:var(--text); font-size:14px; text-decoration:none; flex:1; overflow-wrap:anywhere;}
@@ -1128,7 +1131,7 @@
 
   <section>
     <div class="section-head">
-      <h2 onclick="toggleSection('backup')"><span class="num">·</span> גיבוי והעברה <span class="chev" id="chev-backup">▾</span></h2>
+      <h2 onclick="toggleSection('backup')"><span class="num">05</span> גיבוי והעברה <span class="chev" id="chev-backup">▾</span></h2>
       <div class="hint">לפני שינוי גדול או מעבר בין גרסאות — הורדת גיבוי מבטיחה שלא תאבד כלום · אם הדפדפן תומך, תוכל לבחור בעצמך שם ומיקום; אחרת הקובץ יורד לתיקיית ההורדות (Downloads) עם שם הכולל תאריך ושעה</div>
     </div>
     <div id="secbody-backup">
@@ -1665,7 +1668,7 @@ function renderDomainEditor(){
       <input type="text" style="color:inherit;" value="${escapeAttr(d.name)}"
         onchange="renameDomainCommit('${d.id}', this.value)"
         oninput="updateDomainNameLive('${d.id}', this.value); sizeChipInput(this)">
-      <span class="rm" style="color:${activeChipFg};" onclick="event.stopPropagation(); deleteDomain('${d.id}')">✕</span>
+      <span class="rm" style="color:${activeChipFg};" onclick="event.stopPropagation(); deleteDomain('${d.id}')" title="מחיקת נושא">✕</span>
     </div>`;
   }).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
@@ -7408,6 +7411,11 @@ function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelB
 function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
 function toggleBodyBank(){ bodyBankOpen = !bodyBankOpen; renderFeelBar(); }
 function toggleMoreQuestions(){ moreQuestionsOpen = !moreQuestionsOpen; renderFeelBar(); }
+function jumpToProcrastinationLoop(){
+  switchMainView('tools');
+  if(!procBlockOpen){ procBlockOpen = true; renderProcrastinationBlock(); updateCollapseAllButton(); }
+  scrollElIntoView(document.getElementById('procrastinationBlock'));
+}
 function onBodyNoteInput(val){ data.bodyNote = val; saveData(); }
 function onQSoulNoteInput(val){ data.qSoulNote = val; saveData(); }
 function onQPowerNoteInput(val){ data.qPowerNote = val; saveData(); }
@@ -7612,6 +7620,7 @@ function renderFeelBar(){
             <div class="feel-open-q-label">מה רוצה להתבטא דרכי כרגע?</div>
             ${feelNoteHtml('qExpress', data.qExpressNote, 'onQExpressNoteInput', 'לכתוב מה שעולה...', 'clearFeelNoteField')}
           </div>
+          <div class="cross-link-hint"><span class="link-like" onclick="jumpToProcrastinationLoop()">ראית גם את השאלות בלופ הדחיינות? 🌀</span></div>
         ` : ''}
       </div>
       ` : ''}
@@ -7629,6 +7638,14 @@ let procBlockOpen = false;
 let procExplainOpen = false;
 function toggleProcBlock(){ procBlockOpen = !procBlockOpen; renderProcrastinationBlock(); updateCollapseAllButton(); }
 function toggleProcExplain(){ procExplainOpen = !procExplainOpen; renderProcrastinationBlock(); }
+function jumpToFeelMoreQuestions(){
+  switchMainView('home');
+  if(!feelBlockOpen){ feelBlockOpen = true; }
+  if(!moreQuestionsOpen){ moreQuestionsOpen = true; }
+  renderFeelBar();
+  updateCollapseAllButton();
+  scrollElIntoView(document.getElementById('feelBar'));
+}
 function onProcWantNoteInput(val){ data.procWantNote = val; saveData(); }
 function onProcTrueWantNoteInput(val){ data.procTrueWantNote = val; saveData(); }
 // her own words on why these two questions matter -- kept verbatim, not rewritten, since this is
@@ -7662,6 +7679,7 @@ function renderProcrastinationBlock(){
       </div>
       <button type="button" class="subtask-toggle-btn" onclick="toggleProcExplain()">${procExplainOpen?'▾':'▸'} הסבר 💛</button>
       ${procExplainOpen ? `<div class="proc-explain-text">${escapeHtml(PROC_EXPLAIN_TEXT)}</div>` : ''}
+      <div class="cross-link-hint"><span class="link-like" onclick="jumpToFeelMoreQuestions()">ראית גם את השאלות הפתוחות ב"איך אני מרגיש/ה" → "עוד"? 🌤️</span></div>
       ` : ''}
     `;
   });
