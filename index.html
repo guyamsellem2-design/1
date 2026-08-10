@@ -2472,12 +2472,21 @@
      usually arrives with guilt attached. So the celebration goes exactly where
      there isn't one already.
      --------------------------------------------------------------------------- */
-  .say-no-row{ flex-basis:100%; display:flex; justify-content:flex-start; margin-top:6px; }
+  /* The badge and the "לא!" travel together as one small block, tucked directly under the
+     question rather than claiming a line of their own. It costs the row a few millimetres of
+     height and nothing else — a full-width row for a two-letter button was the clumsy part. */
+  .answer-stack{
+    display:inline-flex; flex-direction:column; align-items:stretch; gap:4px;
+    flex-shrink:0; min-width:0;
+  }
+  .answer-stack .suggestion-badge{ text-align:center; }
+  /* the delete stays pinned to the top of the row instead of drifting down beside the stack */
+  li.suggestion-li > .del-task{ align-self:flex-start; margin-top:2px; }
   .say-no-btn{
-    font-family:var(--font-ui); font-size:14px; font-weight:700;
+    font-family:var(--font-ui); font-size:13px; font-weight:700;
     color:var(--muted); background:var(--surface2);
     border:1.5px solid var(--border-strong); border-radius:var(--r-pill);
-    padding:7px 20px; min-height:38px; cursor:pointer;
+    padding:4px 12px; min-height:30px; cursor:pointer;
     transition:color var(--dur) var(--ease-water), border-color var(--dur) var(--ease-water),
                background var(--dur) var(--ease-water), box-shadow var(--dur) var(--ease-water),
                transform var(--dur) var(--ease-settle);
@@ -8082,9 +8091,11 @@ function renderSuggestions(){
       <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
       <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
       <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
-      <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
+      <span class="answer-stack">
+        <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
+        ${s.answered ? '' : `<button type="button" class="say-no-btn" onpointerdown="startSayNoHold(event)" onclick="sayNoToSuggestion('${s.id}', event)">לא!</button>`}
+      </span>
       <span class="del-task" onclick="deleteSuggestion('${s.id}')" title="מחיקה">✕</span>
-      ${s.answered ? '' : `<div class="say-no-row"><button type="button" class="say-no-btn" onpointerdown="startSayNoHold(event)" onclick="sayNoToSuggestion('${s.id}', event)">לא!</button></div>`}
       ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due" onclick="openSuggestionEdit('${s.id}')" title="לחיצה לשינוי מועד התשובה">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}${urgencyInlineText(s)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true, hideUrgency: !!(s.replyDate || s.replyTime)})}
     </li>`;
@@ -8355,24 +8366,29 @@ function fireConfetti(){
   const count = reduced ? 26 : 96;
   let html = '';
   for(let i=0;i<count;i++){
-    // launch points cluster toward the middle, the way a popper held in one hand would throw them,
-    // with enough spread that the burst still reaches both edges
-    const centreBias = (Math.random() + Math.random() + Math.random()) / 3;   // ~normal around .5
-    const left  = 6 + centreBias * 88;
-    const peak  = (reduced ? 30 : 52) + Math.random() * (reduced ? 18 : 42);  // vh travelled upward
-    const settle = peak - (14 + Math.random() * 34);                          // where it ends up
-    const drift = (Math.random() * 2 - 1) * (reduced ? 22 : 120);
+    // A real popper throws from ONE point in a cone, so every piece starts at the same spot near
+    // the bottom centre and is given a launch angle instead of a random position. The rest is
+    // ordinary projectile geometry: the vertical reach is cos(angle) and the sideways reach is
+    // sin(angle), which is why pieces fired straight up go highest while the wide ones sail out
+    // to the edges. That is what makes it read as a spray rather than as rain.
+    const angle = (Math.random()*2-1) * (reduced ? 42 : 80);        // degrees off vertical
+    const power = (reduced ? 40 : 58) + Math.random() * (reduced ? 22 : 44);
+    const rad   = angle * Math.PI / 180;
+    const peak  = Math.cos(rad) * power;                            // vh climbed
+    const outw  = Math.sin(rad) * power * (reduced ? 0.5 : 1.15);   // vw thrown sideways
+    const settle = peak - (16 + Math.random() * 34);                // where it ends up
+    const jitter = (Math.random()*2-1) * 5;                         // the muzzle is not a pinpoint
     const spin  = reduced ? 0 : (Math.random() * 2 - 1) * 900;
-    const dur   = (reduced ? 2.6 : 1.7) + Math.random() * (reduced ? 0.7 : 1.1);
-    const delay = Math.random() * (reduced ? 0.18 : 0.22);                    // one pop, not rain
+    const dur   = (reduced ? 2.6 : 1.8) + Math.random() * (reduced ? 0.7 : 1.2);
+    const delay = Math.random() * (reduced ? 0.16 : 0.14);          // one bang, not a drizzle
     const size  = 6 + Math.random() * 8;
     const c     = colours[i % colours.length];
     const round = Math.random() < 0.35 ? '50%' : '2px';
-    html += `<i style="left:${left.toFixed(1)}%; width:${size.toFixed(1)}px;
+    html += `<i style="left:calc(50% + ${jitter.toFixed(1)}%); width:${size.toFixed(1)}px;
       height:${(size*(round==='50%'?1:1.6)).toFixed(1)}px; background:${c}; border-radius:${round};
       animation-delay:${delay.toFixed(2)}s; animation-duration:${dur.toFixed(2)}s;
       --peak:${(-peak).toFixed(1)}vh; --settle:${(-settle).toFixed(1)}vh;
-      --dx1:${(drift*0.45).toFixed(0)}px; --dx2:${drift.toFixed(0)}px;
+      --dx1:${(outw*0.5).toFixed(1)}vw; --dx2:${outw.toFixed(1)}vw;
       --spin1:${(spin*0.4).toFixed(0)}deg; --spin2:${spin.toFixed(0)}deg;"></i>`;
   }
   layer.innerHTML = html;
