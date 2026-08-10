@@ -8244,8 +8244,14 @@ function toggleDilemmaDone(id){
 
    The glow is given a moment on its own before the item settles into "decided", so the press has
    a beat of its own rather than instantly disappearing into a re-render. */
-/* Saying no to something SOMEONE ELSE asked for is the harder of the two, so it gets the same
-   send-off. Same button, same glow, same confetti; only the record it closes is different. */
+/* ---------- "לא!" ----------
+   Only on other people's requests, deliberately. Saying yes carries its own celebration: the body
+   is already excited before the tap, so the confetti is internal. Saying no to something SOMEBODY
+   ELSE asked for is the one that arrives with guilt attached, and the one most likely to get
+   reopened later just to stop feeling like a bad person. So that is where the app throws a party.
+
+   The glow gets a beat of its own before the item settles into "answered" — without the pause the
+   re-render swallowed it instantly and the press had no moment. */
 function sayNoToSuggestion(id, ev){
   if(sayNoHeld){ sayNoHeld = false; return; }
   const btn = ev && ev.currentTarget;
@@ -8254,16 +8260,6 @@ function sayNoToSuggestion(id, ev){
   setTimeout(()=>{
     const sg = (data.suggestions||[]).find(x=>x.id===id);
     if(sg && !sg.answered){ sg.answered = true; saveData(); renderSuggestions(); }
-  }, 780);
-}
-function sayNoToDilemma(id, ev){
-  if(sayNoHeld){ sayNoHeld = false; return; }   // the hold already did something else
-  const btn = ev && ev.currentTarget;
-  if(btn) btn.classList.add('said-no');
-  fireConfetti();
-  setTimeout(()=>{
-    const d = (data.generalDilemmas||[]).find(x=>x.id===id);
-    if(d && !d.done){ d.done = true; saveData(); renderGeneralDilemmaList(); }
   }, 780);
 }
 /* Confetti, hand-rolled: no library, no images, and nothing left behind. Pieces are plain divs in
@@ -8454,7 +8450,6 @@ function renderGeneralDilemmaList(){
       <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
       <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')" title="מחיקה">✕</span>
-      ${d.done ? '' : `<div class="say-no-row"><button type="button" class="say-no-btn" onpointerdown="startSayNoHold(event)" onclick="sayNoToDilemma('${d.id}', event)">לא!</button></div>`}
       ${d.decisionDate ? `<div class="sugg-reply-due">⏰ להחליט עד: ${formatDateHe(d.decisionDate)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(d, {urgencyOptions:['objective','other','relief']})}
     </li>`;
