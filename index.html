@@ -2437,10 +2437,27 @@
     box-shadow:0 1px 3px rgba(0,0,0,.18);
   }
   .timeline-more-btn:hover{ border-color:var(--gold); color:var(--gold); }
-  .timeline-collapse-btn{
-    right:auto; left:3px; width:26px; height:22px; font-size:15px;
-    background:var(--gold); color:#241a06; border-color:transparent;
+
+  /* the day's name is the control that opens the whole day */
+  .timeline-dayname{ cursor:pointer; position:relative; transition:background var(--dur) var(--ease-water); }
+  .timeline-dayname:hover{ background:var(--surface2); }
+  .timeline-dayname.is-expanded{ background:var(--surface2); color:var(--gold); }
+  /* a quiet dot means "this day is holding more at the same hour than fits here" — the
+     information the old +N carried, without a button sitting on top of the blocks */
+  .dayname-more-dot{
+    display:inline-block; width:5px; height:5px; border-radius:50%;
+    background:var(--gold); margin-inline-start:4px; vertical-align:middle;
   }
+  /* the way back to the week — deliberately a labelled pill, not a bare −, and in the strip
+     that stays on screen while the hours scroll underneath it */
+  .timeline-week-back-btn{
+    flex:0 0 auto; align-self:center;
+    margin:3px 6px 3px 4px; padding:6px 12px;
+    background:var(--gold); color:#241a06; border:none; border-radius:var(--r-pill);
+    font-family:var(--font-ui); font-size:12px; font-weight:700; line-height:1.2;
+    cursor:pointer; white-space:nowrap; box-shadow:var(--lift-1);
+  }
+  .timeline-week-back-btn:hover{ filter:brightness(1.05); }
   /* a zoomed day is one wide column, so its blocks can afford a little more room
      to breathe than they get at one-seventh of the width */
   .timeline-daycol:only-of-type .timeline-item{ padding:2px 5px; font-size:11.5px; }
@@ -6512,24 +6529,19 @@ function timelineChipHtml(it, dayIdx, dateStr, lane, lanes, dayExpanded){
 function timelineDayChipsHtml(d, dayExpanded){
   const laid = timelineAssignLanes(d.timed);
   const html = [];
-  const seenClusters = new Set();
   laid.forEach(x=>{
+    // collapsed: at most two lanes are drawn. There is no +N button sitting in the grid any more —
+    // it was bulky and it landed right where the blocks are. Opening the whole day is now done by
+    // tapping the day's name at the top, and the day-name strip carries a small dot when a day is
+    // holding more than it can show, so nothing disappears without a trace.
     const shown = dayExpanded || x.lanes <= 2 || x.lane < 2;
     if(shown) html.push(timelineChipHtml(x.it, d.dayIdx, d.dateStr, x.lane, x.lanes, dayExpanded));
-    if(!dayExpanded && x.lanes > 2 && !seenClusters.has(x.clusterTop)){
-      seenClusters.add(x.clusterTop);
-      const hidden = x.lanes - 2;
-      const h = Math.max(20, Math.min(30, x.clusterBottom - x.clusterTop));
-      html.push(`<button type="button" class="timeline-more-btn" style="top:${x.clusterTop}px; height:${h}px; right:calc(88% + 1px); width:calc(12% - 2px);"
-        title="עוד ${hidden} באותו הזמן — הרחבת היום"
-        onclick="event.stopPropagation(); toggleTimelineExpandedDay(${d.dayIdx})">+${hidden}</button>`);
-    }
   });
-  if(dayExpanded){
-    html.push(`<button type="button" class="timeline-more-btn timeline-collapse-btn" style="top:2px;"
-      title="חזרה לכל הימים" onclick="event.stopPropagation(); toggleTimelineExpandedDay(${d.dayIdx})">−</button>`);
-  }
   return html.join('');
+}
+// does this day hold a cluster with more lanes than the collapsed view can draw?
+function timelineDayHasHidden(d){
+  return timelineAssignLanes(d.timed).some(x=>x.lanes > 2);
 }
 function deleteUntimedTimelineItem(kind, id){
   if(kind==='task') deleteTask(id); else deleteAnchor(id);
@@ -7048,11 +7060,10 @@ function renderTimelineSheet(){
       <label class="buf-label"><input type="checkbox" id="timelineSheetBuffer" ${rec.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
       ${gcalFieldHtml}
     `;
-  // An anchor's remaining fields are a breathing-time checkbox and a calendar toggle — two lines.
-  // Hiding those behind an expander bought nothing and cost a tap every time, so an anchor now
-  // shows its whole form at once. A task genuinely has more (energy, description, body check),
-  // so tasks keep "עוד אפשרויות".
-  const alwaysExpanded = (kind !== 'task');
+  // No expander at all any more, for either kind. Once end time moved up front and the draft
+  // checkbox went away, what was left behind "עוד אפשרויות" was a few lines — not enough to be
+  // worth a tap, and not enough to make the sheet long. Everything shows at once.
+  const alwaysExpanded = true;
   sheet.innerHTML = `
     <div class="timeline-sheet-topbar">
       <button type="button" class="timeline-sheet-close-btn" onclick="closeTimelineSheet()" title="ביטול">✕</button>
@@ -7294,8 +7305,21 @@ function renderTimelineGrid(){
         : (timelineExpandedDay = null, perDay));
 
   if(daynamesWrap){
-    daynamesWrap.innerHTML = `<div class="timeline-daynames-spacer"></div>` +
-      visibleDays.map(d=>`<div class="timeline-dayname${ymd(d.dateObj)===ymd(new Date())?' is-today':''}">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
+    // The collapse control lives HERE and not inside the day column: the column scrolls with the
+    // hours, so a button pinned to its top disappeared the moment you scrolled down to the
+    // afternoon. This strip stays put, so the way back is always on screen and legible.
+    const collapseBtnHtml = (timelineExpandedDay !== null)
+      ? `<button type="button" class="timeline-week-back-btn" title="חזרה לתצוגת השבוע"
+           onclick="toggleTimelineExpandedDay(${timelineExpandedDay})">− כל השבוע</button>`
+      : '';
+    daynamesWrap.innerHTML = `<div class="timeline-daynames-spacer"></div>` + collapseBtnHtml +
+      visibleDays.map(d=>{
+        const expanded = timelineExpandedDay===d.dayIdx;
+        const hidden = !expanded && timelineDayHasHidden(d);
+        return `<div class="timeline-dayname${ymd(d.dateObj)===ymd(new Date())?' is-today':''}${expanded?' is-expanded':''}"
+          title="${expanded?'חזרה לכל הימים':'פתיחת כל היום'}"
+          onclick="toggleTimelineExpandedDay(${d.dayIdx})">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}${hidden?'<span class="dayname-more-dot" title="יש כאן עוד באותו הזמן"></span>':''}</div>`;
+      }).join('');
   }
   if(barWrap) barWrap.innerHTML = timelineActionBarHtml();
 
