@@ -2506,6 +2506,38 @@
   }
 
   /* ---------------------------------------------------------------------------
+     36. THE TASK SHEET, IN THE REQUESTED ORDER.
+       1  title + topic      2  days        3  start + end time
+       4  date + energy      5  description 6  calendar + body check
+       7  save / cancel / delete            8  quick move + more options
+     The date is always visible; energy joins it only once "עוד אפשרויות" is open,
+     so the collapsed sheet is everything above minus the extra block, plus the
+     date — which is exactly what was asked for.
+     --------------------------------------------------------------------------- */
+  .timeline-sheet-date-row{ display:flex; gap:8px; align-items:flex-end; margin-top:8px; }
+  .timeline-sheet-date-row .field-label{ font-size:12px; color:var(--muted2); gap:4px; }
+  .timeline-sheet-date-row input[type=date]{
+    width:100%; box-sizing:border-box;
+    background:var(--surface3); border:1.5px solid var(--border);
+    color:var(--text); border-radius:12px; padding:10px 12px;
+    font-family:var(--font-ui); font-size:15px; min-height:44px;
+    direction:ltr; text-align:center;
+  }
+  .timeline-sheet-date-row input[type=date]:focus{
+    outline:none; border-color:var(--gold); box-shadow:0 0 0 4px var(--glow-gold);
+  }
+  .timeline-sheet-date-row select{
+    background:var(--surface3); border:1.5px solid var(--border);
+    color:var(--text); border-radius:12px; padding:10px 12px;
+    font-family:var(--font-ui); font-size:15px; min-height:44px;
+  }
+  /* save / cancel / delete now share one row, so they wrap instead of overflowing */
+  .timeline-sheet-actions{ flex-wrap:wrap; gap:8px; }
+  .timeline-sheet-actions .save-btn,
+  .timeline-sheet-actions .cancel-btn,
+  .timeline-sheet-actions .delete-btn{ flex:1 1 96px; min-height:46px; }
+
+  /* ---------------------------------------------------------------------------
      31. BLOCK HEADINGS — legible on the first pass.
      Amatic is drawn narrow and light. At a 50px page title that reads as
      character; at 21px on a heading you are scanning for, it costs you a beat
@@ -3988,7 +4020,10 @@ function updateInboxFab(){
   const fab = document.getElementById('inboxFab');
   if(!fab) return;
   const menu = fabUsesMenu();
-  fab.innerHTML = `<svg class="ico" aria-hidden="true" focusable="false"><use href="#ico-${menu?'plus':'inbox'}"></use></svg>`;
+  // Pencil on בית/כלים, + on נושאים/רשימות. The pencil stays because the inbox's own hint text
+  // refers to "כפתור ה-✏️ הצף" by name — swapping it for a tray icon quietly made that sentence
+  // untrue, and keeping the drawn pencil is both nicer and honest without touching any copy.
+  fab.innerHTML = `<svg class="ico" aria-hidden="true" focusable="false"><use href="#ico-${menu?'plus':'pencil'}"></use></svg>`;
   fab.title = menu ? 'הוספה' : 'תפיסת מחשבה מהירה';
   fab.classList.toggle('fab-is-menu', menu);
   if(!menu) closeFabMenu();
@@ -6913,6 +6948,28 @@ function toggleTimelineSheetDay(dayIdx){
     timelineSheetSelectedDays.add(dayIdx);
   }
   document.querySelectorAll('.timeline-sheet-day-btn').forEach((btn,i)=>btn.classList.toggle('active', timelineSheetSelectedDays.has(i)));
+  syncSheetDateToDayPicker();
+}
+// The date field and the day strip describe the same thing, so they follow each other. Tapping a
+// day moves the date to that weekday WITHIN the week the date is already in — so a task set three
+// weeks out does not silently jump back to the week on screen.
+function syncSheetDateToDayPicker(){
+  const dateEl = document.getElementById('timelineSheetDate');
+  if(!dateEl || timelineSheetSelectedDays.size !== 1) return;
+  const wd = Array.from(timelineSheetSelectedDays)[0];
+  const base = dateEl.value ? new Date(dateEl.value+'T00:00:00') : viewedWeekDates()[wd];
+  if(isNaN(base)) return;
+  const shifted = new Date(base);
+  shifted.setDate(base.getDate() + (wd - base.getDay()));
+  dateEl.value = ymd(shifted);
+}
+function onSheetDateChange(val){
+  if(!val) return;
+  const d = new Date(val+'T00:00:00');
+  if(isNaN(d)) return;
+  timelineSheetSelectedDays.clear();
+  timelineSheetSelectedDays.add(d.getDay());
+  document.querySelectorAll('.timeline-sheet-day-btn').forEach((btn,i)=>btn.classList.toggle('active', timelineSheetSelectedDays.has(i)));
 }
 // a brand-new task with no time yet defaults to right now (rounded to the grid's half-hour
 // step, clamped into the visible hour range) instead of sitting with no time at all -- she can
@@ -6965,17 +7022,26 @@ function renderTimelineSheet(){
   // End time is NOT in here any more. Needing to open "עוד אפשרויות" just to find out when
   // something finishes made the sheet's first screen answer "when does this start" but not
   // "how long is it" — it now sits beside the start time in the first view for both kinds.
+  // Row 4 holds the date, which is always visible, and the energy level, which is part of
+  // "עוד אפשרויות" — so the energy select carries .sheet-extra-inline and is shown/hidden by the
+  // same toggle as the extra block, rather than living inside it. Collapsed, row 4 is just the date.
+  const dateRowHtml = kind==='task' ? `
+      <div class="edit-form-row timeline-sheet-date-row">
+        <label class="field-label" style="flex:1 1 0; min-width:0;">קביעת תאריך
+          <input type="date" id="timelineSheetDate" value="${escapeAttr(rec.date||'')}" onchange="onSheetDateChange(this.value)">
+        </label>
+        <div class="sheet-extra-inline" style="flex:1 1 0; min-width:0; display:none;">
+          <select id="timelineSheetEnergy" style="width:100%;">
+            <option value="" ${!rec.energy?'selected':''}>ללא רמת אנרגיה</option>
+            <option value="low" ${rec.energy==='low'?'selected':''}>🟢 מטעין</option>
+            <option value="mid" ${rec.energy==='mid'?'selected':''}>🟡 בינוני</option>
+            <option value="high" ${rec.energy==='high'?'selected':''}>🔴 מרוקן</option>
+          </select>
+        </div>
+      </div>` : '';
   const extraFieldsHtml = kind==='task' ? `
-      <div class="edit-form-row">
-        <select id="timelineSheetEnergy">
-          <option value="" ${!rec.energy?'selected':''}>ללא רמת אנרגיה</option>
-          <option value="low" ${rec.energy==='low'?'selected':''}>🟢 מטעין</option>
-          <option value="mid" ${rec.energy==='mid'?'selected':''}>🟡 בינוני</option>
-          <option value="high" ${rec.energy==='high'?'selected':''}>🔴 מרוקן</option>
-        </select>
-      </div>
-      ${gcalFieldHtml}
       <textarea class="detail-desc" id="timelineSheetDesc" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(rec.description||'')}</textarea>
+      ${gcalFieldHtml}
       ${bodyCheckToggleBtnHtml('task', id)}
       ${bodyCheckOpenIds.has('task:'+id) ? bodyCheckPanelHtml('task', id, {urgencyOptions:['objective','other','relief'], showEnergy:true}) : ''}
     ` : `
@@ -7006,17 +7072,15 @@ function renderTimelineSheet(){
       ${timePickerHtml('timelineSheetEndTime', rec.endTime||'', 'שעת סיום')}
     </div>
     ${freqHtml ? `<div class="edit-form-row timeline-sheet-time-row">${freqHtml}</div>` : ''}
+    ${dateRowHtml}
     <div class="timeline-sheet-extra" id="timelineSheetExtra" style="display:none;">${extraFieldsHtml}</div>
-    <label class="buf-label" style="margin-top:10px;"><input type="checkbox" id="timelineSheetDraft" ${rec.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
     <div class="timeline-sheet-actions">
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
       <button type="button" class="cancel-btn" onclick="closeTimelineSheet()">ביטול</button>
-    </div>
-    <div class="timeline-sheet-actions" style="margin-top:8px;">
       ${deleteButtonsHtml}
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
-    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
+    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה ליום אחר</button>
     ${alwaysExpanded ? '' : `<button type="button" class="subtask-toggle-btn timeline-sheet-more" id="timelineSheetExpandBtn" onclick="toggleTimelineSheetExpanded()">עוד אפשרויות ›</button>`}
   `;
   timelineSheetAlwaysExpanded = alwaysExpanded;
@@ -7044,6 +7108,10 @@ function applyTimelineSheetExpandedState(){
   const sheet = document.getElementById('timelineSheet');
   const open = timelineSheetAlwaysExpanded || timelineSheetExpanded;
   if(extra) extra.style.display = open ? '' : 'none';
+  // fields that belong to "עוד אפשרויות" but sit on an always-visible row (the energy select)
+  document.querySelectorAll('#timelineSheet .sheet-extra-inline').forEach(el=>{
+    el.style.display = open ? '' : 'none';
+  });
   if(sheet) sheet.classList.toggle('expanded', open);
   if(btn) btn.textContent = timelineSheetExpanded ? '‹ פחות אפשרויות' : 'עוד אפשרויות ›';
   autoGrowSheetTitle(document.getElementById('timelineSheetTitleInput'));
@@ -7102,7 +7170,11 @@ function saveTimelineSheet(){
   if(!text) return;
   const timeEl = document.getElementById('timelineSheetTime');
   const time = timeEl ? timeEl.value : '';
-  const draft = document.getElementById('timelineSheetDraft').checked;
+  // The 🌱 טיוטה toggle was removed: being able to drag a block around the hour grid and type
+  // straight onto it already covers "this isn't final yet" far better than a checkbox did.
+  // Saving through this sheet clears any flag left over from before, so no item is stranded
+  // wearing a badge with no control to remove it.
+  const draft = false;
   // these live in the "עוד אפשרויות" block -- always present in the DOM (just hidden while
   // collapsed), so reading them here is safe whether or not it was ever opened this time
   const endTimeEl = document.getElementById('timelineSheetEndTime');
@@ -7114,7 +7186,17 @@ function saveTimelineSheet(){
   const selectedDays = Array.from(timelineSheetSelectedDays).sort((x,y)=>x-y);
   const primaryDay = selectedDays[0];
   const extraDays = selectedDays.slice(1);
-  const dateStr = ymd(viewedWeekDates()[primaryDay]);
+  // An explicit date wins over "whichever week happens to be on screen" — that is the whole point
+  // of the field. Extra selected days clone into the same week as that date, not the viewed one.
+  const dateEl = document.getElementById('timelineSheetDate');
+  const baseDate = (dateEl && dateEl.value) ? new Date(dateEl.value+'T00:00:00') : null;
+  const dateForDay = (di)=>{
+    if(!baseDate || isNaN(baseDate)) return ymd(viewedWeekDates()[di]);
+    const d = new Date(baseDate);
+    d.setDate(baseDate.getDate() + (di - baseDate.getDay()));
+    return ymd(d);
+  };
+  const dateStr = dateForDay(primaryDay);
   const isNew = timelineSheetIsNew;
   const domainEl = document.getElementById('timelineSheetDomain');
   if(kind==='task'){
@@ -7133,7 +7215,7 @@ function saveTimelineSheet(){
     // leave her tapping a "שמירה" button that silently does nothing.
     try{ applyGcalSyncForTask(t, isNew || t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd); }catch(e){ console.error('gcal sync failed', e); }
     extraDays.forEach(di=>{
-      const newTask = {...t, id:uid(), date:ymd(viewedWeekDates()[di]), subtasks:(t.subtasks||[]).map(s=>({...s})), createdAt:Date.now()};
+      const newTask = {...t, id:uid(), date:dateForDay(di), subtasks:(t.subtasks||[]).map(s=>({...s})), createdAt:Date.now()};
       data.tasks.push(newTask);
       try{ applyGcalSyncForTask(newTask, true); }catch(e){ console.error('gcal sync failed', e); }
     });
