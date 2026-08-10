@@ -2467,6 +2467,45 @@
   .timeline-sheet-time-row .time-picker-btn{ max-width:none; }
 
   /* ---------------------------------------------------------------------------
+     35. THE FLOATING BUTTON'S LITTLE MENU.
+     Same drawn language as the rest: soft card, hairline edge, generous touch
+     targets. It rises from the button rather than covering it, so the thing you
+     pressed stays visible and the relationship is obvious.
+     --------------------------------------------------------------------------- */
+  .fab-menu{
+    position:fixed; z-index:191;
+    /* clears the button itself: phone FAB sits at 84px up and is 56px tall, so the
+       menu starts above it rather than covering the thing you just pressed */
+    right:16px; bottom:calc(150px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; gap:6px;
+    padding:8px;
+    background:var(--surface);
+    border:1.5px solid var(--card-line);
+    border-radius:18px;
+    box-shadow:var(--lift-3);
+    min-width:186px;
+    animation:fabMenuIn .18s var(--ease-water);
+  }
+  @keyframes fabMenuIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce){ .fab-menu{ animation:none; } }
+  .fab-menu-item{
+    background:var(--surface2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    color:var(--text);
+    font-family:var(--font-ui); font-size:15px; font-weight:500;
+    padding:12px 14px; min-height:46px;
+    text-align:right; cursor:pointer; white-space:nowrap;
+  }
+  .fab-menu-item:hover{ border-color:var(--gold); color:var(--gold); }
+  /* the + turns into an × while its menu is open */
+  .inbox-fab.fab-open .ico{ transform:rotate(45deg); }
+  .inbox-fab .ico{ transition:transform var(--dur) var(--ease-water); }
+  @media (min-width:761px){
+    .fab-menu{ bottom:calc(16px + 60px + 10px + env(safe-area-inset-bottom)); }
+  }
+
+  /* ---------------------------------------------------------------------------
      31. BLOCK HEADINGS — legible on the first pass.
      Amatic is drawn narrow and light. At a 50px page title that reads as
      character; at 21px on a heading you are scanning for, it costs you a beat
@@ -2751,6 +2790,11 @@
         <path d="M8.4 17.9 12 14.5l3.6 3.4"/>
       </g>
     </symbol>
+    <symbol id="ico-plus" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5.2v13.6M5.2 12h13.6"/>
+      </g>
+    </symbol>
     <symbol id="ico-inbox" viewBox="0 0 24 24">
       <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3.7 13.6 6.2 5.1c.1-.5.6-.8 1.1-.8h9.4c.5 0 .9.3 1.1.8l2.5 8.5"/>
@@ -2832,7 +2876,13 @@
 <!-- global quick-capture: reachable from any tab, any scroll position, any collapsed section --
      catching a raw thought should take zero decisions (just text -> save); deciding where it
      belongs (a task, a topic note, someday, a habit...) is a separate, later, optional action. -->
-<button type="button" class="inbox-fab" id="inboxFab" onclick="openInboxCapture()" title="תפיסת מחשבה מהירה">✏️</button>
+<!-- One floating button, two jobs, decided by which tab you are on. On בית/כלים it is pure
+     quick capture and shows the inbox tray it drops into. On נושאים/רשימות those screens already
+     have their own "+ פתק חדש" / "+ הוסף רשימה" controls, so a pencil there was promising to
+     create something and quietly doing something else — it becomes a + that opens a small menu
+     offering both: create the thing this screen is about, or still just catch the thought. -->
+<button type="button" class="inbox-fab" id="inboxFab" onclick="onInboxFabClick()" title="תפיסת מחשבה מהירה">✏️</button>
+<div class="fab-menu" id="fabMenu" style="display:none;"></div>
 <div class="inbox-capture-overlay" id="inboxCaptureOverlay" onclick="closeInboxCapture()" style="display:none;"></div>
 <div class="inbox-capture-sheet" id="inboxCaptureSheet" style="display:none;">
   <div class="timeline-sheet-handle"></div>
@@ -3931,6 +3981,73 @@ function switchMainView(view){
   applyMainViewState();
   closeNav();
 }
+/* ---------- the floating button, per screen ---------- */
+let fabMenuOpen = false;
+function fabUsesMenu(){ return mainView==='topics' || mainView==='lists'; }
+function updateInboxFab(){
+  const fab = document.getElementById('inboxFab');
+  if(!fab) return;
+  const menu = fabUsesMenu();
+  fab.innerHTML = `<svg class="ico" aria-hidden="true" focusable="false"><use href="#ico-${menu?'plus':'inbox'}"></use></svg>`;
+  fab.title = menu ? 'הוספה' : 'תפיסת מחשבה מהירה';
+  fab.classList.toggle('fab-is-menu', menu);
+  if(!menu) closeFabMenu();
+}
+function onInboxFabClick(){
+  if(fabUsesMenu()) toggleFabMenu();
+  else openInboxCapture();
+}
+function toggleFabMenu(){ fabMenuOpen ? closeFabMenu() : openFabMenu(); }
+function closeFabMenu(){
+  fabMenuOpen = false;
+  const m = document.getElementById('fabMenu');
+  if(m) m.style.display = 'none';
+  const f = document.getElementById('inboxFab');
+  if(f) f.classList.remove('fab-open');
+}
+function openFabMenu(){
+  const m = document.getElementById('fabMenu');
+  if(!m) return;
+  const rows = (mainView==='lists')
+    ? [ ['+ רשימה רגילה', "fabAddList('checklist')"],
+        ['+ רשימת בחירה', "fabAddList('chipbank')"],
+        ['+ לתיבת הקליטה', 'fabQuickCapture()'] ]
+    : [ ['+ פתק', 'fabAddNote()'],
+        ['+ לתיבת הקליטה', 'fabQuickCapture()'] ];
+  m.innerHTML = rows.map(([label, fn])=>
+    `<button type="button" class="fab-menu-item" onclick="${fn}">${label}</button>`).join('');
+  m.style.display = '';
+  fabMenuOpen = true;
+  const f = document.getElementById('inboxFab');
+  if(f) f.classList.add('fab-open');
+}
+function fabQuickCapture(){ closeFabMenu(); openInboxCapture(); }
+function fabAddNote(){
+  closeFabMenu();
+  // addDomainNote needs a topic to put the note in; if none is open yet, say so rather than
+  // silently doing nothing
+  if(!activeNoteDomain){ showStatus('בחר/י קודם נושא'); return; }
+  addDomainNote();
+}
+function fabAddList(kind){
+  closeFabMenu();
+  // a list needs a name, so this takes you to the existing name field with the right kind already
+  // chosen -- same code path as the button on the screen, nothing duplicated
+  if(activeListId) closeList();
+  requestAnimationFrame(()=>{
+    const sel = document.getElementById('newListKind');
+    if(sel) sel.value = kind;
+    const inp = document.getElementById('newListInput');
+    if(inp){ inp.scrollIntoView({behavior:'smooth', block:'center'}); inp.focus(); }
+  });
+}
+document.addEventListener('click', (e)=>{
+  if(!fabMenuOpen) return;
+  const m = document.getElementById('fabMenu');
+  const f = document.getElementById('inboxFab');
+  if(m && !m.contains(e.target) && f && !f.contains(e.target)) closeFabMenu();
+}, true);
+
 function applyMainViewState(){
   const home = document.getElementById('homeView');
   const topicsView = document.getElementById('domainPageView');
@@ -3969,6 +4086,7 @@ function applyMainViewState(){
     renderListsView();
     window.scrollTo(0,0);
   }
+  updateInboxFab();
 }
 
 const KEEP_COLORS = ['', '#e2a34c', '#3aa9a0', '#e08a72', '#b98fc4', '#4fb4d6'];
