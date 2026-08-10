@@ -2496,15 +2496,30 @@
   .confetti-layer{
     position:fixed; inset:0; z-index:6000; pointer-events:none; overflow:hidden;
   }
+  /* launches from just below the bottom edge, not from the top */
   .confetti-layer i{
-    position:absolute; top:-24px; display:block;
-    animation-name:confettiFall; animation-timing-function:cubic-bezier(.35,.15,.5,1);
-    animation-fill-mode:forwards; will-change:transform, opacity;
+    position:absolute; bottom:-16px; display:block;
+    animation-name:confettiPop; animation-fill-mode:forwards;
+    will-change:transform, opacity;
   }
-  @keyframes confettiFall{
-    0%   { transform:translate3d(0,-10vh,0) rotate(0deg); opacity:0; }
-    12%  { opacity:1; }
-    100% { transform:translate3d(var(--drift,0), 108vh, 0) rotate(var(--spin,360deg)); opacity:0; }
+  /* Two phases with their own easing, which is what makes it read as a popper rather than
+     as snow: the rise takes 36% of the run and decelerates hard into the peak; the fall gets
+     the remaining 64% and eases gently, so coming down is visibly slower than going up. */
+  @keyframes confettiPop{
+    0%{
+      transform:translate3d(0,0,0) rotate(0deg) scale(.6); opacity:0;
+      animation-timing-function:cubic-bezier(.12,.85,.3,1);   /* fast out of the tube */
+    }
+    7%{ opacity:1; }
+    36%{
+      transform:translate3d(var(--dx1,0), var(--peak,-60vh), 0) rotate(var(--spin1,180deg)) scale(1);
+      animation-timing-function:cubic-bezier(.45,.02,.55,.95); /* hangs, then drifts back down */
+    }
+    88%{ opacity:1; }
+    100%{
+      transform:translate3d(var(--dx2,0), var(--settle,-30vh), 0) rotate(var(--spin2,360deg)) scale(1);
+      opacity:0;
+    }
   }
   /* a zoomed day is one wide column, so its blocks can afford a little more room
      to breathe than they get at one-seventh of the width */
@@ -8155,7 +8170,14 @@ function sayNoToDilemma(id, ev){
 /* Confetti, hand-rolled: no library, no images, and nothing left behind. Pieces are plain divs in
    one fixed, pointer-events:none layer over the whole app, animated by the compositor (transform +
    opacity only) and removed when they land. In the app's own palette rather than primary colours,
-   so a celebration still looks like it belongs to this world. */
+   so a celebration still looks like it belongs to this world.
+
+   The motion is a party popper, not falling snow: everything launches from just below the bottom
+   edge, shoots up fast, and then drifts back down noticeably slower than it went up. That asymmetry
+   is the whole feel of a popper, and it is built here by splitting one animation into two phases
+   with their OWN easing — a short, hard-decelerating rise (0-36% of the run) and a long, gentle
+   fall (36-100%), so the descent takes almost twice as long as the launch. Every piece gets its
+   own peak, drift and spin, so the burst spreads instead of moving as one sheet. */
 function fireConfetti(){
   if(document.getElementById('confettiLayer')) return;   // one party at a time
   const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -8164,25 +8186,32 @@ function fireConfetti(){
   layer.className = 'confetti-layer';
   layer.setAttribute('aria-hidden','true');
   const colours = ['#E0A85C','#4A8FA8','#6FA08C','#CC7A6A','#8E7BB5','#EFCB8A','#8FC6DC'];
-  const count = reduced ? 24 : 90;
+  const count = reduced ? 26 : 96;
   let html = '';
   for(let i=0;i<count;i++){
-    const left  = Math.random()*100;
-    const delay = Math.random()*(reduced?0.5:0.9);
-    const dur   = (reduced?2.4:1.5) + Math.random()*(reduced?0.8:1.4);
-    const size  = 6 + Math.random()*8;
-    const drift = (Math.random()*2-1) * (reduced?20:120);
-    const spin  = reduced ? 0 : (Math.random()*2-1)*720;
+    // launch points cluster toward the middle, the way a popper held in one hand would throw them,
+    // with enough spread that the burst still reaches both edges
+    const centreBias = (Math.random() + Math.random() + Math.random()) / 3;   // ~normal around .5
+    const left  = 6 + centreBias * 88;
+    const peak  = (reduced ? 30 : 52) + Math.random() * (reduced ? 18 : 42);  // vh travelled upward
+    const settle = peak - (14 + Math.random() * 34);                          // where it ends up
+    const drift = (Math.random() * 2 - 1) * (reduced ? 22 : 120);
+    const spin  = reduced ? 0 : (Math.random() * 2 - 1) * 900;
+    const dur   = (reduced ? 2.6 : 1.7) + Math.random() * (reduced ? 0.7 : 1.1);
+    const delay = Math.random() * (reduced ? 0.18 : 0.22);                    // one pop, not rain
+    const size  = 6 + Math.random() * 8;
     const c     = colours[i % colours.length];
     const round = Math.random() < 0.35 ? '50%' : '2px';
-    html += `<i style="left:${left}%; width:${size}px; height:${size*(round==='50%'?1:1.6)}px;
-      background:${c}; border-radius:${round};
+    html += `<i style="left:${left.toFixed(1)}%; width:${size.toFixed(1)}px;
+      height:${(size*(round==='50%'?1:1.6)).toFixed(1)}px; background:${c}; border-radius:${round};
       animation-delay:${delay.toFixed(2)}s; animation-duration:${dur.toFixed(2)}s;
-      --drift:${drift.toFixed(0)}px; --spin:${spin.toFixed(0)}deg;"></i>`;
+      --peak:${(-peak).toFixed(1)}vh; --settle:${(-settle).toFixed(1)}vh;
+      --dx1:${(drift*0.45).toFixed(0)}px; --dx2:${drift.toFixed(0)}px;
+      --spin1:${(spin*0.4).toFixed(0)}deg; --spin2:${spin.toFixed(0)}deg;"></i>`;
   }
   layer.innerHTML = html;
   document.body.appendChild(layer);
-  setTimeout(()=>{ layer.remove(); }, (reduced?3600:3200));
+  setTimeout(()=>{ layer.remove(); }, (reduced ? 4000 : 3400));
 }
 function deleteGeneralDilemma(id){
   data.generalDilemmas = (data.generalDilemmas||[]).filter(d=>d.id!==id);
