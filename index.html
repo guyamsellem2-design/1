@@ -2574,6 +2574,57 @@
   }
   @keyframes discoSweep{ from{ background-position:130% 0; } to{ background-position:-130% 0; } }
 
+  /* ---- the tube dancers ----
+     Drawn here, not lifted from anywhere: the reference clip is watermarked stock footage, so it
+     could not be shipped. This is a few KB of SVG instead of a megabyte of video, it scales to any
+     screen, and it can actually be animated rather than just played.
+
+     The whip comes from three stacked segments, each rotating a little and each a beat behind the
+     one below it — the cheap version of a chain of joints, and enough to read as a flailing tube.
+     They inflate up from the floor when the party starts and deflate when it ends. */
+  .party-dancers{ position:absolute; inset:0; pointer-events:none; }
+  .air-dancer{
+    position:absolute; bottom:0; height:46vh; width:auto;
+    filter:drop-shadow(0 0 18px rgba(255,255,255,.18));
+  }
+  .air-dancer.ad-a{ left:-2vw; }
+  .air-dancer.ad-b{ right:-2vw; transform:scaleX(-1); }
+  .air-dancer .ad-root{
+    transform-box:fill-box; transform-origin:bottom center;
+    animation:adInflate .9s cubic-bezier(.2,1.4,.35,1) both .55s;
+  }
+  .air-dancer.ad-b .ad-root{ animation-delay:.8s; }
+  @keyframes adInflate{ from{ transform:scaleY(.04) scaleX(.7); } to{ transform:scaleY(1) scaleX(1); } }
+  /* deflates on the way out instead of vanishing */
+  .party.leaving .air-dancer .ad-root{
+    animation:adDeflate .5s cubic-bezier(.5,0,.9,.4) both;
+  }
+  @keyframes adDeflate{ from{ transform:scaleY(1) scaleX(1); } to{ transform:scaleY(.03) scaleX(.6); } }
+
+  .air-dancer .ad-s1, .air-dancer .ad-s2, .air-dancer .ad-s3{
+    transform-box:fill-box; transform-origin:bottom center;
+  }
+  .air-dancer .ad-s1{ animation:adWhip1 1.35s ease-in-out infinite alternate; }
+  .air-dancer .ad-s2{ animation:adWhip2 1.35s ease-in-out infinite alternate .12s; }
+  .air-dancer .ad-s3{ animation:adWhip3 1.35s ease-in-out infinite alternate .24s; }
+  .air-dancer.ad-b .ad-s1{ animation-duration:1.15s; }
+  .air-dancer.ad-b .ad-s2{ animation-duration:1.15s; }
+  .air-dancer.ad-b .ad-s3{ animation-duration:1.15s; }
+  @keyframes adWhip1{ from{ transform:rotate(-7deg); } to{ transform:rotate(7deg); } }
+  @keyframes adWhip2{ from{ transform:rotate(-11deg); } to{ transform:rotate(11deg); } }
+  @keyframes adWhip3{ from{ transform:rotate(-15deg); } to{ transform:rotate(16deg); } }
+
+  .air-dancer .ad-arm{ transform-box:fill-box; transform-origin:bottom center; }
+  .air-dancer .ad-arm-l{ animation:adArmL .62s ease-in-out infinite alternate; }
+  .air-dancer .ad-arm-r{ animation:adArmR .74s ease-in-out infinite alternate; }
+  @keyframes adArmL{ from{ transform:rotate(-26deg); } to{ transform:rotate(18deg); } }
+  @keyframes adArmR{ from{ transform:rotate(24deg); } to{ transform:rotate(-20deg); } }
+  .air-dancer .ad-fringe{ transform-box:fill-box; transform-origin:bottom center;
+    animation:adFringe .5s ease-in-out infinite alternate; }
+  @keyframes adFringe{ from{ transform:rotate(-9deg) scaleY(.92); } to{ transform:rotate(9deg) scaleY(1.08); } }
+
+  @media (max-width:520px){ .air-dancer{ height:34vh; } }
+
   /* the word, comic-book style: heavy display face, thick ink outline, halftone dots
      punched through the fill, sitting on a yellow starburst — the whole thing lands
      with a little overshoot and then breathes */
@@ -8378,6 +8429,75 @@ function startPartyMode(){
       <span class="disco-cap"></span>
       <span class="disco-ball"><svg class="disco-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="dbClip"><circle cx="110" cy="110" r="96"/></clipPath><radialGradient id="dbSpec" cx="34%" cy="28%" r="45%"><stop offset="0%" stop-color="#fff" stop-opacity=".9"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient><radialGradient id="dbShade" cx="38%" cy="32%" r="80%"><stop offset="62%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".42"/></radialGradient></defs><g clip-path="url(#dbClip)"><circle cx="110" cy="110" r="96" fill="#6c7883"/><path d="M104.2,205.3 L95.2,201.3 L124.8,201.3 L115.8,205.3 Z" fill="#69696c"/><path d="M84.3,201.3 L69.7,194.0 L86.7,194.0 L95.2,201.3 Z" fill="#727275"/><path d="M95.2,201.3 L86.7,194.0 L110.0,194.0 L110.0,201.3 Z" fill="#909094"/><path d="M110.0,201.3 L110.0,194.0 L133.3,194.0 L124.8,201.3 Z" fill="#6a6a6d"/><path d="M124.8,201.3 L133.3,194.0 L150.3,194.0 L135.7,201.3 Z" fill="#6e6e71"/><path d="M66.6,194.0 L52.5,183.5 L64.4,183.5 L75.6,194.0 Z" fill="#747477"/><path d="M75.6,194.0 L64.4,183.5 L82.5,183.5 L89.3,194.0 Z" fill="#545456"/><path d="M89.3,194.0 L82.5,183.5 L104.3,183.5 L105.7,194.0 Z" fill="#6e6e71"/><path d="M105.7,194.0 L104.3,183.5 L126.9,183.5 L122.7,194.0 Z" fill="#78787b"/><path d="M122.7,194.0 L126.9,183.5 L147.2,183.5 L138.0,194.0 Z" fill="#858588"/><path d="M138.0,194.0 L147.2,183.5 L162.5,183.5 L149.6,194.0 Z" fill="#4c4c4e"/><path d="M149.6,194.0 L162.5,183.5 L170.7,183.5 L155.7,194.0 Z" fill="#5d5d5f"/><path d="M51.0,183.5 L38.7,170.4 L48.4,170.4 L59.0,183.5 Z" fill="#535355"/><path d="M59.0,183.5 L48.4,170.4 L63.5,170.4 L71.5,183.5 Z" fill="#98989c"/><path d="M71.5,183.5 L63.5,170.4 L82.7,170.4 L87.5,183.5 Z" fill="#919195"/><path d="M87.5,183.5 L82.7,170.4 L104.4,170.4 L105.4,183.5 Z" fill="#58585a"/><path d="M105.4,183.5 L104.4,170.4 L126.6,170.4 L123.7,183.5 Z" fill="#9a9a9e"/><path d="M123.7,183.5 L126.6,170.4 L147.3,170.4 L140.9,183.5 Z" fill="#939397"/><path d="M140.9,183.5 L147.3,170.4 L164.7,170.4 L155.2,183.5 Z" fill="#7a7a7d"/><path d="M155.2,183.5 L164.7,170.4 L177.2,170.4 L165.6,183.5 Z" fill="#77777a"/><path d="M165.6,183.5 L177.2,170.4 L183.8,170.4 L171.0,183.5 Z" fill="#515153"/><path d="M37.7,170.4 L27.9,155.1 L35.7,155.1 L44.6,170.4 Z" fill="#616163"/><path d="M44.6,170.4 L35.7,155.1 L48.2,155.1 L55.6,170.4 Z" fill="#97979b"/><path d="M55.6,170.4 L48.2,155.1 L64.6,155.1 L70.0,170.4 Z" fill="#77777a"/><path d="M70.0,170.4 L64.6,155.1 L83.8,155.1 L86.9,170.4 Z" fill="#828285"/><path d="M86.9,170.4 L83.8,155.1 L104.7,155.1 L105.3,170.4 Z" fill="#808083"/><path d="M105.3,170.4 L104.7,155.1 L125.9,155.1 L124.0,170.4 Z" fill="#646467"/><path d="M124.0,170.4 L125.9,155.1 L146.1,155.1 L141.8,170.4 Z" fill="#77777a"/><path d="M141.8,170.4 L146.1,155.1 L164.0,155.1 L157.6,170.4 Z" fill="#68686b"/><path d="M157.6,170.4 L164.0,155.1 L178.6,155.1 L170.4,170.4 Z" fill="#89898d"/><path d="M170.4,170.4 L178.6,155.1 L188.8,155.1 L179.4,170.4 Z" fill="#6f6f72"/><path d="M179.4,170.4 L188.8,155.1 L194.1,155.1 L184.0,170.4 Z" fill="#79797c"/><path d="M27.4,155.1 L20.5,138.1 L27.3,138.1 L33.6,155.1 Z" fill="#9d9da1"/><path d="M33.6,155.1 L27.3,138.1 L38.2,138.1 L43.7,155.1 Z" fill="#b7b7bc"/><path d="M43.7,155.1 L38.2,138.1 L52.8,138.1 L57.2,155.1 Z" fill="#afafb4"/><path d="M57.2,155.1 L52.8,138.1 L70.2,138.1 L73.2,155.1 Z" fill="#a3a3a7"/><path d="M73.2,155.1 L70.2,138.1 L89.6,138.1 L91.1,155.1 Z" fill="#dbdbe1"/><path d="M91.1,155.1 L89.6,138.1 L110.0,138.1 L110.0,155.1 Z" fill="#d3d3d9"/><path d="M110.0,155.1 L110.0,138.1 L130.4,138.1 L128.9,155.1 Z" fill="#bababf"/><path d="M128.9,155.1 L130.4,138.1 L149.8,138.1 L146.8,155.1 Z" fill="#9e9ea2"/><path d="M146.8,155.1 L149.8,138.1 L167.2,138.1 L162.8,155.1 Z" fill="#6b6b6e"/><path d="M162.8,155.1 L167.2,138.1 L181.8,138.1 L176.3,155.1 Z" fill="#575759"/><path d="M176.3,155.1 L181.8,138.1 L192.7,138.1 L186.4,155.1 Z" fill="#5c5c5e"/><path d="M186.4,155.1 L192.7,138.1 L199.5,138.1 L192.6,155.1 Z" fill="#4a4a4c"/><path d="M20.3,138.1 L16.8,120.0 L23.4,120.0 L26.7,138.1 Z" fill="#c7c7cc"/><path d="M26.7,138.1 L23.4,120.0 L34.0,120.0 L36.9,138.1 Z" fill="#b7b7bc"/><path d="M36.9,138.1 L34.0,120.0 L48.2,120.0 L50.6,138.1 Z" fill="#e5e5eb"/><path d="M50.6,138.1 L48.2,120.0 L65.3,120.0 L67.0,138.1 Z" fill="#c3c3c8"/><path d="M67.0,138.1 L65.3,120.0 L84.5,120.0 L85.4,138.1 Z" fill="#f0f0f7"/><path d="M85.4,138.1 L84.5,120.0 L104.8,120.0 L105.0,138.1 Z" fill="#e0e0e6"/><path d="M105.0,138.1 L104.8,120.0 L125.4,120.0 L124.9,138.1 Z" fill="#8f8f93"/><path d="M124.9,138.1 L125.4,120.0 L145.3,120.0 L144.0,138.1 Z" fill="#8f8f93"/><path d="M144.0,138.1 L145.3,120.0 L163.6,120.0 L161.5,138.1 Z" fill="#b5b5ba"/><path d="M161.5,138.1 L163.6,120.0 L179.3,120.0 L176.7,138.1 Z" fill="#7b7b7e"/><path d="M176.7,138.1 L179.3,120.0 L191.8,120.0 L188.7,138.1 Z" fill="#949498"/><path d="M188.7,138.1 L191.8,120.0 L200.5,120.0 L197.0,138.1 Z" fill="#656568"/><path d="M197.0,138.1 L200.5,120.0 L204.9,120.0 L201.3,138.1 Z" fill="#4a4a4c"/><path d="M16.6,120.0 L16.5,101.6 L22.6,101.6 L22.8,120.0 Z" fill="#ceced4"/><path d="M22.8,120.0 L22.6,101.6 L32.6,101.6 L32.8,120.0 Z" fill="#e8e8ee"/><path d="M32.8,120.0 L32.6,101.6 L46.0,101.6 L46.1,120.0 Z" fill="#c9c9cf"/><path d="M46.1,120.0 L46.0,101.6 L62.2,101.6 L62.3,120.0 Z" fill="#bebec3"/><path d="M62.3,120.0 L62.2,101.6 L80.4,101.6 L80.5,120.0 Z" fill="#d1d1d7"/><path d="M80.5,120.0 L80.4,101.6 L100.0,101.6 L100.0,120.0 Z" fill="#ffffff"/><path d="M100.0,120.0 L100.0,101.6 L120.0,101.6 L120.0,120.0 Z" fill="#e3e3e9"/><path d="M120.0,120.0 L120.0,101.6 L139.6,101.6 L139.5,120.0 Z" fill="#a0a0a4"/><path d="M139.5,120.0 L139.6,101.6 L157.8,101.6 L157.7,120.0 Z" fill="#97979b"/><path d="M157.7,120.0 L157.8,101.6 L174.0,101.6 L173.9,120.0 Z" fill="#767679"/><path d="M173.9,120.0 L174.0,101.6 L187.4,101.6 L187.2,120.0 Z" fill="#5c5c5e"/><path d="M187.2,120.0 L187.4,101.6 L197.4,101.6 L197.2,120.0 Z" fill="#858588"/><path d="M197.2,120.0 L197.4,101.6 L203.5,101.6 L203.4,120.0 Z" fill="#535355"/><path d="M16.6,101.6 L19.9,83.5 L26.2,83.5 L23.2,101.6 Z" fill="#d9d9df"/><path d="M23.2,101.6 L26.2,83.5 L36.5,83.5 L33.9,101.6 Z" fill="#ffffff"/><path d="M33.9,101.6 L36.5,83.5 L50.3,83.5 L48.1,101.6 Z" fill="#ffffff"/><path d="M48.1,101.6 L50.3,83.5 L66.8,83.5 L65.2,101.6 Z" fill="#ffffff"/><path d="M65.2,101.6 L66.8,83.5 L85.3,83.5 L84.4,101.6 Z" fill="#ffffff"/><path d="M84.4,101.6 L85.3,83.5 L105.0,83.5 L104.8,101.6 Z" fill="#d4d4da"/><path d="M104.8,101.6 L105.0,83.5 L124.9,83.5 L125.5,101.6 Z" fill="#f3f3fa"/><path d="M125.5,101.6 L124.9,83.5 L144.2,83.5 L145.4,101.6 Z" fill="#b9b9be"/><path d="M145.4,101.6 L144.2,83.5 L161.8,83.5 L163.7,101.6 Z" fill="#d4d4da"/><path d="M163.7,101.6 L161.8,83.5 L177.0,83.5 L179.4,101.6 Z" fill="#87878b"/><path d="M179.4,101.6 L177.0,83.5 L189.1,83.5 L191.9,101.6 Z" fill="#7e7e81"/><path d="M191.9,101.6 L189.1,83.5 L197.5,83.5 L200.6,101.6 Z" fill="#8c8c90"/><path d="M200.6,101.6 L197.5,83.5 L201.7,83.5 L205.1,101.6 Z" fill="#79797c"/><path d="M20.0,83.5 L26.6,66.4 L32.9,66.4 L26.9,83.5 Z" fill="#c0c0c5"/><path d="M26.9,83.5 L32.9,66.4 L43.1,66.4 L37.9,83.5 Z" fill="#ffffff"/><path d="M37.9,83.5 L43.1,66.4 L56.7,66.4 L52.5,83.5 Z" fill="#e3e3e9"/><path d="M52.5,83.5 L56.7,66.4 L72.9,66.4 L70.0,83.5 Z" fill="#ffffff"/><path d="M70.0,83.5 L72.9,66.4 L91.0,66.4 L89.5,83.5 Z" fill="#ffffff"/><path d="M89.5,83.5 L91.0,66.4 L110.0,66.4 L110.0,83.5 Z" fill="#ffffff"/><path d="M110.0,83.5 L110.0,66.4 L129.0,66.4 L130.5,83.5 Z" fill="#ffffff"/><path d="M130.5,83.5 L129.0,66.4 L147.1,66.4 L150.0,83.5 Z" fill="#ccccd2"/><path d="M150.0,83.5 L147.1,66.4 L163.3,66.4 L167.5,83.5 Z" fill="#e0e0e6"/><path d="M167.5,83.5 L163.3,66.4 L176.9,66.4 L182.1,83.5 Z" fill="#a3a3a7"/><path d="M182.1,83.5 L176.9,66.4 L187.1,66.4 L193.1,83.5 Z" fill="#929296"/><path d="M193.1,83.5 L187.1,66.4 L193.4,66.4 L200.0,83.5 Z" fill="#939397"/><path d="M27.2,66.4 L36.7,50.9 L43.7,50.9 L35.0,66.4 Z" fill="#ffffff"/><path d="M35.0,66.4 L43.7,50.9 L54.9,50.9 L47.6,66.4 Z" fill="#ffffff"/><path d="M47.6,66.4 L54.9,50.9 L69.5,50.9 L64.2,66.4 Z" fill="#ffffff"/><path d="M64.2,66.4 L69.5,50.9 L86.6,50.9 L83.6,66.4 Z" fill="#ffffff"/><path d="M83.6,66.4 L86.6,50.9 L105.2,50.9 L104.6,66.4 Z" fill="#e0e0e6"/><path d="M104.6,66.4 L105.2,50.9 L124.2,50.9 L126.0,66.4 Z" fill="#ffffff"/><path d="M126.0,66.4 L124.2,50.9 L142.2,50.9 L146.4,66.4 Z" fill="#d4d4da"/><path d="M146.4,66.4 L142.2,50.9 L158.2,50.9 L164.5,66.4 Z" fill="#a5a5a9"/><path d="M164.5,66.4 L158.2,50.9 L171.2,50.9 L179.2,66.4 Z" fill="#88888c"/><path d="M179.2,66.4 L171.2,50.9 L180.3,50.9 L189.5,66.4 Z" fill="#bbbbc0"/><path d="M189.5,66.4 L180.3,50.9 L185.1,50.9 L194.9,66.4 Z" fill="#68686b"/><path d="M37.4,50.9 L49.6,37.5 L57.0,37.5 L46.4,50.9 Z" fill="#ffffff"/><path d="M46.4,50.9 L57.0,37.5 L68.8,37.5 L60.5,50.9 Z" fill="#ffffff"/><path d="M60.5,50.9 L68.8,37.5 L83.8,37.5 L78.6,50.9 Z" fill="#ffffff"/><path d="M78.6,50.9 L83.8,37.5 L101.0,37.5 L99.2,50.9 Z" fill="#ffffff"/><path d="M99.2,50.9 L101.0,37.5 L119.0,37.5 L120.8,50.9 Z" fill="#dbdbe1"/><path d="M120.8,50.9 L119.0,37.5 L136.2,37.5 L141.4,50.9 Z" fill="#fefeff"/><path d="M141.4,50.9 L136.2,37.5 L151.2,37.5 L159.5,50.9 Z" fill="#bababf"/><path d="M159.5,50.9 L151.2,37.5 L163.0,37.5 L173.6,50.9 Z" fill="#d7d7dd"/><path d="M173.6,50.9 L163.0,37.5 L170.4,37.5 L182.6,50.9 Z" fill="#848487"/><path d="M51.3,37.5 L65.2,26.9 L74.5,26.9 L63.5,37.5 Z" fill="#ffffff"/><path d="M63.5,37.5 L74.5,26.9 L88.6,26.9 L81.9,37.5 Z" fill="#ffffff"/><path d="M81.9,37.5 L88.6,26.9 L105.6,26.9 L104.2,37.5 Z" fill="#ffffff"/><path d="M104.2,37.5 L105.6,26.9 L123.1,26.9 L127.2,37.5 Z" fill="#ffffff"/><path d="M127.2,37.5 L123.1,26.9 L138.9,26.9 L148.0,37.5 Z" fill="#ccccd2"/><path d="M148.0,37.5 L138.9,26.9 L150.8,26.9 L163.5,37.5 Z" fill="#dfdfe5"/><path d="M163.5,37.5 L150.8,26.9 L157.2,26.9 L171.9,37.5 Z" fill="#cdcdd3"/><path d="M68.4,26.9 L82.9,19.2 L94.4,19.2 L86.0,26.9 Z" fill="#f8f8ff"/><path d="M86.0,26.9 L94.4,19.2 L110.0,19.2 L110.0,26.9 Z" fill="#ffffff"/><path d="M110.0,26.9 L110.0,19.2 L125.6,19.2 L134.0,26.9 Z" fill="#b7b7bc"/><path d="M134.0,26.9 L125.6,19.2 L137.1,19.2 L151.6,26.9 Z" fill="#9f9fa3"/><path d="M90.5,19.2 L101.7,14.9 L113.0,14.9 L117.0,19.2 Z" fill="#fcfcff"/><path d="M117.0,19.2 L113.0,14.9 L122.0,14.9 L138.2,19.2 Z" fill="#dadae0"/><ellipse cx="76" cy="66" rx="38" ry="29" fill="url(#dbSpec)"/><ellipse cx="150" cy="124" rx="26" ry="21" fill="url(#dbSpec)" opacity=".6"/><circle cx="110" cy="110" r="96" fill="url(#dbShade)"/></g><circle cx="110" cy="110" r="96" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1.5"/></svg><span class="disco-sweep"></span></span>
     </div>
+    <div class="party-dancers">
+      <svg class="air-dancer ad-a" viewBox="0 0 120 320" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tubead-a" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6E2C90"/><stop offset="42%" stop-color="#B455D6"/>
+      <stop offset="72%" stop-color="#E39CF5"/><stop offset="100%" stop-color="#6E2C90"/>
+    </linearGradient>
+  </defs>
+  <g class="ad-root">
+    <g class="ad-s1">
+      <path d="M44 320 q-3 -60 2 -104 h28 q5 44 2 104 z" fill="url(#tubead-a)"/>
+      <g class="ad-s2" transform="translate(0,-104)">
+        <path d="M46 216 q-3 -52 1 -92 h26 q4 40 1 92 z" fill="url(#tubead-a)"/>
+        <g class="ad-s3" transform="translate(0,-92)">
+          <path d="M47 124 q-2 -48 2 -74 h22 q4 26 2 74 z" fill="url(#tubead-a)"/>
+          <g class="ad-arm ad-arm-l">
+            <path d="M48 62 q-22 -6 -32 -26 q-4 -9 -12 -12" fill="none" stroke="url(#tubead-a)" stroke-width="11" stroke-linecap="round"/>
+            <path d="M6 26 l-4 -9 M2 25 l-6 -6 M6 24 l-1 -10" fill="none" stroke="#E39CF5" stroke-width="3" stroke-linecap="round"/>
+          </g>
+          <g class="ad-arm ad-arm-r">
+            <path d="M72 62 q22 -6 32 -26 q4 -9 12 -12" fill="none" stroke="url(#tubead-a)" stroke-width="11" stroke-linecap="round"/>
+            <path d="M114 26 l4 -9 M118 25 l6 -6 M114 24 l1 -10" fill="none" stroke="#E39CF5" stroke-width="3" stroke-linecap="round"/>
+          </g>
+          <g class="ad-fringe">
+            <path d="M52 52 l-5 -16 M58 50 l-2 -18 M64 50 l3 -18 M70 52 l6 -16" fill="none" stroke="#E39CF5" stroke-width="4" stroke-linecap="round"/>
+          </g>
+          <g class="ad-face" fill="#1b1220">
+            <ellipse cx="55" cy="66" rx="2.6" ry="3.4"/><ellipse cx="67" cy="66" rx="2.6" ry="3.4"/>
+            <path d="M53 76 q8 8 16 0" fill="none" stroke="#1b1220" stroke-width="3" stroke-linecap="round"/>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
+      <svg class="air-dancer ad-b" viewBox="0 0 120 320" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tubead-b" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1B6E85"/><stop offset="42%" stop-color="#39C3D9"/>
+      <stop offset="72%" stop-color="#95E9F5"/><stop offset="100%" stop-color="#1B6E85"/>
+    </linearGradient>
+  </defs>
+  <g class="ad-root">
+    <g class="ad-s1">
+      <path d="M44 320 q-3 -60 2 -104 h28 q5 44 2 104 z" fill="url(#tubead-b)"/>
+      <g class="ad-s2" transform="translate(0,-104)">
+        <path d="M46 216 q-3 -52 1 -92 h26 q4 40 1 92 z" fill="url(#tubead-b)"/>
+        <g class="ad-s3" transform="translate(0,-92)">
+          <path d="M47 124 q-2 -48 2 -74 h22 q4 26 2 74 z" fill="url(#tubead-b)"/>
+          <g class="ad-arm ad-arm-l">
+            <path d="M48 62 q-22 -6 -32 -26 q-4 -9 -12 -12" fill="none" stroke="url(#tubead-b)" stroke-width="11" stroke-linecap="round"/>
+            <path d="M6 26 l-4 -9 M2 25 l-6 -6 M6 24 l-1 -10" fill="none" stroke="#95E9F5" stroke-width="3" stroke-linecap="round"/>
+          </g>
+          <g class="ad-arm ad-arm-r">
+            <path d="M72 62 q22 -6 32 -26 q4 -9 12 -12" fill="none" stroke="url(#tubead-b)" stroke-width="11" stroke-linecap="round"/>
+            <path d="M114 26 l4 -9 M118 25 l6 -6 M114 24 l1 -10" fill="none" stroke="#95E9F5" stroke-width="3" stroke-linecap="round"/>
+          </g>
+          <g class="ad-fringe">
+            <path d="M52 52 l-5 -16 M58 50 l-2 -18 M64 50 l3 -18 M70 52 l6 -16" fill="none" stroke="#95E9F5" stroke-width="4" stroke-linecap="round"/>
+          </g>
+          <g class="ad-face" fill="#1b1220">
+            <ellipse cx="55" cy="66" rx="2.6" ry="3.4"/><ellipse cx="67" cy="66" rx="2.6" ry="3.4"/>
+            <path d="M53 76 q8 8 16 0" fill="none" stroke="#1b1220" stroke-width="3" stroke-linecap="round"/>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>    </div>
     <div class="party-stage">
       <svg class="party-burst" viewBox="0 0 420 320" preserveAspectRatio="xMidYMid meet">
         <path fill="#FFD400" d="M210 6l26 52 52-38-13 62 62-13-38 52 52 26-52 26 38 52-62-13 13 62-52-38-26 52-26-52-52 38 13-62-62 13 38-52-52-26 52-26-38-52 62 13-13-62 52 38z"/>
@@ -8411,7 +8531,10 @@ function endPartyMode(){
   partyMode = false;
   partyTimers.forEach(clearTimeout); partyTimers = [];
   const layer = document.getElementById('partyLayer');
-  if(layer) layer.classList.remove('on');            // css fades it out, never a hard cut
+  if(layer){
+    layer.classList.add('leaving');                  // lets the dancers deflate on the way out
+    layer.classList.remove('on');                    // css fades it out, never a hard cut
+  }
   // and the sound fades with it rather than stopping dead
   if(partyAudio && !partyAudio.paused){
     const from = partyAudio.volume, steps = 24, step = from/steps;
