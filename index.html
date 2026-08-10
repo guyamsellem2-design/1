@@ -8317,6 +8317,63 @@ function toggleDilemmaDone(id){
   const d = (data.generalDilemmas||[]).find(d=>d.id===id);
   if(d){ d.done = !d.done; saveData(); renderGeneralDilemmaList(); }
 }
+/* The little sound on "לא!".
+
+   Synthesised, not sampled: no file to download, nothing to license, and every part of it is
+   tunable from here. It is built from what a party popper actually sounds like —
+     the POP        a 50ms noise burst through a bandpass, which is the cork;
+     the BODY       a sine dropping 620Hz -> 180Hz underneath it, which gives the pop weight;
+     the SPARKLE    four tiny bells climbing a major chord, which is the confetti catching light.
+   Deliberately quiet (peak gain 0.18) and under half a second — it should land as punctuation,
+   not as an announcement, because this button gets pressed on hard days.
+
+   Only fires on a normal press. During the hidden party the music is already playing and extra
+   pops would just be clutter, so fireConfetti() itself stays silent. */
+let sfxCtx = null;
+function playNoPop(){
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    sfxCtx = sfxCtx || new Ctx();
+    // resume() hands back a promise; if it rejects, that escapes the try/catch as an unhandled
+    // rejection, so it gets its own swallow
+    if(sfxCtx.state === 'suspended'){ const r = sfxCtx.resume(); if(r && r.catch) r.catch(()=>{}); }
+    const t0 = sfxCtx.currentTime;
+    const master = sfxCtx.createGain();
+    master.gain.value = 0.18;                       // the whole thing, kept small
+    master.connect(sfxCtx.destination);
+
+    // the pop
+    const len = Math.floor(sfxCtx.sampleRate * 0.05);
+    const buf = sfxCtx.createBuffer(1, len, sfxCtx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.5);
+    const noise = sfxCtx.createBufferSource(); noise.buffer = buf;
+    const bp = sfxCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.1;
+    const ng = sfxCtx.createGain();
+    ng.gain.setValueAtTime(1, t0); ng.gain.exponentialRampToValueAtTime(0.001, t0 + 0.09);
+    noise.connect(bp); bp.connect(ng); ng.connect(master); noise.start(t0);
+
+    // the body under it
+    const body = sfxCtx.createOscillator(); body.type = 'sine';
+    body.frequency.setValueAtTime(620, t0);
+    body.frequency.exponentialRampToValueAtTime(180, t0 + 0.10);
+    const bg = sfxCtx.createGain();
+    bg.gain.setValueAtTime(0.5, t0); bg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12);
+    body.connect(bg); bg.connect(master); body.start(t0); body.stop(t0 + 0.14);
+
+    // the sparkle
+    [880, 1174.7, 1568, 2093].forEach((f, i)=>{
+      const o = sfxCtx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
+      const g = sfxCtx.createGain();
+      const st = t0 + 0.055 + i * 0.052;
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(0.28, st + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.20);
+      o.connect(g); g.connect(master); o.start(st); o.stop(st + 0.22);
+    });
+  }catch(e){ /* a missing sound must never break a button */ }
+}
 /* ---------- "לא!" ----------
    Saying yes carries its own celebration: the body is already excited, the confetti is internal.
    Saying no, for someone who tends to please and who feels things strongly, usually carries the
@@ -8338,6 +8395,7 @@ function sayNoToSuggestion(id, ev){
   if(sayNoHeld){ sayNoHeld = false; return; }
   const btn = ev && ev.currentTarget;
   if(btn) btn.classList.add('said-no');
+  playNoPop();
   fireConfetti();
   setTimeout(()=>{
     const sg = (data.suggestions||[]).find(x=>x.id===id);
