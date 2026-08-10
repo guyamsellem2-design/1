@@ -2421,6 +2421,52 @@
   }
 
   /* ---------------------------------------------------------------------------
+     33. OVERLAPPING BLOCKS IN THE HOUR VIEW.
+     Two things at the same hour used to be drawn one on top of the other, so one
+     of them was simply invisible. They now share the column in lanes; when a
+     cluster needs more lanes than fit, a + carries the rest and zooms that day
+     open to full width. See timelineAssignLanes for the layout itself.
+     --------------------------------------------------------------------------- */
+  .timeline-more-btn{
+    position:absolute; z-index:3;
+    background:var(--surface3); color:var(--text);
+    border:1px solid var(--border-strong); border-radius:5px;
+    font-family:var(--font-ui); font-size:10px; font-weight:600; line-height:1;
+    padding:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 1px 3px rgba(0,0,0,.18);
+  }
+  .timeline-more-btn:hover{ border-color:var(--gold); color:var(--gold); }
+  .timeline-collapse-btn{
+    right:auto; left:3px; width:26px; height:22px; font-size:15px;
+    background:var(--gold); color:#241a06; border-color:transparent;
+  }
+  /* a zoomed day is one wide column, so its blocks can afford a little more room
+     to breathe than they get at one-seventh of the width */
+  .timeline-daycol:only-of-type .timeline-item{ padding:2px 5px; font-size:11.5px; }
+
+  /* ---------------------------------------------------------------------------
+     34. THE EDIT SHEET — a long name simply takes another line.
+     The title was a single-line <input>, so anything longer than the field just
+     scrolled out of sight and there was no way to read the whole thing. It is a
+     textarea now that grows a line whenever it needs one (see autoGrowSheetTitle)
+     — no truncation, no ellipsis to tap, nothing hidden behind a control.
+     --------------------------------------------------------------------------- */
+  textarea.timeline-sheet-title{
+    width:100%; font-size:17px; font-family:var(--font-ui);
+    background:transparent; border:none; border-bottom:1.5px solid var(--border);
+    color:var(--text); padding:6px 2px; margin-bottom:12px;
+    resize:none; overflow-y:auto; line-height:1.45;
+    max-height:160px; min-height:34px;
+  }
+  textarea.timeline-sheet-title:focus{ outline:none; border-bottom-color:var(--gold); }
+  .timeline-sheet-title-row{ align-items:flex-start; }
+  .timeline-sheet-title-row .timeline-sheet-domain{ margin-top:2px; }
+  /* start and end time now share the first row, so each needs to be free to shrink */
+  .timeline-sheet-time-row .time-picker-wrap{ flex:1 1 0; min-width:0; }
+  .timeline-sheet-time-row .time-picker-btn{ max-width:none; }
+
+  /* ---------------------------------------------------------------------------
      31. BLOCK HEADINGS — legible on the first pass.
      Amatic is drawn narrow and light. At a 50px page title that reads as
      character; at 21px on a heading you are scanning for, it costs you a beat
@@ -6232,20 +6278,105 @@ function toggleTimelineDesktopDragMode(){
 // the block only ever shows the name -- position on the axis already says when it is, exactly
 // like a real calendar's week view; repeating the start time in the label just crowded out the
 // name on narrow blocks (that was the previous version's actual bug, not a display preference).
-function timelineChipHtml(it, dayIdx, dateStr){
+/* ---------- overlapping blocks ----------
+   Two things happening at 10:00 used to be drawn one exactly on top of the other, so the one
+   underneath was simply invisible. These lay them out side by side instead.
+
+   Items are grouped into "clusters": runs of blocks that actually overlap in time. Lanes are then
+   assigned greedily inside each cluster (first lane whose previous block has already ended), which
+   is the same approach a real calendar week view uses, and it means a cluster only ever gets as
+   many lanes as it genuinely needs.
+
+   How many of those lanes get shown depends on the room available:
+     1 lane      full width, exactly as before
+     2 lanes     half and half
+     3 or more   the first two lanes, each a little narrower, plus a + button holding the rest —
+                 tapping it zooms that one day to the full width of the view, where every lane
+                 fits at a readable size, and the button becomes − to come back.
+   Nothing is ever silently dropped: if a cluster has more lanes than are being shown, the +
+   carries the count of what is waiting behind it. */
+function timelineAssignLanes(items){
+  const withPos = items.map(it=>{
+    const top = timelineTopPx(it.time);
+    const h = timelineHeightPx(it.time, it.data.endTime);
+    return { it, top, bottom: top + h, h };
+  });
+  withPos.sort((a,b)=> a.top - b.top || a.bottom - b.bottom);
+  const out = [];
+  let cluster = [], clusterEnd = -1, clusterTop = 0;
+  function flush(){
+    if(!cluster.length) return;
+    const laneEnds = [];
+    cluster.forEach(x=>{
+      let lane = laneEnds.findIndex(end => end <= x.top + 0.5);
+      if(lane === -1){ lane = laneEnds.length; laneEnds.push(0); }
+      laneEnds[lane] = x.bottom;
+      x.lane = lane;
+    });
+    const lanes = laneEnds.length;
+    const bottom = Math.max(...cluster.map(x=>x.bottom));
+    cluster.forEach(x=>{ x.lanes = lanes; x.clusterTop = clusterTop; x.clusterBottom = bottom; });
+    out.push(...cluster);
+    cluster = []; clusterEnd = -1;
+  }
+  withPos.forEach(x=>{
+    if(cluster.length && x.top >= clusterEnd - 0.5) flush();
+    if(!cluster.length) clusterTop = x.top;
+    cluster.push(x);
+    clusterEnd = Math.max(clusterEnd, x.bottom);
+  });
+  flush();
+  return out;
+}
+// which day (if any) is currently zoomed to fill the whole view so all its lanes fit
+let timelineExpandedDay = null;
+function toggleTimelineExpandedDay(dayIdx){
+  timelineExpandedDay = (timelineExpandedDay === dayIdx) ? null : dayIdx;
+  renderTimelineGrid();
+}
+function timelineChipHtml(it, dayIdx, dateStr, lane, lanes, dayExpanded){
   const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
   const draft = !!it.data.draft;
   const top = timelineTopPx(it.time);
   const height = timelineHeightPx(it.time, it.data.endTime);
+  lane = lane || 0; lanes = lanes || 1;
+  // width/offset of this lane, as a percentage of the day column
+  let widthPct, rightPct;
+  if(lanes <= 1){ widthPct = 100; rightPct = 0; }
+  else if(dayExpanded || lanes === 2){ widthPct = 100/lanes; rightPct = lane * (100/lanes); }
+  else { widthPct = 44; rightPct = lane * 44; }   // collapsed, 3+: two slightly narrower lanes
   // as many lines as actually fit the block's real height get to show the full name, wrapping
   // (breaking mid-word if a single word is too long for the width) -- only once even that isn't
   // enough does the browser's own line-clamp ellipsis kick in, on the last visible line.
   const availableLines = Math.max(1, Math.floor((height-2)/13));
-  return `<div class="timeline-item ${picked?'chip-picked':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px;" draggable="false" ondragstart="return false;"
+  return `<div class="timeline-item ${picked?'chip-picked':''} ${draft?'chip-draft':''}" style="top:${top}px; height:${height}px; right:calc(${rightPct}% + 1px); width:calc(${widthPct}% - 2px); left:auto;" draggable="false" ondragstart="return false;"
     onpointerdown="startTimelineItemDrag(event,'${it.kind}','${it.data.id}')"
     onclick="event.stopPropagation(); onTimelineChipClick('${it.kind}','${it.data.id}', ${dayIdx}, '${it.time}', '${dateStr}')">
     <span class="timeline-chip-text" style="--lc:${availableLines};">${escapeHtml(timelineItemLabel(it))}</span>
   </div>`;
+}
+// builds the chips for one day, plus a + for any cluster whose lanes do not all fit
+function timelineDayChipsHtml(d, dayExpanded){
+  const laid = timelineAssignLanes(d.timed);
+  const html = [];
+  const seenClusters = new Set();
+  laid.forEach(x=>{
+    const shown = dayExpanded || x.lanes <= 2 || x.lane < 2;
+    if(shown) html.push(timelineChipHtml(x.it, d.dayIdx, d.dateStr, x.lane, x.lanes, dayExpanded));
+    if(!dayExpanded && x.lanes > 2 && !seenClusters.has(x.clusterTop)){
+      seenClusters.add(x.clusterTop);
+      const hidden = x.lanes - 2;
+      const h = Math.max(20, Math.min(30, x.clusterBottom - x.clusterTop));
+      html.push(`<button type="button" class="timeline-more-btn" style="top:${x.clusterTop}px; height:${h}px; right:calc(88% + 1px); width:calc(12% - 2px);"
+        title="עוד ${hidden} באותו הזמן — הרחבת היום"
+        onclick="event.stopPropagation(); toggleTimelineExpandedDay(${d.dayIdx})">+${hidden}</button>`);
+    }
+  });
+  if(dayExpanded){
+    html.push(`<button type="button" class="timeline-more-btn timeline-collapse-btn" style="top:2px;"
+      title="חזרה לכל הימים" onclick="event.stopPropagation(); toggleTimelineExpandedDay(${d.dayIdx})">−</button>`);
+  }
+  return html.join('');
 }
 function deleteUntimedTimelineItem(kind, id){
   if(kind==='task') deleteTask(id); else deleteAnchor(id);
@@ -6713,6 +6844,9 @@ function renderTimelineSheet(){
   const gcalFieldHtml = data.gcalConnected
     ? `<label class="buf-label"><input type="checkbox" id="timelineSheetGcalSync" ${rec.gcalSync!==false?'checked':''}> עדכון ביומן גוגל</label>`
     : `<a class="cancel-btn" style="text-align:center; text-decoration:none; display:block;" href="${kind==='task'?taskCalendarUrl(rec):anchorCalendarUrl(rec)}" target="_blank">📅 הוספה ליומן</a>`;
+  // End time is NOT in here any more. Needing to open "עוד אפשרויות" just to find out when
+  // something finishes made the sheet's first screen answer "when does this start" but not
+  // "how long is it" — it now sits beside the start time in the first view for both kinds.
   const extraFieldsHtml = kind==='task' ? `
       <div class="edit-form-row">
         <select id="timelineSheetEnergy">
@@ -6721,24 +6855,29 @@ function renderTimelineSheet(){
           <option value="mid" ${rec.energy==='mid'?'selected':''}>🟡 בינוני</option>
           <option value="high" ${rec.energy==='high'?'selected':''}>🔴 מרוקן</option>
         </select>
-        ${timePickerHtml('timelineSheetEndTime', rec.endTime||'', 'שעת סיום')}
       </div>
       ${gcalFieldHtml}
       <textarea class="detail-desc" id="timelineSheetDesc" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(rec.description||'')}</textarea>
       ${bodyCheckToggleBtnHtml('task', id)}
       ${bodyCheckOpenIds.has('task:'+id) ? bodyCheckPanelHtml('task', id, {urgencyOptions:['objective','other','relief'], showEnergy:true}) : ''}
     ` : `
-      ${timePickerHtml('timelineSheetEndTime', rec.endTime||'', 'שעת סיום')}
       <label class="buf-label"><input type="checkbox" id="timelineSheetBuffer" ${rec.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
       ${gcalFieldHtml}
     `;
+  // An anchor's remaining fields are a breathing-time checkbox and a calendar toggle — two lines.
+  // Hiding those behind an expander bought nothing and cost a tap every time, so an anchor now
+  // shows its whole form at once. A task genuinely has more (energy, description, body check),
+  // so tasks keep "עוד אפשרויות".
+  const alwaysExpanded = (kind !== 'task');
   sheet.innerHTML = `
     <div class="timeline-sheet-topbar">
       <button type="button" class="timeline-sheet-close-btn" onclick="closeTimelineSheet()" title="ביטול">✕</button>
       <div class="timeline-sheet-handle-hit" id="timelineSheetHandle"><span class="timeline-sheet-handle-bar"></span></div>
     </div>
     <div class="timeline-sheet-title-row">
-      <input type="text" class="timeline-sheet-title" id="timelineSheetTitleInput" value="${escapeAttr(label)}" placeholder="שם...">
+      <textarea class="timeline-sheet-title" id="timelineSheetTitleInput" rows="1" placeholder="שם..." dir="auto"
+        oninput="autoGrowSheetTitle(this)"
+        onkeydown="if(event.key==='Enter'){ event.preventDefault(); this.blur(); }">${escapeHtml(label)}</textarea>
       ${domainPickerHtml}
     </div>
     <div class="timeline-sheet-daypicker">
@@ -6746,8 +6885,9 @@ function renderTimelineSheet(){
     </div>
     <div class="edit-form-row timeline-sheet-time-row">
       ${timePickerHtml('timelineSheetTime', timeValue, 'שעה')}
-      ${freqHtml}
+      ${timePickerHtml('timelineSheetEndTime', rec.endTime||'', 'שעת סיום')}
     </div>
+    ${freqHtml ? `<div class="edit-form-row timeline-sheet-time-row">${freqHtml}</div>` : ''}
     <div class="timeline-sheet-extra" id="timelineSheetExtra" style="display:none;">${extraFieldsHtml}</div>
     <label class="buf-label" style="margin-top:10px;"><input type="checkbox" id="timelineSheetDraft" ${rec.draft?'checked':''}> 🌱 טיוטה — לא סופי, אפשר לשנות בקלות</label>
     <div class="timeline-sheet-actions">
@@ -6759,8 +6899,9 @@ function renderTimelineSheet(){
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
     <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה (בלי לפתוח את הטופס)</button>
-    <button type="button" class="subtask-toggle-btn timeline-sheet-more" id="timelineSheetExpandBtn" onclick="toggleTimelineSheetExpanded()">עוד אפשרויות ›</button>
+    ${alwaysExpanded ? '' : `<button type="button" class="subtask-toggle-btn timeline-sheet-more" id="timelineSheetExpandBtn" onclick="toggleTimelineSheetExpanded()">עוד אפשרויות ›</button>`}
   `;
+  timelineSheetAlwaysExpanded = alwaysExpanded;
   // deliberately no auto-focus here -- opening an item is first and foremost "look at what this
   // is," not an implicit "start typing now." the keyboard should only appear once the person
   // actually taps into a field on their own.
@@ -6771,13 +6912,23 @@ function renderTimelineSheet(){
 // TOGGLING it (tap on the button, or an up-drag on the handle) deliberately does NOT call
 // renderTimelineSheet() again -- see toggleTimelineSheetDay's comment just above for why a full
 // re-render mid-edit would silently discard anything typed but not yet saved.
+// a long name must never be a single clipped line you have to scroll inside -- the title is a
+// textarea that simply grows another line whenever it needs one.
+function autoGrowSheetTitle(el){
+  if(!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+let timelineSheetAlwaysExpanded = false;
 function applyTimelineSheetExpandedState(){
   const extra = document.getElementById('timelineSheetExtra');
   const btn = document.getElementById('timelineSheetExpandBtn');
   const sheet = document.getElementById('timelineSheet');
-  if(extra) extra.style.display = timelineSheetExpanded ? '' : 'none';
-  if(sheet) sheet.classList.toggle('expanded', timelineSheetExpanded);
+  const open = timelineSheetAlwaysExpanded || timelineSheetExpanded;
+  if(extra) extra.style.display = open ? '' : 'none';
+  if(sheet) sheet.classList.toggle('expanded', open);
   if(btn) btn.textContent = timelineSheetExpanded ? '‹ פחות אפשרויות' : 'עוד אפשרויות ›';
+  autoGrowSheetTitle(document.getElementById('timelineSheetTitleInput'));
 }
 function toggleTimelineSheetExpanded(){
   timelineSheetExpanded = !timelineSheetExpanded;
@@ -6933,10 +7084,18 @@ function renderTimelineGrid(){
   if(!el) return;
   if(wrapEl) wrapEl.classList.toggle('current-week', weekOffset===0);
   const perDay = timelinePerDay();
+  // when one day is zoomed open, it is the only column drawn — so its lanes get the entire width
+  // of the view and every overlapping block is readable. The day-name strip has to follow the same
+  // filter or the headers would no longer line up with the columns underneath them.
+  const visibleDays = (timelineExpandedDay === null)
+    ? perDay
+    : (perDay.some(d=>d.dayIdx===timelineExpandedDay)
+        ? perDay.filter(d=>d.dayIdx===timelineExpandedDay)
+        : (timelineExpandedDay = null, perDay));
 
   if(daynamesWrap){
     daynamesWrap.innerHTML = `<div class="timeline-daynames-spacer"></div>` +
-      perDay.map(d=>`<div class="timeline-dayname${ymd(d.dateObj)===ymd(new Date())?' is-today':''}">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
+      visibleDays.map(d=>`<div class="timeline-dayname${ymd(d.dateObj)===ymd(new Date())?' is-today':''}">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
   }
   if(barWrap) barWrap.innerHTML = timelineActionBarHtml();
 
@@ -6970,7 +7129,7 @@ function renderTimelineGrid(){
   }
   const hourCol = `<div class="timeline-hourcol" style="height:${totalHeight}px;">${hourLabels.join('')}</div>`;
 
-  const dayCols = perDay.map(d=>{
+  const dayCols = visibleDays.map(d=>{
     const isAddingHere = timelineAddCell && timelineAddCell.dayIdx===d.dayIdx;
     const addBox = isAddingHere ? `<div class="timeline-item-add" style="top:${timelineTopPx(timelineAddCell.slot)}px;">
       <input type="text" class="timeline-add-input" id="timelineAddInput" placeholder="כתוב כאן..."
@@ -6983,7 +7142,7 @@ function renderTimelineGrid(){
       onclick="event.stopPropagation(); openTimelineAddCell(${d.dayIdx}, '${timelineSelectedCell.slot}')">
       <span>${timelineSelectedCell.slot} — לחיצה נוספת לכתיבה</span>
     </div>` : '';
-    const itemsHtml = d.timed.map(it=>timelineChipHtml(it, d.dayIdx, d.dateStr)).join('');
+    const itemsHtml = timelineDayChipsHtml(d, timelineExpandedDay === d.dayIdx);
     return `<div class="timeline-daycol" data-day-idx="${d.dayIdx}" data-date-str="${d.dateStr}" style="height:${totalHeight}px;" onclick="onTimelineColClick(event, ${d.dayIdx}, '${d.dateStr}')">${itemsHtml}${addBox}${selectMarker}</div>`;
   }).join('');
 
