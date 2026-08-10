@@ -2458,6 +2458,54 @@
     cursor:pointer; white-space:nowrap; box-shadow:var(--lift-1);
   }
   .timeline-week-back-btn:hover{ filter:brightness(1.05); }
+
+  /* ---------------------------------------------------------------------------
+     37. "לא!"
+     Sitting under "התקבלה החלטה?" on every open dilemma. Pressing it rings the
+     word in neon and sets off confetti across the whole app.
+
+     This is the one place in the app that deliberately shouts, and it is worth
+     saying why: everywhere else the rule has been no alarm lights, no streaks,
+     nothing that raises the temperature. But a "yes" already celebrates itself —
+     the body is excited before the tap. A "no", for someone who tends to please,
+     usually arrives with guilt attached. So the celebration goes exactly where
+     there isn't one already.
+     --------------------------------------------------------------------------- */
+  .say-no-row{ flex-basis:100%; display:flex; justify-content:flex-start; margin-top:6px; }
+  .say-no-btn{
+    font-family:var(--font-ui); font-size:14px; font-weight:700;
+    color:var(--muted); background:var(--surface2);
+    border:1.5px solid var(--border-strong); border-radius:var(--r-pill);
+    padding:7px 20px; min-height:38px; cursor:pointer;
+    transition:color var(--dur) var(--ease-water), border-color var(--dur) var(--ease-water),
+               background var(--dur) var(--ease-water), box-shadow var(--dur) var(--ease-water),
+               transform var(--dur) var(--ease-settle);
+  }
+  .say-no-btn:hover{ color:var(--text); border-color:var(--muted2); }
+  /* the moment it is pressed */
+  .say-no-btn.said-no{
+    color:var(--gold); border-color:var(--gold);
+    background:transparent;
+    box-shadow:0 0 0 2px var(--gold), 0 0 18px 2px var(--glow-gold), inset 0 0 14px -4px var(--glow-gold);
+    transform:scale(1.06);
+  }
+  body.night-mode .say-no-btn.said-no{
+    box-shadow:0 0 0 2px var(--gold), 0 0 24px 3px rgba(231,200,120,.55), inset 0 0 16px -4px rgba(231,200,120,.4);
+  }
+
+  .confetti-layer{
+    position:fixed; inset:0; z-index:6000; pointer-events:none; overflow:hidden;
+  }
+  .confetti-layer i{
+    position:absolute; top:-24px; display:block;
+    animation-name:confettiFall; animation-timing-function:cubic-bezier(.35,.15,.5,1);
+    animation-fill-mode:forwards; will-change:transform, opacity;
+  }
+  @keyframes confettiFall{
+    0%   { transform:translate3d(0,-10vh,0) rotate(0deg); opacity:0; }
+    12%  { opacity:1; }
+    100% { transform:translate3d(var(--drift,0), 108vh, 0) rotate(var(--spin,360deg)); opacity:0; }
+  }
   /* a zoomed day is one wide column, so its blocks can afford a little more room
      to breathe than they get at one-seventh of the width */
   .timeline-daycol:only-of-type .timeline-item{ padding:2px 5px; font-size:11.5px; }
@@ -8086,6 +8134,56 @@ function toggleDilemmaDone(id){
   const d = (data.generalDilemmas||[]).find(d=>d.id===id);
   if(d){ d.done = !d.done; saveData(); renderGeneralDilemmaList(); }
 }
+/* ---------- "לא!" ----------
+   Saying yes carries its own celebration: the body is already excited, the confetti is internal.
+   Saying no, for someone who tends to please and who feels things strongly, usually carries the
+   opposite — second-guessing, guilt, and sometimes reopening a decision that was already made
+   just to stop feeling like a bad person. So that is where the app throws the party: the moment
+   the answer is no, it lights the word up and the whole screen celebrates.
+
+   The glow is given a moment on its own before the item settles into "decided", so the press has
+   a beat of its own rather than instantly disappearing into a re-render. */
+function sayNoToDilemma(id, ev){
+  const btn = ev && ev.currentTarget;
+  if(btn) btn.classList.add('said-no');
+  fireConfetti();
+  setTimeout(()=>{
+    const d = (data.generalDilemmas||[]).find(x=>x.id===id);
+    if(d && !d.done){ d.done = true; saveData(); renderGeneralDilemmaList(); }
+  }, 780);
+}
+/* Confetti, hand-rolled: no library, no images, and nothing left behind. Pieces are plain divs in
+   one fixed, pointer-events:none layer over the whole app, animated by the compositor (transform +
+   opacity only) and removed when they land. In the app's own palette rather than primary colours,
+   so a celebration still looks like it belongs to this world. */
+function fireConfetti(){
+  if(document.getElementById('confettiLayer')) return;   // one party at a time
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const layer = document.createElement('div');
+  layer.id = 'confettiLayer';
+  layer.className = 'confetti-layer';
+  layer.setAttribute('aria-hidden','true');
+  const colours = ['#E0A85C','#4A8FA8','#6FA08C','#CC7A6A','#8E7BB5','#EFCB8A','#8FC6DC'];
+  const count = reduced ? 24 : 90;
+  let html = '';
+  for(let i=0;i<count;i++){
+    const left  = Math.random()*100;
+    const delay = Math.random()*(reduced?0.5:0.9);
+    const dur   = (reduced?2.4:1.5) + Math.random()*(reduced?0.8:1.4);
+    const size  = 6 + Math.random()*8;
+    const drift = (Math.random()*2-1) * (reduced?20:120);
+    const spin  = reduced ? 0 : (Math.random()*2-1)*720;
+    const c     = colours[i % colours.length];
+    const round = Math.random() < 0.35 ? '50%' : '2px';
+    html += `<i style="left:${left}%; width:${size}px; height:${size*(round==='50%'?1:1.6)}px;
+      background:${c}; border-radius:${round};
+      animation-delay:${delay.toFixed(2)}s; animation-duration:${dur.toFixed(2)}s;
+      --drift:${drift.toFixed(0)}px; --spin:${spin.toFixed(0)}deg;"></i>`;
+  }
+  layer.innerHTML = html;
+  document.body.appendChild(layer);
+  setTimeout(()=>{ layer.remove(); }, (reduced?3600:3200));
+}
 function deleteGeneralDilemma(id){
   data.generalDilemmas = (data.generalDilemmas||[]).filter(d=>d.id!==id);
   saveData();
@@ -8128,6 +8226,7 @@ function renderGeneralDilemmaList(){
       <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 הפוך למשימה</span>
       <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
       <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')" title="מחיקה">✕</span>
+      ${d.done ? '' : `<div class="say-no-row"><button type="button" class="say-no-btn" onclick="sayNoToDilemma('${d.id}', event)">לא!</button></div>`}
       ${d.decisionDate ? `<div class="sugg-reply-due">⏰ להחליט עד: ${formatDateHe(d.decisionDate)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(d, {urgencyOptions:['objective','other','relief']})}
     </li>`;
