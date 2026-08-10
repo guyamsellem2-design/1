@@ -2380,6 +2380,47 @@
   .inbox-item-top .del-task{ flex-shrink:0; margin-top:-2px; }
 
   /* ---------------------------------------------------------------------------
+     32. TODAY.
+     A thin neon outline traced around the day-name box, in both the hour-axis
+     view and the weekly grid, so "where am I now" is answerable at a glance
+     without reading a single date.
+
+     Yellow at night, sky-blue by day — each picked to sit on its own background
+     rather than to match the other. The glow is deliberately restrained: one
+     hairline ring plus a soft halo, no fill and no animation. It has to catch
+     the eye on the way past, not hold it.
+     --------------------------------------------------------------------------- */
+  :root{
+    --today-line:#3FA8CE;                 /* תכלת for daylight */
+    --today-glow:rgba(63,168,206,.42);
+    --today-glow-soft:rgba(63,168,206,.18);
+  }
+  body.night-mode{
+    --today-line:#F2CE5A;                 /* yellow for the dark */
+    --today-glow:rgba(242,206,90,.46);
+    --today-glow-soft:rgba(242,206,90,.20);
+  }
+  body.soft{ --today-glow:rgba(63,168,206,.30); --today-glow-soft:rgba(63,168,206,.12); }
+  body.night-mode.soft{ --today-glow:rgba(242,206,90,.32); --today-glow-soft:rgba(242,206,90,.14); }
+
+  .timeline-dayname.is-today{
+    position:relative;
+    color:var(--today-line);
+    border-radius:7px;
+    box-shadow:inset 0 0 0 1.5px var(--today-line),
+               0 0 6px 0 var(--today-glow),
+               inset 0 0 7px 0 var(--today-glow-soft);
+  }
+  /* In the day cards (and the compact list view) the marker is the rule under
+     the day name and nothing else — no box, no fill, no change to the text.
+     The card already has its own outline, so a second ring inside it would read
+     as a button; a lit underline says "this one" without adding a shape. */
+  .day-name.is-today{
+    border-bottom:2px solid var(--today-line);
+    box-shadow:0 2px 7px -2px var(--today-glow);
+  }
+
+  /* ---------------------------------------------------------------------------
      31. BLOCK HEADINGS — legible on the first pass.
      Amatic is drawn narrow and light. At a 50px page title that reads as
      character; at 21px on a heading you are scanning for, it costs you a beat
@@ -6057,7 +6098,7 @@ function renderScheduleGrid(){
     const emptyNote = totalCount===0 ? '<div class="sched-empty">כלום מתוזמן</div>' : '';
 
     return `<div class="day-col ${isMinimized?'minimized':'expanded'}" data-day-idx="${dayIdx}">
-      <div class="day-name" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
+      <div class="day-name${ymd(dateObj)===ymd(new Date())?' is-today':''}" onclick="toggleDayMinimize(${dayIdx})">${dayName}<span class="sched-date">${pad(dateObj.getDate())}/${pad(dateObj.getMonth()+1)}</span></div>
       ${emptyNote}${itemsHtml}
       ${convertMenuHtml('schedule:'+dayIdx, dayIdx, dateStr)}
       ${moreHtml}
@@ -6895,7 +6936,7 @@ function renderTimelineGrid(){
 
   if(daynamesWrap){
     daynamesWrap.innerHTML = `<div class="timeline-daynames-spacer"></div>` +
-      perDay.map(d=>`<div class="timeline-dayname">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
+      perDay.map(d=>`<div class="timeline-dayname${ymd(d.dateObj)===ymd(new Date())?' is-today':''}">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}</div>`).join('');
   }
   if(barWrap) barWrap.innerHTML = timelineActionBarHtml();
 
