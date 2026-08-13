@@ -2368,7 +2368,7 @@
 
   /* ---------------------------------------------------------------------------
      30. HABIT ROW — the requested order.
-     Title, then one row of actions (עשיתי היום · +עוגן · +משימה · הרחב), and the
+     Title, then one row of actions (עשיתי היום · + הוסף ליומן · נתחיל בקטן · אחרי מה זה קורה?), and the
      two deeper questions only once expanded, side by side on their own row.
      --------------------------------------------------------------------------- */
   /* "עשיתי היום" is the one thing you press daily, so it sits on the title row
@@ -2855,7 +2855,24 @@
      so the collapsed sheet is everything above minus the extra block, plus the
      date — which is exactly what was asked for.
      --------------------------------------------------------------------------- */
+  /* topic and energy stack beside the name — both describe WHAT this is, so they belong on the
+     title row rather than scattered down the form */
+  .timeline-sheet-side{
+    display:flex; flex-direction:column; gap:6px;
+    flex:0 0 auto; max-width:42%; min-width:0;
+  }
+  .timeline-sheet-side .timeline-sheet-domain{ max-width:none; width:100%; }
+  .timeline-sheet-energy{
+    width:100%; font-size:13.5px; font-family:var(--font-ui);
+    background:var(--surface2); border:1px solid var(--border-strong);
+    color:var(--text); border-radius:8px; padding:6px;
+  }
   .timeline-sheet-date-row{ display:flex; gap:8px; align-items:flex-end; margin-top:8px; }
+  /* the repeat sits next to the date: together they answer "when, and how often" */
+  .timeline-sheet-date-row .timeline-sheet-freq-wrap{
+    flex:1 1 0; min-width:0; align-self:stretch;
+    border-radius:12px; border-width:1.5px; padding:0 8px;
+  }
   .timeline-sheet-date-row .field-label{ font-size:12px; color:var(--muted2); gap:4px; }
   .timeline-sheet-date-row input[type=date]{
     width:100%; box-sizing:border-box;
@@ -7331,18 +7348,23 @@ function renderTimelineSheet(){
   // frequency shortcut -- anchors only (tasks have no repeat concept). includes ALL existing
   // repeatType values, not just the four requested ones, so opening this small sheet and saving
   // without touching the field can never silently downgrade a חד-פעמי/שנתי anchor to something else.
-  const freqValue = kind==='anchor' ? (rec.repeatType || 'weekly') : null;
-  const freqHtml = kind==='anchor' ? `<div class="timeline-sheet-freq-wrap">
+  // ONE form for both kinds now. Everything you add is a task; choosing a repeat here is what
+  // turns it into an anchor (and clearing the repeat on an anchor turns it back into a task).
+  // A one-off anchor from before the merge reads as "doesn't repeat", which is exactly what it is.
+  const freqValue = kind==='anchor'
+    ? ((rec.repeatType||'weekly')==='once' ? '' : (rec.repeatType||'weekly'))
+    : '';
+  const freqHtml = `<div class="timeline-sheet-freq-wrap">
       <span class="timeline-sheet-freq-label">פעם ב־</span>
       <select id="timelineSheetFreq" class="timeline-sheet-freq">
+        <option value="" ${freqValue===''?'selected':''}>לא חוזר</option>
         <option value="daily" ${freqValue==='daily'?'selected':''}>יום</option>
         <option value="every2days" ${freqValue==='every2days'?'selected':''}>יומיים</option>
         <option value="weekly" ${freqValue==='weekly'?'selected':''}>שבוע</option>
         <option value="monthly" ${freqValue==='monthly'?'selected':''}>חודש</option>
-        <option value="once" ${freqValue==='once'?'selected':''}>פעם אחת בלבד</option>
         <option value="yearly" ${freqValue==='yearly'?'selected':''}>שנה</option>
       </select>
-    </div>` : '';
+    </div>`;
   // repeating anchors (anything but חד-פעמי) get the same once/forever delete choice the full form
   // already offers, instead of a single button that always deletes the whole recurring anchor
   const isRepeatingAnchor = kind==='anchor' && (rec.repeatType||'weekly')!=='once';
@@ -7361,26 +7383,22 @@ function renderTimelineSheet(){
   // Row 4 holds the date, which is always visible, and the energy level, which is part of
   // "עוד אפשרויות" — so the energy select carries .sheet-extra-inline and is shown/hidden by the
   // same toggle as the extra block, rather than living inside it. Collapsed, row 4 is just the date.
-  const dateRowHtml = kind==='task' ? `
+  const energyHtml = `<select id="timelineSheetEnergy" class="timeline-sheet-energy">
+      <option value="" ${!rec.energy?'selected':''}>ללא רמת אנרגיה</option>
+      <option value="low" ${rec.energy==='low'?'selected':''}>🟢 מטעין</option>
+      <option value="mid" ${rec.energy==='mid'?'selected':''}>🟡 בינוני</option>
+      <option value="high" ${rec.energy==='high'?'selected':''}>🔴 מרוקן</option>
+    </select>`;
+  const dateRowHtml = `
       <div class="edit-form-row timeline-sheet-date-row">
         <label class="field-label" style="flex:1 1 0; min-width:0;">קביעת תאריך
           <input type="date" id="timelineSheetDate" value="${escapeAttr(rec.date||'')}" onchange="onSheetDateChange(this.value)">
         </label>
-        <div class="sheet-extra-inline" style="flex:1 1 0; min-width:0; display:none;">
-          <select id="timelineSheetEnergy" style="width:100%;">
-            <option value="" ${!rec.energy?'selected':''}>ללא רמת אנרגיה</option>
-            <option value="low" ${rec.energy==='low'?'selected':''}>🟢 מטעין</option>
-            <option value="mid" ${rec.energy==='mid'?'selected':''}>🟡 בינוני</option>
-            <option value="high" ${rec.energy==='high'?'selected':''}>🔴 מרוקן</option>
-          </select>
-        </div>
-      </div>` : '';
-  const extraFieldsHtml = kind==='task' ? `
+        ${freqHtml}
+      </div>`;
+  // one shared block — the two forms are the same form now
+  const extraFieldsHtml = `
       <textarea class="detail-desc" id="timelineSheetDesc" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(rec.description||'')}</textarea>
-      ${gcalFieldHtml}
-      ${bodyCheckToggleBtnHtml('task', id)}
-      ${bodyCheckOpenIds.has('task:'+id) ? bodyCheckPanelHtml('task', id, {urgencyOptions:['objective','other','relief'], showEnergy:true}) : ''}
-    ` : `
       <label class="buf-label"><input type="checkbox" id="timelineSheetBuffer" ${rec.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
       ${gcalFieldHtml}
     `;
@@ -7397,7 +7415,7 @@ function renderTimelineSheet(){
       <textarea class="timeline-sheet-title" id="timelineSheetTitleInput" rows="1" placeholder="שם..." dir="auto"
         oninput="autoGrowSheetTitle(this)"
         onkeydown="if(event.key==='Enter'){ event.preventDefault(); this.blur(); }">${escapeHtml(label)}</textarea>
-      ${domainPickerHtml}
+      <div class="timeline-sheet-side">${domainPickerHtml}${energyHtml}</div>
     </div>
     <div class="timeline-sheet-daypicker">
       ${DAYS.map((dn,di)=>`<button type="button" class="timeline-sheet-day-btn ${timelineSheetSelectedDays.has(di)?'active':''}" onclick="toggleTimelineSheetDay(${di})">${dn}</button>`).join('')}
@@ -7406,7 +7424,6 @@ function renderTimelineSheet(){
       ${timePickerHtml('timelineSheetTime', timeValue, 'שעה')}
       ${timePickerHtml('timelineSheetEndTime', rec.endTime||'', 'שעת סיום')}
     </div>
-    ${freqHtml ? `<div class="edit-form-row timeline-sheet-time-row">${freqHtml}</div>` : ''}
     ${dateRowHtml}
     <div class="timeline-sheet-extra" id="timelineSheetExtra" style="display:none;">${extraFieldsHtml}</div>
     <div class="timeline-sheet-actions">
@@ -7497,6 +7514,66 @@ function setupTimelineSheetHandleDrag(){
   handle.onpointerup = onUp;
   handle.onpointercancel = onUp;
 }
+/* ---------- task <-> anchor, driven purely by the repeat field ----------
+   Both directions read the CURRENT state of the open form rather than the stored record, so
+   whatever was just typed comes across with it; then they re-open the sheet on the new record so
+   the save can finish normally against the right kind. The old record is removed only after the
+   new one exists, and the id changes, so nothing can end up living in both lists at once. */
+function readSheetFieldsForConvert(){
+  const g = id => document.getElementById(id);
+  const titleEl = g('timelineSheetTitleInput');
+  const dateEl = g('timelineSheetDate');
+  const days = Array.from(timelineSheetSelectedDays).sort((a,b)=>a-b);
+  return {
+    text: titleEl ? titleEl.value.trim() : '',
+    time: g('timelineSheetTime') ? g('timelineSheetTime').value : '',
+    endTime: g('timelineSheetEndTime') ? g('timelineSheetEndTime').value : '',
+    domain: g('timelineSheetDomain') ? g('timelineSheetDomain').value : '',
+    energy: g('timelineSheetEnergy') ? g('timelineSheetEnergy').value : '',
+    description: g('timelineSheetDesc') ? g('timelineSheetDesc').value : '',
+    buffer: g('timelineSheetBuffer') ? g('timelineSheetBuffer').checked : false,
+    gcalSync: g('timelineSheetGcalSync') ? g('timelineSheetGcalSync').checked : undefined,
+    date: (dateEl && dateEl.value) ? dateEl.value : '',
+    day: days.length ? days[0] : new Date().getDay()
+  };
+}
+function promoteTaskToAnchor(taskId, repeatType){
+  const t = (data.tasks||[]).find(x=>x.id===taskId);
+  if(!t) return;
+  const f = readSheetFieldsForConvert();
+  const a = {
+    id: uid(), label: f.text || t.text, day: f.day, time: f.time, endTime: f.endTime,
+    domain: f.domain, buffer: f.buffer, draft: false, repeatType,
+    date: ['daily','every2days','monthly','yearly'].includes(repeatType) ? (f.date || t.date || '') : '',
+    description: f.description, createdAt: Date.now()
+  };
+  if(f.gcalSync !== undefined) a.gcalSync = f.gcalSync;
+  data.anchors.push(a);
+  data.tasks = data.tasks.filter(x=>x.id!==taskId);
+  saveData();
+  try{ applyGcalSyncForAnchor(a, true); }catch(e){ console.error('gcal sync failed', e); }
+  renderTasks(); renderScheduleGrid(); if(typeof renderAnchorsTab==='function') renderAnchorsTab();
+  closeTimelineSheet();
+  flashStatus('נשמר — עבר לעוגנים');
+}
+function demoteAnchorToTask(anchorId){
+  const a = (data.anchors||[]).find(x=>x.id===anchorId);
+  if(!a) return;
+  const f = readSheetFieldsForConvert();
+  const t = {
+    id: uid(), text: f.text || a.label, domain: f.domain, done: false, energy: f.energy,
+    date: f.date || ymd(viewedWeekDates()[f.day]), time: f.time, endTime: f.endTime,
+    description: f.description, subtasks: [], draft: false, createdAt: Date.now()
+  };
+  if(f.gcalSync !== undefined) t.gcalSync = f.gcalSync;
+  data.tasks.push(t);
+  data.anchors = data.anchors.filter(x=>x.id!==anchorId);
+  saveData();
+  try{ applyGcalSyncForTask(t, true); }catch(e){ console.error('gcal sync failed', e); }
+  renderTasks(); renderScheduleGrid(); if(typeof renderAnchorsTab==='function') renderAnchorsTab();
+  closeTimelineSheet();
+  flashStatus('נשמר — עבר למשימות');
+}
 function saveTimelineSheet(){
   if(!timelineSheetItem) return;
   const {kind, id} = timelineSheetItem;
@@ -7534,6 +7611,13 @@ function saveTimelineSheet(){
   const dateStr = dateForDay(primaryDay);
   const isNew = timelineSheetIsNew;
   const domainEl = document.getElementById('timelineSheetDomain');
+  // The merge point. There is one form and one thing you create — a task. Setting a repeat is what
+  // promotes it to an anchor, and clearing the repeat on an anchor demotes it back to a task. So
+  // the kind is no longer something chosen up front; it is a consequence of one field.
+  const freqElNow = document.getElementById('timelineSheetFreq');
+  const wantedRepeat = freqElNow ? freqElNow.value : '';
+  if(kind==='task' && wantedRepeat){ promoteTaskToAnchor(id, wantedRepeat); return; }
+  if(kind==='anchor' && !wantedRepeat){ demoteAnchorToTask(id); return; }
   if(kind==='task'){
     const t = data.tasks.find(x=>x.id===id);
     if(!t) return;
@@ -7567,7 +7651,11 @@ function saveTimelineSheet(){
     if(domainEl) a.domain = domainEl.value;
     if(bufferEl) a.buffer = bufferEl.checked;
     if(gcalSyncEl) a.gcalSync = gcalSyncEl.checked;
-    if(freqEl){
+    const energyElA = document.getElementById('timelineSheetEnergy');
+    if(energyElA) a.energy = energyElA.value;
+    const descElA = document.getElementById('timelineSheetDesc');
+    if(descElA) a.description = descElA.value;
+    if(freqEl && freqEl.value){
       a.repeatType = freqEl.value;
       if(['daily','every2days','monthly'].includes(freqEl.value)) a.date = dateStr;
     }
@@ -7839,7 +7927,7 @@ function somedayEditFormHtml(s){
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSomedayEdit()">בטל</button>
-        <button class="cancel-btn" onclick="convertSomedayToTask('${s.id}')">→ הפוך למשימה</button>
+        <button class="cancel-btn" onclick="convertSomedayToTask('${s.id}')">→ הוסף ליומן</button>
       </div>
     </div>
   </li>`;
@@ -8186,7 +8274,7 @@ function renderSuggestions(){
       <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
       <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
       <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
-      <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הפוך למשימה</span>
+      <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הוסף ליומן</span>
       <span class="answer-stack">
         <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
         ${s.answered ? '' : `<button type="button" class="say-no-btn" onpointerdown="startSayNoHold(event)" onclick="sayNoToSuggestion('${s.id}', event)">לא!</button>`}
@@ -8706,7 +8794,7 @@ function renderGeneralDilemmaList(){
       <div class="chk ${d.done?'done':''}" onclick="toggleDilemmaDone('${d.id}')"></div>
       <span class="task-text" style="flex:1" onclick="openDilemmaEdit('${d.id}')">${escapeHtml(d.text)}</span>
       ${dom ? `<span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>` : ''}
-      <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 הפוך למשימה</span>
+      <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 הוסף ליומן</span>
       <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
       <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')" title="מחיקה">✕</span>
       ${d.decisionDate ? `<div class="sugg-reply-due">⏰ להחליט עד: ${formatDateHe(d.decisionDate)}</div>` : ''}
@@ -10509,8 +10597,7 @@ function renderHabits(){
           </div>
           <div class="habit-context-row">
             <span class="habit-inline-actions">
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsAnchor('${h.id}')" title="הוספה כעוגן קבוע בלוח השבועי (רשות)">+עוגן</button>
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה כמשימה חד-פעמית - בלי להתחייב לקבוע, רק לקשר ליומן הפעם הזו">+ משימה</button>
+              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה ליומן — אם תבחר/י 'פעם ב־' זה יהפוך לעוגן">+ הוסף ליומן</button>
               <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">נתחיל בקטן</button>
               ${inlineEditIds.has('habitctx:'+h.id)
                 ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
@@ -10880,7 +10967,7 @@ function listItemHtml(l, item){
     </div>
     <div class="list-item-actions">
       <button type="button" class="subtask-toggle-btn ${subitems.length?'has-content':''}" onclick="toggleListItemSub('${l.id}','${item.id}')">${subOpen?'▾':'▸'} תת-רשימה${subitems.length?' ('+subitems.length+')':''}</button>
-      <span class="list-to-task-btn" onclick="convertListItemToTask('${l.id}','${item.id}')" title="יצירת משימה חדשה מהטקסט הזה">➜ הפוך למשימה</span>
+      <span class="list-to-task-btn" onclick="convertListItemToTask('${l.id}','${item.id}')" title="הוספה ליומן">➜ הוסף ליומן</span>
     </div>
     ${subOpen ? `
     <div class="list-subitems">
@@ -10980,15 +11067,17 @@ function saveInboxItemEdit(id, val){
   if(it && val.trim()){ it.text = val.trim(); saveData(); }
   renderInbox();
 }
-/* ---------- "+ הפוך ל..." — a small picker replacing the old separate "+ עוגן"/"+ משימה" buttons
+/* ---------- "+ הוסף" — the blank-creation picker. Since the task/anchor merge there is only one
+   schedulable kind here: you create a task, and choosing "פעם ב־" in its form is what makes it an
+   anchor. The remaining options are the non-schedule destinations.
+   Originally a picker replacing separate "+ עוגן"/"+ משימה" buttons
    wherever something brand new is being created (schedule grid day columns, the עוגנים/משימות tab
    add-rows). deliberately scoped to blank creation only -- NOT retrofitted onto items that already
    have a home (an existing habit/someday item/suggestion/dilemma), since those already only offer
    the one or two conversions that actually make sense for them; a full 6-option menu on every
    existing item would just be more decisions dangling in front of her, not fewer. */
 const CONVERT_KINDS = [
-  {kind:'task', label:'משימה'},
-  {kind:'anchor', label:'עוגן'},
+  {kind:'task', label:'הוסף ליומן'},
   {kind:'suggestion', label:'העדפה של מישהו אחר'},
   {kind:'dilemma', label:'התלבטות'},
   {kind:'note', label:'פתק'},
@@ -11014,7 +11103,7 @@ function closeConvertMenu(){
 function convertMenuHtml(key, dayIdx, dateStr){
   const isOpen = convertMenuOpenKey === key;
   return `<span class="convert-menu-wrap">
-    <button type="button" class="add-anchor-btn" onclick="event.stopPropagation(); toggleConvertMenu('${key}')">+ הפוך ל...${isOpen?' ▴':' ▾'}</button>
+    <button type="button" class="add-anchor-btn" onclick="event.stopPropagation(); toggleConvertMenu('${key}')">+ הוסף${isOpen?' ▴':' ▾'}</button>
     ${isOpen ? `<div class="convert-menu">${CONVERT_KINDS.map(o=>`<button type="button" class="convert-menu-btn" onclick="event.stopPropagation(); convertBlankTo('${o.kind}', ${dayIdx!=null?dayIdx:'null'}, '${dateStr||''}')">${o.label}</button>`).join('')}</div>` : ''}
   </span>`;
 }
