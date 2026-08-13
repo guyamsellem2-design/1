@@ -5440,7 +5440,7 @@ function applyGcalSyncForAnchor(a, timingOrSyncChanged){
   pushAnchorToGcal(a);
 }
 
-function syncGoogleCalendar(){
+function syncGoogleCalendar(quiet){
   // sync only ever refreshes content from calendars already connected — it must never open a Google sign-in screen.
   // that screen only belongs to connectGoogleCalendar(), used for the initial connect or adding another calendar manually.
   if(gcalSyncing) return;
@@ -5456,7 +5456,7 @@ function syncGoogleCalendar(){
             gcalAccessToken = resp.access_token;
             persistGcalToken(resp.access_token, resp.expires_in);
             resolvePrimaryCalendarId();
-            runGcalSync();
+            runGcalSync(quiet);
           } else {
             flashStatus('החיבור ליומן פג — לחיצה על "חיבור ליומן גוגל" תחדש אותו');
           }
@@ -5469,7 +5469,7 @@ function syncGoogleCalendar(){
     });
     return;
   }
-  runGcalSync();
+  runGcalSync(quiet);
 }
 
 function parseGcalRecurrence(recurrenceArr, fallbackDate){
@@ -5498,7 +5498,7 @@ function parseGcalRecurrence(recurrenceArr, fallbackDate){
   }
   return null;
 }
-function runGcalSync(){
+function runGcalSync(quiet){
   if(gcalSyncing) return;
   gcalSyncing = true;
   renderGcalStatus();
@@ -5613,15 +5613,39 @@ function runGcalSync(){
         if(addedTasks>0) parts.push(`${addedTasks} משימות`);
         if(addedAnchors>0) parts.push(`${addedAnchors} עוגנים קבועים`);
         flashStatus(`יובאו מהיומן: ${parts.join(' + ')}`);
-      } else { saveData(); flashStatus('אין אירועים חדשים ביומן'); }
+      } else { saveData(); if(!quiet) flashStatus('אין אירועים חדשים ביומן'); }
       renderGcalStatus();
     });
   }).catch(()=>{
     gcalSyncing = false;
     renderGcalStatus();
-    flashStatus('הסנכרון עם היומן נכשל');
+    if(!quiet) flashStatus('הסנכרון עם היומן נכשל');
   });
 }
+
+/* ---------- pulling FROM Google while the app is open ----------
+   The push side runs on every save, so anything created here reaches Google immediately. The pull
+   side, though, only ever ran at page load and on the manual "סנכרן עכשיו" — so an event added in
+   Google Calendar while the app was already open never arrived. That is the whole of the "it
+   stopped syncing" report: it was only ever syncing inward once per launch.
+
+   Coming back to the app is the natural moment to check, because that is exactly what happens
+   after adding something in Google Calendar. Throttled so switching tabs repeatedly cannot hammer
+   the API, and quiet, so a check that finds nothing says nothing. */
+let gcalLastAutoPull = 0;
+const GCAL_AUTOPULL_MIN_GAP = 45000;
+function maybeAutoPullGcal(){
+  if(!data.gcalConnected || gcalSyncing) return;
+  const now = Date.now();
+  if(now - gcalLastAutoPull < GCAL_AUTOPULL_MIN_GAP) return;
+  gcalLastAutoPull = now;
+  syncGoogleCalendar(true);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) maybeAutoPullGcal(); });
+window.addEventListener('focus', maybeAutoPullGcal);
+window.addEventListener('online', maybeAutoPullGcal);
+// and a slow heartbeat, for a session left open all day on a desktop
+setInterval(()=>{ if(!document.hidden) maybeAutoPullGcal(); }, 5*60*1000);
 
 let syncMenuOpen = false;
 function toggleSyncMenu(){
