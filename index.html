@@ -2872,6 +2872,28 @@
   .timeline-sheet-date-row .timeline-sheet-freq-wrap{
     flex:1 1 0; min-width:0; align-self:stretch;
     border-radius:12px; border-width:1.5px; padding:0 8px;
+    transition:opacity var(--dur) var(--ease-water), filter var(--dur) var(--ease-water);
+  }
+  /* the one that is not in charge dims out — still readable, still holding what you put in it,
+     simply not the answer being used */
+  .timeline-sheet-date-row .field-label,
+  .timeline-sheet-date-row .timeline-sheet-freq-wrap{
+    transition:opacity var(--dur) var(--ease-water), filter var(--dur) var(--ease-water);
+  }
+  .timeline-sheet-date-row .sched-off{ opacity:.38; filter:grayscale(.7); }
+
+  /* pressing + on the עוגנים tab points at the field that makes something an anchor */
+  .timeline-sheet-freq-wrap.freq-hint{
+    animation:freqHint 1.9s var(--ease-water);
+    border-color:var(--gold) !important;
+  }
+  @keyframes freqHint{
+    0%,100%{ box-shadow:0 0 0 0 rgba(224,168,92,0); }
+    12%    { box-shadow:0 0 0 3px var(--gold), 0 0 20px 3px var(--glow-gold); }
+    70%    { box-shadow:0 0 0 3px var(--gold), 0 0 20px 3px var(--glow-gold); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .timeline-sheet-freq-wrap.freq-hint{ animation:none; box-shadow:0 0 0 3px var(--gold); }
   }
   .timeline-sheet-date-row .field-label{ font-size:12px; color:var(--muted2); gap:4px; }
   .timeline-sheet-date-row input[type=date]{
@@ -5174,6 +5196,7 @@ const GCAL_CLIENT_ID = '205912988147-1nd655pslkb8temou2oonfueep3lhvs4.apps.googl
 const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 let gcalAccessToken = null;
 let gcalSyncing = false;
+let gcalDiag = null;   // what the last pull actually saw, so a silent failure stops being silent
 let gcalPickerOpen = false;
 
 // the access token itself was living only in a JS variable, so every page load/refresh wiped it even
@@ -5508,12 +5531,15 @@ function runGcalSync(quiet){
   const timeMax = new Date(endDates[6].getFullYear(), endDates[6].getMonth(), endDates[6].getDate(), 23,59,59).toISOString();
   const params = new URLSearchParams({ timeMin, timeMax, singleEvents:'true', orderBy:'startTime', maxResults:'250' });
   const calIds = gcalSelectedCalendarIds();
+  gcalDiag = { started:Date.now(), calendars:calIds.slice(), fetched:0, failures:[], skippedExisting:0, addedTasks:0, addedAnchors:0 };
   Promise.all(calIds.map(calId=>
     fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?${params.toString()}`, {
       headers:{ Authorization: 'Bearer '+gcalAccessToken }
-    }).then(r=>{ if(!r.ok) throw new Error('gcal_'+r.status); return r.json(); })
-      .then(json=>(json.items||[]).map(ev=>({ev, calId})))
-      .catch(()=>[])
+    }).then(r=>{ if(!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(json=>{ const items=(json.items||[]); gcalDiag.fetched += items.length; return items.map(ev=>({ev, calId})); })
+      // a failed calendar is RECORDED, not silently turned into an empty result — otherwise a 401
+      // or a wrong calendar id looks exactly like "there was nothing new"
+      .catch(err=>{ gcalDiag.failures.push(calId+' → '+(err && err.message ? err.message : 'failed')); return []; })
   )).then(resultsPerCal=>{
     const allEvents = resultsPerCal.flat();
     const existingTaskIds = new Set();
@@ -5544,7 +5570,7 @@ function runGcalSync(quiet){
     });
     const newRecurringKeys = [...recurringGroups.keys()].filter(key=>!existingAnchorRecIds.has(recurringGroups.get(key).recurringEventId));
 
-    Promise.all(newRecurringKeys.map(key=>{
+    return Promise.all(newRecurringKeys.map(key=>{
       const group = recurringGroups.get(key);
       return fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(group.calId)}/events/${encodeURIComponent(group.recurringEventId)}`, {
         headers:{ Authorization: 'Bearer '+gcalAccessToken }
@@ -5585,7 +5611,7 @@ function runGcalSync(quiet){
       let addedTasks = 0;
       oneTimeEvents.forEach(({ev,calId})=>{
         const gid = calId+':'+ev.id;
-        if(existingTaskIds.has(gid)) return;
+        if(existingTaskIds.has(gid)){ gcalDiag.skippedExisting++; return; }
         existingTaskIds.add(gid);
         let date='', time='', endTime='';
         if(ev.start && ev.start.date){
@@ -5606,6 +5632,7 @@ function runGcalSync(quiet){
 
       gcalSyncing = false;
       data.gcalLastSync = Date.now();
+      gcalDiag.addedTasks = addedTasks; gcalDiag.addedAnchors = addedAnchors;
       const added = addedAnchors + addedTasks;
       if(added>0){
         saveData(); renderTasks(); renderScheduleGrid();
@@ -5613,11 +5640,20 @@ function runGcalSync(quiet){
         if(addedTasks>0) parts.push(`${addedTasks} משימות`);
         if(addedAnchors>0) parts.push(`${addedAnchors} עוגנים קבועים`);
         flashStatus(`יובאו מהיומן: ${parts.join(' + ')}`);
-      } else { saveData(); if(!quiet) flashStatus('אין אירועים חדשים ביומן'); }
+      } else {
+        saveData();
+        // "nothing new" and "the request failed" are different answers and must not look the same
+        if(gcalDiag.failures.length){
+          if(!quiet) flashStatus('היומן החזיר שגיאה — ראה/י פרטים בחלון הסנכרון');
+        } else if(!quiet) flashStatus('אין אירועים חדשים ביומן');
+      }
       renderGcalStatus();
     });
-  }).catch(()=>{
+  }).catch((err)=>{
+    // this catch now really does cover the whole chain, including the recurring-event stage —
+    // before, a throw in there left gcalSyncing stuck true and every later sync bailed at the guard
     gcalSyncing = false;
+    if(gcalDiag) gcalDiag.failures.push('sync → '+(err && err.message ? err.message : 'failed'));
     renderGcalStatus();
     if(!quiet) flashStatus('הסנכרון עם היומן נכשל');
   });
@@ -5660,6 +5696,30 @@ function closeSyncMenu(){
 document.addEventListener('click', (e)=>{
   if(syncMenuOpen && !e.target.closest('#syncMenu')) closeSyncMenu();
 });
+/* The likeliest reason an event added in Google never appears here: it went to a calendar this
+   app was never told about. Only the calendars listed above are ever queried, and by default that
+   is just the personal one. This pulls the account's full calendar list and connects all of them,
+   so "I added it in Google and nothing happened" stops depending on picking the right calendar by
+   hand. Read-only calendars are included — they can be shown here even if we cannot write to them. */
+function addAllGcalCalendars(){
+  if(!gcalAccessToken){ flashStatus('צריך קודם להתחבר ליומן'); return; }
+  fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250', {
+    headers:{ Authorization: 'Bearer '+gcalAccessToken }
+  }).then(r=>{ if(!r.ok) throw new Error(String(r.status)); return r.json(); })
+    .then(json=>{
+      const ids = (json.items||[]).map(c=>c.id).filter(Boolean);
+      if(!ids.length){ flashStatus('לא נמצאו יומנים בחשבון'); return; }
+      const before = gcalSelectedCalendarIds();
+      const merged = Array.from(new Set(before.filter(x=>x!=='primary').concat(ids)));
+      data.gcalCalendarIds = merged;
+      saveData();
+      renderGcalStatus();
+      flashStatus(`חוברו ${merged.length} יומנים — מסנכרן`);
+      gcalLastAutoPull = 0;
+      syncGoogleCalendar();
+    })
+    .catch(err=>{ flashStatus('שליפת רשימת היומנים נכשלה ('+(err&&err.message?err.message:'')+')'); });
+}
 function renderGcalStatus(){
   const el = document.getElementById('gcalSyncRow');
   if(!el) return;
@@ -5682,7 +5742,24 @@ function renderGcalStatus(){
         <input type="text" id="gcalAddCalendarInput" placeholder="מייל/מזהה של יומן נוסף...">
         <button onclick="addGcalCalendarId()">הוסף יומן +</button>
       </div>
+      <button class="reset-btn" style="margin-top:6px; width:100%;" onclick="addAllGcalCalendars()">📥 חבר את כל היומנים שלי</button>
     </div>`;
+  }
+  // What the last pull actually saw. Without this, "nothing arrived" gives you no way to tell
+  // apart: the wrong calendar is connected, the token expired, or the events really were already
+  // there. Only shown once a pull has run.
+  let diagHtml = '';
+  if(gcalDiag){
+    const d = gcalDiag;
+    const bits = [];
+    bits.push(`נבדקו ${d.calendars.length} יומנים · נמצאו ${d.fetched} אירועים בטווח`);
+    if(d.skippedExisting) bits.push(`${d.skippedExisting} כבר היו אצלך`);
+    if(d.addedTasks || d.addedAnchors) bits.push(`נוספו ${d.addedTasks + d.addedAnchors}`);
+    const failed = d.failures.length
+      ? `<div style="color:#e06060; margin-top:2px;">⚠️ ${escapeHtml(d.failures.join(' · '))}</div>` : '';
+    const which = `<div style="opacity:.75; margin-top:2px;">${escapeHtml(d.calendars.join(' · '))}</div>`;
+    diagHtml = `<div class="gcal-status" style="font-size:12.5px; line-height:1.5; margin-top:6px;">
+      ${escapeHtml(bits.join(' · '))}${which}${failed}</div>`;
   }
   const syncErrorHtml = (!currentSyncUser && lastSyncSignInError)
     ? `<div class="gcal-status" style="color:#e06060; margin-top:4px;">⚠️ סנכרון בין מכשירים נכשל: ${escapeHtml(lastSyncSignInError)}</div>`
@@ -5695,7 +5772,7 @@ function renderGcalStatus(){
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
-    ${syncErrorHtml}
+    ${syncErrorHtml}${diagHtml}
     ${pickerHtml}
   `;
 }
@@ -6284,7 +6361,7 @@ function applyListCap(key, itemCount){
 function renderTasks(){
   const el = document.getElementById('taskList');
   const addRowWrap = document.getElementById('taskAddRowWrap');
-  if(addRowWrap) addRowWrap.innerHTML = convertMenuHtml('tasks:add', null, ymd(new Date()));
+  if(addRowWrap) addRowWrap.innerHTML = `<button type="button" class="add-anchor-btn" onclick="addFromTab(null, '${ymd(new Date())}', false)">+ הוסף</button>`;
   renderTaskFilterSelect();
   let list = data.tasks;
   const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
@@ -7341,12 +7418,33 @@ function syncSheetDateToDayPicker(){
   dateEl.value = ymd(shifted);
 }
 function onSheetDateChange(val){
+  setSheetScheduleMode('date');
   if(!val) return;
   const d = new Date(val+'T00:00:00');
   if(isNaN(d)) return;
   timelineSheetSelectedDays.clear();
   timelineSheetSelectedDays.add(d.getDay());
   document.querySelectorAll('.timeline-sheet-day-btn').forEach((btn,i)=>btn.classList.toggle('active', timelineSheetSelectedDays.has(i)));
+}
+
+/* ---------- a date OR a repeat, never both ----------
+   These are two different answers to "when": a single date makes this a one-off task, a repeat
+   makes it an anchor. Something cannot be both, so touching one puts the other to sleep.
+
+   Asleep means dimmed and ignored on save — NOT cleared. Whatever was typed or chosen stays
+   visible and comes straight back if you switch over, because losing what you already entered
+   just to change your mind about the kind would be its own small punishment. */
+let sheetScheduleMode = 'date';   // 'date' | 'repeat'
+function setSheetScheduleMode(mode){
+  sheetScheduleMode = mode;
+  const dateWrap = document.querySelector('#timelineSheet .timeline-sheet-date-row .field-label');
+  const freqWrap = document.querySelector('#timelineSheet .timeline-sheet-freq-wrap');
+  if(dateWrap) dateWrap.classList.toggle('sched-off', mode !== 'date');
+  if(freqWrap) freqWrap.classList.toggle('sched-off', mode !== 'repeat');
+}
+function onSheetFreqChange(val){
+  // picking a real repeat is what turns this into an anchor; "לא חוזר" hands the answer back to the date
+  setSheetScheduleMode(val ? 'repeat' : 'date');
 }
 // a brand-new task with no time yet defaults to right now (rounded to the grid's half-hour
 // step, clamped into the visible hour range) instead of sitting with no time at all -- she can
@@ -7380,7 +7478,7 @@ function renderTimelineSheet(){
     : '';
   const freqHtml = `<div class="timeline-sheet-freq-wrap">
       <span class="timeline-sheet-freq-label">פעם ב־</span>
-      <select id="timelineSheetFreq" class="timeline-sheet-freq">
+      <select id="timelineSheetFreq" class="timeline-sheet-freq" onchange="onSheetFreqChange(this.value)">
         <option value="" ${freqValue===''?'selected':''}>לא חוזר</option>
         <option value="daily" ${freqValue==='daily'?'selected':''}>יום</option>
         <option value="every2days" ${freqValue==='every2days'?'selected':''}>יומיים</option>
@@ -7464,6 +7562,7 @@ function renderTimelineSheet(){
   // is," not an implicit "start typing now." the keyboard should only appear once the person
   // actually taps into a field on their own.
   applyTimelineSheetExpandedState();
+  setSheetScheduleMode(freqValue ? 'repeat' : 'date');
   setupTimelineSheetHandleDrag();
 }
 // the extra-fields block and its own toggle button are rebuilt on every renderTimelineSheet, but
@@ -7625,7 +7724,7 @@ function saveTimelineSheet(){
   // An explicit date wins over "whichever week happens to be on screen" — that is the whole point
   // of the field. Extra selected days clone into the same week as that date, not the viewed one.
   const dateEl = document.getElementById('timelineSheetDate');
-  const baseDate = (dateEl && dateEl.value) ? new Date(dateEl.value+'T00:00:00') : null;
+  const baseDate = (sheetScheduleMode === 'date' && dateEl && dateEl.value) ? new Date(dateEl.value+'T00:00:00') : null;
   const dateForDay = (di)=>{
     if(!baseDate || isNaN(baseDate)) return ymd(viewedWeekDates()[di]);
     const d = new Date(baseDate);
@@ -7639,7 +7738,7 @@ function saveTimelineSheet(){
   // promotes it to an anchor, and clearing the repeat on an anchor demotes it back to a task. So
   // the kind is no longer something chosen up front; it is a consequence of one field.
   const freqElNow = document.getElementById('timelineSheetFreq');
-  const wantedRepeat = freqElNow ? freqElNow.value : '';
+  const wantedRepeat = (sheetScheduleMode === 'repeat' && freqElNow) ? freqElNow.value : '';
   if(kind==='task' && wantedRepeat){ promoteTaskToAnchor(id, wantedRepeat); return; }
   if(kind==='anchor' && !wantedRepeat){ demoteAnchorToTask(id); return; }
   if(kind==='task'){
@@ -7832,7 +7931,7 @@ function renderAnchorsTab(){
   const el = document.getElementById('anchorsList');
   if(!el) return;
   const addRowWrap = document.getElementById('anchorAddRowWrap');
-  if(addRowWrap) addRowWrap.innerHTML = convertMenuHtml('anchors:add', new Date().getDay(), '');
+  if(addRowWrap) addRowWrap.innerHTML = `<button type="button" class="add-anchor-btn" onclick="addFromTab(${new Date().getDay()}, '', true)">+ הוסף</button>`;
   const list = data.anchors.slice().sort((a,b)=>{
     const da = (a.repeatType||'weekly')==='weekly' ? a.day : 7;
     const db = (b.repeatType||'weekly')==='weekly' ? b.day : 7;
@@ -11123,6 +11222,24 @@ function closeConvertMenu(){
   const key = convertMenuOpenKey;
   convertMenuOpenKey = null;
   convertMenuRerender(key);
+}
+/* One button, one form. There is only one thing to create now, so the picker that used to sit in
+   these two tabs was a menu with a single meaningful option in it.
+
+   Pressing it on the עוגנים tab opens the same task form — but flashes the "פעם ב־" field for a
+   moment on the way in. That is the honest way to teach the new model: this tab holds repeating
+   things, and the repeat field is what puts something here. It says so by pointing, once, instead
+   of by adding a permanent explanation. */
+function addFromTab(dayIdx, dateStr, hintRepeat){
+  finishConvert('task', '', '', {dayIdx: dayIdx, dateStr: dateStr||''});
+  if(hintRepeat){
+    setTimeout(()=>{
+      const wrap = document.querySelector('#timelineSheet .timeline-sheet-freq-wrap');
+      if(!wrap) return;
+      wrap.classList.add('freq-hint');
+      setTimeout(()=>wrap.classList.remove('freq-hint'), 1900);
+    }, 260);
+  }
 }
 function convertMenuHtml(key, dayIdx, dateStr){
   const isOpen = convertMenuOpenKey === key;
