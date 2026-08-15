@@ -5539,7 +5539,7 @@ function runGcalSync(quiet){
       .then(json=>{ const items=(json.items||[]); gcalDiag.fetched += items.length; return items.map(ev=>({ev, calId})); })
       // a failed calendar is RECORDED, not silently turned into an empty result — otherwise a 401
       // or a wrong calendar id looks exactly like "there was nothing new"
-      .catch(err=>{ gcalDiag.failures.push(calId+' → '+(err && err.message ? err.message : 'failed')); return []; })
+      .catch(err=>{ gcalDiag.failures.push({calId, code:(err && err.message ? err.message : '?')}); return []; })
   )).then(resultsPerCal=>{
     const allEvents = resultsPerCal.flat();
     const existingTaskIds = new Set();
@@ -5653,7 +5653,7 @@ function runGcalSync(quiet){
     // this catch now really does cover the whole chain, including the recurring-event stage —
     // before, a throw in there left gcalSyncing stuck true and every later sync bailed at the guard
     gcalSyncing = false;
-    if(gcalDiag) gcalDiag.failures.push('sync → '+(err && err.message ? err.message : 'failed'));
+    if(gcalDiag) gcalDiag.failures.push({calId:'הסנכרון', code:(err && err.message ? err.message : '?')});
     renderGcalStatus();
     if(!quiet) flashStatus('הסנכרון עם היומן נכשל');
   });
@@ -5755,8 +5755,20 @@ function renderGcalStatus(){
     bits.push(`נבדקו ${d.calendars.length} יומנים · נמצאו ${d.fetched} אירועים בטווח`);
     if(d.skippedExisting) bits.push(`${d.skippedExisting} כבר היו אצלך`);
     if(d.addedTasks || d.addedAnchors) bits.push(`נוספו ${d.addedTasks + d.addedAnchors}`);
+    // A bare status code is not an answer. Each one says what it actually means for this calendar
+    // and what to do about it, with the fix one tap away.
+    const REASONS = {
+      '404': 'היומן הזה לא קיים עבור החשבון שמחובר — כנראה יומן של חשבון אחר, או שהוא לא שותף אליך',
+      '403': 'אין הרשאה לקרוא את היומן הזה מהחשבון שמחובר',
+      '401': 'ההרשאה פגה — לחיצה על "חיבור ליומן גוגל" תחדש אותה',
+      '400': 'מזהה היומן לא תקין'
+    };
     const failed = d.failures.length
-      ? `<div style="color:#e06060; margin-top:2px;">⚠️ ${escapeHtml(d.failures.join(' · '))}</div>` : '';
+      ? d.failures.map(f=>`<div style="color:#e06060; margin-top:4px; line-height:1.5;">
+            ⚠️ ${escapeHtml(f.calId)} — ${escapeHtml(REASONS[f.code] || ('שגיאה '+f.code))}
+            ${f.calId && f.calId!=='הסנכרון' ? `<span class="del-task" style="color:#e06060; text-decoration:underline;" onclick="removeGcalCalendar('${escapeAttr(f.calId)}')">✕ נתק את היומן הזה</span>` : ''}
+          </div>`).join('')
+      : '';
     const which = `<div style="opacity:.75; margin-top:2px;">${escapeHtml(d.calendars.join(' · '))}</div>`;
     diagHtml = `<div class="gcal-status" style="font-size:12.5px; line-height:1.5; margin-top:6px;">
       ${escapeHtml(bits.join(' · '))}${which}${failed}</div>`;
