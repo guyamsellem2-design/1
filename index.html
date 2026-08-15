@@ -2882,6 +2882,37 @@
   }
   .timeline-sheet-date-row .sched-off{ opacity:.38; filter:grayscale(.7); }
 
+  /* A calendar that failed says one short sentence; the how-to is folded away, because it is a
+     long answer to a question most people ask once. */
+  .gcal-fail{
+    margin-top:8px; padding:10px 12px; border-radius:12px;
+    background:rgba(181,119,107,.10); border:1px solid var(--caution);
+    line-height:1.55;
+  }
+  /* the reason first and on its own line -- a calendar id is often a long address, and
+     leading with it pushes the one thing you actually need to read onto a third line */
+  .gcal-fail-head{ color:var(--caution); font-weight:600; font-size:13.5px; }
+  .gcal-fail-which{
+    font-size:12px; color:var(--muted); margin-top:3px; overflow-wrap:anywhere;
+  }
+  .gcal-fail-toggle{
+    margin-top:6px; font-size:12.5px; color:var(--muted); cursor:pointer;
+    text-decoration:underline; text-underline-offset:2px; user-select:none;
+  }
+  .gcal-fail-steps{
+    display:none; margin:8px 0 0; padding-inline-start:20px;
+    font-size:12.5px; color:var(--text); line-height:1.7;
+  }
+  .gcal-fail.open .gcal-fail-steps{ display:block; }
+  .gcal-fail.open .gcal-fail-toggle::after{ content:' ▴'; }
+  .gcal-fail:not(.open) .gcal-fail-toggle::after{ content:''; }
+  .gcal-fail-steps li{ margin-bottom:5px; }
+  .gcal-fail-act{ margin-top:8px; }
+  .gcal-fail-act span{
+    color:var(--caution); font-size:12.5px; cursor:pointer;
+    text-decoration:underline; text-underline-offset:2px;
+  }
+
   /* pressing + on the עוגנים tab points at the field that makes something an anchor */
   .timeline-sheet-freq-wrap.freq-hint{
     animation:freqHint 1.9s var(--ease-water);
@@ -2952,6 +2983,34 @@
     background-image:none;
     -webkit-mask-image:none; mask-image:none;
   }
+
+  /* ---------------------------------------------------------------------------
+     39. THE SYNC PANEL NEEDS ITS OWN PAPER.
+     Cards get their surface from a watercolour wash, which is built to sit on
+     the page's paper — translucent by design. The sync menu is the one card
+     that floats over live content instead, so the page reads straight through
+     it and anything longer than a line becomes unreadable. It gets the same
+     frosted panel the options menu already uses, so it stays in the same visual
+     language while actually being legible.
+     --------------------------------------------------------------------------- */
+  .sync-menu-panel.open{
+    /* fully opaque on purpose: --surface is alpha-based (it is meant to let the
+       page's paper through) and the cards here switch backdrop-filter off, so a
+       token-based fill would still read straight through to the page underneath */
+    background:color-mix(in srgb, var(--bg) 55%, #ffffff);
+    border:1px solid var(--card-line);
+    border-radius:20px;
+    padding:10px;
+    box-shadow:var(--lift-3);
+  }
+  body.night-mode .sync-menu-panel.open{
+    background:color-mix(in srgb, var(--bg) 88%, #ffffff);
+  }
+  /* inside the panel the blocks are already framed by the panel itself */
+  .sync-menu-panel .gcal-block{ margin-bottom:0; padding:14px 14px; }
+  .sync-menu-panel .gcal-block + .gcal-block{ margin-top:10px; }
+  .sync-menu-panel .gcal-block::before,
+  .sync-menu-panel .gcal-block::after{ display:none; }
 
 </style>
 </head>
@@ -3627,7 +3686,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -3682,6 +3741,7 @@ function loadData(){
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
+      data.gcalWriteCalendarId = parsed.gcalWriteCalendarId || null;
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
@@ -5349,8 +5409,23 @@ function ensureGcalWriteToken(onReady){
     client.requestAccessToken({prompt:''});
   });
 }
+/* The app writes to exactly ONE calendar and reads from all of them. Which one it writes to used
+   to be "whichever is first in the list", so connecting another calendar could silently move where
+   new events land — possibly onto a calendar that is only shared for reading. It is now an explicit
+   choice that survives the list changing order. */
+function gcalWriteCalendarId(){
+  const ids = gcalSelectedCalendarIds();
+  const chosen = data.gcalWriteCalendarId;
+  return (chosen && ids.includes(chosen)) ? chosen : (ids[0] || 'primary');
+}
+function setGcalWriteCalendar(calId){
+  data.gcalWriteCalendarId = calId;
+  saveData();
+  renderGcalStatus();
+  flashStatus('היומן הראשי עודכן');
+}
 function pushEventToGcal(eventBody, existingEventId, onSuccess){
-  const calId = gcalSelectedCalendarIds()[0] || 'primary';
+  const calId = gcalWriteCalendarId();
   const method = existingEventId ? 'PATCH' : 'POST';
   const url = existingEventId
     ? `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(existingEventId)}`
@@ -5733,11 +5808,19 @@ function renderGcalStatus(){
   let pickerHtml = '';
   if(gcalPickerOpen){
     pickerHtml = `<div class="gcal-picker">
-      ${selectedIds.length ? selectedIds.map(calId=>`
-        <div class="gcal-cal-row">
-          <span style="flex:1">${escapeHtml(gcalCalendarLabel(calId))}</span>
+      ${selectedIds.length ? selectedIds.map(calId=>{
+        const isWrite = calId === gcalWriteCalendarId();
+        return `<div class="gcal-cal-row">
+          <span style="flex:1; min-width:0; overflow-wrap:anywhere;">${escapeHtml(gcalCalendarLabel(calId))}
+            <span style="display:block; font-size:11.5px; opacity:.75;">${isWrite ? 'ראשי · האפליקציה כותבת אליו וקוראת ממנו' : 'משני · קריאה בלבד'}</span>
+          </span>
+          ${isWrite ? '' : `<span class="del-task" style="white-space:nowrap;" onclick="setGcalWriteCalendar('${escapeAttr(calId)}')" title="הפיכה ליומן הראשי">★ ראשי</span>`}
           <span class="del-task" onclick="removeGcalCalendar('${escapeAttr(calId)}')" title="מחיקה">✕ נתק</span>
-        </div>`).join('') : '<div class="empty">לא נבחרו יומנים</div>'}
+        </div>`;
+      }).join('') : '<div class="empty">לא נבחרו יומנים</div>'}
+      <div class="hint" style="margin-top:6px; font-size:12px; line-height:1.5;">
+        האפליקציה כותבת רק ליומן הראשי. משאר היומנים היא רק קוראת.
+      </div>
       <div class="add-row" style="margin:8px 0 0;">
         <input type="text" id="gcalAddCalendarInput" placeholder="מייל/מזהה של יומן נוסף...">
         <button onclick="addGcalCalendarId()">הוסף יומן +</button>
@@ -5761,19 +5844,41 @@ function renderGcalStatus(){
     // address (school/work) is a different account entirely, and its calendar genuinely does not
     // exist from the signed-in account's point of view. Naming the connected account makes that
     // concrete, and sharing is the actual fix.
+    // One short sentence saying what is wrong, and the steps folded away behind "פרטים" so the
+    // panel does not turn into a wall of text for something most people will only hit once.
     const acct = data.gcalAccountEmail || 'החשבון שמחובר';
-    const REASONS = {
-      '404': 'היומן הזה לא קיים עבור ' + acct + ' — כנראה חשבון גוגל אחר (עבודה/לימודים). כדי שיסונכרן, צריך לשתף אותו מהחשבון ההוא אל ' + acct + ', ואז ללחוץ "חבר את כל היומנים שלי"',
-      '403': 'אין הרשאה לקרוא את היומן הזה מהחשבון שמחובר',
-      '401': 'ההרשאה פגה — לחיצה על "חיבור ליומן גוגל" תחדש אותה',
-      '400': 'מזהה היומן לא תקין'
+    const FAILS = {
+      '404': {
+        short: 'היומן הזה שייך לחשבון גוגל אחר',
+        steps: [
+          'זה קורה כשהיומן הוא של חשבון נפרד — עבודה או לימודים. החשבון שמחובר כאן הוא ' + acct + ', והוא פשוט לא רואה אותו.',
+          'היכנס/י ליומן גוגל מהחשבון השני (זה שמבקש ממך סיסמה בנפרד).',
+          'בעמודה השמאלית, העבר/י את העכבר על שם היומן ולחץ/י על שלוש הנקודות.',
+          'בחר/י "הגדרות ושיתוף".',
+          'גלול/י אל "שיתוף עם אנשים או קבוצות ספציפיות" ולחץ/י "הוספת אנשים".',
+          'הוסף/י את הכתובת ' + acct + ' עם הרשאת "הצגת כל פרטי האירועים", ושמור/י.',
+          'חזור/חזרי לכאן ולחץ/י על "חבר את כל היומנים שלי".',
+          'אם אין אפשרות להוסיף כתובת חיצונית — מנהל המערכת של המוסד חסם שיתוף החוצה, ואז אי אפשר לחבר את היומן הזה.'
+        ]
+      },
+      '403': { short:'אין הרשאה לקרוא את היומן הזה',
+        steps:['בעל היומן צריך לשתף אותו עם ' + acct + ' עם הרשאת "הצגת כל פרטי האירועים".'] },
+      '401': { short:'ההרשאה של החיבור פגה',
+        steps:['לחץ/י על "חיבור ליומן גוגל" כדי לחדש אותה. הנתונים שלך לא נפגעים.'] },
+      '400': { short:'מזהה היומן לא תקין',
+        steps:['נתק/י את היומן הזה והוסף/י אותו מחדש, או לחץ/י על "חבר את כל היומנים שלי".'] }
     };
-    const failed = d.failures.length
-      ? d.failures.map(f=>`<div style="color:#e06060; margin-top:4px; line-height:1.5;">
-            ⚠️ ${escapeHtml(f.calId)} — ${escapeHtml(REASONS[f.code] || ('שגיאה '+f.code))}
-            ${f.calId && f.calId!=='הסנכרון' ? `<span class="del-task" style="color:#e06060; text-decoration:underline;" onclick="removeGcalCalendar('${escapeAttr(f.calId)}')">✕ נתק את היומן הזה</span>` : ''}
-          </div>`).join('')
-      : '';
+    const failed = d.failures.map(f=>{
+      const info = FAILS[f.code] || { short:'שגיאה '+f.code, steps:[] };
+      return `<div class="gcal-fail">
+        <div class="gcal-fail-head">⚠️ ${escapeHtml(info.short)}</div>
+        <div class="gcal-fail-which">${escapeHtml(f.calId)}</div>
+        ${info.steps.length ? `
+          <div class="gcal-fail-toggle" onclick="this.parentNode.classList.toggle('open')">פרטים ומה עושים ▾</div>
+          <ol class="gcal-fail-steps">${info.steps.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ol>` : ''}
+        ${f.calId && f.calId!=='הסנכרון' ? `<div class="gcal-fail-act"><span onclick="removeGcalCalendar('${escapeAttr(f.calId)}')">✕ נתק את היומן הזה</span></div>` : ''}
+      </div>`;
+    }).join('');
     const which = `<div style="opacity:.75; margin-top:2px;">${escapeHtml(d.calendars.join(' · '))}</div>`;
     diagHtml = `<div class="gcal-status" style="font-size:12.5px; line-height:1.5; margin-top:6px;">
       ${escapeHtml(bits.join(' · '))}${which}${failed}</div>`;
@@ -7483,7 +7588,9 @@ function renderTimelineSheet(){
   // squeezed into the same row as the name, at its left edge, instead of a row of its own, so it
   // doesn't grow the sheet -- shown for both tasks and anchors now
   const domainPickerHtml = `<select id="timelineSheetDomain" class="timeline-sheet-domain">${domainOptions(rec.domain)}</select>`;
-  const timeValue = (kind==='task' && !rec.time) ? currentRoundedTimeSlot() : (rec.time||'');
+  // both kinds now open with a real time rather than an empty field, since neither can be saved
+  // without one
+  const timeValue = rec.time || currentRoundedTimeSlot();
   // frequency shortcut -- anchors only (tasks have no repeat concept). includes ALL existing
   // repeatType values, not just the four requested ones, so opening this small sheet and saving
   // without touching the field can never silently downgrade a חד-פעמי/שנתי anchor to something else.
@@ -7722,6 +7829,11 @@ function saveTimelineSheet(){
   if(!text) return;
   const timeEl = document.getElementById('timelineSheetTime');
   const time = timeEl ? timeEl.value : '';
+  if(!time){
+    flashStatus('צריך לבחור שעה — בלי שעה זה שייך ל"דברים לעשות" או להרגלים');
+    if(timeEl){ const btn = timeEl.closest('.time-picker-wrap'); if(btn) btn.querySelector('.time-picker-btn').focus(); }
+    return;
+  }
   // The 🌱 טיוטה toggle was removed: being able to drag a block around the hour grid and type
   // straight onto it already covers "this isn't final yet" far better than a checkbox did.
   // Saving through this sheet clears any flag left over from before, so no item is stranded
@@ -9565,6 +9677,7 @@ function importData(e){
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
+      data.gcalWriteCalendarId = parsed.gcalWriteCalendarId || null;
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
@@ -9693,8 +9806,12 @@ function toggleTimePicker(id, evt){
   const current = hidden.value;
   const panel = document.createElement('div');
   panel.className = 'time-picker-panel';
+  // "ללא שעה" is offered for every field EXCEPT a schedule item's start time. Something without a
+  // time is not a task or an anchor — it belongs in "דברים לעשות" or in the habits list — so the
+  // form no longer offers a way to create one. An end time may legitimately be left empty.
+  const allowClear = (id !== 'timelineSheetTime');
   panel.innerHTML = `
-    <button type="button" class="time-picker-clear" onclick="setTimePickerValue('${id}', '')">✕ ללא שעה</button>
+    ${allowClear ? `<button type="button" class="time-picker-clear" onclick="setTimePickerValue('${id}', '')">✕ ללא שעה</button>` : ''}
     <div class="time-picker-grid">${TIME_PICKER_OPTIONS.map(t=>`<button type="button" class="time-picker-opt ${t===current?'active':''}" onclick="setTimePickerValue('${id}', '${t}')">${t}</button>`).join('')}</div>
   `;
   wrap.appendChild(panel);
@@ -9767,7 +9884,8 @@ function resetAll(){
   const keepGcalConnected = data.gcalConnected;
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], onboardingDismissed:true};
+  const keepGcalWriteCalendarId = data.gcalWriteCalendarId;
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalWriteCalendarId:keepGcalWriteCalendarId, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], onboardingDismissed:true};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
