@@ -5757,8 +5757,13 @@ function renderGcalStatus(){
     if(d.addedTasks || d.addedAnchors) bits.push(`נוספו ${d.addedTasks + d.addedAnchors}`);
     // A bare status code is not an answer. Each one says what it actually means for this calendar
     // and what to do about it, with the fix one tap away.
+    // 404 here almost always means a SECOND Google account, not a broken calendar: a Workspace
+    // address (school/work) is a different account entirely, and its calendar genuinely does not
+    // exist from the signed-in account's point of view. Naming the connected account makes that
+    // concrete, and sharing is the actual fix.
+    const acct = data.gcalAccountEmail || 'החשבון שמחובר';
     const REASONS = {
-      '404': 'היומן הזה לא קיים עבור החשבון שמחובר — כנראה יומן של חשבון אחר, או שהוא לא שותף אליך',
+      '404': 'היומן הזה לא קיים עבור ' + acct + ' — כנראה חשבון גוגל אחר (עבודה/לימודים). כדי שיסונכרן, צריך לשתף אותו מהחשבון ההוא אל ' + acct + ', ואז ללחוץ "חבר את כל היומנים שלי"',
       '403': 'אין הרשאה לקרוא את היומן הזה מהחשבון שמחובר',
       '401': 'ההרשאה פגה — לחיצה על "חיבור ליומן גוגל" תחדש אותה',
       '400': 'מזהה היומן לא תקין'
