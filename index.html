@@ -3012,6 +3012,25 @@
   .sync-menu-panel .gcal-block::before,
   .sync-menu-panel .gcal-block::after{ display:none; }
 
+  /* ---------------------------------------------------------------------------
+     40. LINKS ON LIST ITEMS.
+     The 🔗 next to a name is the whole point of the feature, so it is a real
+     touch target rather than a decorative glyph — and it is the one thing in the
+     row that navigates away, so it stays visually quiet until you reach for it.
+     --------------------------------------------------------------------------- */
+  .list-item-link{
+    flex-shrink:0; text-decoration:none; font-size:15px; line-height:1;
+    padding:6px; border-radius:8px; opacity:.7;
+    transition:opacity var(--dur) var(--ease-water), background var(--dur) var(--ease-water);
+  }
+  .list-item-link:hover, .list-item-link:focus-visible{ opacity:1; background:var(--surface3); }
+  .list-item-link-edit{ margin-top:8px; }
+  .list-item-link-row{
+    display:flex; align-items:center; gap:8px; margin-top:6px;
+    font-size:12.5px; overflow-wrap:anywhere;
+  }
+  .list-item-link-row a{ flex:1; min-width:0; color:var(--muted); }
+
 </style>
 </head>
 <body>
@@ -3798,7 +3817,7 @@ function loadData(){
       data.procTrueWantNote = parsed.procTrueWantNote || '';
       data.inspiringVideos = parsed.inspiringVideos || [];
       data.habits = (parsed.habits || []).map(h=>({smallStarts:[], ...h}));
-      data.lists = (parsed.lists || []).map(l=>({...l, items:(l.items||[]).map(i=>({favorite:false, subitems:[], ...i}))}));
+      data.lists = (parsed.lists || []).map(l=>({...l, items:(l.items||[]).map(i=>({favorite:false, subitems:[], link:'', ...i}))}));
       data.inbox = parsed.inbox || [];
       data.onboardingDismissed = !!parsed.onboardingDismissed;
       data.generalDilemmas = parsed.generalDilemmas || [];
@@ -3976,7 +3995,7 @@ function isEverythingCollapsedOnCurrentView(){
       const hasUngrouped = chips.some(c=>!c.headerId || !headers.some(h=>h.id===c.headerId));
       return headers.every(h=>collapsedChipHeaders.has(bank+':'+h.id)) && (!hasUngrouped || collapsedChipHeaders.has(bank+':'));
     }
-    return (l.items||[]).every(i => !listItemSubOpen.has(l.id+':'+i.id));
+    return (l.items||[]).every(i => !listItemSubOpen.has(l.id+':'+i.id) && !listItemLinkOpen.has(l.id+':'+i.id));
   }
   return true;
 }
@@ -4027,7 +4046,7 @@ function collapseAllOnCurrentView(){
         (l.chipHeaders||[]).forEach(h=>collapsedChipHeaders.add(bank+':'+h.id));
         collapsedChipHeaders.add(bank+':');
       } else if(l){
-        (l.items||[]).forEach(i=>listItemSubOpen.delete(l.id+':'+i.id));
+        (l.items||[]).forEach(i=>{ listItemSubOpen.delete(l.id+':'+i.id); listItemLinkOpen.delete(l.id+':'+i.id); });
       }
       renderListsView();
     }
@@ -10888,6 +10907,7 @@ function renderHabits(){
    every solo on the list, instead of retyping it each time. */
 let activeListId = null;
 const listItemSubOpen = new Set(); // 'listId:itemId' keys
+const listItemLinkOpen = new Set(); // 'listId:itemId' keys -- the link editor, same shape as above
 const listNameEditIds = new Set();
 let applyPickerFor = null; // {listId, itemId} or null
 let applyPickerSelected = new Set();
@@ -10919,13 +10939,73 @@ function saveListNameEdit(id, value){
   if(l && value.trim()) l.name = value.trim();
   saveData();
 }
+/* ---------- links on list items ----------
+   A regular list is often a list of things that live somewhere else: a song to learn, a place to
+   go, something to buy. The link is a separate field rather than part of the text, so the name
+   stays yours to write and edit -- and so tapping the text still opens the inline editor exactly
+   as before, instead of navigating away mid-edit. */
+// same normalization the videos and decision-helper links already use: a bare domain gets https://
+// in front of it, and anything that isn't already an http(s) address ends up as a harmless relative
+// https:// URL rather than something the browser would treat as executable.
+function normalizeLinkUrl(raw){
+  const url = (raw||'').trim();
+  if(!url) return '';
+  return /^https?:\/\//i.test(url) ? url : 'https://' + url;
+}
+// Deliberately narrow, and only for the auto-attach shortcut: the text has to be nothing but an
+// unmistakable address -- http(s):// or www. A bare "ksp.co.il" or "index.html" is left alone,
+// because guessing wrong turns an ordinary item name into a link nobody asked for. Typing a bare
+// domain into the קישור field still works; there you have already said it is a link.
+function looksLikeUrl(text){
+  return /^(https?:\/\/\S+|www\.\S+\.\S+)$/i.test((text||'').trim());
+}
+// a short, readable stand-in for a long address -- the domain is the part that tells you where
+// you're about to go, and the rest rarely fits on a phone anyway
+function linkLabel(url){
+  return (url||'').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
+}
+function toggleListItemLink(listId, itemId){
+  const key = listId+':'+itemId;
+  if(listItemLinkOpen.has(key)) listItemLinkOpen.delete(key); else listItemLinkOpen.add(key);
+  renderListsView();
+  updateCollapseAllButton();
+  if(listItemLinkOpen.has(key)){
+    requestAnimationFrame(()=>{ const el = document.getElementById('listItemLinkInput-'+listId+'-'+itemId); if(el){ el.focus(); el.select(); } });
+  }
+}
+function saveListItemLink(listId, itemId){
+  const input = document.getElementById('listItemLinkInput-'+listId+'-'+itemId);
+  const item = listItemById(listId, itemId);
+  if(!item || !input) return;
+  item.link = normalizeLinkUrl(input.value);
+  listItemLinkOpen.delete(listId+':'+itemId);
+  saveData();
+  renderListsView();
+  updateCollapseAllButton();
+  flashStatus(item.link ? 'הקישור נשמר' : 'הקישור הוסר');
+}
+function removeListItemLink(listId, itemId){
+  const item = listItemById(listId, itemId);
+  if(!item) return;
+  item.link = '';
+  listItemLinkOpen.delete(listId+':'+itemId);
+  saveData();
+  renderListsView();
+  updateCollapseAllButton();
+  flashStatus('הקישור הוסר');
+}
 function addListItem(listId){
   const input = document.getElementById('newListItemInput-'+listId);
   const text = input.value.trim();
   if(!text) return;
   const l = listById(listId);
   if(!l) return;
-  l.items.push({id:uid(), text, done:false, favorite:false, subitems:[], createdAt:Date.now()});
+  // pasting an address straight into the add field is the obvious gesture, so it just works:
+  // the item gets the link attached, and the name starts as the readable part of the address
+  // (still editable afterwards like any other item name)
+  const isUrl = looksLikeUrl(text);
+  const link = isUrl ? normalizeLinkUrl(text) : '';
+  l.items.push({id:uid(), text: isUrl ? linkLabel(link) : text, link, done:false, favorite:false, subitems:[], createdAt:Date.now()});
   input.value='';
   saveData();
   renderListsView();
@@ -10935,6 +11015,7 @@ function deleteListItem(listId, itemId){
   if(!l) return;
   l.items = l.items.filter(i=>i.id!==itemId);
   listItemSubOpen.delete(listId+':'+itemId);
+  listItemLinkOpen.delete(listId+':'+itemId);
   saveData();
   renderListsView();
 }
@@ -11209,6 +11290,8 @@ function listChipBankHtml(l){
 function listItemHtml(l, item){
   const key = l.id+':'+item.id;
   const subOpen = listItemSubOpen.has(key);
+  const linkOpen = listItemLinkOpen.has(key);
+  const link = item.link || '';
   const subitems = item.subitems || [];
   const editKey = 'listitem:'+key;
   const showingPicker = applyPickerFor && applyPickerFor.listId===l.id && applyPickerFor.itemId===item.id;
@@ -11220,13 +11303,27 @@ function listItemHtml(l, item){
       ${inlineEditIds.has(editKey)
         ? `<input type="text" class="inline-text-edit" value="${escapeAttr(item.text)}" data-inline-key="${editKey}" onblur="this.dataset.cancelled ? cancelInlineEdit('${editKey}', renderListsView) : (saveListItemTextEdit('${l.id}','${item.id}', this.value), cancelInlineEdit('${editKey}', renderListsView))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
         : `<span class="list-item-text ${item.done?'done':''}" data-inline-key="${editKey}" onclick="inlineEditToggle('${editKey}', renderListsView)">${escapeHtml(item.text)}</span>`}
+      ${link ? `<a class="list-item-link" href="${escapeAttr(link)}" target="_blank" rel="noopener" title="${escapeAttr(link)}">🔗</a>` : ''}
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleListItemFavorite('${l.id}','${item.id}')" title="${item.favorite?'הסר ממועדפים':'הוסף למועדפים'}">${item.favorite?'★':'☆'}</span>
       <span class="del-task" onclick="deleteListItem('${l.id}','${item.id}')" title="מחיקה">✕</span>
     </div>
     <div class="list-item-actions">
       <button type="button" class="subtask-toggle-btn ${subitems.length?'has-content':''}" onclick="toggleListItemSub('${l.id}','${item.id}')">${subOpen?'▾':'▸'} תת-רשימה${subitems.length?' ('+subitems.length+')':''}</button>
+      <button type="button" class="subtask-toggle-btn ${link?'has-content':''}" onclick="toggleListItemLink('${l.id}','${item.id}')">${linkOpen?'▾':'▸'} קישור</button>
       <span class="list-to-task-btn" onclick="convertListItemToTask('${l.id}','${item.id}')" title="הוספה ליומן">➜ הוסף ליומן</span>
     </div>
+    ${linkOpen ? `
+    <div class="list-item-link-edit">
+      <div class="add-row">
+        <input type="text" id="listItemLinkInput-${l.id}-${item.id}" dir="ltr" placeholder="קישור..." value="${escapeAttr(link)}"
+          onkeydown="if(event.key==='Enter') saveListItemLink('${l.id}','${item.id}'); else if(event.key==='Escape') toggleListItemLink('${l.id}','${item.id}');">
+        <button onclick="saveListItemLink('${l.id}','${item.id}')">שמור</button>
+      </div>
+      ${link ? `<div class="list-item-link-row">
+        <a href="${escapeAttr(link)}" target="_blank" rel="noopener">${escapeHtml(linkLabel(link))}</a>
+        <span class="del-task" onclick="removeListItemLink('${l.id}','${item.id}')" title="הסרת הקישור">✕</span>
+      </div>` : ''}
+    </div>` : ''}
     ${subOpen ? `
     <div class="list-subitems">
       ${subitems.map(s=>`<div class="list-subitem-row" data-drag-id="${s.id}">
