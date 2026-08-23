@@ -145,8 +145,30 @@
   }
   .tag .dot{width:7px; height:7px; border-radius:50%;}
   .tag:not(.life){border-radius:7px;}   /* same shape language as the filter chips */
+  .tag .sec{opacity:.68;}
   .picker .opt:not(.life){border-radius:9px;}
+  .picker .opt.dashed{border-style:dashed; background:transparent; color:var(--muted2);}
   .addbar .pill.filed{border-style:solid; color:var(--text);}
+
+  .inline-add{display:flex; align-items:center; gap:4px;}
+  .inline-add input{
+    background:var(--surface2); border:1px solid var(--gold); border-radius:9px;
+    padding:7px 11px; font-family:inherit; font-size:13.5px; color:var(--text); width:130px;
+  }
+  .inline-add input:focus{outline:none;}
+  .inline-add button{
+    background:transparent; border:none; cursor:pointer; font-size:14px;
+    padding:6px 7px; border-radius:8px; font-family:inherit;
+  }
+  .inline-add .ok{color:var(--gold);}
+  .inline-add .no{color:var(--muted2);}
+  .hint-line{margin-top:8px; font-size:12px; color:var(--muted2); line-height:1.55;}
+
+  /* inside an open notebook the second row shows where you are, not another choice */
+  .shelf-bar.sub .shelf-chip.nb-name{
+    border:none; background:transparent; color:var(--text); font-weight:600; padding-inline:4px;
+  }
+  .shelf-bar.sub .shelf-chip.back{border-style:dashed; color:var(--muted2);}
   .card-pin{position:absolute; top:9px; left:10px; font-size:11px; opacity:.6;}
 
   .empty-state{
@@ -359,7 +381,7 @@
    ============================================================================ */
 
 /* Two catalogues, not one — and this is the point.
-   A life-domain says "this belongs to a part of my life". A shelf says "this is a pile of
+   A life-domain says "this belongs to a part of my life". A notebook says "this is a body of
    things that is deliberately NOT a part of my life". Putting אלבום ויצירה and קניות in the
    same row of chips reads as if they were the same kind of answer, and they are not. */
 const LIFE_DOMAINS = [
@@ -372,10 +394,21 @@ const LIFE_DOMAINS = [
   {id:'home',    name:'בית',          color:'#cf9a5c'},
   {id:'rest',    name:'מנוחה וטבע',   color:'#3fae7a'},
 ];
-const SHELVES = [
-  {id:'shop', name:'קניות'},
-  {id:'gear', name:'גיטרה וציוד'},
-  {id:'read', name:'לקרוא ולראות'},
+
+/* Notebooks, OneNote-style — with the one rule OneNote gets wrong reversed:
+   a notebook does NOT have to be opened to a section before you can write in it.
+   Sections are optional. A notebook can hold loose notes and sections at the same time,
+   and a note can sit in a notebook without belonging to any section at all. */
+let notebooks = [
+  {id:'shop', name:'קניות', sections:[
+    {id:'shop-super', name:'סופר'},
+    {id:'shop-gifts', name:'מתנות'},
+  ]},
+  {id:'gear', name:'גיטרה וציוד', sections:[]},
+  {id:'read', name:'לקרוא ולראות', sections:[
+    {id:'read-books', name:'ספרים'},
+    {id:'read-watch', name:'לראות'},
+  ]},
 ];
 
 const CARD_COLORS = ['', '#F6D9C8', '#DCE8DA', '#D8E4EE', '#EDE0F0', '#F3E6C8'];
@@ -387,15 +420,21 @@ const NIGHT_COLORS = {
 let items = [];
 let openId = null;
 let nightMode = false;
-// two-level filter: pick the world first, then (optionally) the specific one inside it.
-// at rest this is four chips instead of a dozen, and the two worlds never sit side by side.
-let activeGroup = 'all';   // 'all' | 'domain' | 'shelf' | 'none'
-let activeId = '';         // a specific domain/shelf id, or '' for the whole group
+// Layered filter: pick the world first, then (optionally) the one inside it, and inside a
+// notebook (optionally) one of its sections. At rest this is four chips instead of a dozen,
+// and the two worlds never sit side by side.
+let activeGroup = 'all';   // 'all' | 'domain' | 'notebook' | 'none'
+let activeId = '';         // a specific domain / notebook id, or '' for the whole group
+let activeSection = '';    // a section id inside the open notebook, 'loose', or ''
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const domainById = id => LIFE_DOMAINS.find(d => d.id === id);
-const shelfById = id => SHELVES.find(s => s.id === id);
+const notebookById = id => notebooks.find(n => n.id === id);
+function sectionById(nbId, secId){
+  const nb = notebookById(nbId);
+  return nb ? (nb.sections||[]).find(s => s.id === secId) : null;
+}
 
 function normalizeUrl(raw){
   const u = (raw||'').trim();
@@ -410,9 +449,9 @@ function looksLikeUrl(t){
 }
 
 /* ---------- storage (prototype only — its own key, cannot touch the real app) ---------- */
-const KEY = 'notebookPrototype.v2';
+const KEY = 'notebookPrototype.v3';
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({items, nightMode})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({items, notebooks, nightMode})); }catch(e){}
 }
 function load(){
   try{
@@ -420,6 +459,7 @@ function load(){
     if(raw){
       const p = JSON.parse(raw);
       items = p.items || [];
+      if(p.notebooks) notebooks = p.notebooks;
       nightMode = !!p.nightMode;
       return true;
     }
@@ -430,12 +470,13 @@ function load(){
 /* ---------- seed: one of each shape, to show they are the same shape ----------
    domain and shelf are two separate fields on purpose. An item has one, the other, or neither. */
 function blank(extra){
-  return Object.assign({ id:uid(), title:'', body:'', pinned:false, domain:'', shelf:'',
+  return Object.assign({ id:uid(), title:'', body:'', pinned:false,
+    domain:'', notebook:'', section:'',
     color:'', checks:[], links:[] }, extra);
 }
 function seed(){
   items = [
-    blank({ title:'רשימת קניות', pinned:true, shelf:'shop', color:'#DCE8DA',
+    blank({ title:'רשימת קניות', pinned:true, notebook:'shop', section:'shop-super', color:'#DCE8DA',
       checks:[
         {id:uid(), text:'קפה', done:true},
         {id:uid(), text:'לחם מחמצת', done:false},
@@ -443,18 +484,26 @@ function seed(){
         {id:uid(), text:'עגבניות שרי', done:false},
       ] }),
 
+    // a loose note inside a notebook that HAS sections — belongs to no section, and that is fine
+    blank({ title:'לבדוק אם יש קופון', notebook:'shop',
+      body:'היה משהו באפליקציה של הסופר, לבדוק לפני הקנייה הבאה.' }),
+
+    blank({ title:'מתנה ליום הולדת של אמא', notebook:'shop', section:'shop-gifts',
+      checks:[{id:uid(), text:'לבדוק אם היא כבר קנתה את הספר', done:false}] }),
+
     blank({ title:'מחשבות על האלבום', domain:'album',
       body:'הצליל של השיר השלישי עדיין לא יושב. אולי הבעיה היא לא המיקס אלא הטמפו — לנסות להוריד 4 BPM ולראות מה קורה לתחושה.\n\nהרעיון של לפתוח את האלבום דווקא בשקט, בלי תופים, נשאר איתי כבר שבועיים. זה כנראה אומר משהו.',
       links:[{id:uid(), url:'https://youtube.com/watch?v=example'}] }),
 
-    blank({ title:'ספרים לקרוא', shelf:'read', color:'#D8E4EE',
+    blank({ title:'ספרים לקרוא', notebook:'read', section:'read-books', color:'#D8E4EE',
       checks:[
         {id:uid(), text:'הגן הסודי', done:false},
         {id:uid(), text:'מוסר הרוח', done:false},
       ],
       links:[{id:uid(), url:'https://www.goodreads.com'}] }),
 
-    blank({ title:'מיתרים ופיקאפים', shelf:'gear',
+    // a notebook with no sections at all — nothing forces you to make any
+    blank({ title:'מיתרים ופיקאפים', notebook:'gear',
       body:'הפיקאפ בגיטרה השנייה מזמזם כשאני מתקרב למחשב. לבדוק אם זה הכבל.',
       checks:[{id:uid(), text:'להזמין סט מיתרים 10-46', done:false}],
       links:[{id:uid(), url:'https://thomann.de'}] }),
@@ -484,9 +533,15 @@ function visibleItems(){
   return items
     .filter(it => {
       if(activeGroup === 'all') return true;
-      if(activeGroup === 'none') return !it.domain && !it.shelf;
+      if(activeGroup === 'none') return !it.domain && !it.notebook;
       if(activeGroup === 'domain') return activeId ? it.domain === activeId : !!it.domain;
-      if(activeGroup === 'shelf')  return activeId ? it.shelf  === activeId : !!it.shelf;
+      if(activeGroup === 'notebook'){
+        if(!activeId) return !!it.notebook;
+        if(it.notebook !== activeId) return false;
+        if(!activeSection) return true;                  // the whole notebook, sections and loose alike
+        if(activeSection === 'loose') return !it.section; // notes that never got filed into a section
+        return it.section === activeSection;
+      }
       return true;
     })
     .filter(it => matchesSearch(it, q))
@@ -498,30 +553,53 @@ function cardColor(it){
   return nightMode ? (NIGHT_COLORS[it.color] || it.color) : it.color;
 }
 
-/* Level one is the world: everything, my life, my shelves, or unfiled. Level two only appears
-   once you have picked a world, and only ever shows things from inside it — so a life-domain and
-   a shelf are never two chips next to each other pretending to be the same kind of answer. */
+/* Level one is the world: everything, my life, my notebooks, or unfiled. The rows below only
+   ever show things from inside the chosen world — so a life-domain and a notebook are never two
+   chips next to each other pretending to be the same kind of answer. Opening a notebook replaces
+   the second row with that notebook's sections, so the bar is never more than two rows deep. */
 function renderShelfBar(){
   const nDomain = items.filter(i => i.domain).length;
-  const nShelf  = items.filter(i => i.shelf).length;
-  const nNone   = items.filter(i => !i.domain && !i.shelf).length;
+  const nNb     = items.filter(i => i.notebook).length;
+  const nNone   = items.filter(i => !i.domain && !i.notebook).length;
 
   const top = [`<div class="shelf-chip ${activeGroup==='all'?'active':''}" onclick="setGroup('all')">הכל (${items.length})</div>`];
-  if(nDomain) top.push(`<div class="shelf-chip life ${activeGroup==='domain'?'active':''}" onclick="setGroup('domain')">🌱 נושאי חיים (${nDomain})</div>`);
-  if(nShelf)  top.push(`<div class="shelf-chip ${activeGroup==='shelf'?'active':''}" onclick="setGroup('shelf')">🏷 מדפים (${nShelf})</div>`);
+  if(nDomain) top.push(`<div class="shelf-chip life ${activeGroup==='domain'?'active':''}" onclick="setGroup('domain')">🌱 תחומי חיים (${nDomain})</div>`);
+  if(nNb)     top.push(`<div class="shelf-chip ${activeGroup==='notebook'?'active':''}" onclick="setGroup('notebook')">📓 מחברות (${nNb})</div>`);
   if(nNone)   top.push(`<div class="shelf-chip ${activeGroup==='none'?'active':''}" onclick="setGroup('none')">ללא שיוך (${nNone})</div>`);
 
   let sub = '';
-  if(activeGroup === 'domain' || activeGroup === 'shelf'){
-    const isLife = activeGroup === 'domain';
-    const catalog = isLife ? LIFE_DOMAINS : SHELVES;
-    const countOf = e => items.filter(i => (isLife ? i.domain : i.shelf) === e.id).length;
-    const used = catalog.filter(e => countOf(e) > 0);
+
+  if(activeGroup === 'domain'){
+    const countOf = d => items.filter(i => i.domain === d.id).length;
+    const used = LIFE_DOMAINS.filter(d => countOf(d) > 0);
     sub = `<div class="shelf-bar sub">
-      <div class="shelf-chip ${!activeId?'active':''} ${isLife?'life':''}" onclick="setSpecific('')">הכל</div>
-      ${used.map(e => `<div class="shelf-chip ${isLife?'life':''} ${activeId===e.id?'active':''}" onclick="setSpecific('${e.id}')">
-        ${isLife ? `<span class="dot" style="background:${e.color}"></span>` : ''}${esc(e.name)} (${countOf(e)})
-      </div>`).join('')}
+      <div class="shelf-chip life ${!activeId?'active':''}" onclick="setSpecific('')">הכל</div>
+      ${used.map(d => `<div class="shelf-chip life ${activeId===d.id?'active':''}" onclick="setSpecific('${d.id}')">
+        <span class="dot" style="background:${d.color}"></span>${esc(d.name)} (${countOf(d)})</div>`).join('')}
+    </div>`;
+
+  } else if(activeGroup === 'notebook' && !activeId){
+    const countOf = nb => items.filter(i => i.notebook === nb.id).length;
+    const used = notebooks.filter(nb => countOf(nb) > 0);
+    sub = `<div class="shelf-bar sub">
+      <div class="shelf-chip ${!activeId?'active':''}" onclick="setSpecific('')">הכל</div>
+      ${used.map(nb => `<div class="shelf-chip" onclick="setSpecific('${nb.id}')">
+        📓 ${esc(nb.name)} (${countOf(nb)})</div>`).join('')}
+    </div>`;
+
+  } else if(activeGroup === 'notebook' && activeId){
+    const nb = notebookById(activeId);
+    const inNb = items.filter(i => i.notebook === activeId);
+    const secCount = s => inNb.filter(i => i.section === s.id).length;
+    const used = (nb ? nb.sections||[] : []).filter(s => secCount(s) > 0);
+    const looseCount = inNb.filter(i => !i.section).length;
+    sub = `<div class="shelf-bar sub">
+      <div class="shelf-chip back" onclick="setSpecific('')">→ מחברות</div>
+      <div class="shelf-chip nb-name">📓 ${esc(nb ? nb.name : '')}</div>
+      <div class="shelf-chip ${!activeSection?'active':''}" onclick="setSection('')">הכל (${inNb.length})</div>
+      ${used.map(s => `<div class="shelf-chip ${activeSection===s.id?'active':''}" onclick="setSection('${s.id}')">
+        ${esc(s.name)} (${secCount(s)})</div>`).join('')}
+      ${(used.length && looseCount) ? `<div class="shelf-chip ${activeSection==='loose'?'active':''}" onclick="setSection('loose')">ללא נושא (${looseCount})</div>` : ''}
     </div>`;
   }
 
@@ -529,8 +607,9 @@ function renderShelfBar(){
   document.getElementById('shelfSub').innerHTML = sub;
 }
 
-function setGroup(g){ activeGroup = g; activeId = ''; render(); }
-function setSpecific(id){ activeId = id; render(); }
+function setGroup(g){ activeGroup = g; activeId = ''; activeSection = ''; render(); }
+function setSpecific(id){ activeId = id; activeSection = ''; render(); }
+function setSection(id){ activeSection = id; render(); }
 
 function cardHtml(it){
   const checks = it.checks || [];
@@ -539,7 +618,8 @@ function cardHtml(it){
   const rest = checks.length - shown.length;
   const bg = cardColor(it);
   const dom = domainById(it.domain);
-  const sh = shelfById(it.shelf);
+  const nb = notebookById(it.notebook);
+  const sec = sectionById(it.notebook, it.section);
   return `<div class="card ${bg?'tinted':''}" style="${bg?`background:${bg};`:''}" onclick="openItem('${it.id}')">
     ${it.pinned ? '<span class="card-pin">📌</span>' : ''}
     <div class="card-title ${it.title?'':'untitled'}">${it.title ? esc(it.title) : 'ללא שם'}</div>
@@ -547,9 +627,9 @@ function cardHtml(it){
     ${shown.length ? `<div class="card-checks">${shown.map(c => `
       <div class="card-check ${c.done?'done':''}"><span class="box">${c.done?'☑':'☐'}</span><span>${esc(c.text)}</span></div>
     `).join('')}${rest > 0 ? `<div class="card-more">ועוד ${rest}</div>` : ''}</div>` : ''}
-    ${(dom || sh || links.length) ? `<div class="card-foot">
+    ${(dom || nb || links.length) ? `<div class="card-foot">
       ${dom ? `<span class="tag life"><span class="dot" style="background:${dom.color}"></span>${esc(dom.name)}</span>` : ''}
-      ${sh ? `<span class="tag">🏷 ${esc(sh.name)}</span>` : ''}
+      ${nb ? `<span class="tag">📓 ${esc(nb.name)}${sec ? ` <span class="sec">· ${esc(sec.name)}</span>` : ''}</span>` : ''}
       ${links.length ? `<span class="tag">🔗 ${links.length}</span>` : ''}
     </div>` : ''}
   </div>`;
@@ -573,10 +653,13 @@ function toggleNight(){ nightMode = !nightMode; render(); }
 function byId(id){ return items.find(i => i.id === id); }
 
 function newItem(){
-  // a new item lands where you were already looking, so filtering then adding does the obvious thing
+  // a new item lands where you were already looking, so filtering then adding does the obvious
+  // thing — including "inside this notebook but in no section", which is a real place to be
+  const inNb = activeGroup === 'notebook' && activeId;
   const it = blank({
-    domain: (activeGroup === 'domain' && activeId) ? activeId : '',
-    shelf:  (activeGroup === 'shelf'  && activeId) ? activeId : ''
+    domain:   (activeGroup === 'domain' && activeId) ? activeId : '',
+    notebook: inNb ? activeId : '',
+    section:  (inNb && activeSection && activeSection !== 'loose') ? activeSection : ''
   });
   items.unshift(it);
   openItem(it.id);
@@ -588,6 +671,10 @@ function newItem(){
 
 function openItem(id){
   openId = id;
+  // every note opens on its own text, never on whichever panel the last one was left showing
+  shelfPickerOpen = false;
+  colorPickerOpen = false;
+  cancelInlineAdd();
   renderSheet();
   document.getElementById('overlay').classList.add('open');
   document.getElementById('sheet').classList.add('open');
@@ -620,7 +707,8 @@ function renderSheet(){
   const checks = it.checks || [];
   const links = it.links || [];
   const dom = domainById(it.domain);
-  const sh = shelfById(it.shelf);
+  const nb = notebookById(it.notebook);
+  const sec = sectionById(it.notebook, it.section);
 
   document.getElementById('sheetScroll').innerHTML = `
     <textarea class="title-input" rows="1" placeholder="שם..."
@@ -663,17 +751,43 @@ function renderSheet(){
     </div>` : ''}
 
     ${shelfPickerOpen ? `<div class="sect">
-      <div class="sect-label">🌱 נושא חיים</div>
+      <div class="sect-label">🌱 תחום חיים</div>
       <div class="picker">
-        <button class="opt ${!it.domain?'active':''}" onclick="setDomainOf('')">ללא</button>
+        <button class="opt life ${!it.domain?'active':''}" onclick="setDomainOf('')">ללא</button>
         ${LIFE_DOMAINS.map(d => `<button class="opt life ${it.domain===d.id?'active':''}" onclick="setDomainOf('${d.id}')">
           <span class="dot" style="background:${d.color}"></span>${esc(d.name)}</button>`).join('')}
       </div>
-      <div class="sect-label" style="margin-top:14px;">🏷 מדף — לדברים שהם לא נושא חיים</div>
+
+      <div class="sect-label" style="margin-top:14px;">📓 מחברת — למה שאינו תחום חיים</div>
       <div class="picker">
-        <button class="opt ${!it.shelf?'active':''}" onclick="setShelfOf('')">ללא</button>
-        ${SHELVES.map(s => `<button class="opt ${it.shelf===s.id?'active':''}" onclick="setShelfOf('${s.id}')">${esc(s.name)}</button>`).join('')}
+        <button class="opt ${!it.notebook?'active':''}" onclick="setNotebookOf('')">ללא</button>
+        ${notebooks.map(n => `<button class="opt ${it.notebook===n.id?'active':''}" onclick="setNotebookOf('${n.id}')">${esc(n.name)}</button>`).join('')}
+        ${addingNotebook
+          ? `<span class="inline-add">
+              <input id="newNotebookInput" placeholder="שם המחברת..."
+                onkeydown="if(event.key==='Enter') commitNotebook(); if(event.key==='Escape') cancelInlineAdd();">
+              <button class="ok" onclick="commitNotebook()">✓</button>
+              <button class="no" onclick="cancelInlineAdd()">✕</button>
+            </span>`
+          : `<button class="opt dashed" onclick="startAddNotebook()">＋ מחברת חדשה</button>`}
       </div>
+
+      ${nb ? `
+      <div class="sect-label" style="margin-top:14px;">נושא בתוך "${esc(nb.name)}" — לא חובה</div>
+      <div class="picker">
+        <button class="opt ${!it.section?'active':''}" onclick="setSectionOf('')">ללא נושא</button>
+        ${(nb.sections||[]).map(s => `<button class="opt ${it.section===s.id?'active':''}" onclick="setSectionOf('${s.id}')">${esc(s.name)}</button>`).join('')}
+        ${addingSection
+          ? `<span class="inline-add">
+              <input id="newSectionInput" placeholder="שם הנושא..."
+                onkeydown="if(event.key==='Enter') commitSection(); if(event.key==='Escape') cancelInlineAdd();">
+              <button class="ok" onclick="commitSection()">✓</button>
+              <button class="no" onclick="cancelInlineAdd()">✕</button>
+            </span>`
+          : `<button class="opt dashed" onclick="startAddSection()">＋ נושא חדש</button>`}
+      </div>
+      <div class="hint-line">אפשר להשאיר "ללא נושא" — פתק יכול לשבת במחברת בלי להשתייך לשום נושא בתוכה.</div>
+      ` : ''}
     </div>` : ''}
 
     ${colorPickerOpen ? `<div class="sect">
@@ -687,16 +801,17 @@ function renderSheet(){
 
     ${(!checks.length && !links.length && !shelfPickerOpen && !colorPickerOpen) ? `
       <div class="note">אפשר להשאיר את זה ככה — שם ומחשבה זה פריט שלם.<br>
-      וכשמתברר שצריך יותר, הכפתורים למטה מוסיפים <b>סעיפים</b>, <b>קישור</b>, <b>שיוך</b> או <b>צבע</b>.</div>` : ''}
+      וכשמתברר שצריך יותר, הכפתורים למטה מוסיפים <b>סעיפים</b>, <b>קישור</b>, <b>שיוך</b> או <b>צבע</b>.<br>
+      מחברת ותחום חיים הם לא חובה, ונושא בתוך מחברת הוא בטח לא.</div>` : ''}
   `;
 
   const filedAs = dom ? `<span class="dot" style="background:${dom.color}"></span>${esc(dom.name)}`
-                : sh ? `🏷 ${esc(sh.name)}`
+                : nb ? `📓 ${esc(nb.name)}${sec ? ' · ' + esc(sec.name) : ''}`
                 : 'שיוך';
   document.getElementById('addbar').innerHTML = `
     <button class="pill" onclick="addCheck()">＋ סעיפים</button>
     <button class="pill" onclick="addLink()">＋ קישור</button>
-    <button class="pill ${(dom||sh)?'filed':''}" onclick="toggleShelfPicker()">${filedAs}</button>
+    <button class="pill ${(dom||nb)?'filed':''}" onclick="toggleShelfPicker()">${filedAs}</button>
     <button class="pill" onclick="toggleColorPicker()">🎨 צבע</button>
   `;
 
@@ -730,21 +845,64 @@ function deleteItem(){
   toast('נמחק');
 }
 
-// picking one clears the other: a thing is either part of a life-domain or a pile that is not,
-// and letting it be both is exactly the muddle we are trying to get rid of
+// picking one clears the other: a thing is either part of a life-domain or in a notebook that is
+// deliberately not one, and letting it be both is exactly the muddle we are trying to get rid of
 function setDomainOf(id){
   const it = byId(openId); if(!it) return;
   it.domain = id;
-  if(id) it.shelf = '';
+  if(id){ it.notebook = ''; it.section = ''; }
+  cancelInlineAdd();
+  // a life-domain is the whole answer, so the panel closes; picking a notebook leaves it open,
+  // because choosing a section inside it is the very next thing you might want
   shelfPickerOpen = false;
   renderSheet(); save();
 }
-function setShelfOf(id){
+function setNotebookOf(id){
   const it = byId(openId); if(!it) return;
-  it.shelf = id;
+  it.notebook = id;
+  it.section = '';                 // a section only means anything inside its own notebook
   if(id) it.domain = '';
-  shelfPickerOpen = false;
+  cancelInlineAdd();
   renderSheet(); save();
+}
+function setSectionOf(id){
+  const it = byId(openId); if(!it) return;
+  it.section = id;
+  cancelInlineAdd();
+  renderSheet(); save();
+}
+
+/* creating a notebook or a section happens right where you needed it, without leaving the note */
+let addingNotebook = false;
+let addingSection = false;
+function startAddNotebook(){ addingNotebook = true; addingSection = false; renderSheet(); focusInline('newNotebookInput'); }
+function startAddSection(){ addingSection = true; addingNotebook = false; renderSheet(); focusInline('newSectionInput'); }
+function cancelInlineAdd(){ addingNotebook = false; addingSection = false; }
+function focusInline(id){
+  requestAnimationFrame(()=>{ const el = document.getElementById(id); if(el) el.focus(); });
+}
+function commitNotebook(){
+  const el = document.getElementById('newNotebookInput');
+  const name = el ? el.value.trim() : '';
+  addingNotebook = false;
+  if(!name){ renderSheet(); return; }
+  const nb = {id:uid(), name, sections:[]};
+  notebooks.push(nb);
+  setNotebookOf(nb.id);
+  toast('המחברת נוצרה');
+}
+function commitSection(){
+  const el = document.getElementById('newSectionInput');
+  const name = el ? el.value.trim() : '';
+  addingSection = false;
+  const it = byId(openId);
+  const nb = it ? notebookById(it.notebook) : null;
+  if(!name || !nb){ renderSheet(); return; }
+  const sec = {id:uid(), name};
+  if(!nb.sections) nb.sections = [];
+  nb.sections.push(sec);
+  setSectionOf(sec.id);
+  toast('הנושא נוצר');
 }
 
 function setColor(c){
