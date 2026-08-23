@@ -3035,6 +3035,99 @@
   .tools-card-fold{ cursor:pointer; user-select:none; display:flex; align-items:center; gap:8px; }
   .tools-card-fold:hover{ color:var(--gold); }
 
+  /* ---------------------------------------------------------------------------
+     41. THE NOTEBOOK — two worlds, and a note that can be a list.
+     The world switch sits ABOVE the tabs on purpose: a life-domain and a notebook
+     are not two values of one field, and they must never appear as two chips in
+     the same row. A notebook also gets no colour dot — colour is what marks a
+     part of your life, and lending it to a shopping list blurs the same line.
+     --------------------------------------------------------------------------- */
+  .note-world-switch{ display:flex; gap:8px; margin:0 0 12px; flex-wrap:wrap; }
+  .note-world-btn{
+    background:var(--surface2); border:1px solid var(--border-strong); color:var(--muted);
+    border-radius:var(--r-pill); padding:9px 16px; font-family:inherit; font-size:14px;
+    cursor:pointer; min-height:42px; transition:all var(--dur) var(--ease-water);
+  }
+  .note-world-btn:hover{ color:var(--text); }
+  .note-world-btn.active{
+    background:var(--surface); border-color:var(--gold); color:var(--text); box-shadow:var(--lift-1);
+  }
+  .domain-chip.notebook-chip{ border-radius:10px; }
+  .domain-chip.notebook-chip.active{ background:var(--surface); border-color:var(--gold); color:var(--text); }
+  .notebook-add-row{ display:flex; align-items:center; gap:6px; }
+  .notebook-add-row input{ width:150px; min-height:38px; }
+
+  /* a note's optional name */
+  .keep-note-title{
+    width:100%; background:transparent; border:none; padding:0 0 6px;
+    font-family:inherit; font-size:16px; font-weight:600; color:var(--note-fg, var(--text));
+  }
+  .keep-note-title:focus{ outline:none; }
+  .keep-note-title::placeholder{ color:var(--note-fg-muted, var(--muted2)); font-weight:400; }
+
+  /* tick-boxes: what used to make something "a list" */
+  .note-checks, .note-links{
+    margin-top:9px; padding-top:8px; border-top:1px dashed var(--border-strong);
+  }
+  .note-checks-label{ font-size:11.5px; color:var(--note-fg-muted, var(--muted2)); margin-bottom:5px; }
+  .note-check-row{ display:flex; align-items:center; gap:8px; padding:2px 0; }
+  /* a note card paints its own background (and can carry any of the note colours), so the box has
+     to take its outline from the note's text colour rather than from the page surface — otherwise
+     it vanishes on a dark card and on every tinted one */
+  .note-check-row input[type=checkbox]{
+    appearance:none; -webkit-appearance:none; margin:0;
+    width:18px; height:18px; flex-shrink:0; cursor:pointer;
+    border:1.5px solid currentColor; border-radius:5px; background:transparent;
+    color:var(--note-fg-muted, var(--muted2)); opacity:.85;
+    position:relative;
+  }
+  .note-check-row input[type=checkbox]:hover{ opacity:1; }
+  .note-check-row input[type=checkbox]:checked{ background:var(--gold); border-color:var(--gold); opacity:1; }
+  .note-check-row input[type=checkbox]:checked::after{
+    content:''; position:absolute; inset:0;
+    background:no-repeat center/10px 8px
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 9'%3E%3Cpath d='M1 4.6 4 7.6 10 1.4' fill='none' stroke='%232A2418' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  .note-check-text{
+    flex:1; min-width:0; background:transparent; border:none; padding:4px 0;
+    font-family:inherit; font-size:14.5px; color:var(--note-fg, var(--text));
+  }
+  .note-check-text:focus{ outline:none; }
+  .note-check-row.done .note-check-text{ text-decoration:line-through; opacity:.6; }
+  .note-check-subs{ padding-inline-start:26px; }
+  .note-check-row.sub .note-check-text{ font-size:13.5px; opacity:.85; }
+  .note-check-add{
+    display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer;
+    font-size:13.5px; color:var(--note-fg-muted, var(--muted2));
+  }
+  .note-check-add span{ width:18px; text-align:center; }
+
+  /* one row per link — open it, edit it in place, or remove it. never two boxes for one link. */
+  .note-link-row{ display:flex; align-items:center; gap:6px; padding:3px 0; }
+  .note-link-row a{
+    flex:1; min-width:0; display:flex; align-items:center; gap:7px;
+    padding:7px 10px; border-radius:10px; text-decoration:none;
+    background:var(--surface2); border:1px solid var(--border);
+    color:var(--note-fg, var(--text)); font-size:14px;
+  }
+  .note-link-row a:hover{ border-color:var(--gold); }
+  .note-link-label{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:ltr; text-align:left; }
+  .note-link-input{
+    flex:1; min-width:0; background:var(--surface2); border:1px solid var(--gold);
+    border-radius:10px; padding:8px 10px; font-family:inherit; font-size:14px;
+    color:var(--text); direction:ltr; text-align:left;
+  }
+  .note-link-input:focus{ outline:none; }
+
+  .keep-note-add-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .keep-note-add-btn{
+    background:transparent; border:1px dashed var(--border-strong);
+    color:var(--note-fg-muted, var(--muted)); border-radius:var(--r-pill);
+    padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit;
+  }
+  .keep-note-add-btn:hover{ color:var(--note-fg, var(--text)); border-style:solid; }
+  .note-chiplist{ margin-top:8px; }
+
 </style>
 </head>
 <body>
@@ -3417,8 +3510,7 @@
 <div class="main-tab-bar">
   <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 בית</button>
   <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
-  <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 נושאים</button>
-  <button class="main-tab-btn" id="mainTabListsBtn" onclick="switchMainView('lists')">🗂 רשימות</button>
+  <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 המחברת</button>
 </div>
 
 <div class="undo-redo-bar">
@@ -3632,14 +3724,15 @@
 
 <div id="domainPageView" style="display:none;">
   <div class="domain-page-topbar">
-    <div class="domain-page-header"><h1>📓 נושאים</h1></div>
+    <div class="domain-page-header"><h1>📓 המחברת</h1></div>
     <div class="header-actions">
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
       <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
       <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </div>
-  <p class="hint" style="margin:0 0 18px;">כל נושא הוא חוצץ במחברת — שם, צבע וסדר ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור · לחיצה על חוצץ פותחת את הפתקים שלו</p>
+  <p class="hint" style="margin:0 0 12px;">תחום חיים או מחברת — כל אחד הוא חוצץ · שם, צבע וסדר ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור · לחיצה על חוצץ פותחת את הפתקים שלו</p>
+  <div class="note-world-switch" id="noteWorldSwitch"></div>
   <div class="topic-tab-strip" id="topicTabStrip"></div>
   <div class="notebook-body">
     <div class="add-row">
@@ -3664,7 +3757,7 @@
   <div class="feel-block" id="inspiringVideosBlock"></div>
 </div>
 
-<div id="listsView" style="display:none;">
+<div id="listsView" style="display:none;" hidden>
   <div class="domain-page-topbar">
     <div class="domain-page-header"><h1>🗂 רשימות</h1></div>
     <div class="header-actions">
@@ -3709,7 +3802,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -3761,6 +3854,8 @@ function loadData(){
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
       data.domainNoteHeaders = parsed.domainNoteHeaders || {};
+      data.notebooks = parsed.notebooks || [];
+      data.notebookMigrated = !!parsed.notebookMigrated;
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
@@ -3865,8 +3960,52 @@ function loadData(){
   SECTION_KEYS.forEach(k=>{ data.collapsedSections[k] = true; });
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
   migrateOldNotesToDomainNotes();
+  migrateListsIntoNotebook();
   lastSnapshotJSON = JSON.stringify(data);
   render();
+}
+/* ---------- lists and notes become one thing: המחברת ----------
+   A note and a list were never two kinds of object — each was simply missing what the other had.
+   A note had rich text, a drawing, a colour and no name; a list had a name, tickable items and
+   links. From here one item carries all of it, and every field is optional: a note that grew
+   tick-boxes IS a list, a list you wrote a paragraph in IS a note.
+
+   Notes already live in data.domainNotes[containerId] with their groups in
+   data.domainNoteHeaders[containerId]. A notebook is simply another container id, so every one of
+   the existing note functions — drawing, voice memos, colours, pinning, groups — keeps working on
+   notebook items with no change at all.
+
+   Nothing is deleted. data.lists keeps every list exactly as it was; the choice-lists still read
+   their chips straight out of it, and a plain checklist is copied rather than moved, so a bad
+   surprise here costs nothing. */
+const LISTS_NOTEBOOK_ID = 'nb-lists';
+function migrateListsIntoNotebook(){
+  if(data.notebookMigrated) return;
+  data.notebookMigrated = true;
+  if(!data.notebooks) data.notebooks = [];
+  const lists = data.lists || [];
+  if(!lists.length) return;
+  if(!data.notebooks.some(nb => nb.id === LISTS_NOTEBOOK_ID)){
+    data.notebooks.push({id: LISTS_NOTEBOOK_ID, name: 'רשימות'});
+  }
+  const target = ensureDomainNotes(LISTS_NOTEBOOK_ID);
+  lists.forEach(l => {
+    if(target.some(n => n.listId === l.id)) return;
+    if(l.kind === 'chipbank'){
+      // a choice-list is a different creature — tap-to-select, not tick-to-finish. It keeps living
+      // in data.lists and the item here is a window onto it, so nothing about it changes.
+      target.push({id: uid(), listId: l.id, chipList: true, title: l.name, text: '', html: null,
+        color: '', drawing: '', memos: [], pinned: false, headerId: '', checks: [], links: []});
+    } else {
+      target.push({id: uid(), listId: l.id, title: l.name, text: '', html: null,
+        color: '', drawing: '', memos: [], pinned: false, headerId: '',
+        checks: (l.items || []).map(i => ({
+          id: uid(), text: i.text, done: !!i.done, favorite: !!i.favorite,
+          link: i.link || '', subitems: (i.subitems || []).map(s => ({id: uid(), text: s.text, done: !!s.done}))
+        })),
+        links: []});
+    }
+  });
 }
 function migrateOldNotesToDomainNotes(){
   if(data.notesMigrated) return;
@@ -4122,9 +4261,25 @@ function toggleNightMode(){
 }
 
 /* ---------- domain editor ---------- */
+/* The world switch sits above the tabs, so a life-domain and a notebook are never two chips in the
+   same row pretending to be the same kind of answer. */
+function renderWorldSwitch(){
+  const el = document.getElementById('noteWorldSwitch');
+  if(!el) return;
+  const countIn = ids => ids.reduce((sum, c) => sum + ensureDomainNotes(c.id).length, 0);
+  const nDomain = countIn(data.domains || []);
+  const nNotebook = countIn(notebookList());
+  el.innerHTML = `
+    <button type="button" class="note-world-btn ${noteWorld==='domain'?'active':''}" onclick="setNoteWorld('domain')">
+      🌱 תחומי חיים${nDomain?` (${nDomain})`:''}</button>
+    <button type="button" class="note-world-btn ${noteWorld==='notebook'?'active':''}" onclick="setNoteWorld('notebook')">
+      📓 מחברות${nNotebook?` (${nNotebook})`:''}</button>`;
+}
 function renderDomainEditor(){
+  renderWorldSwitch();
   const el = document.getElementById('topicTabStrip');
   if(!el) return;
+  if(noteWorld === 'notebook'){ renderNotebookStrip(el); return; }
   const emptyHint = data.domains.length===0 ? '<div class="empty" style="flex-basis:100%;">עדיין אין כאן נושאים — זה בית ריק שמחכה לך. תתחיל/י עם הכפתור "+ נושא" למטה 🌱</div>' : '';
   el.innerHTML = emptyHint + data.domains.map((d,i)=>{
     if(d.id!==activeNoteDomain){
@@ -4146,6 +4301,35 @@ function renderDomainEditor(){
   }).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
   el.querySelectorAll('input[type="text"]').forEach(sizeChipInput);
+  renderNavList();
+}
+/* Notebooks get the same tab strip, minus the colour: a notebook is a plain divider, not a part of
+   your life, and giving it a life-domain's colour dot would blur exactly the line we just drew. */
+function renderNotebookStrip(el){
+  const list = notebookList();
+  const emptyHint = list.length===0
+    ? '<div class="empty" style="flex-basis:100%;">עדיין אין מחברות — מחברת היא מקום לדברים שהם לא תחום חיים: קניות, ציוד, דברים לקרוא</div>'
+    : '';
+  el.innerHTML = emptyHint + list.map(nb => {
+    if(nb.id !== activeNoteDomain){
+      return `<div class="domain-chip notebook-chip" data-id="${nb.id}" onclick="selectTopicTab('${nb.id}')">
+        <span class="chip-name">📓 ${escapeHtml(nb.name)}</span>
+      </div>`;
+    }
+    return `<div class="domain-chip notebook-chip active" data-id="${nb.id}">
+      <span class="chip-name" style="opacity:.7;">📓</span>
+      <input type="text" style="color:inherit;" value="${escapeAttr(nb.name)}"
+        onchange="renameNotebook('${nb.id}', this.value)" oninput="sizeChipInput(this)">
+      <span class="rm" onclick="event.stopPropagation(); deleteNotebook('${nb.id}')" title="מחיקת מחברת">✕</span>
+    </div>`;
+  }).join('') + `
+    <span class="add-row notebook-add-row">
+      <input type="text" id="newNotebookInput" placeholder="שם המחברת..." onkeydown="if(event.key==='Enter') addNotebook();">
+      <button class="add-domain-btn" onclick="addNotebook()">+ מחברת</button>
+    </span>`;
+  // only the tab's own name shrinks to fit; the "new notebook" field keeps its full width
+  const nameInput = el.querySelector('.domain-chip.active input');
+  if(nameInput) sizeChipInput(nameInput);
   renderNavList();
 }
 function sizeChipInput(inputEl){
@@ -4466,6 +4650,8 @@ let mainView = 'home';
 function navigateToDomain(id){ activeNoteDomain = id; switchMainView('topics'); }
 function navigateHome(){ switchMainView('home'); }
 function switchMainView(view){
+  // the lists tab was folded into the notebook; anything still asking for it lands there
+  if(view === 'lists') view = 'topics';
   if(mainView==='topics' && view!=='topics') collapseUnpinnedNotesForTopic(activeNoteDomain);
   // leaving a specific list always lands back on the lists overview next time, not wherever she
   // happened to be -- so "רשימות" never feels like a dead end with only deleting the list as a way out
@@ -4565,7 +4751,8 @@ function applyMainViewState(){
   if(listsBtn) listsBtn.classList.toggle('active', mainView==='lists');
   updateCollapseAllButton();
   if(mainView==='topics'){
-    if(!activeNoteDomain || !domainById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
+    if(!activeNoteDomain || !containerById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
+    noteWorld = worldOfContainer(activeNoteDomain);
     renderDomainEditor();
     renderKeepGrid(activeNoteDomain);
     updateAddNoteBtnColor();
@@ -4636,6 +4823,69 @@ function collapseUnpinnedNotesForTopic(domainId){
 }
 function autoGrowNoteTextarea(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
 function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(!data.domainNotes[id]) data.domainNotes[id] = []; return data.domainNotes[id]; }
+
+/* ---------- the two worlds of the notebook ----------
+   A life-domain says "this belongs to a part of my life". A notebook says "this is a body of
+   things that is deliberately not one" — shopping, gear, things to read. They are never offered
+   side by side as if they were the same kind of answer: you pick the world first, and only then
+   what is inside it. Both hold notes the same way and both can have groups, so everything below
+   this line is shared. */
+let noteWorld = 'domain'; // 'domain' | 'notebook'
+function notebookList(){ return data.notebooks || (data.notebooks = []); }
+function notebookById(id){ return notebookList().find(nb => nb.id === id); }
+function isNotebookContainer(id){ return !!notebookById(id); }
+function containersOfWorld(world){ return world === 'notebook' ? notebookList() : (data.domains || []); }
+function containerById(id){ return domainById(id) || notebookById(id); }
+function containerName(id){ const c = containerById(id); return c ? c.name : ''; }
+function worldOfContainer(id){ return isNotebookContainer(id) ? 'notebook' : 'domain'; }
+function firstContainerOf(world){
+  const list = containersOfWorld(world);
+  return list.length ? list[0].id : null;
+}
+function setNoteWorld(world){
+  if(noteWorld === world) return;
+  noteWorld = world;
+  const first = firstContainerOf(world);
+  if(first) activeNoteDomain = first;
+  renderDomainEditor();
+  renderKeepGrid(activeNoteDomain);
+  updateAddNoteBtnColor();
+}
+function addNotebook(){
+  const input = document.getElementById('newNotebookInput');
+  const name = input ? input.value.trim() : '';
+  if(!name) return;
+  const nb = {id: uid(), name};
+  notebookList().push(nb);
+  if(input) input.value = '';
+  noteWorld = 'notebook';
+  activeNoteDomain = nb.id;
+  saveData();
+  renderDomainEditor();
+  renderKeepGrid(activeNoteDomain);
+  updateAddNoteBtnColor();
+  flashStatus('המחברת נוצרה');
+}
+function renameNotebook(id, value){
+  const nb = notebookById(id);
+  if(nb && value.trim()) nb.name = value.trim();
+  saveData();
+}
+function deleteNotebook(id){
+  const notes = ensureDomainNotes(id);
+  if(!confirm(notes.length
+      ? `למחוק את המחברת "${containerName(id)}" ואת ${notes.length} הפתקים שבה? זה לא ניתן לביטול.`
+      : `למחוק את המחברת "${containerName(id)}"?`)) return;
+  data.notebooks = notebookList().filter(nb => nb.id !== id);
+  delete data.domainNotes[id];
+  delete data.domainNoteHeaders[id];
+  if(activeNoteDomain === id) activeNoteDomain = firstContainerOf('notebook') || firstContainerOf('domain');
+  if(!firstContainerOf('notebook')) noteWorld = 'domain';
+  saveData();
+  renderDomainEditor();
+  renderKeepGrid(activeNoteDomain);
+  updateAddNoteBtnColor();
+}
 /* ---------- note headers ("כותרות") per topic, same idea as the chip-bank headers in רשימות:
    collapsible groups, an unlabeled catch-all for notes with no header, headers rendered/managed
    with the exact same classes (.chip-group / .chip-group-header / .chip-header-*) on purpose so
@@ -4726,15 +4976,172 @@ function toggleNoteHeaderCollapse(domainId, headerId){
   renderKeepGrid(domainId);
   updateCollapseAllButton();
 }
+/* ---------- the parts a note gained when lists merged into it ----------
+   Everything here is optional and appears only once you have asked for it, so a plain note looks
+   exactly as it always did. */
+function onKeepNoteTitleInput(domainId, noteId, val){
+  const n = ensureDomainNotes(domainId).find(x => x.id === noteId);
+  if(n){ n.title = val; saveData(); }
+}
+// a choice-list keeps living in data.lists — this is a window onto it, not a copy
+function noteChipListHtml(n){
+  const l = (data.lists || []).find(x => x.id === n.listId);
+  if(!l) return '<div class="empty" style="font-size:13px;">רשימת הבחירה הזו כבר לא קיימת</div>';
+  return `<div class="note-chiplist">${feelChipGridHtml('list:' + l.id)}</div>`;
+}
+function noteChecksHtml(domainId, n){
+  const checks = n.checks || [];
+  if(!checks.length) return '';
+  const done = checks.filter(c => c.done).length;
+  return `<div class="note-checks">
+    <div class="note-checks-label">סעיפים · ${done}/${checks.length}</div>
+    ${checks.map((c, i) => `
+      <div class="note-check-row ${c.done?'done':''}">
+        <input type="checkbox" ${c.done?'checked':''} onchange="toggleNoteCheck('${domainId}','${n.id}','${c.id}')">
+        <input class="note-check-text" dir="auto" value="${escapeAttr(c.text)}" data-field-key="check-${c.id}"
+          oninput="setNoteCheckText('${domainId}','${n.id}','${c.id}', this.value)"
+          onkeydown="noteCheckKey(event, '${domainId}','${n.id}','${c.id}', ${i})">
+        <span class="del-task" onclick="removeNoteCheck('${domainId}','${n.id}','${c.id}')" title="מחיקה">✕</span>
+      </div>
+      ${(c.subitems||[]).length ? `<div class="note-check-subs">${c.subitems.map(sub=>`
+        <div class="note-check-row sub ${sub.done?'done':''}">
+          <input type="checkbox" ${sub.done?'checked':''} onchange="toggleNoteSubcheck('${domainId}','${n.id}','${c.id}','${sub.id}')">
+          <span class="note-check-text">${escapeHtml(sub.text)}</span>
+        </div>`).join('')}</div>` : ''}
+    `).join('')}
+    <div class="note-check-add" onclick="addNoteCheck('${domainId}','${n.id}')"><span>＋</span> סעיף</div>
+  </div>`;
+}
+// one row per link: tapping it opens it, ✎ turns that same row into the field, ✕ removes it.
+// never a separate "edit here, open there" pair of boxes.
+function noteLinksHtml(domainId, n){
+  const links = n.links || [];
+  if(!links.length) return '';
+  return `<div class="note-links">
+    <div class="note-checks-label">קישורים</div>
+    ${links.map(l => l.editing ? `
+      <div class="note-link-row">
+        <input class="note-link-input" dir="ltr" value="${escapeAttr(l.url||'')}" placeholder="הדבק כתובת..."
+          data-link-edit="${l.id}"
+          onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.value=''; this.blur();}"
+          onblur="commitNoteLink('${domainId}','${n.id}','${l.id}', this.value)">
+      </div>` : `
+      <div class="note-link-row">
+        <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener"><span>🔗</span><span class="note-link-label">${escapeHtml(linkLabel(l.url))}</span></a>
+        <span class="del-task" onclick="editNoteLink('${domainId}','${n.id}','${l.id}')" title="עריכה">✎</span>
+        <span class="del-task" onclick="removeNoteLink('${domainId}','${n.id}','${l.id}')" title="הסרה">✕</span>
+      </div>`).join('')}
+    <div class="note-check-add" onclick="addNoteLink('${domainId}','${n.id}')"><span>＋</span> קישור</div>
+  </div>`;
+}
+function noteRecord(domainId, noteId){ return ensureDomainNotes(domainId).find(x => x.id === noteId); }
+function addNoteCheck(domainId, noteId, afterId){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  if(!n.checks) n.checks = [];
+  const row = {id: uid(), text: '', done: false, subitems: []};
+  const at = afterId ? n.checks.findIndex(c => c.id === afterId) + 1 : n.checks.length;
+  n.checks.splice(at, 0, row);
+  saveData();
+  renderKeepGrid(domainId);
+  requestAnimationFrame(()=>{
+    const el = document.querySelector(`.note-check-text[data-field-key="check-${row.id}"]`);
+    if(el){ el.focus(); el.scrollIntoView({block:'nearest'}); }
+  });
+}
+function setNoteCheckText(domainId, noteId, checkId, val){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  const c = (n.checks||[]).find(x => x.id === checkId);
+  if(c){ c.text = val; saveData(); }
+}
+function toggleNoteCheck(domainId, noteId, checkId){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  const c = (n.checks||[]).find(x => x.id === checkId);
+  if(c){ c.done = !c.done; saveData(); renderKeepGrid(domainId); }
+}
+function toggleNoteSubcheck(domainId, noteId, checkId, subId){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  const c = (n.checks||[]).find(x => x.id === checkId);
+  const sub = c ? (c.subitems||[]).find(s => s.id === subId) : null;
+  if(sub){ sub.done = !sub.done; saveData(); renderKeepGrid(domainId); }
+}
+function removeNoteCheck(domainId, noteId, checkId){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  n.checks = (n.checks||[]).filter(x => x.id !== checkId);
+  saveData();
+  renderKeepGrid(domainId);
+}
+// Enter opens the next line, Backspace on an empty one steps back up -- typing a list without
+// ever leaving the keyboard
+function noteCheckKey(e, domainId, noteId, checkId, idx){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    addNoteCheck(domainId, noteId, checkId);
+  } else if(e.key === 'Backspace' && e.target.value === '' && (n.checks||[]).length > 1){
+    e.preventDefault();
+    const prev = n.checks[idx - 1];
+    removeNoteCheck(domainId, noteId, checkId);
+    if(prev){
+      requestAnimationFrame(()=>{
+        const el = document.querySelector(`.note-check-text[data-field-key="check-${prev.id}"]`);
+        if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      });
+    }
+  }
+}
+function addNoteLink(domainId, noteId){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  if(!n.links) n.links = [];
+  const l = {id: uid(), url: '', editing: true};
+  n.links.push(l);
+  renderKeepGrid(domainId);
+  requestAnimationFrame(()=>{
+    const el = document.querySelector(`.note-link-input[data-link-edit="${l.id}"]`);
+    if(el){ el.focus(); el.scrollIntoView({block:'nearest'}); }
+  });
+}
+function editNoteLink(domainId, noteId, linkId){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  const l = (n.links||[]).find(x => x.id === linkId);
+  if(!l) return;
+  l.editing = true;
+  renderKeepGrid(domainId);
+  requestAnimationFrame(()=>{
+    const el = document.querySelector(`.note-link-input[data-link-edit="${linkId}"]`);
+    if(el){ el.focus(); el.select(); }
+  });
+}
+function commitNoteLink(domainId, noteId, linkId, value){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  const l = (n.links||[]).find(x => x.id === linkId);
+  if(!l) return;
+  const url = normalizeLinkUrl(value);
+  if(!url) n.links = n.links.filter(x => x.id !== linkId);
+  else { l.url = url; delete l.editing; }
+  saveData();
+  renderKeepGrid(domainId);
+}
+function removeNoteLink(domainId, noteId, linkId){
+  const n = noteRecord(domainId, noteId); if(!n) return;
+  n.links = (n.links||[]).filter(x => x.id !== linkId);
+  saveData();
+  renderKeepGrid(domainId);
+}
 function keepNoteHtml(id, n){
     const isDrawing = drawingNoteId===n.id;
     const level = getNoteLevel(id, n.id);
     const noteStyle = `background:${n.color||'var(--surface2)'};${n.color?` --note-fg:${contrastTextColor(n.color)}; --note-fg-muted:${contrastMutedColor(n.color)};`:''}`;
     if(level===2){
-      const preview = (n.text||'').trim().slice(0,70) || 'פתק ריק';
+      const checks = n.checks || [];
+      const preview = (n.title||'').trim()
+        || (n.text||'').trim().slice(0,70)
+        || (checks.length ? checks.map(c=>c.text).join(' · ').slice(0,70) : '')
+        || 'פתק ריק';
+      const badge = (checks.length ? ` ☑${checks.filter(c=>c.done).length}/${checks.length}` : '')
+        + ((n.links||[]).length ? ' 🔗' : '') + (n.drawing ? ' 🎨' : '');
       return `
       <div class="keep-note keep-note-minimized" style="${noteStyle}" onclick="expandNoteStep('${id}','${n.id}')" title="לחיצה להרחבה">
-        <span class="keep-note-preview">${escapeHtml(preview)}${n.drawing?' 🎨':''}</span>
+        <span class="keep-note-preview">${escapeHtml(preview)}${badge}</span>
         <span class="note-pin-btn ${n.pinned?'active':''}" onclick="event.stopPropagation(); toggleNotePin('${id}','${n.id}')" title="${n.pinned?'בטל נעיצה':'נעיצה — נשאר פתוח תמיד'}">📌</span>
         <span class="chev">▸</span>
       </div>`;
@@ -4750,6 +5157,8 @@ function keepNoteHtml(id, n){
           : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
         <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')" title="מחיקה">✕</span>
       </div>
+      <input type="text" class="keep-note-title" dir="auto" placeholder="שם (לא חובה)" value="${escapeAttr(n.title||'')}"
+        data-field-key="notetitle-${n.id}" oninput="onKeepNoteTitleInput('${id}','${n.id}', this.value)">
       <div class="keep-note-toolbar">
         <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
         <span class="keep-note-fmt-btn fmt-underline" onmousedown="event.preventDefault()" onclick="execNoteFormat('underline')" title="קו תחתון">U</span>
@@ -4761,6 +5170,9 @@ function keepNoteHtml(id, n){
         >${noteEditorHtml(n)}</div>
         ${isMedium ? `<div class="note-clip-more" onclick="expandNoteStep('${id}','${n.id}')" title="יש עוד טקסט — לחיצה להרחבה" style="display:none; background:linear-gradient(to top, ${n.color||'var(--surface2)'} 55%, transparent);">⋯</div>` : ''}
       </div>
+      ${n.chipList ? noteChipListHtml(n) : ''}
+      ${noteChecksHtml(id, n)}
+      ${noteLinksHtml(id, n)}
       ${(n.drawing && !isDrawing) ? `<img class="keep-note-drawing-preview" src="${n.drawing}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="לחיצה לעריכת הציור">` : ''}
       ${isDrawing ? `
         <div class="draw-toolbar">
@@ -4773,6 +5185,10 @@ function keepNoteHtml(id, n){
         </div>
         <canvas class="keep-note-canvas" id="canvas-${n.id}" data-domain="${id}" data-note="${n.id}"></canvas>
       ` : ''}
+      <div class="keep-note-add-row">
+        ${(n.checks||[]).length ? '' : `<button type="button" class="keep-note-add-btn" onclick="addNoteCheck('${id}','${n.id}')">＋ סעיפים</button>`}
+        ${(n.links||[]).length ? '' : `<button type="button" class="keep-note-add-btn" onclick="addNoteLink('${id}','${n.id}')">＋ קישור</button>`}
+      </div>
       <div class="keep-note-draw-row">
         <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
         ${isDrawing ? `
@@ -5950,10 +6366,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','possibilities','customTimerPresets','inbox'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','possibilities','customTimerPresets','inbox'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote','onboardingDismissed'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], possibilities:[], customTimerPresets:[], inbox:[], onboardingDismissed:false, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], notebooks:[], possibilities:[], customTimerPresets:[], inbox:[], onboardingDismissed:false, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -6045,7 +6461,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','generalDilemmas','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','generalDilemmas','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -9697,6 +10113,8 @@ function importData(e){
       data.suggestions = parsed.suggestions || [];
       data.domainNotes = parsed.domainNotes || {};
       data.domainNoteHeaders = parsed.domainNoteHeaders || {};
+      data.notebooks = parsed.notebooks || [];
+      data.notebookMigrated = !!parsed.notebookMigrated;
       data.gcalConnected = !!parsed.gcalConnected;
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
@@ -9706,6 +10124,7 @@ function importData(e){
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
       activeNoteDomain = data.domains[0].id;
       migrateOldNotesToDomainNotes();
+  migrateListsIntoNotebook();
       saveData();
       render();
       flashStatus('גיבוי נטען');
@@ -9908,7 +10327,8 @@ function resetAll(){
   const keepGcalCalendarIds = data.gcalCalendarIds;
   const keepGcalAccountEmail = data.gcalAccountEmail;
   const keepGcalWriteCalendarId = data.gcalWriteCalendarId;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalWriteCalendarId:keepGcalWriteCalendarId, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], onboardingDismissed:true};
+  const keepNotebooks = data.notebooks;
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, notebooks:keepNotebooks, notebookMigrated:true, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalWriteCalendarId:keepGcalWriteCalendarId, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], onboardingDismissed:true};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
