@@ -3031,6 +3031,10 @@
   }
   .list-item-link-row a{ flex:1; min-width:0; color:var(--muted); }
 
+  /* a tools card title is now the fold control for its card */
+  .tools-card-fold{ cursor:pointer; user-select:none; display:flex; align-items:center; gap:8px; }
+  .tools-card-fold:hover{ color:var(--gold); }
+
 </style>
 </head>
 <body>
@@ -12176,30 +12180,58 @@ function deletePossibility(id){
   saveData();
   renderToolsView();
 }
+/* ---------- folding for the tools cards ----------
+   Every card here is a full tool with its own explanation, so four of them stacked open means
+   scrolling past three to reach the one you came for. Each header folds now. Only "הכל אפשרי"
+   starts folded: its invitation is a paragraph long and its list has no natural end, so it was
+   the one card that pushed everything else off the screen. Nothing is hidden — the title of each
+   card still says exactly what it is.
+
+   State rides in collapsedSections, which loadData deliberately wipes on every app open so the
+   first screen is always calm. That is the behaviour we want here too: every launch starts with
+   "הכל אפשרי" folded and the rest open, and whatever you unfold stays unfolded for that session. */
+function isToolCardOpen(key){
+  const stored = data.collapsedSections ? data.collapsedSections['tool:'+key] : undefined;
+  if(stored === undefined) return key !== 'possibilities';
+  return !stored;
+}
+function toggleToolCard(key){
+  if(!data.collapsedSections) data.collapsedSections = {};
+  data.collapsedSections['tool:'+key] = isToolCardOpen(key);
+  saveData();
+  renderToolsView();
+}
 function renderToolsView(){
   const el = document.getElementById('toolsContent');
   if(!el) return;
+  const openGood = isToolCardOpen('goodThings');
+  const openPoss = isToolCardOpen('possibilities');
+  const openTimer = isToolCardOpen('timer');
+  const openBreath = isToolCardOpen('breathing');
   el.innerHTML = `
     <div class="tools-card">
-      <h3>💛 מה שעושה לי טוב</h3>
+      <h3 class="tools-card-fold" onclick="toggleToolCard('goodThings')">${openGood?'▾':'▸'} 💛 מה שעושה לי טוב</h3>
+      ${openGood ? `
       <p class="hint" style="margin:0 0 4px;">תחביבים, דברים מרגיעים, דברים שמטעינים אותי. מסמנים מה בוחרים לעשות עכשיו — נשאר מסומן עד שלוחצים שוב.</p>
       <p class="hint" style="margin:0 0 10px;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</p>
-      ${feelChipGridHtml('activeGoodThings')}
+      ${feelChipGridHtml('activeGoodThings')}` : ''}
     </div>
 
     <div class="tools-card">
-      <h3>🌈 הכל אפשרי? הכל אפשרי!</h3>
+      <h3 class="tools-card-fold" onclick="toggleToolCard('possibilities')">${openPoss?'▾':'▸'} 🌈 הכל אפשרי? הכל אפשרי!${(data.possibilities||[]).length?' ('+data.possibilities.length+')':''}</h3>
+      ${openPoss ? `
       <p class="hint" style="margin:0 0 10px;">בוא רגע נדמיין שהכל אפשרי, בלי גבולות. פשוט מקום לכתוב בו בלי שיפוטיות את כל מה שאפשרי — תן/י לעצמך לזרום עם זה ופשוט לזרוק לכאן רעיונות, מציאותיים או לא מציאותיים, מחשבות חיוביות, או כל מה שעולה לראש שבא לך לומר שהוא אפשרי. זה מרחב מקבל — אפשר לכתוב פה הכל. זה יכול לעזור לפתוח אותנו לראות מעבר למה שאנחנו לא מודעים שאפשרי בחיים, וזה כלי טוב להשראה.</p>
       <div class="add-row possibility-add-row">
         <span class="possibility-prefix">זה לגמרי אפשרי ש...</span>
         <input type="text" id="possibilityInput" placeholder="לצאת לטבע לבד" onkeydown="if(event.key==='Enter') addPossibility();">
         <button onclick="addPossibility()">הוסף</button>
       </div>
-      <ul class="tasks" id="possibilitiesList">${possibilitiesListHtml()}</ul>
+      <ul class="tasks" id="possibilitiesList">${possibilitiesListHtml()}</ul>` : ''}
     </div>
 
     <div class="tools-card">
-      <h3>⏱ רגע עצירה</h3>
+      <h3 class="tools-card-fold" onclick="toggleToolCard('timer')">${openTimer?'▾':'▸'} ⏱ רגע עצירה</h3>
+      ${openTimer ? `
       <p class="hint" style="margin:0 0 10px;">טיימר פשוט לקחת רגע, בלי לחשוב על כלום אחר.</p>
       <div class="timer-presets">
         ${TOOLS_TIMER_PRESETS.map(s=>`<button type="button" class="timer-preset-btn ${toolsTimerPreset===s?'active':''}" onclick="startToolsTimer(${s})">${formatTimerClock(s)}</button>`).join('')}
@@ -12213,11 +12245,12 @@ function renderToolsView(){
       ${toolsTimerPreset!==null ? `
         <div class="timer-display" id="toolsTimerDisplay">${formatTimerClock(toolsTimerRemaining)}</div>
         <div class="timer-controls"><button type="button" class="reset-btn" onclick="stopToolsTimer(); renderToolsView();">⏹ עצירה</button></div>
-      ` : ''}
+      ` : ''}` : ''}
     </div>
 
     <div class="tools-card">
-      <h3>🌬 נשימה</h3>
+      <h3 class="tools-card-fold" onclick="toggleToolCard('breathing')">${openBreath?'▾':'▸'} 🌬 נשימה</h3>
+      ${openBreath ? `
       <p class="hint" style="margin:0 0 6px;">עיגול שמתרחב ומתכווץ בקצב שאת/ה קובע/ת. בלי מילים.</p>
       <div class="breathing-config">
         <span>פנימה</span><input type="number" id="breathIn" min="1" max="30" value="${data.breathIn||3}">
@@ -12232,7 +12265,7 @@ function renderToolsView(){
             ? `<button type="button" class="reset-btn" onclick="stopBreathing(); renderToolsView();">⏹ עצירה</button>`
             : `<button type="button" class="gcal-connect-btn" onclick="startBreathing()">▶ התחלה</button>`}
         </div>
-      </div>
+      </div>` : ''}
     </div>
   `;
 }
