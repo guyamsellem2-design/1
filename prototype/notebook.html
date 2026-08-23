@@ -101,6 +101,15 @@
   }
   .shelf-chip .dot{width:8px; height:8px; border-radius:50%; flex-shrink:0;}
   .shelf-chip.active{background:var(--surface); border-color:var(--gold); color:var(--text); box-shadow:var(--lift-1);}
+  /* the two worlds are told apart by shape, not only by words: a life-domain is a soft round
+     pill, a shelf is a squarer tag. even at a glance they do not read as the same kind of thing. */
+  .shelf-chip:not(.life){border-radius:9px;}
+  .shelf-bar.sub{
+    margin:-4px 0 10px; padding-right:14px;
+    border-right:2px solid var(--border-strong);
+  }
+  .shelf-bar.sub .shelf-chip{font-size:13px; padding:6px 12px; background:transparent;}
+  .shelf-bar.sub .shelf-chip.active{background:var(--surface);}
 
   /* ---------- the grid of cards ---------- */
   .grid{columns:2; column-gap:11px;}
@@ -135,6 +144,9 @@
     background:var(--surface3); color:var(--muted); display:flex; align-items:center; gap:5px;
   }
   .tag .dot{width:7px; height:7px; border-radius:50%;}
+  .tag:not(.life){border-radius:7px;}   /* same shape language as the filter chips */
+  .picker .opt:not(.life){border-radius:9px;}
+  .addbar .pill.filed{border-style:solid; color:var(--text);}
   .card-pin{position:absolute; top:9px; left:10px; font-size:11px; opacity:.6;}
 
   .empty-state{
@@ -319,6 +331,7 @@
 </div>
 
 <div class="shelf-bar" id="shelfBar"></div>
+<div id="shelfSub"></div>
 
 <div class="grid" id="grid"></div>
 
@@ -345,18 +358,24 @@
    A note that grew checkboxes IS a list. A list you wrote a paragraph in IS a note.
    ============================================================================ */
 
+/* Two catalogues, not one — and this is the point.
+   A life-domain says "this belongs to a part of my life". A shelf says "this is a pile of
+   things that is deliberately NOT a part of my life". Putting אלבום ויצירה and קניות in the
+   same row of chips reads as if they were the same kind of answer, and they are not. */
+const LIFE_DOMAINS = [
+  {id:'album',   name:'אלבום ויצירה', color:'#e2a34c'},
+  {id:'teach',   name:'הוראה',        color:'#3aa9a0'},
+  {id:'body',    name:'גוף ובריאות',  color:'#e08a72'},
+  {id:'love',    name:'זוגיות',       color:'#b98fc4'},
+  {id:'family',  name:'משפחה',        color:'#e2903f'},
+  {id:'friends', name:'חברים',        color:'#4fb4d6'},
+  {id:'home',    name:'בית',          color:'#cf9a5c'},
+  {id:'rest',    name:'מנוחה וטבע',   color:'#3fae7a'},
+];
 const SHELVES = [
-  {id:'album',   name:'אלבום ויצירה', color:'#e2a34c', kind:'domain'},
-  {id:'teach',   name:'הוראה',        color:'#3aa9a0', kind:'domain'},
-  {id:'body',    name:'גוף ובריאות',  color:'#e08a72', kind:'domain'},
-  {id:'love',    name:'זוגיות',       color:'#b98fc4', kind:'domain'},
-  {id:'family',  name:'משפחה',        color:'#e2903f', kind:'domain'},
-  {id:'friends', name:'חברים',        color:'#4fb4d6', kind:'domain'},
-  {id:'home',    name:'בית',          color:'#cf9a5c', kind:'domain'},
-  {id:'rest',    name:'מנוחה וטבע',   color:'#3fae7a', kind:'domain'},
-  // shelves that are deliberately NOT life-domains — the thing lists are for today
-  {id:'shop',    name:'קניות',        color:'#8fb8d6', kind:'custom'},
-  {id:'gear',    name:'גיטרה וציוד',  color:'#c9a0d6', kind:'custom'},
+  {id:'shop', name:'קניות'},
+  {id:'gear', name:'גיטרה וציוד'},
+  {id:'read', name:'לקרוא ולראות'},
 ];
 
 const CARD_COLORS = ['', '#F6D9C8', '#DCE8DA', '#D8E4EE', '#EDE0F0', '#F3E6C8'];
@@ -368,10 +387,14 @@ const NIGHT_COLORS = {
 let items = [];
 let openId = null;
 let nightMode = false;
-let activeShelf = 'all';
+// two-level filter: pick the world first, then (optionally) the specific one inside it.
+// at rest this is four chips instead of a dozen, and the two worlds never sit side by side.
+let activeGroup = 'all';   // 'all' | 'domain' | 'shelf' | 'none'
+let activeId = '';         // a specific domain/shelf id, or '' for the whole group
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const domainById = id => LIFE_DOMAINS.find(d => d.id === id);
 const shelfById = id => SHELVES.find(s => s.id === id);
 
 function normalizeUrl(raw){
@@ -387,7 +410,7 @@ function looksLikeUrl(t){
 }
 
 /* ---------- storage (prototype only — its own key, cannot touch the real app) ---------- */
-const KEY = 'notebookPrototype.v1';
+const KEY = 'notebookPrototype.v2';
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify({items, nightMode})); }catch(e){}
 }
@@ -404,39 +427,44 @@ function load(){
   return false;
 }
 
-/* ---------- seed: one of each shape, to show they are the same shape ---------- */
+/* ---------- seed: one of each shape, to show they are the same shape ----------
+   domain and shelf are two separate fields on purpose. An item has one, the other, or neither. */
+function blank(extra){
+  return Object.assign({ id:uid(), title:'', body:'', pinned:false, domain:'', shelf:'',
+    color:'', checks:[], links:[] }, extra);
+}
 function seed(){
   items = [
-    { id:uid(), title:'רשימת קניות', body:'', pinned:true, shelf:'shop', color:'#DCE8DA',
+    blank({ title:'רשימת קניות', pinned:true, shelf:'shop', color:'#DCE8DA',
       checks:[
         {id:uid(), text:'קפה', done:true},
         {id:uid(), text:'לחם מחמצת', done:false},
         {id:uid(), text:'טחינה גולמית', done:false},
         {id:uid(), text:'עגבניות שרי', done:false},
-      ], links:[] },
+      ] }),
 
-    { id:uid(), title:'מחשבות על האלבום',
+    blank({ title:'מחשבות על האלבום', domain:'album',
       body:'הצליל של השיר השלישי עדיין לא יושב. אולי הבעיה היא לא המיקס אלא הטמפו — לנסות להוריד 4 BPM ולראות מה קורה לתחושה.\n\nהרעיון של לפתוח את האלבום דווקא בשקט, בלי תופים, נשאר איתי כבר שבועיים. זה כנראה אומר משהו.',
-      pinned:false, shelf:'album', color:'',
-      checks:[], links:[{id:uid(), url:'https://youtube.com/watch?v=example'}] },
+      links:[{id:uid(), url:'https://youtube.com/watch?v=example'}] }),
 
-    { id:uid(), title:'ספרים לקרוא', body:'', pinned:false, shelf:'', color:'#D8E4EE',
+    blank({ title:'ספרים לקרוא', shelf:'read', color:'#D8E4EE',
       checks:[
         {id:uid(), text:'הגן הסודי', done:false},
         {id:uid(), text:'מוסר הרוח', done:false},
       ],
-      links:[{id:uid(), url:'https://www.goodreads.com'}] },
+      links:[{id:uid(), url:'https://www.goodreads.com'}] }),
 
-    { id:uid(), title:'מיתרים ופיקאפים', body:'הפיקאפ בגיטרה השנייה מזמזם כשאני מתקרב למחשב. לבדוק אם זה הכבל.',
-      pinned:false, shelf:'gear', color:'',
+    blank({ title:'מיתרים ופיקאפים', shelf:'gear',
+      body:'הפיקאפ בגיטרה השנייה מזמזם כשאני מתקרב למחשב. לבדוק אם זה הכבל.',
       checks:[{id:uid(), text:'להזמין סט מיתרים 10-46', done:false}],
-      links:[{id:uid(), url:'https://thomann.de'}] },
+      links:[{id:uid(), url:'https://thomann.de'}] }),
 
-    { id:uid(), title:'לשלוח לרונית את התאריכים', body:'', pinned:false, shelf:'teach', color:'#F3E6C8',
-      checks:[], links:[] },
+    blank({ title:'לשלוח לרונית את התאריכים', domain:'teach', color:'#F3E6C8' }),
 
-    { id:uid(), title:'', body:'משהו שתפסתי באמצע היום ועוד אין לו שם. זה בסדר גמור.',
-      pinned:false, shelf:'', color:'', checks:[], links:[] },
+    blank({ title:'גוף — מה עוזר', domain:'body',
+      body:'ריצה קצרה בבוקר עובדת יותר טוב מאימון ארוך בערב. לשמור על זה.' }),
+
+    blank({ body:'משהו שתפסתי באמצע היום ועוד אין לו שם. זה בסדר גמור.' }),
   ];
 }
 
@@ -454,8 +482,13 @@ function matchesSearch(it, q){
 function visibleItems(){
   const q = (document.getElementById('search').value || '').trim().toLowerCase();
   return items
-    .filter(it => activeShelf === 'all'
-      || (activeShelf === 'none' ? !it.shelf : it.shelf === activeShelf))
+    .filter(it => {
+      if(activeGroup === 'all') return true;
+      if(activeGroup === 'none') return !it.domain && !it.shelf;
+      if(activeGroup === 'domain') return activeId ? it.domain === activeId : !!it.domain;
+      if(activeGroup === 'shelf')  return activeId ? it.shelf  === activeId : !!it.shelf;
+      return true;
+    })
     .filter(it => matchesSearch(it, q))
     .sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0));
 }
@@ -465,24 +498,39 @@ function cardColor(it){
   return nightMode ? (NIGHT_COLORS[it.color] || it.color) : it.color;
 }
 
+/* Level one is the world: everything, my life, my shelves, or unfiled. Level two only appears
+   once you have picked a world, and only ever shows things from inside it — so a life-domain and
+   a shelf are never two chips next to each other pretending to be the same kind of answer. */
 function renderShelfBar(){
-  const used = new Set(items.map(i => i.shelf).filter(Boolean));
-  const chips = [
-    `<div class="shelf-chip ${activeShelf==='all'?'active':''}" onclick="setShelf('all')">הכל (${items.length})</div>`
-  ];
-  SHELVES.filter(s => used.has(s.id)).forEach(s => {
-    const n = items.filter(i => i.shelf === s.id).length;
-    chips.push(`<div class="shelf-chip ${activeShelf===s.id?'active':''}" onclick="setShelf('${s.id}')">
-      <span class="dot" style="background:${s.color}"></span>${esc(s.name)} (${n})</div>`);
-  });
-  const noneCount = items.filter(i => !i.shelf).length;
-  if(noneCount){
-    chips.push(`<div class="shelf-chip ${activeShelf==='none'?'active':''}" onclick="setShelf('none')">ללא מדף (${noneCount})</div>`);
+  const nDomain = items.filter(i => i.domain).length;
+  const nShelf  = items.filter(i => i.shelf).length;
+  const nNone   = items.filter(i => !i.domain && !i.shelf).length;
+
+  const top = [`<div class="shelf-chip ${activeGroup==='all'?'active':''}" onclick="setGroup('all')">הכל (${items.length})</div>`];
+  if(nDomain) top.push(`<div class="shelf-chip life ${activeGroup==='domain'?'active':''}" onclick="setGroup('domain')">🌱 נושאי חיים (${nDomain})</div>`);
+  if(nShelf)  top.push(`<div class="shelf-chip ${activeGroup==='shelf'?'active':''}" onclick="setGroup('shelf')">🏷 מדפים (${nShelf})</div>`);
+  if(nNone)   top.push(`<div class="shelf-chip ${activeGroup==='none'?'active':''}" onclick="setGroup('none')">ללא שיוך (${nNone})</div>`);
+
+  let sub = '';
+  if(activeGroup === 'domain' || activeGroup === 'shelf'){
+    const isLife = activeGroup === 'domain';
+    const catalog = isLife ? LIFE_DOMAINS : SHELVES;
+    const countOf = e => items.filter(i => (isLife ? i.domain : i.shelf) === e.id).length;
+    const used = catalog.filter(e => countOf(e) > 0);
+    sub = `<div class="shelf-bar sub">
+      <div class="shelf-chip ${!activeId?'active':''} ${isLife?'life':''}" onclick="setSpecific('')">הכל</div>
+      ${used.map(e => `<div class="shelf-chip ${isLife?'life':''} ${activeId===e.id?'active':''}" onclick="setSpecific('${e.id}')">
+        ${isLife ? `<span class="dot" style="background:${e.color}"></span>` : ''}${esc(e.name)} (${countOf(e)})
+      </div>`).join('')}
+    </div>`;
   }
-  document.getElementById('shelfBar').innerHTML = chips.join('');
+
+  document.getElementById('shelfBar').innerHTML = top.join('');
+  document.getElementById('shelfSub').innerHTML = sub;
 }
 
-function setShelf(id){ activeShelf = id; render(); }
+function setGroup(g){ activeGroup = g; activeId = ''; render(); }
+function setSpecific(id){ activeId = id; render(); }
 
 function cardHtml(it){
   const checks = it.checks || [];
@@ -490,6 +538,7 @@ function cardHtml(it){
   const shown = checks.slice(0, 5);
   const rest = checks.length - shown.length;
   const bg = cardColor(it);
+  const dom = domainById(it.domain);
   const sh = shelfById(it.shelf);
   return `<div class="card ${bg?'tinted':''}" style="${bg?`background:${bg};`:''}" onclick="openItem('${it.id}')">
     ${it.pinned ? '<span class="card-pin">📌</span>' : ''}
@@ -498,8 +547,9 @@ function cardHtml(it){
     ${shown.length ? `<div class="card-checks">${shown.map(c => `
       <div class="card-check ${c.done?'done':''}"><span class="box">${c.done?'☑':'☐'}</span><span>${esc(c.text)}</span></div>
     `).join('')}${rest > 0 ? `<div class="card-more">ועוד ${rest}</div>` : ''}</div>` : ''}
-    ${(sh || links.length) ? `<div class="card-foot">
-      ${sh ? `<span class="tag"><span class="dot" style="background:${sh.color}"></span>${esc(sh.name)}</span>` : ''}
+    ${(dom || sh || links.length) ? `<div class="card-foot">
+      ${dom ? `<span class="tag life"><span class="dot" style="background:${dom.color}"></span>${esc(dom.name)}</span>` : ''}
+      ${sh ? `<span class="tag">🏷 ${esc(sh.name)}</span>` : ''}
       ${links.length ? `<span class="tag">🔗 ${links.length}</span>` : ''}
     </div>` : ''}
   </div>`;
@@ -523,7 +573,11 @@ function toggleNight(){ nightMode = !nightMode; render(); }
 function byId(id){ return items.find(i => i.id === id); }
 
 function newItem(){
-  const it = { id:uid(), title:'', body:'', pinned:false, shelf:(activeShelf!=='all'&&activeShelf!=='none')?activeShelf:'', color:'', checks:[], links:[] };
+  // a new item lands where you were already looking, so filtering then adding does the obvious thing
+  const it = blank({
+    domain: (activeGroup === 'domain' && activeId) ? activeId : '',
+    shelf:  (activeGroup === 'shelf'  && activeId) ? activeId : ''
+  });
   items.unshift(it);
   openItem(it.id);
   requestAnimationFrame(()=>{
@@ -565,6 +619,7 @@ function renderSheet(){
 
   const checks = it.checks || [];
   const links = it.links || [];
+  const dom = domainById(it.domain);
   const sh = shelfById(it.shelf);
 
   document.getElementById('sheetScroll').innerHTML = `
@@ -608,11 +663,16 @@ function renderSheet(){
     </div>` : ''}
 
     ${shelfPickerOpen ? `<div class="sect">
-      <div class="sect-label">מדף</div>
+      <div class="sect-label">🌱 נושא חיים</div>
       <div class="picker">
-        <button class="opt ${!it.shelf?'active':''}" onclick="setShelfOf('')">ללא מדף</button>
-        ${SHELVES.map(s => `<button class="opt ${it.shelf===s.id?'active':''}" onclick="setShelfOf('${s.id}')">
-          <span class="dot" style="background:${s.color}"></span>${esc(s.name)}</button>`).join('')}
+        <button class="opt ${!it.domain?'active':''}" onclick="setDomainOf('')">ללא</button>
+        ${LIFE_DOMAINS.map(d => `<button class="opt life ${it.domain===d.id?'active':''}" onclick="setDomainOf('${d.id}')">
+          <span class="dot" style="background:${d.color}"></span>${esc(d.name)}</button>`).join('')}
+      </div>
+      <div class="sect-label" style="margin-top:14px;">🏷 מדף — לדברים שהם לא נושא חיים</div>
+      <div class="picker">
+        <button class="opt ${!it.shelf?'active':''}" onclick="setShelfOf('')">ללא</button>
+        ${SHELVES.map(s => `<button class="opt ${it.shelf===s.id?'active':''}" onclick="setShelfOf('${s.id}')">${esc(s.name)}</button>`).join('')}
       </div>
     </div>` : ''}
 
@@ -627,13 +687,16 @@ function renderSheet(){
 
     ${(!checks.length && !links.length && !shelfPickerOpen && !colorPickerOpen) ? `
       <div class="note">אפשר להשאיר את זה ככה — שם ומחשבה זה פריט שלם.<br>
-      וכשמתברר שצריך יותר, הכפתורים למטה מוסיפים <b>סעיפים</b>, <b>קישור</b>, <b>מדף</b> או <b>צבע</b>.</div>` : ''}
+      וכשמתברר שצריך יותר, הכפתורים למטה מוסיפים <b>סעיפים</b>, <b>קישור</b>, <b>שיוך</b> או <b>צבע</b>.</div>` : ''}
   `;
 
+  const filedAs = dom ? `<span class="dot" style="background:${dom.color}"></span>${esc(dom.name)}`
+                : sh ? `🏷 ${esc(sh.name)}`
+                : 'שיוך';
   document.getElementById('addbar').innerHTML = `
     <button class="pill" onclick="addCheck()">＋ סעיפים</button>
     <button class="pill" onclick="addLink()">＋ קישור</button>
-    <button class="pill ${shelfPickerOpen?'':''}" onclick="toggleShelfPicker()">🏷 ${sh ? esc(sh.name) : 'מדף'}</button>
+    <button class="pill ${(dom||sh)?'filed':''}" onclick="toggleShelfPicker()">${filedAs}</button>
     <button class="pill" onclick="toggleColorPicker()">🎨 צבע</button>
   `;
 
@@ -667,9 +730,19 @@ function deleteItem(){
   toast('נמחק');
 }
 
+// picking one clears the other: a thing is either part of a life-domain or a pile that is not,
+// and letting it be both is exactly the muddle we are trying to get rid of
+function setDomainOf(id){
+  const it = byId(openId); if(!it) return;
+  it.domain = id;
+  if(id) it.shelf = '';
+  shelfPickerOpen = false;
+  renderSheet(); save();
+}
 function setShelfOf(id){
   const it = byId(openId); if(!it) return;
   it.shelf = id;
+  if(id) it.domain = '';
   shelfPickerOpen = false;
   renderSheet(); save();
 }
