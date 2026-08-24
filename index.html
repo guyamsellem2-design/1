@@ -3042,16 +3042,61 @@
      the same row. A notebook also gets no colour dot — colour is what marks a
      part of your life, and lending it to a shopping list blurs the same line.
      --------------------------------------------------------------------------- */
-  .note-world-switch{ display:flex; gap:8px; margin:0 0 12px; flex-wrap:wrap; }
+  /* Dividers in a notebook, not another row of chips. They overlap each other, they sit ON the
+     page instead of floating above it, and colour marks only the one you are standing in — so
+     these three never read as siblings of the topic chips underneath them. */
+  .note-world-switch{
+    display:flex; align-items:flex-end; gap:0; margin:0; padding:0 6px;
+    position:relative; z-index:2; overflow-x:auto; scrollbar-width:none;
+  }
+  .note-world-switch::-webkit-scrollbar{ display:none; }
+  .note-world-fill{ flex:1; min-width:0; }
   .note-world-btn{
-    background:var(--surface2); border:1px solid var(--border-strong); color:var(--muted);
-    border-radius:var(--r-pill); padding:9px 16px; font-family:inherit; font-size:14px;
-    cursor:pointer; min-height:42px; transition:all var(--dur) var(--ease-water);
+    --tab-tint:var(--surface2);
+    flex-shrink:0; position:relative;
+    background:var(--tab-tint);
+    border:1px solid var(--card-line); border-bottom:none;
+    border-radius:15px 15px 0 0;
+    color:var(--muted); font-family:inherit; font-size:14px; font-weight:500;
+    padding:11px 17px 13px; cursor:pointer; white-space:nowrap;
+    margin-inline-start:-12px;      /* the overlap — one tab tucked behind the next */
+    transform:translateY(5px);       /* an unopened divider sits lower on the page */
+    transition:transform var(--dur) var(--ease-water), background var(--dur) var(--ease-water),
+               color var(--dur) var(--ease-water);
   }
-  .note-world-btn:hover{ color:var(--text); }
+  .note-world-btn:first-child{ margin-inline-start:0; }
+  .note-world-btn:hover{ color:var(--text); transform:translateY(2px); }
   .note-world-btn.active{
-    background:var(--surface); border-color:var(--gold); color:var(--text); box-shadow:var(--lift-1);
+    color:var(--text); font-weight:600;
+    transform:translateY(1px);
+    padding-bottom:15px;             /* reaches down over the page edge, so the seam disappears */
+    margin-bottom:-1px;
   }
+  /* only the open divider takes a colour, and it is the same wash the backdrop is painted with */
+  .note-world-btn.active.world-plan{     --tab-tint:color-mix(in srgb, var(--wash-2) 26%, var(--surface)); }
+  .note-world-btn.active.world-domain{   --tab-tint:color-mix(in srgb, var(--wash-4) 30%, var(--surface)); }
+  .note-world-btn.active.world-notebook{ --tab-tint:color-mix(in srgb, var(--wash-3) 32%, var(--surface)); }
+  body.night-mode .note-world-btn{ --tab-tint:color-mix(in srgb, var(--surface2) 70%, transparent); }
+  body.night-mode .note-world-btn.active.world-plan{     --tab-tint:color-mix(in srgb, var(--wash-2) 42%, var(--surface)); }
+  body.night-mode .note-world-btn.active.world-domain{   --tab-tint:color-mix(in srgb, var(--wash-4) 34%, var(--surface)); }
+  body.night-mode .note-world-btn.active.world-notebook{ --tab-tint:color-mix(in srgb, var(--wash-3) 34%, var(--surface)); }
+
+  /* the page the open divider is attached to — it carries the same tint, so the tab reads as the
+     lip of this sheet rather than as a button that happens to sit above it */
+  .note-world-page{
+    position:relative;
+    border:1px solid var(--card-line); border-radius:0 14px 14px 14px;
+    padding:14px 12px 4px; margin:0 0 14px;
+    background:color-mix(in srgb, var(--surface2) 55%, transparent);
+    transition:background var(--dur) var(--ease-water);
+  }
+  .note-world-page.world-plan{     background:color-mix(in srgb, var(--wash-2) 13%, transparent); }
+  .note-world-page.world-domain{   background:color-mix(in srgb, var(--wash-4) 15%, transparent); }
+  .note-world-page.world-notebook{ background:color-mix(in srgb, var(--wash-3) 16%, transparent); }
+  body.night-mode .note-world-page.world-plan{     background:color-mix(in srgb, var(--wash-2) 26%, transparent); }
+  body.night-mode .note-world-page.world-domain{   background:color-mix(in srgb, var(--wash-4) 18%, transparent); }
+  body.night-mode .note-world-page.world-notebook{ background:color-mix(in srgb, var(--wash-3) 18%, transparent); }
+  .note-world-page .topic-tab-strip{ margin-bottom:0; }
   .domain-chip.notebook-chip{ border-radius:10px; }
   .domain-chip.notebook-chip.active{ background:var(--surface); border-color:var(--gold); color:var(--text); }
   .notebook-add-row{ display:flex; align-items:center; gap:6px; }
@@ -3750,7 +3795,9 @@
   </div>
   <p class="hint" style="margin:0 0 12px;">תחום חיים או מחברת — כל אחד הוא חוצץ · שם, צבע וסדר ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור · לחיצה על חוצץ פותחת את הפתקים שלו</p>
   <div class="note-world-switch" id="noteWorldSwitch"></div>
-  <div class="topic-tab-strip" id="topicTabStrip"></div>
+  <div class="note-world-page" id="noteWorldPage">
+    <div class="topic-tab-strip" id="topicTabStrip"></div>
+  </div>
   <div class="notebook-body" id="notesBody">
     <div class="add-row">
       <button id="addNoteBtn" onclick="addDomainNote()">+ פתק חדש</button>
@@ -4289,13 +4336,21 @@ function renderWorldSwitch(){
   const nDomain = countIn(data.domains || []);
   const nNotebook = countIn(notebookList());
   const nPlan = (data.someday||[]).length + (data.habits||[]).length + (data.suggestions||[]).length;
-  el.innerHTML = `
-    <button type="button" class="note-world-btn ${noteWorld==='domain'?'active':''}" onclick="setNoteWorld('domain')">
-      🌱 תחומי חיים${nDomain?` (${nDomain})`:''}</button>
-    <button type="button" class="note-world-btn ${noteWorld==='notebook'?'active':''}" onclick="setNoteWorld('notebook')">
-      📓 מחברות${nNotebook?` (${nNotebook})`:''}</button>
-    <button type="button" class="note-world-btn ${noteWorld==='plan'?'active':''}" onclick="setNoteWorld('plan')">
-      🗺 תכנון${nPlan?` (${nPlan})`:''}</button>`;
+  // Dividers in a notebook, not another row of chips: they overlap, they sit ON the page rather
+  // than floating above it, and only the one you are standing in takes a colour. The order runs
+  // תכנון → תחומי חיים → מחברות, from the draft of a life outward to the things beside it.
+  const worlds = [
+    {key:'plan',     label:'🗺 תכנון',      count:nPlan},
+    {key:'domain',   label:'🌱 תחומי חיים', count:nDomain},
+    {key:'notebook', label:'📓 מחברות',     count:nNotebook},
+  ];
+  el.innerHTML = worlds.map((w, i) => `
+    <button type="button" class="note-world-btn world-${w.key} ${noteWorld===w.key?'active':''}"
+      style="z-index:${noteWorld===w.key ? worlds.length + 1 : worlds.length - i};"
+      onclick="setNoteWorld('${w.key}')">${w.label}${w.count?` (${w.count})`:''}</button>`).join('')
+    + `<span class="note-world-fill"></span>`;
+  const page = document.getElementById('noteWorldPage');
+  if(page) page.className = 'note-world-page world-' + noteWorld;
 }
 function renderDomainEditor(){
   renderWorldSwitch();
