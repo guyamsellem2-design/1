@@ -6737,6 +6737,15 @@ document.addEventListener('focusout', (e)=>{
   // the field and this still catches it.
   setTimeout(()=>{
     if(!pendingRenderAfterTyping) return;
+    // Moving from one field straight into the next one is the MIDDLE of filling something in, not
+    // the end of it. A form with two fields side by side -- a title and a link, a name and an
+    // address -- blurs the first the moment you tap the second, and rendering here rebuilds the
+    // whole block and wipes what you just typed into the field you left. So the value is gone
+    // before the "הוסף" button ever reads it, and only the second attempt works.
+    // By the time this fires, focus has already landed wherever it is going: if that is another
+    // text field, keep waiting. The flag stays set, and the next blur that actually leaves every
+    // field will run the deferred render then.
+    if(isTypingNow()) return;
     pendingRenderAfterTyping = false;
     renderKeepingScrollPosition();
   }, 0);
