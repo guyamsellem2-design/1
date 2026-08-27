@@ -3190,6 +3190,48 @@
   #planHost .section-head h2{ cursor:default; }
   #planHost .section-head h2 .chev{ display:none; }
 
+  /* ---------------------------------------------------------------------------
+     43. כוונה להיום — the first thing on the page.
+     It asks for nothing: not a task, nothing to finish. Once written it stops
+     being a form field and becomes handwriting — large, in the drawn face, with
+     air around it. That is the whole point, so it gets no card border, no
+     buttons at rest, and nothing that looks like it wants an answer.
+     --------------------------------------------------------------------------- */
+  #dayIntentionBlock{ background:transparent; border:none; box-shadow:none; padding:6px 4px 2px; }
+  #dayIntentionBlock::before, #dayIntentionBlock::after{ display:none; }
+  .intention-label{
+    font-size:12.5px; color:var(--muted2); letter-spacing:.04em; margin-bottom:4px;
+  }
+  .intention-stale{ opacity:.8; }
+  .intention-text{
+    font-family:var(--font-hand); font-weight:700;
+    font-size:clamp(30px,7.4vw,46px); line-height:1.12; color:var(--text);
+    cursor:pointer; overflow-wrap:anywhere; padding:2px 0 4px;
+  }
+  .intention-text.stale{ opacity:.62; }
+  .intention-actions{ display:flex; gap:14px; }
+  .intention-actions span{
+    font-size:12.5px; color:var(--muted2); cursor:pointer;
+    text-decoration:underline; text-underline-offset:3px;
+  }
+  .intention-actions span:hover{ color:var(--text); }
+  .intention-add{ display:flex; gap:8px; align-items:center; }
+  .intention-add input{
+    flex:1; min-width:0; min-height:46px;
+    font-family:var(--font-hand); font-weight:700; font-size:24px;
+    background:transparent; border:none; border-bottom:1.5px dashed var(--border-strong);
+    border-radius:0; color:var(--text); padding:4px 2px;
+  }
+  .intention-add input:focus{ outline:none; border-bottom-color:var(--gold); }
+  .intention-add input::placeholder{ font-size:19px; color:var(--muted2); }
+
+  /* the ask, said once and plainly, at the top of today's picks */
+  .today-pick-call{
+    font-family:var(--font-hand); font-weight:700;
+    font-size:clamp(24px,5.4vw,32px); line-height:1.15;
+    color:var(--text); margin:2px 0 6px;
+  }
+
 </style>
 </head>
 <body>
@@ -3605,9 +3647,9 @@
 
   <div id="onboardingCard"></div>
 
-  <div class="feel-block" id="inboxBlock"></div>
+  <div class="feel-block" id="dayIntentionBlock"></div>
 
-  <div class="feel-block" id="feelBar"></div>
+  <div class="feel-block" id="inboxBlock" data-plan-block="inbox"></div>
 
   <div class="sync-menu" id="syncMenu">
     <button type="button" class="sync-menu-btn" onclick="toggleSyncMenu()">🔄 סנכרון</button>
@@ -3618,69 +3660,6 @@
   </div>
 
   <div class="feel-block" id="todayPicksBlock"></div>
-
-  <div class="feel-block" id="habitsBlock" data-plan-block="habits"></div>
-
-  <section>
-    <div class="section-head">
-      <h2 onclick="toggleSection('reflection')">תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
-      <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת, ממלאים מתי שבא</div>
-    </div>
-    <div id="secbody-reflection">
-      <div class="card" id="reflectionCard"></div>
-    </div>
-  </section>
-
-  <section data-plan-block="someday">
-    <div class="section-head">
-      <h2 onclick="toggleSection('someday')">דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
-      <div class="hint">רעיונות ומשימות ללא מועד, לא מחייבות — כל דבר שאפשר לגעת בו מתי שבא לך, בלי לחץ</div>
-      <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
-    </div>
-    <div id="secbody-someday">
-    <div class="card">
-      <div class="add-row">
-        <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
-        <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
-        <button onclick="addSomeday()">הוסף</button>
-      </div>
-      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-        <div id="pendingBodyCheck-someday"></div>
-        <div id="pendingSomedayDescWrap"></div>
-        <div id="pendingSomedaySubtasksWrap"></div>
-      </div>
-      <div class="add-row" style="margin-bottom:10px;">
-        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">🔽 הצג את כל הרשימה</button>
-        <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
-          <option value="manual">מיון לפי: ידני (גרירה)</option>
-          <option value="date">מיון לפי: תאריך הוספה</option>
-          <option value="domain" selected>מיון לפי: נושא</option>
-        </select>
-        <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
-      </div>
-      <div class="section-divider"></div>
-      <ul class="tasks scroll-cap" id="somedayList"></ul>
-      <div class="list-expand-row" id="somedayListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('someday')"></button></div>
-    </div>
-    </div>
-  </section>
-
-  <section data-plan-block="suggestions">
-    <div class="section-head">
-      <h2 onclick="toggleSection('suggestions')">התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
-      <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך, וגם מקום לדברים שאת/ה מתלבט/ת עליהם בכלל — בלי שזה יילחץ עליך ישר</div>
-      <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
-    </div>
-    <div id="secbody-suggestions">
-    <div class="card">
-      <div class="dilemma-subtabs">
-        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabOthersBtn" onclick="setDilemmaSubTab('others')">העדפות של אחרים</button>
-        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabGeneralBtn" onclick="setDilemmaSubTab('general')">התלבטויות כלליות</button>
-      </div>
-      <div id="dilemmasSectionBody"></div>
-    </div>
-    </div>
-  </section>
 
   <section>
     <div class="section-head">
@@ -3760,6 +3739,71 @@
     </div>
   </section>
 
+  <div class="feel-block" id="habitsBlock"></div>
+
+
+  <section data-plan-block="someday">
+    <div class="section-head">
+      <h2 onclick="toggleSection('someday')">דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
+      <div class="hint">רעיונות ומשימות ללא מועד, לא מחייבות — כל דבר שאפשר לגעת בו מתי שבא לך, בלי לחץ</div>
+      <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
+    </div>
+    <div id="secbody-someday">
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
+        <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
+        <button onclick="addSomeday()">הוסף</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+        <div id="pendingBodyCheck-someday"></div>
+        <div id="pendingSomedayDescWrap"></div>
+        <div id="pendingSomedaySubtasksWrap"></div>
+      </div>
+      <div class="add-row" style="margin-bottom:10px;">
+        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">🔽 הצג את כל הרשימה</button>
+        <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
+          <option value="manual">מיון לפי: ידני (גרירה)</option>
+          <option value="date">מיון לפי: תאריך הוספה</option>
+          <option value="domain" selected>מיון לפי: נושא</option>
+        </select>
+        <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
+      </div>
+      <div class="section-divider"></div>
+      <ul class="tasks scroll-cap" id="somedayList"></ul>
+      <div class="list-expand-row" id="somedayListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('someday')"></button></div>
+    </div>
+    </div>
+  </section>
+
+  <section data-plan-block="suggestions">
+    <div class="section-head">
+      <h2 onclick="toggleSection('suggestions')">התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
+      <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך, וגם מקום לדברים שאת/ה מתלבט/ת עליהם בכלל — בלי שזה יילחץ עליך ישר</div>
+      <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
+    </div>
+    <div id="secbody-suggestions">
+    <div class="card">
+      <div class="dilemma-subtabs">
+        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabOthersBtn" onclick="setDilemmaSubTab('others')">העדפות של אחרים</button>
+        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabGeneralBtn" onclick="setDilemmaSubTab('general')">התלבטויות כלליות</button>
+      </div>
+      <div id="dilemmasSectionBody"></div>
+    </div>
+    </div>
+  </section>
+
+
+  <section>
+    <div class="section-head">
+      <h2 onclick="toggleSection('reflection')">תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
+      <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת, ממלאים מתי שבא</div>
+    </div>
+    <div id="secbody-reflection">
+      <div class="card" id="reflectionCard"></div>
+    </div>
+  </section>
+
   <section>
     <div class="section-head">
       <h2 onclick="toggleSection('backup')">גיבוי והעברה <span class="chev" id="chev-backup">▾</span></h2>
@@ -3818,8 +3862,9 @@
       <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </div>
-  <div class="feel-block" id="procrastinationBlock"></div>
+  <div class="feel-block" id="feelBar"></div>
   <div id="toolsContent"></div>
+  <div class="feel-block" id="procrastinationBlock"></div>
   <div class="feel-block" id="inspiringVideosBlock"></div>
 </div>
 
@@ -3868,7 +3913,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -3959,6 +4004,8 @@ function loadData(){
       data.possibilities = parsed.possibilities || [];
       data.customTimerPresets = parsed.customTimerPresets || [];
       data.todayIdeasDate = parsed.todayIdeasDate || '';
+      data.dayIntention = parsed.dayIntention || '';
+      data.dayIntentionDate = parsed.dayIntentionDate || '';
       data.todayIdeasShowFavOnly = !!parsed.todayIdeasShowFavOnly;
       data.todayIdeas = parsed.todayIdeas || [];
       data.breathIn = (typeof parsed.breathIn === 'number') ? parsed.breathIn : 3;
@@ -4335,7 +4382,7 @@ function renderWorldSwitch(){
   const countIn = ids => ids.reduce((sum, c) => sum + ensureDomainNotes(c.id).length, 0);
   const nDomain = countIn(data.domains || []);
   const nNotebook = countIn(notebookList());
-  const nPlan = (data.someday||[]).length + (data.habits||[]).length + (data.suggestions||[]).length;
+  const nPlan = (data.inbox||[]).length + (data.someday||[]).length + (data.suggestions||[]).length;
   // Dividers in a notebook, not another row of chips: they overlap, they sit ON the page rather
   // than floating above it, and only the one you are standing in takes a colour. The order runs
   // תכנון → תחומי חיים → מחברות, from the draft of a life outward to the things beside it.
@@ -4384,8 +4431,8 @@ function renderDomainEditor(){
 /* The three drafts of a life get the same strip. They are fixed — you don't add or delete one —
    so these tabs carry no name field and no ✕, only a count of what is waiting inside. */
 function renderPlanStrip(el){
-  const countOf = key => key==='someday' ? (data.someday||[]).length
-                      : key==='habits'  ? (data.habits||[]).length
+  const countOf = key => key==='inbox'   ? (data.inbox||[]).length
+                      : key==='someday' ? (data.someday||[]).length
                       : (data.suggestions||[]).length;
   el.innerHTML = PLAN_KINDS.map(k => {
     const n = countOf(k.key);
@@ -4936,11 +4983,11 @@ let noteWorld = 'domain'; // 'domain' | 'notebook' | 'plan'
    of their existing behaviours (sub-tasks, small starts, the decision helper, body-check, "turn
    into a task") keeps working with no change and nothing to re-test. */
 const PLAN_KINDS = [
+  {key:'inbox',       label:'תיבת קליטה'},
   {key:'someday',     label:'דברים לעשות'},
-  {key:'habits',      label:'דברים שהייתי רוצה להתמיד בהם'},
   {key:'suggestions', label:'התלבטויות'},
 ];
-let activePlanKind = 'someday';
+let activePlanKind = 'inbox';
 let planBlocksMoved = false;
 function movePlanBlocksIntoNotebook(){
   if(planBlocksMoved) return;
@@ -4963,11 +5010,10 @@ function setPlanKind(key){
   // these blocks each carry their own collapse toggle from when they lived on the home screen;
   // inside a tab of their own, collapsed would just mean an empty page
   if(key === 'someday' || key === 'suggestions') openSection(key);
-  if(key === 'habits' && !habitsBlockOpen) habitsBlockOpen = true;
   // and each one is drawn by the home render pass, which no longer runs when you open this tab --
   // so draw the one being shown, or you get its empty shell from boot time
-  if(key === 'someday'){ renderSomeday(); }
-  else if(key === 'habits'){ renderHabits(); }
+  if(key === 'inbox'){ if(!inboxBlockOpen) inboxBlockOpen = true; renderInbox(); }
+  else if(key === 'someday'){ renderSomeday(); }
   else if(key === 'suggestions'){ renderDilemmasSection(); renderSuggestions(); }
   renderPlanPanes();
   renderDomainEditor();
@@ -11306,7 +11352,7 @@ function renderInspiringVideos(){
   if(!el) return;
   const videos = data.inspiringVideos || [];
   el.innerHTML = `
-    <div class="feel-block-header" onclick="toggleVideosBlock()">${videosBlockOpen?'▾':'▸'} 🎬 סרטונים מעוררי השראה${videos.length?' ('+videos.length+')':''}</div>
+    <div class="feel-block-header" onclick="toggleVideosBlock()">${videosBlockOpen?'▾':'▸'} 🔗 לינקים מעוררי השראה${videos.length?' ('+videos.length+')':''}</div>
     ${videosBlockOpen ? `
       <div class="add-row" style="margin-bottom:10px;">
         <input type="text" id="videoTitleInput" placeholder="כותרת הסרטון">
@@ -11445,7 +11491,7 @@ function renderHabits(){
   if(!el) return;
   const habits = data.habits || [];
   el.innerHTML = `
-    <div class="feel-block-header" onclick="toggleHabitsBlock()">${habitsBlockOpen?'▾':'▸'} 🌱 דברים שהייתי רוצה להתמיד בהם${habits.length?' ('+habits.length+')':''}</div>
+    <div class="feel-block-header" onclick="toggleHabitsBlock()">${habitsBlockOpen?'▾':'▸'} 🌱 הרגלים${habits.length?' ('+habits.length+')':''}</div>
     ${habitsBlockOpen ? `
       <div class="add-row" style="margin-bottom:10px;">
         <input type="text" id="habitInput" placeholder="פעולה קטנה לעשות באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
@@ -12562,6 +12608,64 @@ function todayIdeaRowHtml(item){
     </div>
   `;
 }
+/* ---------- כוונה להיום ----------
+   The first thing on the page, and the only one that asks for nothing. Not a task, not something
+   to finish — one sentence about how you want the day to feel. Once it is written it stops being
+   a field and becomes handwriting: large, in the drawn face, with room around it. */
+let dayIntentionEditing = false;
+function startEditDayIntention(){
+  dayIntentionEditing = true;
+  renderDayIntention();
+  requestAnimationFrame(()=>{
+    const el = document.getElementById('dayIntentionInput');
+    if(el){ el.focus(); el.select(); }
+  });
+}
+function saveDayIntention(){
+  const el = document.getElementById('dayIntentionInput');
+  const text = el ? el.value.trim() : '';
+  data.dayIntention = text;
+  data.dayIntentionDate = text ? ymd(new Date()) : '';
+  dayIntentionEditing = false;
+  saveData();
+  renderDayIntention();
+}
+function clearDayIntention(){
+  data.dayIntention = '';
+  data.dayIntentionDate = '';
+  dayIntentionEditing = false;
+  saveData();
+  renderDayIntention();
+  flashStatus('הכוונה נוקתה');
+}
+function renderDayIntention(){
+  const el = document.getElementById('dayIntentionBlock');
+  if(!el) return;
+  const text = (data.dayIntention||'').trim();
+  // an intention set on an earlier day is still yours — it is shown, just quietly marked, so it
+  // is never silently deleted and never pretends to be today's
+  const fromEarlierDay = !!text && data.dayIntentionDate && data.dayIntentionDate !== ymd(new Date());
+  withFocusPreserved('dayIntentionBlock', ()=>{
+    if(text && !dayIntentionEditing){
+      el.innerHTML = `
+        <div class="intention-label">הכוונה שלי להיום${fromEarlierDay ? ' <span class="intention-stale">· נכתבה ביום אחר</span>' : ''}</div>
+        <div class="intention-text ${fromEarlierDay?'stale':''}" onclick="startEditDayIntention()" title="לחיצה לעריכה">${escapeHtml(text)}</div>
+        <div class="intention-actions">
+          <span onclick="startEditDayIntention()">✎ עריכה</span>
+          <span onclick="clearDayIntention()">✕ ניקוי</span>
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <div class="intention-label">כוונה להיום</div>
+        <div class="intention-add">
+          <input type="text" id="dayIntentionInput" dir="auto" data-field-key="dayIntention"
+            placeholder="איך אני רוצה שהיום הזה ירגיש?" value="${escapeAttr(text)}"
+            onkeydown="if(event.key==='Enter') saveDayIntention();">
+          <button type="button" onclick="saveDayIntention()">שמירה</button>
+        </div>`;
+    }
+  });
+}
 function renderTodayIdeas(){
   const el = document.getElementById('todayPicksBlock');
   if(!el) return;
@@ -12573,6 +12677,7 @@ function renderTodayIdeas(){
     el.innerHTML = `
       <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה בא לי לעשות היום?</div>
       ${todayIdeasOpen ? `
+      <div class="today-pick-call">בחר 3 דברים להספיק היום</div>
       <p class="hint" style="margin:2px 0 8px;">כתבי/כתוב טיוטה חופשית של כל מה שבא לך היום, בלי סדר ובלי לחשוב יותר מדי. אחר כך סמני/סמן ⭐ על מה שאת/ה באמת בוחר/ת היום — נגיד שלושה — ואפשר לעבור לתצוגת "נבחרים" ולראות רק אותם. בלי יומן ובלי זמנים; מקסימום לא יקרו.</p>
       <div class="timer-presets">
         <button type="button" class="timer-preset-btn ${!showFavOnly?'active':''}" onclick="setTodayIdeasFavView(false)">☰ הכל (${data.todayIdeas.length})</button>
@@ -12871,6 +12976,7 @@ function render(){
   renderSyncBlock();
   renderOnboardingCard();
   renderInbox();
+  renderDayIntention();
   renderFeelBar();
   renderProcrastinationBlock();
   renderInspiringVideos();
@@ -13277,6 +13383,10 @@ window.addEventListener('touchcancel', gestureCancel, {passive:true});
 
 setupPWA();
 loadData();
+// the draft blocks live in the home markup but belong to the notebook's תכנון tab -- relocate them
+// at boot rather than the first time that tab is opened, or a fresh load shows them on the home
+// page until you happen to go there
+movePlanBlocksIntoNotebook();
 // a plain page load/refresh (F5, reopening the app) should sync too, not just the pull-to-refresh
 // gesture and the manual buttons — cross-device sync already does this via onAuthStateChanged below,
 // this covers the calendar half of it
