@@ -3202,13 +3202,11 @@
   .intention-label{
     font-size:12.5px; color:var(--muted2); letter-spacing:.04em; margin-bottom:4px;
   }
-  .intention-stale{ opacity:.8; }
   .intention-text{
     font-family:var(--font-hand); font-weight:700;
     font-size:clamp(30px,7.4vw,46px); line-height:1.12; color:var(--text);
     cursor:pointer; overflow-wrap:anywhere; padding:2px 0 4px;
   }
-  .intention-text.stale{ opacity:.62; }
   .intention-actions{ display:flex; gap:14px; }
   .intention-actions span{
     font-size:12.5px; color:var(--muted2); cursor:pointer;
@@ -3434,6 +3432,13 @@
         <path d="M7.6 12.6h8.6M7.6 15.4h5.4"/>
       </g>
     </symbol>
+    <symbol id="ico-map" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.6 19.6c3.1.4 4.8-.8 5.1-3.6.3-2.8-1.4-4.2-1.1-6.4C8.9 7 10.9 5.6 14.4 6"/>
+        <circle cx="4.4" cy="19.7" r="1.5"/>
+        <path d="M17.4 3.4c1.9 0 3.4 1.5 3.4 3.4 0 2.3-3.4 5.6-3.4 5.6S14 9.1 14 6.8c0-1.9 1.5-3.4 3.4-3.4z"/>
+      </g>
+    </symbol>
     <symbol id="ico-pencil" viewBox="0 0 24 24">
       <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M16.4 3.9a1.9 1.9 0 0 1 2.7 0l1.1 1.1a1.9 1.9 0 0 1 0 2.7L8.9 19.1l-4.4 1.3 1.4-4.3z"/>
@@ -3578,9 +3583,9 @@
 <div class="inbox-capture-sheet" id="inboxCaptureSheet" style="display:none;">
   <div class="timeline-sheet-handle"></div>
   <div class="inbox-capture-label">מה עולה לך?</div>
-  <textarea id="inboxCaptureInput" class="inbox-capture-textarea" dir="auto" placeholder="אין צורך לדעת עדיין איפה זה שייך — זה נשמר בתיבת קליטה, ואפשר למיין אחר כך." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); commitInboxCapture(); } else if(event.key==='Escape'){ closeInboxCapture(); }"></textarea>
+  <textarea id="inboxCaptureInput" class="inbox-capture-textarea" dir="auto" placeholder="כותבים, וזה נוחת במקום שבחרת." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); commitInboxCapture(); } else if(event.key==='Escape'){ closeInboxCapture(); }"></textarea>
   <div class="timeline-sheet-actions">
-    <button type="button" class="save-btn" onclick="commitInboxCapture()">שמירה בתיבת הקליטה</button>
+    <button type="button" class="save-btn" onclick="commitInboxCapture()">שמירה</button>
     <button type="button" class="cancel-btn" onclick="closeInboxCapture()">ביטול</button>
   </div>
 </div>
@@ -3613,8 +3618,9 @@
 
 <div class="main-tab-bar">
   <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 בית</button>
-  <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
+  <button class="main-tab-btn" id="mainTabPlanBtn" onclick="switchMainView('plan')">🗺 תכנון</button>
   <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 המחברת</button>
+  <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
 </div>
 
 <div class="undo-redo-bar">
@@ -3649,7 +3655,6 @@
 
   <div class="feel-block" id="dayIntentionBlock"></div>
 
-  <div class="feel-block" id="inboxBlock" data-plan-block="inbox"></div>
 
   <div class="sync-menu" id="syncMenu">
     <button type="button" class="sync-menu-btn" onclick="toggleSyncMenu()">🔄 סנכרון</button>
@@ -3744,7 +3749,7 @@
 
   <section data-plan-block="someday">
     <div class="section-head">
-      <h2 onclick="toggleSection('someday')">דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
+      <h2 onclick="toggleSection('someday')"><span id="somedayHeading">רעיונות וחלומות</span> <span class="chev" id="chev-someday">▾</span></h2>
       <div class="hint">רעיונות ומשימות בלי מועד. לגעת מתי שבא, בלי התחייבות.</div>
       <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
     </div>
@@ -3778,7 +3783,7 @@
 
   <section data-plan-block="suggestions">
     <div class="section-head">
-      <h2 onclick="toggleSection('suggestions')">התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
+      <h2 onclick="toggleSection('suggestions')"><span id="suggestionsHeading">הצעות ובקשות</span> <span class="chev" id="chev-suggestions">▾</span></h2>
       <div class="hint">מישהו מחכה לתשובה, או משהו שעוד לא הוכרע. בלי לחץ להחליט עכשיו.</div>
       <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
     </div>
@@ -3794,15 +3799,6 @@
   </section>
 
 
-  <section>
-    <div class="section-head">
-      <h2 onclick="toggleSection('reflection')">תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
-      <div class="hint">בלי לספור מה לא נעשה — רק לשים לב · נשמר בבנק, ממלאים מתי שבא</div>
-    </div>
-    <div id="secbody-reflection">
-      <div class="card" id="reflectionCard"></div>
-    </div>
-  </section>
 
   <section>
     <div class="section-head">
@@ -3850,7 +3846,21 @@
     <div id="keepNoteHeaderManage"></div>
     <div class="keep-grid" id="keepGrid"></div>
   </div>
-  <div id="planHost" style="display:none;"></div>
+
+</div>
+
+<div id="planView" style="display:none;">
+  <div class="domain-page-topbar">
+    <div class="domain-page-header"><h1>🗺 תכנון</h1></div>
+    <div class="header-actions">
+      <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+      <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+    </div>
+  </div>
+  <p class="hint" style="margin:0 0 12px;">כל מה שעוד לא קיבל זמן. אין כאן מועדים ואין לחץ — רק מקום לדברים שמחכים.</p>
+  <div class="topic-tab-strip" id="planTabStrip"></div>
+  <div id="planHost"></div>
 </div>
 
 <div id="toolsView" style="display:none;">
@@ -3863,6 +3873,18 @@
     </div>
   </div>
   <div class="feel-block" id="feelBar"></div>
+  <div id="toolsContentTop"></div>
+  <div id="reflectionHost">
+  <section>
+    <div class="section-head">
+      <h2 onclick="toggleSection('reflection')">תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
+      <div class="hint">בלי לספור מה לא נעשה — רק לשים לב · נשמר בבנק, ממלאים מתי שבא</div>
+    </div>
+    <div id="secbody-reflection">
+      <div class="card" id="reflectionCard"></div>
+    </div>
+  </section>
+  </div>
   <div id="toolsContent"></div>
   <div class="feel-block" id="procrastinationBlock"></div>
   <div class="feel-block" id="inspiringVideosBlock"></div>
@@ -4074,6 +4096,7 @@ function loadData(){
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
   migrateOldNotesToDomainNotes();
   migrateListsIntoNotebook();
+  migrateInboxAway();
   lastSnapshotJSON = JSON.stringify(data);
   render();
 }
@@ -4092,6 +4115,18 @@ function loadData(){
    their chips straight out of it, and a plain checklist is copied rather than moved, so a bad
    surprise here costs nothing. */
 const LISTS_NOTEBOOK_ID = 'nb-lists';
+/* The inbox is gone: the ✏️ now asks where a thought goes at the moment of writing it, so a tray
+   of unsorted items has nothing to be. Anything already waiting there moves into רעיונות וחלומות —
+   the same "not decided yet" shelf, just one that is actually looked at. */
+function migrateInboxAway(){
+  const items = data.inbox || [];
+  if(!items.length) return;
+  items.forEach(it => {
+    data.someday.push({id:uid(), dream:true, text:it.text, domain:'', description:'',
+      subtasks:[], draft:true, createdAt: it.createdAt || Date.now()});
+  });
+  data.inbox = [];
+}
 function migrateListsIntoNotebook(){
   if(data.notebookMigrated) return;
   data.notebookMigrated = true;
@@ -4221,7 +4256,7 @@ function updateUndoRedoButtons(){
 function isEverythingCollapsedOnCurrentView(){
   if(mainView==='home'){
     if(SECTION_KEYS.some(k=>!isSectionCollapsed(k))) return false;
-    return !feelBlockOpen && !todayIdeasOpen && !habitsBlockOpen && !inboxBlockOpen;
+    return !feelBlockOpen && !todayIdeasOpen && !habitsBlockOpen;
   }
   if(mainView==='tools') return !procBlockOpen && !videosBlockOpen;
   if(mainView==='topics'){
@@ -4274,7 +4309,6 @@ function collapseAllOnCurrentView(){
     bodyBankOpen = false;
     moreQuestionsOpen = false;
     ['emotion','body','need','qSoul','qPower','qHealing','qFreeSelf','qExpress'].forEach(k=>feelNoteMinimized.add(k));
-    inboxBlockOpen = false;
     renderFeelBar();
     renderTodayIdeas();
     renderHabits();
@@ -4382,12 +4416,10 @@ function renderWorldSwitch(){
   const countIn = ids => ids.reduce((sum, c) => sum + ensureDomainNotes(c.id).length, 0);
   const nDomain = countIn(data.domains || []);
   const nNotebook = countIn(notebookList());
-  const nPlan = (data.inbox||[]).length + (data.someday||[]).length + (data.suggestions||[]).length;
   // Dividers in a notebook, not another row of chips: they overlap, they sit ON the page rather
   // than floating above it, and only the one you are standing in takes a colour. The order runs
   // תכנון → תחומי חיים → מחברות, from the draft of a life outward to the things beside it.
   const worlds = [
-    {key:'plan',     label:'🗺 תכנון',      count:nPlan},
     {key:'domain',   label:'🌱 תחומי חיים', count:nDomain},
     {key:'notebook', label:'📓 מחברות',     count:nNotebook},
   ];
@@ -4403,7 +4435,6 @@ function renderDomainEditor(){
   renderWorldSwitch();
   const el = document.getElementById('topicTabStrip');
   if(!el) return;
-  if(noteWorld === 'plan'){ renderPlanStrip(el); return; }
   if(noteWorld === 'notebook'){ renderNotebookStrip(el); return; }
   const emptyHint = data.domains.length===0 ? '<div class="empty" style="flex-basis:100%;">עדיין אין כאן נושאים — זה בית ריק שמחכה לך. תתחיל/י עם הכפתור "+ נושא" למטה 🌱</div>' : '';
   el.innerHTML = emptyHint + data.domains.map((d,i)=>{
@@ -4430,17 +4461,20 @@ function renderDomainEditor(){
 }
 /* The three drafts of a life get the same strip. They are fixed — you don't add or delete one —
    so these tabs carry no name field and no ✕, only a count of what is waiting inside. */
-function renderPlanStrip(el){
-  const countOf = key => key==='inbox'   ? (data.inbox||[]).length
-                      : key==='someday' ? (data.someday||[]).length
-                      : (data.suggestions||[]).length;
+function renderPlanStrip(){
+  const el = document.getElementById('planTabStrip');
+  if(!el) return;
+  const countOf = key =>
+      key==='dreams'       ? (data.someday||[]).filter(x=>x.dream).length
+    : key==='somedayTasks' ? (data.someday||[]).filter(x=>!x.dream).length
+    : key==='suggestions'  ? (data.suggestions||[]).length
+    : (data.generalDilemmas||[]).length;
   el.innerHTML = PLAN_KINDS.map(k => {
     const n = countOf(k.key);
     return `<div class="domain-chip plan-chip ${activePlanKind===k.key?'active':''}" onclick="setPlanKind('${k.key}')">
       <span class="chip-name">${escapeHtml(k.label)}${n?` (${n})`:''}</span>
     </div>`;
   }).join('');
-  renderNavList();
 }
 /* Notebooks get the same tab strip, minus the colour: a notebook is a plain divider, not a part of
    your life, and giving it a life-domain's colour dot would blur exactly the line we just drew. */
@@ -4802,24 +4836,30 @@ function switchMainView(view){
   closeNav();
 }
 /* ---------- the floating button, per screen ---------- */
+/* ---------- the ✏️ : one button, every destination ----------
+   The inbox used to sit between you and everywhere else: you captured a thought, and then it
+   waited in a tray for a second act of sorting that mostly never came — so the one place meant to
+   remove a decision quietly added a room. Now the destination is part of the capture: one tap
+   opens the six places a thought can go, and it lands there directly.
+   From anywhere. Choosing a kind that lives on another tab does NOT navigate you there — it opens
+   the same floating sheet over whatever you were doing, and you stay put. */
 let fabMenuOpen = false;
-function fabUsesMenu(){ return mainView==='topics' || mainView==='lists'; }
+const FAB_KINDS = [
+  {kind:'task',         label:'+ ליומן'},
+  {kind:'habit',        label:'+ הרגל'},
+  {kind:'dream',        label:'+ רעיון/חלום'},
+  {kind:'somedayTask',  label:'+ משימה ללא מועד'},
+  {kind:'suggestion',   label:'+ הצעה/בקשה'},
+  {kind:'note',         label:'+ פתק'},
+];
 function updateInboxFab(){
   const fab = document.getElementById('inboxFab');
   if(!fab) return;
-  const menu = fabUsesMenu();
-  // Pencil on בית/כלים, + on נושאים/רשימות. The pencil stays because the inbox's own hint text
-  // refers to "כפתור ה-✏️ הצף" by name — swapping it for a tray icon quietly made that sentence
-  // untrue, and keeping the drawn pencil is both nicer and honest without touching any copy.
-  fab.innerHTML = `<svg class="ico" aria-hidden="true" focusable="false"><use href="#ico-${menu?'plus':'pencil'}"></use></svg>`;
-  fab.title = menu ? 'הוספה' : 'תפיסת מחשבה מהירה';
-  fab.classList.toggle('fab-is-menu', menu);
-  if(!menu) closeFabMenu();
+  fab.innerHTML = `<svg class="ico" aria-hidden="true" focusable="false"><use href="#ico-pencil"></use></svg>`;
+  fab.title = 'הוספה';
+  fab.classList.remove('fab-is-menu');
 }
-function onInboxFabClick(){
-  if(fabUsesMenu()) toggleFabMenu();
-  else openInboxCapture();
-}
+function onInboxFabClick(){ toggleFabMenu(); }
 function toggleFabMenu(){ fabMenuOpen ? closeFabMenu() : openFabMenu(); }
 function closeFabMenu(){
   fabMenuOpen = false;
@@ -4831,20 +4871,21 @@ function closeFabMenu(){
 function openFabMenu(){
   const m = document.getElementById('fabMenu');
   if(!m) return;
-  const rows = (mainView==='lists')
-    ? [ ['+ רשימה רגילה', "fabAddList('checklist')"],
-        ['+ רשימת בחירה', "fabAddList('chipbank')"],
-        ['+ לתיבת הקליטה', 'fabQuickCapture()'] ]
-    : [ ['+ פתק', 'fabAddNote()'],
-        ['+ לתיבת הקליטה', 'fabQuickCapture()'] ];
-  m.innerHTML = rows.map(([label, fn])=>
-    `<button type="button" class="fab-menu-item" onclick="${fn}">${label}</button>`).join('');
+  m.innerHTML = FAB_KINDS.map(o =>
+    `<button type="button" class="fab-menu-item" onclick="fabCreate('${o.kind}')">${o.label}</button>`).join('');
   m.style.display = '';
   fabMenuOpen = true;
   const f = document.getElementById('inboxFab');
   if(f) f.classList.add('fab-open');
 }
-function fabQuickCapture(){ closeFabMenu(); openInboxCapture(); }
+// "+ ליומן" opens the schedule sheet it already had; everything else needs a name first, so it
+// reuses the same small floating text sheet, told in advance where the text is going.
+function fabCreate(kind){
+  closeFabMenu();
+  if(kind === 'task'){ finishConvert('task', '', ''); return; }
+  quickCaptureTarget = kind;
+  openInboxCapture();
+}
 function fabAddNote(){
   closeFabMenu();
   // addDomainNote needs a topic to put the note in; if none is open yet, say so rather than
@@ -4880,20 +4921,27 @@ function applyMainViewState(){
   const topicsBtn = document.getElementById('mainTabTopicsBtn');
   const toolsBtn = document.getElementById('mainTabToolsBtn');
   const listsBtn = document.getElementById('mainTabListsBtn');
+  const planView = document.getElementById('planView');
+  const planBtn = document.getElementById('mainTabPlanBtn');
   home.style.display = mainView==='home' ? '' : 'none';
   topicsView.style.display = mainView==='topics' ? '' : 'none';
   if(toolsView) toolsView.style.display = mainView==='tools' ? '' : 'none';
   if(listsView) listsView.style.display = mainView==='lists' ? '' : 'none';
+  if(planView) planView.style.display = mainView==='plan' ? '' : 'none';
   if(homeBtn) homeBtn.classList.toggle('active', mainView==='home');
   if(topicsBtn) topicsBtn.classList.toggle('active', mainView==='topics');
   if(toolsBtn) toolsBtn.classList.toggle('active', mainView==='tools');
   if(listsBtn) listsBtn.classList.toggle('active', mainView==='lists');
+  if(planBtn) planBtn.classList.toggle('active', mainView==='plan');
   updateCollapseAllButton();
+  if(mainView==='plan'){
+    movePlanBlocksIntoPlanView();
+    setPlanKind(activePlanKind);
+    window.scrollTo(0,0);
+  }
   if(mainView==='topics'){
     if(!activeNoteDomain || !containerById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
-    if(noteWorld !== 'plan') noteWorld = worldOfContainer(activeNoteDomain);
-    movePlanBlocksIntoNotebook();
-    applyNoteWorldLayout();
+    noteWorld = worldOfContainer(activeNoteDomain);
     renderDomainEditor();
     renderKeepGrid(activeNoteDomain);
     updateAddNoteBtnColor();
@@ -4971,7 +5019,7 @@ function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(
    side by side as if they were the same kind of answer: you pick the world first, and only then
    what is inside it. Both hold notes the same way and both can have groups, so everything below
    this line is shared. */
-let noteWorld = 'domain'; // 'domain' | 'notebook' | 'plan'
+let noteWorld = 'domain'; // 'domain' | 'notebook'
 
 /* ---------- the third tab: תכנון ----------
    The concrete plan is the calendar. Everything else about organising a life is a draft of one:
@@ -4982,23 +5030,29 @@ let noteWorld = 'domain'; // 'domain' | 'notebook' | 'plan'
    They are MOVED, not rebuilt — the original elements are relocated into this view, so every one
    of their existing behaviours (sub-tasks, small starts, the decision helper, body-check, "turn
    into a task") keeps working with no change and nothing to re-test. */
+/* Two of these four share one block: an idea and an undated task live in the same list and differ
+   only by a flag, so the tab sets a filter rather than opening a different place. Splitting them
+   matters because "לתקן את האופניים" and "לנסוע ליפן" are not the same kind of thing, and mixing
+   them is exactly what makes such a list feel like too much. */
 const PLAN_KINDS = [
-  {key:'inbox',       label:'תיבת קליטה'},
-  {key:'someday',     label:'דברים לעשות'},
-  {key:'suggestions', label:'התלבטויות'},
+  {key:'dreams',      label:'רעיונות וחלומות', block:'someday'},
+  {key:'somedayTasks',label:'משימות ללא מועד', block:'someday'},
+  {key:'suggestions', label:'הצעות ובקשות',    block:'suggestions'},
+  {key:'dilemmas',    label:'התלבטויות',       block:'suggestions'},
 ];
-let activePlanKind = 'inbox';
+let activePlanKind = 'dreams';
+function planBlockOf(key){ const k = PLAN_KINDS.find(x=>x.key===key); return k ? k.block : 'someday'; }
 let planBlocksMoved = false;
-function movePlanBlocksIntoNotebook(){
+function movePlanBlocksIntoPlanView(){
   if(planBlocksMoved) return;
   const host = document.getElementById('planHost');
   if(!host) return;
-  PLAN_KINDS.forEach(k => {
-    const block = document.querySelector(`[data-plan-block="${k.key}"]`);
+  ['someday','suggestions'].forEach(key => {
+    const block = document.querySelector(`[data-plan-block="${key}"]`);
     if(!block) return;
     const pane = document.createElement('div');
     pane.className = 'plan-pane';
-    pane.dataset.planPane = k.key;
+    pane.dataset.planPane = key;
     block.parentNode.removeChild(block);
     pane.appendChild(block);
     host.appendChild(pane);
@@ -5007,20 +5061,26 @@ function movePlanBlocksIntoNotebook(){
 }
 function setPlanKind(key){
   activePlanKind = key;
+  const block = planBlockOf(key);
   // these blocks each carry their own collapse toggle from when they lived on the home screen;
   // inside a tab of their own, collapsed would just mean an empty page
-  if(key === 'someday' || key === 'suggestions') openSection(key);
-  // and each one is drawn by the home render pass, which no longer runs when you open this tab --
-  // so draw the one being shown, or you get its empty shell from boot time
-  if(key === 'inbox'){ if(!inboxBlockOpen) inboxBlockOpen = true; renderInbox(); }
-  else if(key === 'someday'){ renderSomeday(); }
-  else if(key === 'suggestions'){ renderDilemmasSection(); renderSuggestions(); }
+  openSection(block);
+  // and each one is drawn by the home render pass, which no longer runs here -- so draw the one
+  // being shown, or you get its empty shell from boot time
+  if(block === 'someday'){ renderSomeday(); }
+  else { renderDilemmasSection(); renderSuggestions(); }
+  // one block, two lenses -- so its heading has to say which lens you are looking through
+  const h1 = document.getElementById('somedayHeading');
+  if(h1) h1.textContent = key === 'dreams' ? 'רעיונות וחלומות' : 'משימות ללא מועד';
+  const h2 = document.getElementById('suggestionsHeading');
+  if(h2) h2.textContent = key === 'suggestions' ? 'הצעות ובקשות' : 'התלבטויות';
   renderPlanPanes();
-  renderDomainEditor();
+  renderPlanStrip();
 }
 function renderPlanPanes(){
+  const block = planBlockOf(activePlanKind);
   document.querySelectorAll('#planHost .plan-pane').forEach(p => {
-    p.style.display = p.dataset.planPane === activePlanKind ? '' : 'none';
+    p.style.display = p.dataset.planPane === block ? '' : 'none';
   });
 }
 function notebookList(){ return data.notebooks || (data.notebooks = []); }
@@ -5037,26 +5097,12 @@ function firstContainerOf(world){
 function setNoteWorld(world){
   if(noteWorld === world) return;
   noteWorld = world;
-  if(world === 'plan'){
-    setPlanKind(activePlanKind);
-  } else {
-    const first = firstContainerOf(world);
-    if(first) activeNoteDomain = first;
-    renderKeepGrid(activeNoteDomain);
-    updateAddNoteBtnColor();
-  }
-  applyNoteWorldLayout();
+  const first = firstContainerOf(world);
+  if(first) activeNoteDomain = first;
+  renderKeepGrid(activeNoteDomain);
+  updateAddNoteBtnColor();
   renderDomainEditor();
   window.scrollTo(0, 0);
-}
-// notes and plans share the page: whichever world is showing gets the body, the other is hidden
-function applyNoteWorldLayout(){
-  const notesBody = document.getElementById('notesBody');
-  const planHost = document.getElementById('planHost');
-  const isPlan = noteWorld === 'plan';
-  if(notesBody) notesBody.style.display = isPlan ? 'none' : '';
-  if(planHost) planHost.style.display = isPlan ? '' : 'none';
-  if(isPlan) renderPlanPanes();
 }
 function addNotebook(){
   const input = document.getElementById('newNotebookInput');
@@ -8768,7 +8814,9 @@ function renderSomedayFilterSelect(){
 function renderSomeday(){
   const el = document.getElementById('somedayList');
   renderSomedayFilterSelect();
-  let list = data.someday.slice();
+  // רעיונות וחלומות and משימות ללא מועד are one list seen through two lenses
+  const wantDreams = activePlanKind === 'dreams';
+  let list = data.someday.filter(x => !!x.dream === wantDreams);
   if(somedayFilterDomain) list = list.filter(s=>s.domain===somedayFilterDomain);
   list.sort((a,b)=>{
     const fav = (b.favorite?1:0)-(a.favorite?1:0);
@@ -9065,7 +9113,7 @@ function addSomeday(){
   const domainSel = document.getElementById('somedayDomain');
   const domain = domainSel ? domainSel.value : data.domains[0].id;
   const bodyCheck = {...pendingBodyCheck.someday};
-  data.someday.push({id:uid(), text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck});
+  data.someday.push({id:uid(), dream: activePlanKind==='dreams', text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck});
   input.value='';
   resetPendingBodyCheck('someday');
   resetPendingSomedayDesc();
@@ -10341,6 +10389,7 @@ function importData(e){
       activeNoteDomain = data.domains[0].id;
       migrateOldNotesToDomainNotes();
   migrateListsIntoNotebook();
+  migrateInboxAway();
       saveData();
       render();
       flashStatus('גיבוי נטען');
@@ -12026,7 +12075,14 @@ function toggleInboxBlock(){ inboxBlockOpen = !inboxBlockOpen; renderInbox(); up
 // set by convertBlankTo for the four "+ הפוך ל..." kinds without their own quick-open sheet --
 // when set, committing this capture creates that kind directly instead of landing in the inbox
 let quickCaptureTarget = null;
+const CAPTURE_TITLES = {
+  habit:'הרגל חדש', dream:'רעיון או חלום', somedayTask:'משימה ללא מועד',
+  suggestion:'הצעה או בקשה', note:'פתק חדש', dilemma:'התלבטות',
+  todayIdea:'משהו שבא לי היום'
+};
 function openInboxCapture(){
+  const label = document.querySelector('#inboxCaptureSheet .inbox-capture-label');
+  if(label) label.textContent = CAPTURE_TITLES[quickCaptureTarget] || 'תפיסה מהירה';
   document.getElementById('inboxCaptureOverlay').style.display = '';
   document.getElementById('inboxCaptureSheet').style.display = '';
   requestAnimationFrame(()=>{ const el = document.getElementById('inboxCaptureInput'); if(el) el.focus(); });
@@ -12044,11 +12100,7 @@ function commitInboxCapture(){
   const target = quickCaptureTarget;
   closeInboxCapture();
   if(!text) return;
-  if(target){ finishConvert(target, text, ''); return; }
-  data.inbox.push({id:uid(), text, createdAt:Date.now()});
-  saveData();
-  renderInbox();
-  flashStatus('נשמר בתיבת הקליטה 📥');
+  finishConvert(target || 'dream', text, '');
 }
 function deleteInboxItem(id){
   data.inbox = data.inbox.filter(x=>x.id!==id);
@@ -12159,6 +12211,15 @@ function finishConvert(destKind, text, domain, extra={}){
     data.generalDilemmas.push({id:uid(), text, domain: domain||'', decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()});
     saveData(); renderGeneralDilemmaList();
     flashStatus('נוסף ל"התלבטויות כלליות"');
+  } else if(destKind==='habit'){
+    data.habits.push({id:uid(), text, smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
+    saveData(); renderHabits();
+    flashStatus('נוסף להרגלים');
+  } else if(destKind==='dream' || destKind==='somedayTask'){
+    data.someday.push({id:uid(), dream: destKind==='dream', text, domain: domain||'', description:'',
+      subtasks:[], draft:true, createdAt:Date.now()});
+    saveData(); renderSomeday();
+    flashStatus(destKind==='dream' ? 'נוסף לרעיונות וחלומות' : 'נוסף למשימות ללא מועד');
   } else if(destKind==='todayIdea'){
     data.todayIdeas.push({id:uid(), text, done:false, favorite:false});
     saveData(); renderTodayIdeas();
@@ -12642,14 +12703,11 @@ function renderDayIntention(){
   const el = document.getElementById('dayIntentionBlock');
   if(!el) return;
   const text = (data.dayIntention||'').trim();
-  // an intention set on an earlier day is still yours — it is shown, just quietly marked, so it
-  // is never silently deleted and never pretends to be today's
-  const fromEarlierDay = !!text && data.dayIntentionDate && data.dayIntentionDate !== ymd(new Date());
   withFocusPreserved('dayIntentionBlock', ()=>{
     if(text && !dayIntentionEditing){
       el.innerHTML = `
-        <div class="intention-label">הכוונה שלי להיום${fromEarlierDay ? ' <span class="intention-stale">· נכתבה ביום אחר</span>' : ''}</div>
-        <div class="intention-text ${fromEarlierDay?'stale':''}" onclick="startEditDayIntention()" title="לחיצה לעריכה">${escapeHtml(text)}</div>
+        <div class="intention-label">הכוונה שלי להיום</div>
+        <div class="intention-text" onclick="startEditDayIntention()" title="לחיצה לעריכה">${escapeHtml(text)}</div>
         <div class="intention-actions">
           <span onclick="startEditDayIntention()">✎ עריכה</span>
           <span onclick="clearDayIntention()">✕ ניקוי</span>
@@ -12898,20 +12956,21 @@ function toggleToolCard(key){
 }
 function renderToolsView(){
   const el = document.getElementById('toolsContent');
+  const elTop = document.getElementById('toolsContentTop');
   if(!el) return;
   const openGood = isToolCardOpen('goodThings');
   const openPoss = isToolCardOpen('possibilities');
   const openTimer = isToolCardOpen('timer');
   const openBreath = isToolCardOpen('breathing');
-  el.innerHTML = `
+  if(elTop) elTop.innerHTML = `
     <div class="tools-card">
       <h3 class="tools-card-fold" onclick="toggleToolCard('goodThings')">${openGood?'▾':'▸'} 💛 מה שעושה לי טוב</h3>
       ${openGood ? `
       <p class="hint" style="margin:0 0 4px;">דברים שמרגיעים ומטעינים. מסמנים מה בוחרים עכשיו — נשאר מסומן עד שלוחצים שוב.</p>
       <p class="hint" style="margin:0 0 10px;">הקשה מסמנת · החזקה וגרירה מסדרת</p>
       ${feelChipGridHtml('activeGoodThings')}` : ''}
-    </div>
-
+    </div>`;
+  el.innerHTML = `
     <div class="tools-card">
       <h3 class="tools-card-fold" onclick="toggleToolCard('possibilities')">${openPoss?'▾':'▸'} 🌈 הכל אפשרי? הכל אפשרי!${(data.possibilities||[]).length?' ('+data.possibilities.length+')':''}</h3>
       ${openPoss ? `
@@ -13386,7 +13445,7 @@ loadData();
 // the draft blocks live in the home markup but belong to the notebook's תכנון tab -- relocate them
 // at boot rather than the first time that tab is opened, or a fresh load shows them on the home
 // page until you happen to go there
-movePlanBlocksIntoNotebook();
+movePlanBlocksIntoPlanView();
 // a plain page load/refresh (F5, reopening the app) should sync too, not just the pull-to-refresh
 // gesture and the manual buttons — cross-device sync already does this via onAuthStateChanged below,
 // this covers the calendar half of it
@@ -13414,7 +13473,7 @@ if(data.gcalConnected) syncGoogleCalendar();
 (function(){
   var MAP = {'🏠':'home','🧰':'tools','📓':'notebook','🗂':'lists','✏':'pencil','🌙':'moon',
              '🍃':'leaf','🔄':'sync','🔍':'search','⚙':'gear','🗕':'minimize','🧹':'broom',
-             '📥':'inbox','🌤':'heart','✨':'spark','🌱':'seed','🗑':'trash',
+             '📥':'inbox','🌤':'heart','✨':'spark','🌱':'seed','🗑':'trash','🗺':'map',
              '✕':'close','↶':'undo','↷':'redo'};
   var CHROME = 'button, .nav-home-link, .sync-menu-btn, .section-head h2,' +
                '.feel-block-header, .gcal-block-title, .nav-drawer h3';
