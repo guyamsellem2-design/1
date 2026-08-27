@@ -3636,7 +3636,7 @@
   <header class="top">
     <div>
       <h1>המפה השבועית שלי</h1>
-      <p class="sub">עוגנים קבועים, משימות לשבוע, פתקים חופשיים, ומקום מנוחה לכל רעיון שעוד לא הגיע תורו.</p>
+      <p class="sub">כוונה אחת, מה שבא לך היום, והזמנים שכבר תפוסים.</p>
     </div>
     <div class="header-actions">
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
@@ -3685,7 +3685,7 @@
           <div class="timeline-toolbar">
             <button type="button" class="timeline-fs-btn" onclick="zoomTimelineOut()" title="הקטנת תצוגה">🔍−</button>
             <button type="button" class="timeline-fs-btn" onclick="zoomTimelineIn()" title="הגדלת תצוגה — יותר מקום לכיתוב של כל משימה/עוגן">🔍+</button>
-            <button type="button" class="timeline-fs-btn" id="timelineDragModeBtn" onclick="toggleTimelineDesktopDragMode()" title="במחשב, גרירה בעכבר לא תמיד נתפסת כלחיצה ארוכה -- מצב הזה מדליק גרירה מיידית בלי להחזיק">🖱 מצב גרירה</button>
+            <button type="button" class="timeline-fs-btn" id="timelineDragModeBtn" onclick="toggleTimelineDesktopDragMode()" title="בעכבר, גרירה לא תמיד נתפסת כלחיצה ארוכה — המצב הזה מדליק גרירה מיידית">🖱 מצב גרירה</button>
             <button type="button" class="timeline-fs-btn" id="timelineFsBtn" onclick="toggleTimelineFullscreen()">⤢ מסך מלא</button>
           </div>
           <div class="timeline-daynames" id="timelineDaynames"></div>
@@ -3745,7 +3745,7 @@
   <section data-plan-block="someday">
     <div class="section-head">
       <h2 onclick="toggleSection('someday')">דברים לעשות <span class="chev" id="chev-someday">▾</span></h2>
-      <div class="hint">רעיונות ומשימות ללא מועד, לא מחייבות — כל דבר שאפשר לגעת בו מתי שבא לך, בלי לחץ</div>
+      <div class="hint">רעיונות ומשימות בלי מועד. לגעת מתי שבא, בלי התחייבות.</div>
       <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-someday">
@@ -3779,7 +3779,7 @@
   <section data-plan-block="suggestions">
     <div class="section-head">
       <h2 onclick="toggleSection('suggestions')">התלבטויות <span class="chev" id="chev-suggestions">▾</span></h2>
-      <div class="hint">מקום לזכור שמישהו מחכה לתשובה ממך, וגם מקום לדברים שאת/ה מתלבט/ת עליהם בכלל — בלי שזה יילחץ עליך ישר</div>
+      <div class="hint">מישהו מחכה לתשובה, או משהו שעוד לא הוכרע. בלי לחץ להחליט עכשיו.</div>
       <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-suggestions">
@@ -3797,7 +3797,7 @@
   <section>
     <div class="section-head">
       <h2 onclick="toggleSection('reflection')">תזכורות לעצמי <span class="chev" id="chev-reflection">▾</span></h2>
-      <div class="hint">בלי לספור מה לא הספקת — רק לשים לב · כל תשובה נשמרת בבנק, לא נעלמת, ממלאים מתי שבא</div>
+      <div class="hint">בלי לספור מה לא נעשה — רק לשים לב · נשמר בבנק, ממלאים מתי שבא</div>
     </div>
     <div id="secbody-reflection">
       <div class="card" id="reflectionCard"></div>
@@ -3807,7 +3807,7 @@
   <section>
     <div class="section-head">
       <h2 onclick="toggleSection('backup')">גיבוי והעברה <span class="chev" id="chev-backup">▾</span></h2>
-      <div class="hint">לפני שינוי גדול או מעבר בין גרסאות — הורדת גיבוי מבטיחה שלא תאבד כלום · אם הדפדפן תומך, תוכל לבחור בעצמך שם ומיקום; אחרת הקובץ יורד לתיקיית ההורדות (Downloads) עם שם הכולל תאריך ושעה</div>
+      <div class="hint">קובץ אחד עם כל התוכן, כדאי לפני שינוי גדול · אם הדפדפן תומך אפשר לבחור שם ומיקום, אחרת הוא יורד לתיקיית ההורדות</div>
     </div>
     <div id="secbody-backup">
     <div class="card" style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -3837,7 +3837,7 @@
       <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </div>
-  <p class="hint" style="margin:0 0 12px;">תחום חיים או מחברת — כל אחד הוא חוצץ · שם, צבע וסדר ניתנים לעריכה · להזזה: החזק את ⠿ בלחיצה ארוכה וגרור · לחיצה על חוצץ פותחת את הפתקים שלו</p>
+  <p class="hint" style="margin:0 0 12px;">כל חוצץ הוא תחום חיים או מחברת. לחיצה פותחת את הפתקים שלו · ⠿ בלחיצה ארוכה מזיז</p>
   <div class="note-world-switch" id="noteWorldSwitch"></div>
   <div class="note-world-page" id="noteWorldPage">
     <div class="topic-tab-strip" id="topicTabStrip"></div>
@@ -4447,7 +4447,7 @@ function renderPlanStrip(el){
 function renderNotebookStrip(el){
   const list = notebookList();
   const emptyHint = list.length===0
-    ? '<div class="empty" style="flex-basis:100%;">עדיין אין מחברות — מחברת היא מקום לדברים שהם לא תחום חיים: קניות, ציוד, דברים לקרוא</div>'
+    ? '<div class="empty" style="flex-basis:100%;">מחברת היא מקום לדברים שהם לא תחום חיים — קניות, ציוד, דברים לקרוא</div>'
     : '';
   el.innerHTML = emptyHint + list.map(nb => {
     if(nb.id !== activeNoteDomain){
@@ -6915,7 +6915,7 @@ function renderSyncBlock(){
     el.style.display = '';
     el.innerHTML = `
       <div class="gcal-block-title">🔄 סנכרון בין מכשירים</div>
-      <p class="hint" style="margin:0 0 8px;">המכשיר הזה עדיין לא מחובר לסנכרון — מה שנכתב במכשירים אחרים לא יופיע כאן עד שמתחברים, ולהפך.</p>
+      <p class="hint" style="margin:0 0 8px;">המכשיר הזה לא מסונכרן — מה שנכתב במכשירים אחרים לא יופיע כאן, ולהפך.</p>
       <div class="gcal-sync-row-inner">
         <button class="gcal-connect-btn" onclick="connectSyncOnly()">🔗 חיבור סנכרון בין מכשירים</button>
       </div>
@@ -7141,7 +7141,7 @@ function renderTasks(){
   if(addRowWrap) addRowWrap.innerHTML = `<button type="button" class="add-anchor-btn" onclick="addFromTab(null, '${ymd(new Date())}', false)">+ הוסף</button>`;
   renderTaskFilterSelect();
   let list = data.tasks;
-  const notice = data.softMode ? '<div class="soft-notice">מצב רגוע פעיל — משימות מטעינות מוצגות כרגיל, ומשימות בלי רמת אנרגיה מוגדרת מוצגות מעומעמות 🟢</div>' : '';
+  const notice = data.softMode ? '<div class="soft-notice">מצב רגוע — משימות בלי רמת אנרגיה מוצגות מעומעמות 🟢</div>' : '';
   if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
   if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain);
   const today = ymd(new Date());
@@ -8485,7 +8485,7 @@ function saveTimelineSheet(){
   const timeEl = document.getElementById('timelineSheetTime');
   const time = timeEl ? timeEl.value : '';
   if(!time){
-    flashStatus('צריך לבחור שעה — בלי שעה זה שייך ל"דברים לעשות" או להרגלים');
+    flashStatus('בלי שעה זה שייך ל"דברים לעשות" או להרגלים');
     if(timeEl){ const btn = timeEl.closest('.time-picker-wrap'); if(btn) btn.querySelector('.time-picker-btn').focus(); }
     return;
   }
@@ -10235,7 +10235,7 @@ function renderSelfChoiceRemindersSection(){
       </div>`).join('')}</div>` : '<div class="empty">עוד אין תזכורות בבנק הזה</div>') : '';
   return `<div class="reflect-q">
     <label>❤️‍🩹 תזכורות לבחור בעצמי</label>
-    <div class="hint" style="margin:-2px 0 8px;">משפטים שכותבים לעצמכם ברגע רגוע, כדי שיהיו זמינים ברגע שקשה לבחור בעצמכם — הכלי מוצע כשבדיקת גוף מראה שמשהו מכווץ או שאין אנרגיה</div>
+    <div class="hint" style="margin:-2px 0 8px;">משפטים שכותבים ברגע רגוע, לרגע שבו קשה לבחור בעצמך.</div>
     <textarea id="reflect-selfChoice" placeholder="מה הייתי רוצה להזכיר לעצמי?"></textarea>
     <div class="reflect-actions" onclick="toggleBank('selfChoice')">
       <button class="reflect-add-btn" onclick="event.stopPropagation(); addSelfChoiceReminder()">+ הוסף תזכורת</button>
@@ -11197,7 +11197,7 @@ function renderFeelBar(){
       <div class="feel-block-header" onclick="toggleFeelBlock()">${feelBlockOpen?'▾':'▸'} 🌤️ איך אני מרגיש/ה עכשיו</div>
       ${feelBlockOpen ? `
       <div class="hint" style="margin:0 0 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-        <span>הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</span>
+        <span>הקשה מסמנת · החזקה וגרירה מסדרת</span>
         <button type="button" class="reset-btn" onclick="resetFeelBar()">🧹 איפוס הכל</button>
       </div>
       <div class="feel-energy-row">
@@ -11534,7 +11534,7 @@ function renderHabits(){
           </div>` : ''}
         </li>`;
       }).join('')}</ul>` : '<div class="empty">עדיין אין כאן הרגלים — אפשר להתחיל עם אחד קטן</div>'}
-      <div class="habits-footnote">קח/י את זה כהמלצה — אם לא עשית יום, יומיים, שנה, זה בסדר 🥰 תמיד אפשר להתחיל שוב.</div>
+      <div class="habits-footnote">זו הזמנה, לא מעקב — יום, שנה, לא משנה 🥰 תמיד אפשר להתחיל שוב.</div>
     ` : ''}
   `;
 }
@@ -11802,7 +11802,7 @@ function renderListsView(){
         </select>
         <button onclick="addList()">+ הוסף רשימה</button>
       </div>
-      <p class="hint" style="margin:0 0 14px;">רשימת בחירה = כמו הבנקים של רגשות/צרכים/מה שעושה טוב - את/ה קובע/ת את הקטגוריות שלה בעצמך, בצבעים אקראיים שאפשר גם לערוך, ומסמנים במה בוחרים. שימושי למשל לרשימת אנשים לשמור איתם על קשר.</p>
+      <p class="hint" style="margin:0 0 14px;">רשימת בחירה — קטגוריות משלך בצבעים, ומסמנים במה בוחרים. למשל: אנשים לשמור איתם על קשר.</p>
       ${lists.length ? `<div class="lists-grid">${lists.map(l=>{
         const isChipBank = l.kind==='chipbank';
         const meta = isChipBank
@@ -11818,7 +11818,7 @@ function renderListsView(){
           </div>
         </div>`;
       }).join('')}</div>` : `<div class="empty">עדיין אין רשימות — אפשר להתחיל עם אחת חדשה למעלה</div>
-        <div class="hint" style="margin-top:8px;">כמה רעיונות: ספרים לקרוא (עם אותם שלבי קריאה לכל ספר), אנשים שבא לי לשמור איתם על קשר, אנשים שעושה לי טוב לדבר איתם, רשימת קניות</div>` }
+        <div class="hint" style="margin-top:8px;">למשל: ספרים לקרוא, אנשים לשמור איתם על קשר, רשימת קניות</div>` }
     `;
     return;
   }
@@ -11923,7 +11923,7 @@ function chipHeaderManageHtml(l){
 }
 function listChipBankHtml(l){
   if(!l.chipHeaders) l.chipHeaders = [];
-  return `<p class="hint" style="margin:10px 0;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה · כותרות מקבצות את הפריטים לתתי-רשימות</p>
+  return `<p class="hint" style="margin:10px 0;">הקשה מסמנת · החזקה וגרירה מסדרת · כותרות מקבצות לתתי-רשימות</p>
   ${chipHeaderManageHtml(l)}
   ${feelChipGridHtml('list:'+l.id)}`;
 }
@@ -12011,7 +12011,7 @@ function renderOnboardingCard(){
   if(!el) return;
   if(data.onboardingDismissed){ el.innerHTML = ''; return; }
   el.innerHTML = `<div class="onboarding-card">
-    <div class="onboarding-card-text">👋 לא יודע/ת מאיפה להתחיל? הכי פשוט: לחיצה על ✏️ בפינה למטה תופסת כל מחשבה, בלי צורך להחליט עכשיו כלום. אפשר למיין אותה למקום המתאים לה אחר כך, מתי שבא.</div>
+    <div class="onboarding-card-text">👋 לא יודע מאיפה להתחיל? ✏️ בפינה תופס כל מחשבה, בלי להחליט עכשיו כלום. למיין אחר כך, מתי שבא.</div>
     <span class="onboarding-card-close" onclick="dismissOnboarding()" title="הבנתי, לא להראות שוב">✕</span>
   </div>`;
 }
@@ -12260,7 +12260,7 @@ function renderInbox(){
   el.innerHTML = `
     <div class="feel-block-header" onclick="toggleInboxBlock()">${inboxBlockOpen?'▾':'▸'} 📥 תיבת קליטה${items.length?`<span class="inbox-badge">${items.length}</span>`:''}</div>
     ${inboxBlockOpen ? `
-      <p class="hint" style="margin:0 0 12px;">כל מה שנתפס דרך כפתור ה-✏️ הצף נוחת כאן קודם, בלי שום החלטה. כשיש כוח, אפשר למיין כל פריט למקום שמתאים לו — או פשוט להשאיר אותו כאן.</p>
+      <p class="hint" style="margin:0 0 12px;">כל מה שנתפס ב-✏️ נוחת כאן, בלי החלטות. למיין מתי שבא — או להשאיר.</p>
       ${items.length ? items.map(inboxItemHtml).join('') : '<div class="empty">עדיין ריק — לחיצה על ✏️ בפינה תופסת מחשבה בכל רגע</div>'}
     ` : ''}
   `;
@@ -12677,14 +12677,14 @@ function renderTodayIdeas(){
     el.innerHTML = `
       <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה בא לי לעשות היום?</div>
       ${todayIdeasOpen ? `
-      <div class="today-pick-call">בחר 3 דברים להספיק היום</div>
-      <p class="hint" style="margin:2px 0 8px;">כתבי/כתוב טיוטה חופשית של כל מה שבא לך היום, בלי סדר ובלי לחשוב יותר מדי. אחר כך סמני/סמן ⭐ על מה שאת/ה באמת בוחר/ת היום — נגיד שלושה — ואפשר לעבור לתצוגת "נבחרים" ולראות רק אותם. בלי יומן ובלי זמנים; מקסימום לא יקרו.</p>
+      <div class="today-pick-call">בחר 3 דברים לעשות היום</div>
+      <p class="hint" style="margin:2px 0 8px;">טיוטה חופשית של מה שבא לך היום. ⭐ מסמן את מה שבחרת, ו"נבחרים" מציג רק אותם.</p>
       <div class="timer-presets">
         <button type="button" class="timer-preset-btn ${!showFavOnly?'active':''}" onclick="setTodayIdeasFavView(false)">☰ הכל (${data.todayIdeas.length})</button>
         <button type="button" class="timer-preset-btn ${showFavOnly?'active':''}" onclick="setTodayIdeasFavView(true)">⭐ נבחרים (${favCount})</button>
         <button type="button" class="timer-preset-btn today-idea-drag-toggle ${todayIdeasDragMode?'active':''}" onclick="toggleTodayIdeasDragMode()">${todayIdeasDragMode?'✓ סיום גרירה':'↕ גרירה'}</button>
       </div>
-      ${todayIdeasDragMode ? `<p class="hint" style="margin:0 0 8px;">מצב גרירה: גוררים כל שורה למקום החדש. עריכה מושבתת עד שיוצאים מהמצב — הקשה על הרקע או על הכפתור שוב.</p>` : ''}
+      ${todayIdeasDragMode ? `<p class="hint" style="margin:0 0 8px;">גוררים כל שורה למקומה. עריכה חוזרת ביציאה מהמצב.</p>` : ''}
       <div class="today-idea-list" id="todayIdeasList">
         ${list.length ? list.map(todayIdeaRowHtml).join('') : '<div class="empty">עוד לא סימנת נבחרים — עברי/עבור לתצוגת "הכל" ותני/תן כוכב ⭐ למה שבוחרים בו היום</div>'}
       </div>
@@ -12907,15 +12907,15 @@ function renderToolsView(){
     <div class="tools-card">
       <h3 class="tools-card-fold" onclick="toggleToolCard('goodThings')">${openGood?'▾':'▸'} 💛 מה שעושה לי טוב</h3>
       ${openGood ? `
-      <p class="hint" style="margin:0 0 4px;">תחביבים, דברים מרגיעים, דברים שמטעינים אותי. מסמנים מה בוחרים לעשות עכשיו — נשאר מסומן עד שלוחצים שוב.</p>
-      <p class="hint" style="margin:0 0 10px;">הקשה = סימון · החזקה וגרירה = סידור מחדש · עריכה ומחיקה = דרך הכפתורים למטה</p>
+      <p class="hint" style="margin:0 0 4px;">דברים שמרגיעים ומטעינים. מסמנים מה בוחרים עכשיו — נשאר מסומן עד שלוחצים שוב.</p>
+      <p class="hint" style="margin:0 0 10px;">הקשה מסמנת · החזקה וגרירה מסדרת</p>
       ${feelChipGridHtml('activeGoodThings')}` : ''}
     </div>
 
     <div class="tools-card">
       <h3 class="tools-card-fold" onclick="toggleToolCard('possibilities')">${openPoss?'▾':'▸'} 🌈 הכל אפשרי? הכל אפשרי!${(data.possibilities||[]).length?' ('+data.possibilities.length+')':''}</h3>
       ${openPoss ? `
-      <p class="hint" style="margin:0 0 10px;">בוא רגע נדמיין שהכל אפשרי, בלי גבולות. פשוט מקום לכתוב בו בלי שיפוטיות את כל מה שאפשרי — תן/י לעצמך לזרום עם זה ופשוט לזרוק לכאן רעיונות, מציאותיים או לא מציאותיים, מחשבות חיוביות, או כל מה שעולה לראש שבא לך לומר שהוא אפשרי. זה מרחב מקבל — אפשר לכתוב פה הכל. זה יכול לעזור לפתוח אותנו לראות מעבר למה שאנחנו לא מודעים שאפשרי בחיים, וזה כלי טוב להשראה.</p>
+      <p class="hint" style="margin:0 0 10px;">בלי גבולות ובלי שיפוט — כל מה שאפשרי, מציאותי או לא. מקום לפתוח בו את הראש.</p>
       <div class="add-row possibility-add-row">
         <span class="possibility-prefix">זה לגמרי אפשרי ש...</span>
         <input type="text" id="possibilityInput" placeholder="לצאת לטבע לבד" onkeydown="if(event.key==='Enter') addPossibility();">
