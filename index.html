@@ -3202,6 +3202,68 @@
   #dayIntentionBlock::before, #dayIntentionBlock::after{ display:none; }
   .intention-heading{ margin:0 0 6px; }
 
+  /* ---------------------------------------------------------------------------
+     44. הרגלים — chips, then one open panel.
+     Same shape as the topic notebook: the habits are the tabs, and only the one
+     you tapped opens. Each keeps its own colour so the row is readable at a
+     glance and the open one is unmistakable.
+     --------------------------------------------------------------------------- */
+  .habit-chip-grid{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .habit-chip-grid .habit-chip{
+    background:transparent; border:1.5px solid var(--border-strong);
+    color:var(--text); border-radius:var(--r-pill);
+    padding:9px 16px; min-height:42px; font-family:inherit; font-size:14.5px;
+    cursor:pointer; white-space:nowrap;
+    transition:background var(--dur) var(--ease-water), transform var(--dur) var(--ease-water);
+  }
+  .habit-chip-grid .habit-chip:hover{ transform:translateY(-1px); }
+  .habit-chip-grid .habit-chip.on{ font-weight:600; box-shadow:var(--lift-1); }
+  .habit-add-row{ margin-bottom:12px; }
+
+  .habit-panel{
+    border:1.5px solid var(--border-strong); border-radius:var(--r-card);
+    padding:14px 15px; margin-bottom:12px;
+    background:color-mix(in srgb, var(--surface2) 60%, transparent);
+  }
+  .habit-panel-head{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .habit-panel-name{ flex:1; min-width:0; font-size:17px; font-weight:600; cursor:pointer; overflow-wrap:anywhere; }
+  /* Five actions need about 450px and a phone gives ~300, so they cannot all fit across. Wrapping
+     put "עשיתי היום" — the one pressed daily — on a second line below the fold of the panel; a
+     single scrolling row keeps the order asked for and keeps the first two always in view, with a
+     fade at the edge showing there is more. */
+  .habit-actions{
+    display:flex; flex-wrap:nowrap; gap:6px;
+    overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+    margin-inline:-15px; padding-inline:15px;   /* the fade sits over the panel's own padding */
+    mask-image:linear-gradient(to left, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+    -webkit-mask-image:linear-gradient(to left, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+  }
+  .habit-actions::-webkit-scrollbar{ display:none; }
+  .habit-actions .habit-act{ flex-shrink:0; }
+  /* scoped through .habit-actions so the "every button in here is the gold add button" rule
+     that lives on add-rows cannot claim these */
+  .habit-actions .habit-act{
+    background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
+    border-radius:var(--r-pill); padding:6px 11px; font-size:12.5px; font-family:inherit;
+    cursor:pointer; white-space:nowrap; min-height:36px;
+  }
+  .habit-actions .habit-act:hover{ color:var(--text); border-color:var(--muted); }
+  .habit-actions .habit-act.filled{ border-style:solid; border-color:var(--gold); color:var(--text); }
+  .habit-actions .habit-act.open{ border-style:solid; background:var(--surface3); color:var(--text); }
+  .habit-field{ margin-top:10px; }
+  .habit-field input{ width:100%; min-height:44px; }
+  .habit-small-line, .habit-note-line{
+    margin-top:10px; font-size:13.5px; color:var(--muted); line-height:1.55; overflow-wrap:anywhere;
+  }
+  .habit-small-line{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .habit-small-line .habit-small-text{ flex:1; min-width:120px; }
+  .habit-small-line .habit-act{
+    background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
+    border-radius:var(--r-pill); padding:5px 10px; font-size:12px; font-family:inherit;
+    cursor:pointer; white-space:nowrap;
+  }
+  .habit-small-line .habit-act:hover{ color:var(--text); border-color:var(--muted); }
+
   /* filtering anchors by topic — the same chip language as everywhere else */
   .anchor-filter-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; width:100%; }
   .anchor-filter-row .anchor-filter-chip{
@@ -7624,10 +7686,21 @@ function cycleCalendarView(){
   renderScheduleTabs();
   if(calendarView === 'timeline') renderTimelineGrid(); else renderScheduleGrid();
 }
+// switching tabs scrolls the tab row to the top, so what you just chose is the first thing you
+// see instead of wherever the previous tab happened to leave the page
+function scrollScheduleTabsToTop(){
+  const tabs = document.getElementById('scheduleTabs');
+  if(!tabs) return;
+  requestAnimationFrame(()=>{
+    const y = tabs.getBoundingClientRect().top + window.scrollY - 8;
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+  });
+}
 function setScheduleTab(tab){
   scheduleActiveTab = tab;
   timelinePickedItem = null;
   renderScheduleTabs();
+  scrollScheduleTabsToTop();
   // a tab that was hidden can go stale if data changed while something else was active -- refresh
   // the one just switched into directly
   if(tab==='calendar'){ if(calendarView==='timeline') renderTimelineGrid(); else renderScheduleGrid(); }
@@ -11476,19 +11549,71 @@ function renderInspiringVideos(){
    deliberately not framed as a streak/checklist -- no done-checkbox, no daily tracking, no red X for
    a missed day. just a soft list of intentions, each with an optional smaller first step, and an
    optional one-click way to also put it on the weekly schedule as a (skippable) daily anchor. */
-const habitSmallStartsOpen = new Set();
+/* ---------- הרגלים ----------
+   Shaped like the topic notebook rather than a stack of cards: the habits themselves are a row of
+   chips, and tapping one opens its own panel underneath. Nothing is seeded — an empty list stays
+   empty until you write the first one yourself.
+
+   A habit carries four pieces of text, all optional:
+     text        — the habit as it stands right now
+     description — what it means / why, and what travels into the calendar entry with it
+     smallStart  — the smaller version worth starting from
+     finalGoal   — where you'd want it to get to eventually
+   "החלף" swaps text and smallStart, parking the bigger version in finalGoal so it is never lost. */
+const HABIT_COLORS = ['#e2a34c','#3aa9a0','#e08a72','#b98fc4','#4fb4d6','#3fae7a','#cf9a5c','#9d84c9','#e6935f','#5fc47f'];
+let selectedHabitId = null;
+let habitFieldOpen = '';   // '' | 'description' | 'smallStart' | 'finalGoal'
+function nextHabitColor(){
+  const used = (data.habits||[]).map(h=>h.color);
+  return HABIT_COLORS.find(c => !used.includes(c)) || HABIT_COLORS[(data.habits||[]).length % HABIT_COLORS.length];
+}
+// older habits kept their smaller versions as a list; fold them into the single field without
+// dropping any of the text that was written there
+function habitSmallStartText(h){
+  if(typeof h.smallStart === 'string') return h.smallStart;
+  const legacy = (h.smallStarts || []).map(s => s.text).filter(Boolean);
+  h.smallStart = legacy.join(' · ');
+  return h.smallStart;
+}
 function addHabit(){
   const input = document.getElementById('habitInput');
   const text = input.value.trim();
   if(!text) return;
-  data.habits.push({id:uid(), text, smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
+  const h = {id:uid(), text, color:nextHabitColor(), description:'', smallStart:'', finalGoal:'',
+             smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()};
+  data.habits.push(h);
   input.value='';
+  selectedHabitId = h.id;
+  habitFieldOpen = '';
   saveData();
   renderHabits();
 }
 function deleteHabit(id){
+  const h = data.habits.find(x=>x.id===id);
+  if(h && !confirm(`למחוק את "${h.text}"?`)) return;
   data.habits = data.habits.filter(h=>h.id!==id);
-  habitSmallStartsOpen.delete(id);
+  if(selectedHabitId===id){ selectedHabitId = null; habitFieldOpen = ''; }
+  saveData();
+  renderHabits();
+}
+function selectHabit(id){
+  // tapping the open one closes it, so the panel is never stuck open
+  selectedHabitId = (selectedHabitId===id) ? null : id;
+  habitFieldOpen = '';
+  renderHabits();
+}
+function toggleHabitField(field){
+  habitFieldOpen = (habitFieldOpen===field) ? '' : field;
+  renderHabits();
+  requestAnimationFrame(()=>{ const el = document.getElementById('habitFieldInput'); if(el){ el.focus(); el.select(); } });
+}
+function saveHabitField(id, field, val){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  h[field] = val.trim();
+  // saving closes the field: what you wrote then shows as a line in the panel, so it is never
+  // displayed twice at once
+  if(habitFieldOpen === field) habitFieldOpen = '';
   saveData();
   renderHabits();
 }
@@ -11499,20 +11624,32 @@ function saveHabitTextEdit(id, val){
   if(h && val.trim()){ h.text = val.trim(); saveData(); }
   renderHabits();
 }
-// "אחרי מה?" -- an existing anchor in her day ("אחרי הקפה של הבוקר"), not a fixed clock time.
-// implementation-intention research is the strongest single lever for actually following through
-// on a habit, and this is the cheapest way to capture one without turning the habit into a task.
-function saveHabitContextEdit(id, val){
-  const key = 'habitctx:'+id;
-  inlineEditIds.delete(key);
+// swapping keeps the bigger version rather than overwriting it: it moves into "המטרה הסופית",
+// which is exactly where you'd look for it later
+function swapHabitWithSmallStart(id){
   const h = data.habits.find(h=>h.id===id);
-  if(h) h.contextAnchor = val.trim();
+  if(!h) return;
+  const small = habitSmallStartText(h);
+  if(!small) return;
+  const big = h.text;
+  h.text = small;
+  h.smallStart = '';
+  if(!h.finalGoal) h.finalGoal = big;
   saveData();
   renderHabits();
+  flashStatus('ההרגל הוחלף · הגרסה הקודמת נשמרה במטרה הסופית');
 }
-// a single tap for "did it today", with a soft relative-date caption -- no streak, no red, no
-// "you broke it" language anywhere, matching the existing "קח/י את זה כהמלצה" tone of this section
-// a second tap undoes it -- so an accidental tap is never stuck marked done with no way back
+function habitLastDoneLabel(dateStr){
+  if(!dateStr) return '';
+  const today = ymd(new Date());
+  if(dateStr === today) return 'היום';
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = Math.round((new Date(today + 'T00:00:00') - d) / 86400000);
+  if(days === 1) return 'אתמול';
+  if(days < 7) return `לפני ${days} ימים`;
+  if(days < 30) return `לפני ${Math.round(days/7)} שבועות`;
+  return `לפני ${Math.round(days/30)} חודשים`;
+}
 function markHabitDoneToday(id){
   const h = data.habits.find(h=>h.id===id);
   if(!h) return;
@@ -11521,112 +11658,87 @@ function markHabitDoneToday(id){
   saveData();
   renderHabits();
 }
-function habitLastDoneLabel(dateStr){
-  if(!dateStr) return '';
-  const todayStr = ymd(new Date());
-  if(dateStr===todayStr) return 'לאחרונה: היום';
-  // diff midnight-to-midnight (not against the current moment) so the current time of day never
-  // skews the day count by one
-  const [y,m,d] = dateStr.split('-').map(Number);
-  const [ty,tm,td] = todayStr.split('-').map(Number);
-  const days = Math.round((new Date(ty,tm-1,td) - new Date(y,m-1,d)) / 86400000);
-  if(days<=0) return 'לאחרונה: היום';
-  if(days===1) return 'לאחרונה: אתמול';
-  return `לאחרונה: לפני ${days} ימים`;
-}
-function toggleHabitSmallStarts(id){
-  if(habitSmallStartsOpen.has(id)) habitSmallStartsOpen.delete(id); else habitSmallStartsOpen.add(id);
-  renderHabits();
-}
-function addHabitSmallStart(habitId){
-  const input = document.getElementById('habitSmallStartInput-'+habitId);
-  const text = input.value.trim();
+// whatever you wrote in "תיאור" travels with it, so the calendar entry opens already explaining
+// itself instead of as a bare line of text
+function addHabitToCalendar(id, useSmallStart){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  const text = useSmallStart ? habitSmallStartText(h) : h.text;
   if(!text) return;
-  const h = data.habits.find(h=>h.id===habitId);
-  if(!h) return;
-  if(!h.smallStarts) h.smallStarts = [];
-  h.smallStarts.push({id:uid(), text});
-  input.value='';
-  saveData();
-  renderHabits();
-}
-function deleteHabitSmallStart(habitId, stepId){
-  const h = data.habits.find(h=>h.id===habitId);
-  if(!h) return;
-  h.smallStarts = (h.smallStarts||[]).filter(s=>s.id!==stepId);
-  saveData();
-  renderHabits();
-}
-function addHabitAsAnchor(id){
-  const h = data.habits.find(h=>h.id===id);
-  if(!h) return;
-  const newAnchor = {id:uid(), day:new Date().getDay(), time:'', endTime:'', label:h.text, domain:'', buffer:false, draft:true, repeatType:'daily', date:'', createdAt:Date.now()};
-  data.anchors.push(newAnchor);
-  saveData();
-  renderScheduleGrid();
-  openTimelineSheet('anchor', newAnchor.id);
-}
-// a lighter alternative to "הוסף כעוגן" -- for someone who isn't ready to commit to a daily/weekly
-// recurrence yet, but still wants this specific attempt to actually have a place on the calendar.
-// creates a plain one-off draft task and opens the quick-edit sheet immediately so the day/time
-// gets picked in the same motion, instead of leaving an unscheduled task easy to forget about.
-function addHabitAsOneTimeTask(id){
-  const h = data.habits.find(h=>h.id===id);
-  if(!h) return;
-  const newTask = {id:uid(), text:h.text, domain:'', done:false, energy:'', date:'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
+  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:'', time:'', endTime:'',
+                   description: h.description || '', subtasks:[], draft:true, createdAt:Date.now()};
   data.tasks.push(newTask);
   saveData();
   renderTasks();
   renderScheduleGrid();
   openTimelineSheet('task', newTask.id);
 }
+const HABIT_FIELDS = [
+  {key:'description', label:'תיאור',        placeholder:'מה זה אומר, ולמה זה חשוב לי'},
+  {key:'smallStart',  label:'נתחיל בקטן',   placeholder:"למשל: 10 דק' ביום"},
+  {key:'finalGoal',   label:'המטרה הסופית', placeholder:'לאן הייתי רוצה להגיע'},
+];
 function renderHabits(){
   const el = document.getElementById('habitsBlock');
   if(!el) return;
   const habits = data.habits || [];
-  // no header of its own: reaching this block already means you tapped "הרגלים", and asking a
-  // second time to open what you just opened is one tap too many
-  el.innerHTML = `
-      <div class="add-row" style="margin-bottom:10px;">
-        <input type="text" id="habitInput" placeholder="פעולה קטנה לעשות באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
-        <button onclick="addHabit()">הוסף</button>
+  if(selectedHabitId && !habits.some(h=>h.id===selectedHabitId)) selectedHabitId = null;
+  const sel = habits.find(h=>h.id===selectedHabitId);
+  withFocusPreserved('habitsBlock', ()=>{
+    el.innerHTML = `
+      <div class="habit-chip-grid">
+        ${habits.map(h=>{
+          const on = h.id===selectedHabitId;
+          const c = h.color || HABIT_COLORS[0];
+          return `<button type="button" class="habit-chip ${on?'on':''}"
+            style="${on ? `background:${c}; border-color:${c}; color:${contrastTextColor(c)};` : `border-color:${c};`}"
+            onclick="selectHabit('${h.id}')">${escapeHtml(h.text)}${h.lastDoneDate===ymd(new Date())?' ✓':''}</button>`;
+        }).join('')}
       </div>
-      ${habits.length ? `<ul class="habit-list">${habits.map(h=>{
-        const stepsOpen = habitSmallStartsOpen.has(h.id);
-        const steps = h.smallStarts || [];
-        const doneToday = h.lastDoneDate===ymd(new Date());
-        const lastDoneLabel = habitLastDoneLabel(h.lastDoneDate);
-        return `
-        <li class="habit-li">
-          <div class="habit-li-row">
-            ${inlineEditIds.has('habit:'+h.id)
-              ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
-              : `<span class="habit-text" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
-            ${lastDoneLabel ? `<span class="habit-last-done-inline">${lastDoneLabel}</span>` : ''}
-            <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
-          </div>
-          <div class="habit-context-row">
-            <span class="habit-inline-actions">
-              <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה ליומן — אם תבחר/י 'פעם ב־' זה יהפוך לעוגן">+ הוסף ליומן</button>
-              <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">נתחיל בקטן</button>
-              <button type="button" class="subtask-toggle-btn habit-done-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום 😊':'עשיתי היום 😊'}</button>
-            </span>
-          </div>
-          ${stepsOpen ? `
-          <div class="habit-small-starts">
-            ${steps.map(s=>`<div class="habit-small-start-row">
-              <span class="habit-small-start-text">${escapeHtml(s.text)}</span>
-              <span class="del-task" onclick="deleteHabitSmallStart('${h.id}','${s.id}')" title="מחיקה">✕</span>
-            </div>`).join('')}
-            <div class="add-row habit-small-start-add">
-              <input type="text" id="habitSmallStartInput-${h.id}" placeholder="למשל: 5 דק' ביום" onkeydown="if(event.key==='Enter') addHabitSmallStart('${h.id}');">
-              <button onclick="addHabitSmallStart('${h.id}')">הוסף</button>
-            </div>
-          </div>` : ''}
-        </li>`;
-      }).join('')}</ul>` : '<div class="empty">עדיין אין כאן הרגלים — אפשר להתחיל עם אחד קטן</div>'}
+      <div class="add-row habit-add-row">
+        <input type="text" id="habitInput" data-field-key="habitInput" placeholder="פעולה קטנה לעשות באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
+        <button onclick="addHabit()">הוסף הרגל</button>
+      </div>
+      ${sel ? habitPanelHtml(sel) : (habits.length ? '' : '<div class="empty">עדיין אין כאן הרגלים — אפשר להתחיל עם אחד קטן</div>')}
       <div class="habits-footnote">זו הזמנה, לא מעקב — יום, שנה, לא משנה 🥰 תמיד אפשר להתחיל שוב.</div>
-  `;
+    `;
+  });
+}
+function habitPanelHtml(h){
+  const c = h.color || HABIT_COLORS[0];
+  const doneToday = h.lastDoneDate===ymd(new Date());
+  const lastDone = habitLastDoneLabel(h.lastDoneDate);
+  const small = habitSmallStartText(h);
+  const open = HABIT_FIELDS.find(f=>f.key===habitFieldOpen);
+  return `<div class="habit-panel" style="border-color:${c};">
+    <div class="habit-panel-head">
+      ${inlineEditIds.has('habit:'+h.id)
+        ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+        : `<span class="habit-panel-name" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
+      ${lastDone ? `<span class="habit-last-done-inline">${lastDone}</span>` : ''}
+      <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
+    </div>
+    <div class="habit-actions">
+      <button type="button" class="habit-act" onclick="addHabitToCalendar('${h.id}', false)">+ הוסף ליומן</button>
+      ${HABIT_FIELDS.map(f=>`<button type="button" class="habit-act ${h[f.key]?'filled':''} ${habitFieldOpen===f.key?'open':''}" onclick="toggleHabitField('${f.key}')">${f.label}</button>`).join('')}
+      <button type="button" class="habit-act habit-done-btn ${doneToday?'filled':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום 🙂':'עשיתי היום 🙂'}</button>
+    </div>
+    ${open ? `
+      <div class="habit-field">
+        <input type="text" id="habitFieldInput" data-field-key="habitfield-${open.key}" dir="auto"
+          placeholder="${escapeAttr(open.placeholder)}" value="${escapeAttr(h[open.key]||'')}"
+          onkeydown="if(event.key==='Enter') saveHabitField('${h.id}','${open.key}', this.value); else if(event.key==='Escape') toggleHabitField('${open.key}');"
+          onblur="saveHabitField('${h.id}','${open.key}', this.value)">
+      </div>` : ''}
+    ${(small && habitFieldOpen!=='smallStart') ? `
+      <div class="habit-small-line">
+        <span class="habit-small-text">נתחיל בקטן: ${escapeHtml(small)}</span>
+        <button type="button" class="habit-act" onclick="addHabitToCalendar('${h.id}', true)">+ הוסף ליומן</button>
+        <button type="button" class="habit-act" onclick="swapHabitWithSmallStart('${h.id}')" title="ההרגל הנוכחי יישמר במטרה הסופית">⇄ החלף</button>
+      </div>` : ''}
+    ${(h.description && habitFieldOpen!=='description') ? `<div class="habit-note-line">${escapeHtml(h.description)}</div>` : ''}
+    ${(h.finalGoal && habitFieldOpen!=='finalGoal') ? `<div class="habit-note-line">🎯 ${escapeHtml(h.finalGoal)}</div>` : ''}
+  </div>`;
 }
 
 /* ---------- lists (🗂 רשימות) ----------
