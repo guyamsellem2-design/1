@@ -3199,9 +3199,9 @@
      --------------------------------------------------------------------------- */
   #dayIntentionBlock{ background:transparent; border:none; box-shadow:none; padding:6px 4px 2px; }
   #dayIntentionBlock::before, #dayIntentionBlock::after{ display:none; }
-  .intention-label{
-    font-size:12.5px; color:var(--muted2); letter-spacing:.04em; margin-bottom:4px;
-  }
+  .intention-heading{ margin:0 0 6px; }
+  /* the question reads from the start of the line, like everything else on the page */
+  .intention-add input{ text-align:start; }
   .intention-text{
     font-family:var(--font-hand); font-weight:700;
     font-size:clamp(30px,7.4vw,46px); line-height:1.12; color:var(--text);
@@ -3605,11 +3605,12 @@
 
 <div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
 <div class="nav-drawer" id="navDrawer">
-  <h3>ניווט</h3>
-  <div class="nav-home-link" onclick="navigateHome()">🏠 דף הבית</div>
+  <div class="nav-app-name">המפה השבועית שלי</div>
+  <hr>
+  <div class="nav-home-link" onclick="navigateHome()">🏠 היומן</div>
+  <div class="nav-home-link" onclick="switchMainView('plan')">🗺 תכנון</div>
+  <div class="nav-home-link" onclick="switchMainView('topics')">📓 המחברת</div>
   <div class="nav-home-link" onclick="switchMainView('tools')">🧰 כלים</div>
-  <div class="nav-home-link" onclick="switchMainView('topics')">📓 נושאים</div>
-  <div class="nav-home-link" onclick="switchMainView('lists')">🗂 רשימות</div>
   <hr>
   <div id="navDomainList"></div>
 </div>
@@ -3617,7 +3618,7 @@
 <div class="wrap">
 
 <div class="main-tab-bar">
-  <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 בית</button>
+  <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 היומן</button>
   <button class="main-tab-btn" id="mainTabPlanBtn" onclick="switchMainView('plan')">🗺 תכנון</button>
   <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 המחברת</button>
   <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
@@ -3639,11 +3640,7 @@
 
 <div id="homeView">
 
-  <header class="top">
-    <div>
-      <h1>המפה השבועית שלי</h1>
-      <p class="sub">כוונה אחת, מה שבא לך היום, והזמנים שכבר תפוסים.</p>
-    </div>
+  <header class="top page-top">
     <div class="header-actions">
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
       <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
@@ -3667,15 +3664,11 @@
   <div class="feel-block" id="todayPicksBlock"></div>
 
   <section>
-    <div class="section-head">
-      <h2 onclick="toggleSection('schedule')">לוח + משימות <span class="chev" id="chev-schedule">▾</span></h2>
-      <div class="hint">הכל במקום אחד — לוח שעות חופשי, רשימה לפי יום, משימות לפי נושא, ועוגנים קבועים</div>
-    </div>
     <div id="secbody-schedule">
-      <div class="schedule-reminder">תזכורת — לשאול את עצמך: מה מרחיב אותי עכשיו? מה מרגש אותי? מה מעורר בי השראה?</div>
+      <div class="schedule-reminder">מה ירחיב אותי? מה יעורר בי השראה?</div>
       <div class="schedule-tabs" id="scheduleTabs">
-        <button type="button" class="schedule-tab-btn" data-tab="timeline" onclick="setScheduleTab('timeline')">מערכת שעות</button>
-        <button type="button" class="schedule-tab-btn" data-tab="list" onclick="setScheduleTab('list')">רשימה</button>
+        <button type="button" class="schedule-tab-btn" data-tab="calendar" onclick="setScheduleTab('calendar')">יומן</button>
+        <button type="button" class="schedule-tab-btn" data-tab="habits" onclick="setScheduleTab('habits')">הרגלים</button>
         <button type="button" class="schedule-tab-btn" data-tab="tasks" onclick="setScheduleTab('tasks')">משימות</button>
         <button type="button" class="schedule-tab-btn" data-tab="anchors" onclick="setScheduleTab('anchors')">עוגנים</button>
       </div>
@@ -3703,6 +3696,10 @@
 
       <div id="scheduleTabList" style="display:none;">
         <div class="schedule-grid" id="scheduleGrid"></div>
+      </div>
+
+      <div id="scheduleTabHabits" style="display:none;">
+        <div class="feel-block" id="habitsBlock"></div>
       </div>
 
       <div id="scheduleTabTasks" style="display:none;">
@@ -3744,7 +3741,6 @@
     </div>
   </section>
 
-  <div class="feel-block" id="habitsBlock"></div>
 
 
   <section data-plan-block="someday">
@@ -7484,19 +7480,17 @@ function weekRangeLabel(offset){
 function renderWeekNav(){
   const el = document.getElementById('weekNav');
   if(!el) return;
-  const isList = data.scheduleViewMode==='list';
+  // the button names where the next tap takes you, never where you already are
+  const nxt = nextCalendarView();
+  const glyph = {timeline:'🕐', board:'▦', list:'☰'};
   el.innerHTML = `
     <button class="week-nav-btn" onclick="changeWeek(-1)" title="שבוע קודם" ${weekOffset<=WEEK_OFFSET_MIN?'disabled':''}>‹</button>
     <span class="week-nav-label">${weekRangeLabel(weekOffset)}${weekOffset===0?' · השבוע':''}</span>
     <button class="week-nav-btn" onclick="changeWeek(1)" title="שבוע הבא" ${weekOffset>=WEEK_OFFSET_MAX?'disabled':''}>›</button>
-    <button class="view-mode-btn" onclick="toggleScheduleViewMode()" title="${isList?'עבור לתצוגת לוח':'עבור לתצוגת רשימה'}">${isList?'▦ לוח':'☰ רשימה'}</button>
+    <button class="view-mode-btn" onclick="cycleCalendarView()" title="מעבר לתצוגת ${CALENDAR_VIEW_LABEL[nxt]}">${glyph[nxt]} ${CALENDAR_VIEW_LABEL[nxt]}</button>
   `;
 }
-function toggleScheduleViewMode(){
-  data.scheduleViewMode = data.scheduleViewMode==='list' ? 'grid' : 'list';
-  saveData();
-  renderScheduleGrid();
-}
+
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 // israeli date convention everywhere a date shows up: day.month(.year, optional), with the day of
 // week spelled out in hebrew -- "יום ג' 06.08" instead of a bare ISO-ish "08-06" that says nothing
@@ -7597,26 +7591,51 @@ function renderScheduleGrid(){
 /* ---------- schedule tabs: לוח שעות (free-write timeline) / רשימה (existing day grid) /
    משימות (existing task list) / עוגנים (flat recurring list) -- one merged section instead of
    two, so opening "the week" isn't itself a second decision on top of what to put in it. ---------- */
-let scheduleActiveTab = 'timeline';
+let scheduleActiveTab = 'calendar';
+/* מערכת שעות, לוח and רשימה are three ways of looking at the same week, not three places -- so
+   they are one tab with one button that cycles between them, and the button says where the next
+   tap goes. The hour grid is what opens, because that is the view that answers "what is my day". */
+const CALENDAR_VIEWS = ['timeline','board','list'];
+const CALENDAR_VIEW_LABEL = {timeline:'מערכת שעות', board:'לוח', list:'רשימה'};
+let calendarView = 'timeline';
+function nextCalendarView(){
+  return CALENDAR_VIEWS[(CALENDAR_VIEWS.indexOf(calendarView) + 1) % CALENDAR_VIEWS.length];
+}
+function cycleCalendarView(){
+  calendarView = nextCalendarView();
+  // the board and the list are the same renderer in two modes; the hour grid is its own
+  if(calendarView !== 'timeline'){
+    data.scheduleViewMode = calendarView === 'list' ? 'list' : 'grid';
+    saveData();
+  }
+  renderScheduleTabs();
+  if(calendarView === 'timeline') renderTimelineGrid(); else renderScheduleGrid();
+}
 function setScheduleTab(tab){
   scheduleActiveTab = tab;
   timelinePickedItem = null;
   renderScheduleTabs();
   // a tab that was hidden can go stale if data changed while something else was active -- refresh
-  // the one just switched into directly (renderScheduleGrid already piggybacks timeline+anchors,
-  // so routing 'list' through it covers those two for free without recursing back into this function)
-  if(tab==='timeline') renderTimelineGrid();
+  // the one just switched into directly
+  if(tab==='calendar'){ if(calendarView==='timeline') renderTimelineGrid(); else renderScheduleGrid(); }
+  else if(tab==='habits') renderHabits();
   else if(tab==='anchors') renderAnchorsTab();
-  else if(tab==='list') renderScheduleGrid();
   else if(tab==='tasks') renderTasks();
 }
 function renderScheduleTabs(){
   document.querySelectorAll('.schedule-tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===scheduleActiveTab));
+  const onCalendar = scheduleActiveTab==='calendar';
   const weekNavWrap = document.getElementById('scheduleWeekNavWrap');
-  if(weekNavWrap) weekNavWrap.style.display = (scheduleActiveTab==='timeline'||scheduleActiveTab==='list') ? '' : 'none';
-  const map = {timeline:'scheduleTabTimeline', list:'scheduleTabList', tasks:'scheduleTabTasks', anchors:'scheduleTabAnchors'};
-  Object.keys(map).forEach(k=>{ const elx = document.getElementById(map[k]); if(elx) elx.style.display = (scheduleActiveTab===k) ? '' : 'none'; });
-  if(scheduleActiveTab==='timeline' || scheduleActiveTab==='list') renderWeekNav();
+  if(weekNavWrap) weekNavWrap.style.display = onCalendar ? '' : 'none';
+  const show = {
+    scheduleTabTimeline: onCalendar && calendarView==='timeline',
+    scheduleTabList:     onCalendar && calendarView!=='timeline',
+    scheduleTabHabits:   scheduleActiveTab==='habits',
+    scheduleTabTasks:    scheduleActiveTab==='tasks',
+    scheduleTabAnchors:  scheduleActiveTab==='anchors',
+  };
+  Object.keys(show).forEach(id=>{ const elx = document.getElementById(id); if(elx) elx.style.display = show[id] ? '' : 'none'; });
+  if(onCalendar) renderWeekNav();
 }
 
 /* ---------- "לוח שעות": a real hour-axis week, like a native calendar's week view -- all 7 days
@@ -11557,7 +11576,6 @@ function renderHabits(){
             ${inlineEditIds.has('habit:'+h.id)
               ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
               : `<span class="habit-text" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
-            <button type="button" class="subtask-toggle-btn habit-done-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום':'עשיתי היום'}</button>
             ${lastDoneLabel ? `<span class="habit-last-done-inline">${lastDoneLabel}</span>` : ''}
             <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
           </div>
@@ -11565,9 +11583,7 @@ function renderHabits(){
             <span class="habit-inline-actions">
               <button type="button" class="subtask-toggle-btn" onclick="addHabitAsOneTimeTask('${h.id}')" title="הוספה ליומן — אם תבחר/י 'פעם ב־' זה יהפוך לעוגן">+ הוסף ליומן</button>
               <button type="button" class="subtask-toggle-btn ${steps.length?'has-content':''}" onclick="toggleHabitSmallStarts('${h.id}')">נתחיל בקטן</button>
-              ${inlineEditIds.has('habitctx:'+h.id)
-                ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.contextAnchor||'')}" placeholder="אחרי הקפה של הבוקר..." data-inline-key="habitctx:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habitctx:${h.id}', renderHabits) : (saveHabitContextEdit('${h.id}', this.value), cancelInlineEdit('habitctx:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
-                : `<button type="button" class="subtask-toggle-btn ${h.contextAnchor?'has-content':''}" data-inline-key="habitctx:${h.id}" onclick="inlineEditToggle('habitctx:${h.id}', renderHabits)" title="לחיצה לעריכה">${h.contextAnchor ? '⏱ אחרי '+escapeHtml(h.contextAnchor) : 'אחרי מה זה קורה?'}</button>`}
+              <button type="button" class="subtask-toggle-btn habit-done-btn ${doneToday?'has-content':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום 😊':'עשיתי היום 😊'}</button>
             </span>
           </div>
           ${stepsOpen ? `
@@ -12223,7 +12239,7 @@ function finishConvert(destKind, text, domain, extra={}){
   } else if(destKind==='todayIdea'){
     data.todayIdeas.push({id:uid(), text, done:false, favorite:false});
     saveData(); renderTodayIdeas();
-    flashStatus('נוסף ל"מה בא לי לעשות היום"');
+    flashStatus('נוסף ל"מה אעשה היום"');
   } else if(destKind==='note'){
     const domainId = domain || activeNoteDomain || (data.domains[0] && data.domains[0].id);
     if(!domainId) return;
@@ -12249,7 +12265,7 @@ function routeInboxItem(kind, id){
     data.todayIdeas.push({id:uid(), text:it.text, done:false, favorite:false});
     data.inbox = data.inbox.filter(x=>x.id!==id);
     saveData(); renderInbox(); renderTodayIdeas();
-    flashStatus('הועבר ל"מה בא לי לעשות היום"');
+    flashStatus('הועבר ל"מה אעשה היום"');
   } else if(kind==='habit'){
     data.habits.push({id:uid(), text:it.text, smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
     data.inbox = data.inbox.filter(x=>x.id!==id);
@@ -12706,7 +12722,7 @@ function renderDayIntention(){
   withFocusPreserved('dayIntentionBlock', ()=>{
     if(text && !dayIntentionEditing){
       el.innerHTML = `
-        <div class="intention-label">הכוונה שלי להיום</div>
+        <h2 class="intention-heading">הכוונה היומית</h2>
         <div class="intention-text" onclick="startEditDayIntention()" title="לחיצה לעריכה">${escapeHtml(text)}</div>
         <div class="intention-actions">
           <span onclick="startEditDayIntention()">✎ עריכה</span>
@@ -12714,10 +12730,10 @@ function renderDayIntention(){
         </div>`;
     } else {
       el.innerHTML = `
-        <div class="intention-label">כוונה להיום</div>
+        <h2 class="intention-heading">הכוונה היומית</h2>
         <div class="intention-add">
-          <input type="text" id="dayIntentionInput" dir="auto" data-field-key="dayIntention"
-            placeholder="איך אני רוצה שהיום הזה ירגיש?" value="${escapeAttr(text)}"
+          <input type="text" id="dayIntentionInput" dir="rtl" data-field-key="dayIntention"
+            placeholder="מה היא הכוונה שלי להיום?" value="${escapeAttr(text)}"
             onkeydown="if(event.key==='Enter') saveDayIntention();">
           <button type="button" onclick="saveDayIntention()">שמירה</button>
         </div>`;
@@ -12733,7 +12749,7 @@ function renderTodayIdeas(){
   const list = showFavOnly ? data.todayIdeas.filter(x=>x.favorite) : data.todayIdeas;
   withFocusPreserved('todayPicksBlock', ()=>{
     el.innerHTML = `
-      <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה בא לי לעשות היום?</div>
+      <div class="feel-block-header" onclick="toggleTodayIdeasBlock()">${todayIdeasOpen?'▾':'▸'} ✨ מה אעשה היום?</div>
       ${todayIdeasOpen ? `
       <div class="today-pick-call">בחר 3 דברים לעשות היום</div>
       <p class="hint" style="margin:2px 0 8px;">טיוטה חופשית של מה שבא לך היום. ⭐ מסמן את מה שבחרת, ו"נבחרים" מציג רק אותם.</p>
@@ -13056,7 +13072,8 @@ function render(){
 }
 
 /* ---------- collapsible sections ---------- */
-const SECTION_KEYS = ['schedule','suggestions','someday','reflection','backup'];
+// 'schedule' is gone from here: the calendar IS this page now, so it has no heading to fold away
+const SECTION_KEYS = ['suggestions','someday','reflection','backup'];
 function isSectionCollapsed(key){
   if(!data.collapsedSections || !(key in data.collapsedSections)) return false;
   return !!data.collapsedSections[key];
