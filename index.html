@@ -3208,12 +3208,14 @@
      you tapped opens. Each keeps its own colour so the row is readable at a
      glance and the open one is unmistakable.
      --------------------------------------------------------------------------- */
-  .habit-chip-grid{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .habit-chip-grid{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; max-width:100%; }
   .habit-chip-grid .habit-chip{
     background:transparent; border:1.5px solid var(--border-strong);
-    color:var(--text); border-radius:var(--r-pill);
+    color:var(--text); border-radius:20px;
     padding:9px 16px; min-height:42px; font-family:inherit; font-size:14.5px;
-    cursor:pointer; white-space:nowrap;
+    cursor:pointer; text-align:start; line-height:1.35;
+    white-space:normal; overflow-wrap:anywhere; word-break:break-word;
+    max-width:100%; min-width:0;
     transition:background var(--dur) var(--ease-water), transform var(--dur) var(--ease-water);
   }
   .habit-chip-grid .habit-chip:hover{ transform:translateY(-1px); }
@@ -3227,16 +3229,12 @@
   }
   .habit-panel-head{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
   .habit-panel-name{ flex:1; min-width:0; font-size:17px; font-weight:600; cursor:pointer; overflow-wrap:anywhere; }
-  /* Five actions need about 450px and a phone gives ~300, so they cannot all fit across. Wrapping
-     put "עשיתי היום" — the one pressed daily — on a second line below the fold of the panel; a
-     single scrolling row keeps the order asked for and keeps the first two always in view, with a
-     fade at the edge showing there is more. */
+  /* Short labels made all five fit across a phone, so this is a plain row again — no scrolling,
+     nothing hidden past an edge, and "עשיתי 🙂" is always in reach. It still scrolls rather than
+     wrapping if a narrower screen than 390px ever turns up. */
   .habit-actions{
-    display:flex; flex-wrap:nowrap; gap:6px;
+    display:flex; flex-wrap:nowrap; gap:4px;
     overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
-    margin-inline:-15px; padding-inline:15px;   /* the fade sits over the panel's own padding */
-    mask-image:linear-gradient(to left, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
-    -webkit-mask-image:linear-gradient(to left, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
   }
   .habit-actions::-webkit-scrollbar{ display:none; }
   .habit-actions .habit-act{ flex-shrink:0; }
@@ -3244,7 +3242,7 @@
      that lives on add-rows cannot claim these */
   .habit-actions .habit-act{
     background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
-    border-radius:var(--r-pill); padding:6px 11px; font-size:12.5px; font-family:inherit;
+    border-radius:var(--r-pill); padding:6px 8px; font-size:12.5px; font-family:inherit;
     cursor:pointer; white-space:nowrap; min-height:36px;
   }
   .habit-actions .habit-act:hover{ color:var(--text); border-color:var(--muted); }
@@ -3252,9 +3250,14 @@
   .habit-actions .habit-act.open{ border-style:solid; background:var(--surface3); color:var(--text); }
   .habit-field{ margin-top:10px; }
   .habit-field input{ width:100%; min-height:44px; }
+  .habit-description{
+    margin-top:11px; font-size:14.5px; color:var(--text); line-height:1.6;
+    white-space:pre-wrap; overflow-wrap:anywhere; cursor:pointer;
+  }
   .habit-small-line, .habit-note-line{
     margin-top:10px; font-size:13.5px; color:var(--muted); line-height:1.55; overflow-wrap:anywhere;
   }
+  .habit-note-line{ cursor:pointer; }
   .habit-small-line{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .habit-small-line .habit-small-text{ flex:1; min-width:120px; }
   .habit-small-line .habit-act{
@@ -4169,6 +4172,7 @@ function loadData(){
   migrateOldNotesToDomainNotes();
   migrateListsIntoNotebook();
   migrateInboxAway();
+  normaliseLongHabits();
   lastSnapshotJSON = JSON.stringify(data);
   render();
 }
@@ -10510,6 +10514,7 @@ function importData(e){
       migrateOldNotesToDomainNotes();
   migrateListsIntoNotebook();
   migrateInboxAway();
+  normaliseLongHabits();
       saveData();
       render();
       flashStatus('גיבוי נטען');
@@ -11563,6 +11568,32 @@ function renderInspiringVideos(){
 const HABIT_COLORS = ['#e2a34c','#3aa9a0','#e08a72','#b98fc4','#4fb4d6','#3fae7a','#cf9a5c','#9d84c9','#e6935f','#5fc47f'];
 let selectedHabitId = null;
 let habitFieldOpen = '';   // '' | 'description' | 'smallStart' | 'finalGoal'
+/* The name of a habit is its heading — the long version belongs in תיאור, which now sits right
+   beside it. So the field is capped: generous enough for a real sentence, short enough that a chip
+   stays a chip. The cap is only half the answer, though; the layout must survive text that was
+   written before it existed, or pasted past it, which the CSS below handles on its own. */
+const HABIT_TITLE_MAX = 60;
+function splitLongHabitTitle(h){
+  const full = (h.text || '').trim();
+  if(full.length <= HABIT_TITLE_MAX) return false;
+  // cut on a word boundary, and keep the whole original in the description rather than losing the tail
+  let title = '';
+  for(const w of full.split(/\s+/)){
+    if(title && (title + ' ' + w).length > HABIT_TITLE_MAX) break;
+    title = title ? title + ' ' + w : w;
+  }
+  if(!title) title = full.slice(0, HABIT_TITLE_MAX);
+  const desc = (h.description || '').trim();
+  h.description = desc ? (desc.includes(full) ? desc : full + '\n' + desc) : full;
+  h.text = title;
+  return true;
+}
+// runs once per load over habits written before the cap existed
+function normaliseLongHabits(){
+  let changed = false;
+  (data.habits || []).forEach(h => { if(splitLongHabitTitle(h)) changed = true; });
+  if(changed) saveData();
+}
 function nextHabitColor(){
   const used = (data.habits||[]).map(h=>h.color);
   return HABIT_COLORS.find(c => !used.includes(c)) || HABIT_COLORS[(data.habits||[]).length % HABIT_COLORS.length];
@@ -11581,6 +11612,7 @@ function addHabit(){
   if(!text) return;
   const h = {id:uid(), text, color:nextHabitColor(), description:'', smallStart:'', finalGoal:'',
              smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()};
+  splitLongHabitTitle(h);   // covers pasted text, which no maxlength can stop
   data.habits.push(h);
   input.value='';
   selectedHabitId = h.id;
@@ -11621,7 +11653,7 @@ function saveHabitTextEdit(id, val){
   const key = 'habit:'+id;
   inlineEditIds.delete(key);
   const h = data.habits.find(h=>h.id===id);
-  if(h && val.trim()){ h.text = val.trim(); saveData(); }
+  if(h && val.trim()){ h.text = val.trim(); splitLongHabitTitle(h); saveData(); }
   renderHabits();
 }
 // swapping keeps the bigger version rather than overwriting it: it moves into "המטרה הסופית",
@@ -11654,9 +11686,11 @@ function markHabitDoneToday(id){
   const h = data.habits.find(h=>h.id===id);
   if(!h) return;
   const today = ymd(new Date());
-  h.lastDoneDate = (h.lastDoneDate===today) ? '' : today;
+  const marking = h.lastDoneDate !== today;
+  h.lastDoneDate = marking ? today : '';
   saveData();
   renderHabits();
+  if(marking){ playNoPop(); fireConfetti(); }
 }
 // whatever you wrote in "תיאור" travels with it, so the calendar entry opens already explaining
 // itself instead of as a bare line of text
@@ -11674,9 +11708,9 @@ function addHabitToCalendar(id, useSmallStart){
   openTimelineSheet('task', newTask.id);
 }
 const HABIT_FIELDS = [
-  {key:'description', label:'תיאור',        placeholder:'מה זה אומר, ולמה זה חשוב לי'},
-  {key:'smallStart',  label:'נתחיל בקטן',   placeholder:"למשל: 10 דק' ביום"},
-  {key:'finalGoal',   label:'המטרה הסופית', placeholder:'לאן הייתי רוצה להגיע'},
+  {key:'description', label:'תיאור',      placeholder:'מה זה אומר, ולמה זה חשוב לי'},
+  {key:'smallStart',  label:'נתחיל בקטן', placeholder:"למשל: 10 דק' ביום"},
+  {key:'finalGoal',   label:'יעד',        placeholder:'לאן הייתי רוצה להגיע'},
 ];
 function renderHabits(){
   const el = document.getElementById('habitsBlock');
@@ -11696,7 +11730,7 @@ function renderHabits(){
         }).join('')}
       </div>
       <div class="add-row habit-add-row">
-        <input type="text" id="habitInput" data-field-key="habitInput" placeholder="פעולה קטנה לעשות באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
+        <input type="text" id="habitInput" data-field-key="habitInput" maxlength="${HABIT_TITLE_MAX}" placeholder="פעולה קטנה לעשות באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
         <button onclick="addHabit()">הוסף הרגל</button>
       </div>
       ${sel ? habitPanelHtml(sel) : (habits.length ? '' : '<div class="empty">עדיין אין כאן הרגלים — אפשר להתחיל עם אחד קטן</div>')}
@@ -11713,15 +11747,15 @@ function habitPanelHtml(h){
   return `<div class="habit-panel" style="border-color:${c};">
     <div class="habit-panel-head">
       ${inlineEditIds.has('habit:'+h.id)
-        ? `<input type="text" class="inline-text-edit" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
+        ? `<input type="text" class="inline-text-edit" maxlength="${HABIT_TITLE_MAX}" value="${escapeAttr(h.text)}" data-inline-key="habit:${h.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('habit:${h.id}', renderHabits) : (saveHabitTextEdit('${h.id}', this.value), cancelInlineEdit('habit:${h.id}', renderHabits))" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
         : `<span class="habit-panel-name" data-inline-key="habit:${h.id}" onclick="inlineEditToggle('habit:${h.id}', renderHabits)" title="לחיצה לעריכה">${escapeHtml(h.text)}</span>`}
       ${lastDone ? `<span class="habit-last-done-inline">${lastDone}</span>` : ''}
       <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
     </div>
     <div class="habit-actions">
-      <button type="button" class="habit-act" onclick="addHabitToCalendar('${h.id}', false)">+ הוסף ליומן</button>
+      <button type="button" class="habit-act" onclick="addHabitToCalendar('${h.id}', false)">+ ליומן</button>
       ${HABIT_FIELDS.map(f=>`<button type="button" class="habit-act ${h[f.key]?'filled':''} ${habitFieldOpen===f.key?'open':''}" onclick="toggleHabitField('${f.key}')">${f.label}</button>`).join('')}
-      <button type="button" class="habit-act habit-done-btn ${doneToday?'filled':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי היום 🙂':'עשיתי היום 🙂'}</button>
+      <button type="button" class="habit-act habit-done-btn ${doneToday?'filled':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי 🙂':'עשיתי 🙂'}</button>
     </div>
     ${open ? `
       <div class="habit-field">
@@ -11736,8 +11770,8 @@ function habitPanelHtml(h){
         <button type="button" class="habit-act" onclick="addHabitToCalendar('${h.id}', true)">+ הוסף ליומן</button>
         <button type="button" class="habit-act" onclick="swapHabitWithSmallStart('${h.id}')" title="ההרגל הנוכחי יישמר במטרה הסופית">⇄ החלף</button>
       </div>` : ''}
-    ${(h.description && habitFieldOpen!=='description') ? `<div class="habit-note-line">${escapeHtml(h.description)}</div>` : ''}
-    ${(h.finalGoal && habitFieldOpen!=='finalGoal') ? `<div class="habit-note-line">🎯 ${escapeHtml(h.finalGoal)}</div>` : ''}
+    ${(h.description && habitFieldOpen!=='description') ? `<div class="habit-description" onclick="toggleHabitField('description')" title="לחיצה לעריכה">${escapeHtml(h.description)}</div>` : ''}
+    ${(h.finalGoal && habitFieldOpen!=='finalGoal') ? `<div class="habit-note-line" onclick="toggleHabitField('finalGoal')" title="לחיצה לעריכה">🎯 ${escapeHtml(h.finalGoal)}</div>` : ''}
   </div>`;
 }
 
