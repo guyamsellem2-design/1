@@ -470,7 +470,8 @@
      already-present "🌱 טיוטה" text badge -- messy and redundant. full rows keep only the dimming,
      the badge stays the sole draft indicator, and the row's own subtle bottom divider is restored. */
   ul.tasks li.chip-draft{border-style:none !important; border-bottom:1px solid var(--border) !important;}
-  .schedule-reminder{font-size:13.5px; color:var(--muted); background:var(--surface2); border-radius:10px; padding:10px 12px; margin-bottom:12px; line-height:1.5;}
+  /* no fill and no rounded box: with them it read as an empty field waiting to be typed into */
+  .schedule-reminder{font-size:13.5px; color:var(--muted); background:none; padding:2px 2px 10px; margin-bottom:6px; line-height:1.5;}
   .overdue-divider{display:block; padding:16px 4px 6px; border-bottom:none;}
   .overdue-divider-line{border-top:2px solid var(--gold); opacity:.55; margin-bottom:10px;}
   .overdue-divider-title{font-family:'Frank Ruhl Libre', serif; font-size:15px; color:var(--gold); cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;}
@@ -3200,6 +3201,19 @@
   #dayIntentionBlock{ background:transparent; border:none; box-shadow:none; padding:6px 4px 2px; }
   #dayIntentionBlock::before, #dayIntentionBlock::after{ display:none; }
   .intention-heading{ margin:0 0 6px; }
+
+  /* filtering anchors by topic — the same chip language as everywhere else */
+  .anchor-filter-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; width:100%; }
+  .anchor-filter-row .anchor-filter-chip{
+    background:var(--surface2); border:1px solid var(--border); color:var(--muted);
+    border-radius:var(--r-pill); padding:6px 12px; font-size:13px; font-family:inherit;
+    cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .anchor-filter-row .anchor-filter-chip:hover{ color:var(--text); }
+  .anchor-filter-row .anchor-filter-chip.active{
+    background:var(--surface); border-color:var(--gold); color:var(--text); font-weight:600;
+  }
+  .anchor-filter-row .anchor-filter-chip .chip-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
   /* the question reads from the start of the line, like everything else on the page */
   .intention-add input{ text-align:start; }
   .intention-text{
@@ -4252,7 +4266,7 @@ function updateUndoRedoButtons(){
 function isEverythingCollapsedOnCurrentView(){
   if(mainView==='home'){
     if(SECTION_KEYS.some(k=>!isSectionCollapsed(k))) return false;
-    return !feelBlockOpen && !todayIdeasOpen && !habitsBlockOpen;
+    return !feelBlockOpen && !todayIdeasOpen;
   }
   if(mainView==='tools') return !procBlockOpen && !videosBlockOpen;
   if(mainView==='topics'){
@@ -4299,7 +4313,6 @@ function collapseAllOnCurrentView(){
     applyAllSectionCollapse();
     feelBlockOpen = false;
     todayIdeasOpen = false;
-    habitsBlockOpen = false;
     emotionsBankOpen = false;
     needsBankOpen = false;
     bodyBankOpen = false;
@@ -8776,18 +8789,33 @@ function anchorRowHtml(a){
     <span class="task-date-badge">${dayLabel}${a.time?' · '+a.time:''}</span>
   </li>`;
 }
+// the filter only offers topics that actually have an anchor, so it never lists empty choices
+let anchorFilterDomain = '';
+function setAnchorFilterDomain(id){ anchorFilterDomain = id; renderAnchorsTab(); }
+function anchorFilterHtml(){
+  const used = (data.domains||[]).filter(d => (data.anchors||[]).some(a => a.domain === d.id));
+  if(!used.length) return '';
+  const n = id => (data.anchors||[]).filter(a => id ? a.domain === id : true).length;
+  return `<div class="anchor-filter-row">
+    <button type="button" class="anchor-filter-chip ${!anchorFilterDomain?'active':''}" onclick="setAnchorFilterDomain('')">הכל (${n('')})</button>
+    ${used.map(d => `<button type="button" class="anchor-filter-chip ${anchorFilterDomain===d.id?'active':''}" onclick="setAnchorFilterDomain('${d.id}')">
+      <span class="chip-dot" style="background:${d.color}"></span>${escapeHtml(d.name)} (${n(d.id)})</button>`).join('')}
+  </div>`;
+}
 function renderAnchorsTab(){
   const el = document.getElementById('anchorsList');
   if(!el) return;
   const addRowWrap = document.getElementById('anchorAddRowWrap');
-  if(addRowWrap) addRowWrap.innerHTML = `<button type="button" class="add-anchor-btn" onclick="addFromTab(${new Date().getDay()}, '', true)">+ הוסף</button>`;
-  const list = data.anchors.slice().sort((a,b)=>{
+  if(addRowWrap) addRowWrap.innerHTML = anchorFilterHtml()
+    + `<button type="button" class="add-anchor-btn" onclick="addFromTab(${new Date().getDay()}, '', true)">+ הוסף</button>`;
+  const list = data.anchors.filter(a => !anchorFilterDomain || a.domain === anchorFilterDomain).sort((a,b)=>{
     const da = (a.repeatType||'weekly')==='weekly' ? a.day : 7;
     const db = (b.repeatType||'weekly')==='weekly' ? b.day : 7;
     if(da!==db) return da-db;
     return (a.time||'').localeCompare(b.time||'');
   });
-  el.innerHTML = list.length ? list.map(anchorRowHtml).join('') : '<li class="empty">אין עדיין עוגנים קבועים</li>';
+  el.innerHTML = list.length ? list.map(anchorRowHtml).join('')
+    : `<li class="empty">${anchorFilterDomain ? 'אין עוגנים בנושא הזה' : 'אין עדיין עוגנים קבועים'}</li>`;
 }
 
 /* ---------- topics notebook: tab strip selects which topic's notes show below ---------- */
@@ -11448,9 +11476,7 @@ function renderInspiringVideos(){
    deliberately not framed as a streak/checklist -- no done-checkbox, no daily tracking, no red X for
    a missed day. just a soft list of intentions, each with an optional smaller first step, and an
    optional one-click way to also put it on the weekly schedule as a (skippable) daily anchor. */
-let habitsBlockOpen = false;
 const habitSmallStartsOpen = new Set();
-function toggleHabitsBlock(){ habitsBlockOpen = !habitsBlockOpen; renderHabits(); updateCollapseAllButton(); }
 function addHabit(){
   const input = document.getElementById('habitInput');
   const text = input.value.trim();
@@ -11558,9 +11584,9 @@ function renderHabits(){
   const el = document.getElementById('habitsBlock');
   if(!el) return;
   const habits = data.habits || [];
+  // no header of its own: reaching this block already means you tapped "הרגלים", and asking a
+  // second time to open what you just opened is one tap too many
   el.innerHTML = `
-    <div class="feel-block-header" onclick="toggleHabitsBlock()">${habitsBlockOpen?'▾':'▸'} 🌱 הרגלים${habits.length?' ('+habits.length+')':''}</div>
-    ${habitsBlockOpen ? `
       <div class="add-row" style="margin-bottom:10px;">
         <input type="text" id="habitInput" placeholder="פעולה קטנה לעשות באופן קבוע" onkeydown="if(event.key==='Enter') addHabit();">
         <button onclick="addHabit()">הוסף</button>
@@ -11600,7 +11626,6 @@ function renderHabits(){
         </li>`;
       }).join('')}</ul>` : '<div class="empty">עדיין אין כאן הרגלים — אפשר להתחיל עם אחד קטן</div>'}
       <div class="habits-footnote">זו הזמנה, לא מעקב — יום, שנה, לא משנה 🥰 תמיד אפשר להתחיל שוב.</div>
-    ` : ''}
   `;
 }
 
@@ -12413,7 +12438,6 @@ function jumpToSearchResult(type, id, extra){
     requestAnimationFrame(()=>scrollElIntoView(document.querySelector(`.someday-li[data-drag-id="${id}"]`)));
   } else if(type==='habit'){
     switchMainView('home');
-    if(!habitsBlockOpen) toggleHabitsBlock();
   } else if(type==='todayIdea'){
     switchMainView('home');
     if(!todayIdeasOpen) toggleTodayIdeasBlock();
