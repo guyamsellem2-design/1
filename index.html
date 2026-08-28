@@ -3220,6 +3220,11 @@
   }
   .habit-chip-grid .habit-chip:hover{ transform:translateY(-1px); }
   .habit-chip-grid .habit-chip.on{ font-weight:600; box-shadow:var(--lift-1); }
+  /* done today: a warm tint sitting between the open chip's full gold and the plain paper of a
+     closed one, and deliberately much nearer the paper — a quiet "yes, that happened", not a
+     second thing competing with whichever habit is actually open */
+  .habit-chip-grid .habit-chip.done:not(.on){ background:rgba(224,168,92,.17); }
+  body.night-mode .habit-chip-grid .habit-chip.done:not(.on){ background:rgba(239,203,138,.15); }
   .habit-add-row{ margin-bottom:12px; }
 
   .habit-panel{
@@ -11723,10 +11728,11 @@ function renderHabits(){
       <div class="habit-chip-grid">
         ${habits.map(h=>{
           const on = h.id===selectedHabitId;
+          const doneToday = h.lastDoneDate===ymd(new Date());
           const c = h.color || HABIT_COLORS[0];
-          return `<button type="button" class="habit-chip ${on?'on':''}"
+          return `<button type="button" class="habit-chip ${on?'on':''} ${doneToday?'done':''}"
             style="${on ? `background:${c}; border-color:${c}; color:${contrastTextColor(c)};` : `border-color:${c};`}"
-            onclick="selectHabit('${h.id}')">${escapeHtml(h.text)}${h.lastDoneDate===ymd(new Date())?' ✓':''}</button>`;
+            onclick="selectHabit('${h.id}')">${escapeHtml(h.text)}${doneToday?' ✓':''}</button>`;
         }).join('')}
       </div>
       <div class="add-row habit-add-row">
