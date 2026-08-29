@@ -3350,15 +3350,6 @@
   #planHost .plan-section-head .reset-btn{ align-self:flex-end; flex-shrink:0; }
   /* `.add-row button` paints every button in the row gold, which made "+ תאריך תשובה" -- a toggle
      for a detail you may not even want -- look exactly as much like the action as "הוסף" does */
-  #planHost .add-row .reset-btn{
-    background:transparent; border:1px solid var(--border-strong); color:var(--muted2);
-    font-weight:400; box-shadow:none;
-  }
-  #dilemmasSectionBody .add-row .add-domain-btn{
-    background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
-    font-weight:400; box-shadow:none;
-  }
-  #dilemmasSectionBody .add-row .add-domain-btn:hover{ color:var(--text); border-color:var(--muted); }
 
   .plan-head-actions{ display:flex; gap:8px; align-self:flex-end; }
   /* in the רעיונות וחלומות lens the body-check has nothing to weigh: a dream is not somebody
@@ -3455,13 +3446,19 @@
   .add-row.pending-host .subtask-add-row{ flex-basis:100%; margin-bottom:0; }
   .add-row.pending-host .pending-panel-row{ margin-top:2px; }
   /* `.add-row button` paints every button in the row gold; in here only "הוסף" is the action */
-  #planHost .add-row .subtask-toggle-btn,
-  #planHost .add-row .add-domain-btn,
-  #planHost .add-row .reset-btn{
+  .add-row .subtask-toggle-btn,
+  .add-row .add-domain-btn,
+  .add-row .reset-btn{
     background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
     font-weight:400; box-shadow:none;
   }
-  #planHost .add-row .subtask-toggle-btn.has-content{ color:var(--gold); border-color:var(--gold); border-style:solid; }
+  .add-row .subtask-toggle-btn:hover,
+  .add-row .add-domain-btn:hover,
+  .add-row .reset-btn:hover{ color:var(--text); border-color:var(--muted); }
+  .add-row .subtask-toggle-btn.has-content{ color:var(--gold); border-color:var(--gold); border-style:solid; }
+
+  ul.tasks li.possibility-li{ flex-direction:row; align-items:center; gap:9px; }
+  ul.tasks li.possibility-li .task-text{ flex:1; min-width:0; }
   /* looking at the list, as opposed to adding to it */
   .list-controls-row{ margin-bottom:10px; }
   .list-controls-row select{ flex:1 1 0; min-width:0; }
@@ -13648,11 +13645,41 @@ function runBreathingPhase(phase, chainId){
 /* ---------- "הכל אפשרי" ---------- an open-ended list of possibilities, not tasks or commitments --
    each entry is shown wrapped in "זה לגמרי אפשרי ש..." so writing something down never reads as a
    promise to do it. */
+/* Three steps, not two. Folded is the resting state; opening the card shows the four most recent,
+   which is enough to remember what is in there without the card taking over the page; expanding
+   again shows everything. Minimizing walks the same three steps back. It reuses the app's own
+   "הרחב רשימה / כווץ בחזרה" button so it behaves like every other long list here. */
+const POSSIBILITIES_PREVIEW = 4;
+let possibilitiesExpanded = false;
+function togglePossibilitiesExpand(){
+  possibilitiesExpanded = !possibilitiesExpanded;
+  renderToolsView();
+}
+function possibilitiesExpandRowHtml(){
+  const n = (data.possibilities || []).length;
+  if(n <= POSSIBILITIES_PREVIEW) return '';
+  return `<div class="list-expand-row"><button class="list-expand-btn" onclick="togglePossibilitiesExpand()">
+    <span class="chev">${possibilitiesExpanded?'▴':'▾'}</span> ${possibilitiesExpanded?'כווץ בחזרה':'הרחב רשימה'}
+  </button></div>`;
+}
+function clearPossibilities(){
+  const n = (data.possibilities || []).length;
+  if(!n){ flashStatus('הרשימה כבר ריקה'); return; }
+  if(!confirm(`למחוק את כל ${n} הדברים שכתבת כאן? אפשר לבטל אחר כך עם ↶.`)) return;
+  data.possibilities = [];
+  possibilitiesExpanded = false;
+  saveData();
+  renderToolsView();
+  flashStatus('הרשימה נוקתה');
+}
 function possibilitiesListHtml(){
-  const list = data.possibilities || [];
-  if(!list.length) return '<li class="empty">עדיין לא נכתב כלום כאן</li>';
-  return list.slice().reverse().map(p=>`
-    <li class="task-li" data-drag-id="${p.id}">
+  const all = data.possibilities || [];
+  if(!all.length) return '<li class="empty">עדיין לא נכתב כלום כאן</li>';
+  // newest first, so the four you see when it opens are the four you just thought of
+  const ordered = all.slice().reverse();
+  const list = possibilitiesExpanded ? ordered : ordered.slice(0, POSSIBILITIES_PREVIEW);
+  return list.map(p=>`
+    <li class="possibility-li" data-drag-id="${p.id}">
       <span class="task-text" style="flex:1">זה לגמרי אפשרי ש${escapeHtml(p.text)}</span>
       <span class="del-task" onclick="deletePossibility('${p.id}')" title="מחיקה">✕</span>
     </li>`).join('');
@@ -13691,6 +13718,8 @@ function isToolCardOpen(key){
 }
 function toggleToolCard(key){
   if(!data.collapsedSections) data.collapsedSections = {};
+  // closing the card walks the last step back: next time it opens on four again, not on everything
+  if(key === 'possibilities' && isToolCardOpen(key)) possibilitiesExpanded = false;
   data.collapsedSections['tool:'+key] = isToolCardOpen(key);
   saveData();
   if(key === 'reflection') renderReflection(); else renderToolsView();
@@ -13713,15 +13742,16 @@ function renderToolsView(){
     </div>`;
   el.innerHTML = `
     <div class="tools-card">
-      <h3 class="tools-card-fold" onclick="toggleToolCard('possibilities')">${openPoss?'▾':'▸'} 🌈 הכל אפשרי? הכל אפשרי!${(data.possibilities||[]).length?' ('+data.possibilities.length+')':''}</h3>
+      <h3 class="tools-card-fold" onclick="toggleToolCard('possibilities')">${openPoss?'▾':'▸'} 🌈 זה לגמרי אפשרי ש..${(data.possibilities||[]).length?' ('+data.possibilities.length+')':''}</h3>
       ${openPoss ? `
       <p class="hint" style="margin:0 0 10px;">בלי גבולות ובלי שיפוט — כל מה שאפשרי, מציאותי או לא. מקום לפתוח בו את הראש.</p>
       <div class="add-row possibility-add-row">
-        <span class="possibility-prefix">זה לגמרי אפשרי ש...</span>
         <input type="text" id="possibilityInput" placeholder="לצאת לטבע לבד" onkeydown="if(event.key==='Enter') addPossibility();">
         <button onclick="addPossibility()">הוסף</button>
+        ${(data.possibilities||[]).length ? `<button type="button" class="reset-btn" onclick="clearPossibilities()">🧹 נקה הכל</button>` : ''}
       </div>
-      <ul class="tasks" id="possibilitiesList">${possibilitiesListHtml()}</ul>` : ''}
+      <ul class="tasks" id="possibilitiesList">${possibilitiesListHtml()}</ul>
+      ${possibilitiesExpandRowHtml()}` : ''}
     </div>
 
     <div class="tools-card">
