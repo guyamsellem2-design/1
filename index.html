@@ -3463,7 +3463,25 @@
   /* משימות and עוגנים: how you look at the list, and the button that adds to it, on one line.
      `.add-row` re-wraps and re-gaps these rows from the mobile layer, so the intent is restated
      here where it wins on source order. */
-  .view-controls-row{ flex-wrap:nowrap; gap:4px; align-items:center; }
+  /* "תצוגה" names the menus from its own small line above them, and a hairline keeps the action
+     button from reading as one of them */
+  .view-controls{ display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
+  .view-controls > .control-label{ font-size:11px; color:var(--muted2); }
+  .view-divider{
+    flex:0 0 auto; width:1px; align-self:stretch; margin-inline:2px;
+    background:var(--border-strong); opacity:.7;
+  }
+  .view-controls-row{ flex-wrap:nowrap; gap:4px; align-items:center; margin-bottom:0; }
+
+  /* As drawn: the task's own words get the first line to themselves, and everything you can do
+     with it lines up underneath. With four pills sharing the line the title was being squeezed
+     into three words a row. */
+  .task-row-main{ flex-wrap:wrap; }
+  .task-row-main > .task-text{ flex:1 1 100%; min-width:0; }
+
+  /* the destination menu, wherever it was opened from */
+  .move-menu{ position:fixed; right:auto; bottom:auto; }
+  .move-to-btn.move-btn-open{ color:var(--gold); border-color:var(--gold); border-style:solid; }
   /* three menus and a button on a 332px row: the menus give up nothing but the space around
      their text, and the button gives up its generous padding, so "כל הנושאים" still reads whole */
   /* A native <select> reserves room for its arrow on top of whatever padding it is given, so the
@@ -4041,9 +4059,11 @@
 
       <div id="scheduleTabTasks" style="display:none;">
         <div class="card">
+          <div class="view-controls">
+          <span class="control-label">תצוגה</span>
           <div class="add-row view-controls-row">
             <span id="taskAddRowWrap"></span>
-            <span class="control-label">תצוגה</span>
+            <span class="view-divider"></span>
             <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
               <option value="manual">ידני</option>
               <option value="time" selected>לפי זמן</option>
@@ -4057,6 +4077,7 @@
               <option value="month">החודש</option>
             </select>
           </div>
+          </div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="taskList"></ul>
           <div class="list-expand-row" id="taskListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('task')"></button></div>
@@ -4066,7 +4087,10 @@
 
       <div id="scheduleTabAnchors" style="display:none;">
         <div class="card">
-          <div class="add-row view-controls-row" id="anchorAddRowWrap"></div>
+          <div class="view-controls">
+            <span class="control-label" id="anchorViewLabel">תצוגה</span>
+            <div class="add-row view-controls-row" id="anchorAddRowWrap"></div>
+          </div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="anchorsList"></ul>
         </div>
@@ -5268,11 +5292,158 @@ let fabMenuOpen = false;
 const FAB_KINDS = [
   {kind:'task',         label:'+ ליומן'},
   {kind:'habit',        label:'+ הרגל'},
-  {kind:'dream',        label:'+ רעיון/חלום'},
+  {kind:'dream',        label:'+ רעיון'},
   {kind:'somedayTask',  label:'+ משימה ללא מועד'},
   {kind:'suggestion',   label:'+ הצעה/בקשה'},
+  {kind:'dilemma',      label:'+ התלבטות'},
   {kind:'note',         label:'+ פתק'},
 ];
+/* ---------- העבר ל... ----------
+   The ✏ says where a new thought can go. This says the same thing about a thought you already
+   wrote down, from the row it is sitting in -- same seven destinations, same order, same menu,
+   only anchored to the button you pressed instead of to the corner of the screen.
+
+   It is a move, not a copy: the item leaves where it was. Everything the destination has a place
+   for travels with it -- the topic, the description, the small steps, the energy level, the
+   body-check, who asked -- and anything it has no place for is still on the record, so moving it
+   back brings it whole. */
+const MOVE_SOURCES = {
+  task:       { list: ()=>data.tasks,            text:'text',  after: ()=>{ renderTasks(); renderScheduleGrid(); } },
+  anchor:     { list: ()=>data.anchors,          text:'label', after: ()=>{ renderAnchorsTab(); renderScheduleGrid(); } },
+  someday:    { list: ()=>data.someday,          text:'text',  after: ()=>renderSomeday() },
+  suggestion: { list: ()=>data.suggestions,      text:'text',  after: ()=>renderSuggestions() },
+  dilemma:    { list: ()=>data.generalDilemmas,  text:'text',  after: ()=>renderGeneralDilemmaList() },
+  habit:      { list: ()=>data.habits,           text:'text',  after: ()=>renderHabits() },
+  todayIdea:  { list: ()=>data.todayIdeas,       text:'text',  after: ()=>renderTodayIdeas() },
+};
+let moveMenuSource = null;
+function closeMoveMenu(){
+  const m = document.getElementById('moveMenu');
+  if(m) m.remove();
+  document.querySelectorAll('.move-btn-open').forEach(b=>b.classList.remove('move-btn-open'));
+  moveMenuSource = null;
+}
+function openMoveMenu(ev, sourceKind, id){
+  ev.stopPropagation();
+  const btn = ev.currentTarget;
+  const wasMine = moveMenuSource && moveMenuSource.kind===sourceKind && moveMenuSource.id===id;
+  closeMoveMenu();
+  if(wasMine) return;                       // pressing the same button again closes it
+  closeFabMenu();
+  moveMenuSource = {kind:sourceKind, id};
+  const m = document.createElement('div');
+  m.id = 'moveMenu'; m.className = 'fab-menu move-menu';
+  m.innerHTML = FAB_KINDS.map(o =>
+    `<button type="button" class="fab-menu-item" onclick="moveItemTo('${o.kind}')">${o.label}</button>`).join('');
+  document.body.appendChild(m);
+  btn.classList.add('move-btn-open');
+  // it comes out of the button that was pressed, and stays on screen
+  const r = btn.getBoundingClientRect(), mm = m.getBoundingClientRect();
+  const pad = 8;
+  let top = r.bottom + 6;
+  if(top + mm.height > window.innerHeight - pad) top = Math.max(pad, r.top - mm.height - 6);
+  let left = r.left;
+  if(left + mm.width > window.innerWidth - pad) left = window.innerWidth - pad - mm.width;
+  m.style.top = Math.round(top) + 'px';
+  m.style.left = Math.round(Math.max(pad, left)) + 'px';
+  syncOverlayGuard();
+}
+document.addEventListener('click', (e)=>{
+  const m = document.getElementById('moveMenu');
+  if(m && !m.contains(e.target) && !e.target.closest('.move-to-btn')) closeMoveMenu();
+}, true);
+
+function moveToBtnHtml(sourceKind, id){
+  return `<button type="button" class="subtask-toggle-btn move-to-btn"
+    onclick="openMoveMenu(event,'${sourceKind}','${id}')" title="העברה למקום אחר באתר">העבר ל...</button>`;
+}
+function moveSourceRecord(src){
+  const def = MOVE_SOURCES[src.kind];
+  const list = def && def.list();
+  return list ? list.find(x=>x.id===src.id) : null;
+}
+/* everything the record carries, named the way each destination expects to find it */
+function movePayload(src, rec){
+  const def = MOVE_SOURCES[src.kind];
+  return {
+    text: (rec[def.text] || '').trim(),
+    domain: rec.domain || '',
+    description: rec.description || '',
+    subtasks: Array.isArray(rec.subtasks) ? rec.subtasks.map(x=>({...x})) : [],
+    energy: rec.energy || '',
+    date: rec.date || '', time: rec.time || '', endTime: rec.endTime || '',
+    who: rec.who || '',
+    favorite: !!rec.favorite,
+    bodyCheck: (rec.bodyCheck && typeof rec.bodyCheck==='object') ? {...rec.bodyCheck} : {},
+  };
+}
+function removeMoveSource(src){
+  const def = MOVE_SOURCES[src.kind];
+  if(src.kind==='task') data.tasks = data.tasks.filter(x=>x.id!==src.id);
+  else if(src.kind==='anchor') data.anchors = data.anchors.filter(x=>x.id!==src.id);
+  else if(src.kind==='someday') data.someday = data.someday.filter(x=>x.id!==src.id);
+  else if(src.kind==='suggestion') data.suggestions = data.suggestions.filter(x=>x.id!==src.id);
+  else if(src.kind==='dilemma') data.generalDilemmas = (data.generalDilemmas||[]).filter(x=>x.id!==src.id);
+  else if(src.kind==='habit') data.habits = data.habits.filter(x=>x.id!==src.id);
+  else if(src.kind==='todayIdea') data.todayIdeas = data.todayIdeas.filter(x=>x.id!==src.id);
+  if(def) def.after();
+}
+const MOVE_DEST_LABEL = {
+  task:'היומן', habit:'הרגלים', dream:'רעיונות וחלומות', somedayTask:'משימות ללא מועד',
+  suggestion:'הצעות ובקשות', dilemma:'התלבטויות', note:'המחברת',
+};
+function moveItemTo(destKind){
+  const src = moveMenuSource;
+  closeMoveMenu();
+  if(!src) return;
+  const rec = moveSourceRecord(src);
+  if(!rec) return;
+  const p = movePayload(src, rec);
+  if(!p.text){ flashStatus('אין כאן טקסט להעביר'); return; }
+  const validDomain = data.domains.some(d=>d.id===p.domain) ? p.domain : '';
+  removeMoveSource(src);
+
+  if(destKind==='task'){
+    const t = {id:uid(), text:p.text, domain: validDomain || (data.domains[0]&&data.domains[0].id) || '',
+      done:false, energy:p.energy||'', date:p.date||'', time:p.time||'', endTime:p.endTime||'',
+      description:p.description, subtasks:p.subtasks, bodyCheck:p.bodyCheck, draft:true, createdAt:Date.now()};
+    data.tasks.push(t);
+    saveData(); renderTasks(); renderScheduleGrid();
+    openTimelineSheet('task', t.id, true);   // the full editor, so a date can be given right away
+    return;
+  }
+  if(destKind==='habit'){
+    data.habits.push({id:uid(), text:p.text, description:p.description, smallStarts:[],
+      contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
+    renderHabits();
+  } else if(destKind==='dream' || destKind==='somedayTask'){
+    data.someday.push({id:uid(), dream: destKind==='dream', text:p.text,
+      domain: validDomain || (data.domains[0]&&data.domains[0].id) || '',
+      description:p.description, subtasks:p.subtasks, favorite:p.favorite,
+      bodyCheck:p.bodyCheck, draft:true, createdAt:Date.now()});
+    renderSomeday();
+  } else if(destKind==='suggestion'){
+    data.suggestions.push({id:uid(), who:p.who, text:p.text, answered:false, done:false,
+      replyDate:p.date||'', replyTime:p.time||'', description:p.description,
+      subtasks:p.subtasks, domain:validDomain, bodyCheck:p.bodyCheck});
+    renderSuggestions();
+  } else if(destKind==='dilemma'){
+    if(!data.generalDilemmas) data.generalDilemmas = [];
+    data.generalDilemmas.push({id:uid(), text:p.text, domain:validDomain, decisionDate:p.date||'',
+      done:false, description:p.description, subtasks:p.subtasks, bodyCheck:p.bodyCheck, createdAt:Date.now()});
+    renderGeneralDilemmaList();
+  } else if(destKind==='note'){
+    const container = (validDomain && containerById(validDomain)) ? validDomain
+      : (activeNoteDomain || (data.domains[0] && data.domains[0].id));
+    if(!container){ flashStatus('אין לאן להעביר'); return; }
+    const body = p.description ? (p.text + '\n' + p.description) : p.text;
+    ensureDomainNotes(container).unshift({id:uid(), text:body, color:'', drawing:'', memos:[], pinned:false, headerId:''});
+    if(activeNoteDomain===container) renderKeepGrid(container);
+  }
+  saveData();
+  renderPlanStrip();
+  flashStatus(`הועבר ל"${MOVE_DEST_LABEL[destKind]||''}"`);
+}
 function updateInboxFab(){
   const fab = document.getElementById('inboxFab');
   if(!fab) return;
@@ -7886,6 +8057,7 @@ function taskRowHtml(t){
       <span class="task-text ${t.done?'done':''} ${(!t.done && energy==='low')?'task-text-energizing':''}" onclick="openTimelineSheet('task','${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
       <select class="tag ${dom?'':'tag-empty'} ${t.done?'tag-dimmed':''}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
       <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
+      ${moveToBtnHtml('task', t.id)}
     </div>
     <div class="task-row-meta">
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
@@ -9492,13 +9664,16 @@ function renderAnchorsTab(){
   // adding comes first, then how you are looking at what is already there -- same order as משימות
   if(addRowWrap) addRowWrap.innerHTML =
     `<button type="button" class="add-anchor-btn" onclick="addFromTab(${new Date().getDay()}, '', true)">+ הוסף</button>`
-    + (anchorFilterHtml() ? `<span class="control-label">תצוגה</span>` + anchorFilterHtml() : '');
+    + (anchorFilterHtml() ? `<span class="view-divider"></span>` + anchorFilterHtml() : '');
   const list = data.anchors.filter(a => !anchorFilterDomain || a.domain === anchorFilterDomain).sort((a,b)=>{
     const da = (a.repeatType||'weekly')==='weekly' ? a.day : 7;
     const db = (b.repeatType||'weekly')==='weekly' ? b.day : 7;
     if(da!==db) return da-db;
     return (a.time||'').localeCompare(b.time||'');
   });
+  // no topics in use yet means no menus, and then there is nothing for "תצוגה" to name
+  const viewLabel = document.getElementById('anchorViewLabel');
+  if(viewLabel) viewLabel.style.display = anchorFilterHtml() ? '' : 'none';
   el.innerHTML = list.length ? list.map(anchorRowHtml).join('')
     : `<li class="empty">${anchorFilterDomain ? 'אין עוגנים בנושא הזה' : 'אין עדיין עוגנים קבועים'}</li>`;
 }
@@ -9965,7 +10140,7 @@ function renderSuggestions(){
         <span class="del-task" onclick="deleteSuggestion('${s.id}')" title="מחיקה">✕</span>
       </div>
       <div class="sugg-opts">
-        <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 ליומן</span>
+        ${moveToBtnHtml('suggestion', s.id)}
         <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
         ${s.answered ? '' : `<button type="button" class="say-no-btn" onpointerdown="startSayNoHold(event)" onclick="sayNoToSuggestion('${s.id}', event)">לא!</button>`}
         <button type="button" class="move-btn" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="להחזיק ולהזיז">⠿ הזזה</button>
@@ -10493,7 +10668,7 @@ function renderGeneralDilemmaList(){
         <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')" title="מחיקה">✕</span>
       </div>
       <div class="sugg-opts">
-        <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 ליומן</span>
+        ${moveToBtnHtml('dilemma', d.id)}
         <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
         <button type="button" class="move-btn" onpointerdown="startListDrag(event,'${d.id}','.suggestion-li',reorderGeneralDilemmas)" title="להחזיק ולהזיז">⠿ הזזה</button>
       </div>
@@ -13629,7 +13804,7 @@ function todayIdeaRowHtml(item){
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleTodayIdeaFavorite('${item.id}')" title="${item.favorite?'הסרה מהנבחרים':'סימון כנבחר להיום'}">${item.favorite?'★':'☆'}</span>
       <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
       <input type="text" class="today-idea-input ${item.done?'done':''}" data-field-key="idea-${item.id}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)" ${todayIdeasDragMode?'readonly':''}>
-      ${(item.text.trim() && !todayIdeasDragMode) ? `<span class="today-idea-promote" title="הפיכה למשימה/עוגן עם זמן" onclick="promoteTodayIdeaToTask('${item.id}')">➜ משימה</span>` : ''}
+      ${(item.text.trim() && !todayIdeasDragMode) ? moveToBtnHtml('todayIdea', item.id) : ''}
       ${!todayIdeasDragMode ? `<span class="today-idea-del" onclick="deleteTodayIdea('${item.id}')" title="מחיקה">✕</span>` : ''}
     </div>
   `;
