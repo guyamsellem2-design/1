@@ -3519,6 +3519,10 @@
   .view-controls-row > #taskAddRowWrap{ display:contents; }
 
   /* the two destination menus share the line under the world tabs */
+  /* inside the sheet the topic menu is one control among the pills, not a field of its own line */
+  #captureFields > select{ flex:0 1 150px; min-width:0; padding:8px 10px; min-height:0; font-size:13px; }
+  #captureFields{ margin:8px 0 0; }
+  #captureFieldsTop{ margin-bottom:8px; align-items:center; }
   #captureNoteDest{ margin-bottom:10px; }
   #captureNoteDest .schedule-tabs{ margin-bottom:8px; }
   .capture-dest-row{ margin-bottom:0; }
@@ -3935,7 +3939,10 @@
     <div class="schedule-tabs" id="captureWorldSwitch"></div>
     <div class="add-row capture-dest-row" id="captureDestRow"></div>
   </div>
+
+  <div class="add-row" id="captureFieldsTop" style="display:none;"></div>
   <textarea id="inboxCaptureInput" class="inbox-capture-textarea" dir="auto" placeholder="כותבים, וזה נוחת במקום שבחרת." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); commitInboxCapture(); } else if(event.key==='Escape'){ closeInboxCapture(); }"></textarea>
+  <div class="add-row pending-host" id="captureFields" style="display:none;"></div>
   <div class="timeline-sheet-actions">
     <button type="button" class="save-btn" onclick="commitInboxCapture()">שמירה</button>
     <button type="button" class="cancel-btn" onclick="closeInboxCapture()">ביטול</button>
@@ -11090,12 +11097,14 @@ function bodyCheckToggleBtnHtml(kind, id){
    bodyCheck to. mirrors bodyCheckPanelHtml exactly (same fields, same look) but writes into a plain
    holding object per kind instead of looking an item up by id; addTask/addSomeday/addSuggestion pull
    it onto the new record at creation, then it resets for the next one. */
-const pendingBodyCheck = { task:{}, someday:{}, suggestion:{}, dilemma:{} };
+const pendingBodyCheck = { task:{}, someday:{}, suggestion:{}, dilemma:{}, capture:{} };
 const PENDING_BODY_CHECK_OPTS = {
   task: {urgencyOptions:['objective','other','relief'], showEnergy:true},
   someday: {hideNote:true},
   suggestion: {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true},
-  dilemma: {urgencyOptions:['objective','other','relief']}
+  dilemma: {urgencyOptions:['objective','other','relief']},
+  // the floating sheet borrows whichever set belongs to the thing being created
+  capture: {urgencyOptions:['objective','other','relief'], showEnergy:true}
 };
 // task's panel lives inside the already-secondary "עוד.." section, and suggestion's create form is
 // dense enough that the panel should stay tucked behind its own button too -- same ❤️‍🩹 בדיקת גוף
@@ -11105,8 +11114,8 @@ const PENDING_BODY_CHECK_OPTS = {
 // also stays directly visible rather than tucked behind a toggle.
 // every one of these is a button you unfold -- a panel that is simply always open reads as a form
 // you are required to fill in, which is the opposite of what a body-check is for
-const PENDING_BODY_CHECK_USE_TOGGLE = { task:true, someday:true, suggestion:true, dilemma:true };
-let pendingBodyCheckOpen = { task:false, someday:false, suggestion:false, dilemma:false };
+const PENDING_BODY_CHECK_USE_TOGGLE = { task:true, someday:true, suggestion:true, dilemma:true, capture:true };
+let pendingBodyCheckOpen = { task:false, someday:false, suggestion:false, dilemma:false, capture:false };
 function togglePendingBodyCheck(kind){
   pendingBodyCheckOpen[kind] = !pendingBodyCheckOpen[kind];
   renderPendingBodyCheck(kind);
@@ -13273,11 +13282,99 @@ function renderCaptureNoteDest(){
               : captureNewHeaderOpen ? 'captureNewHeaderInput' : '');
   if(fresh) requestAnimationFrame(()=>fresh.focus());
 }
+/* ---------- the floating sheet carries the same fields as the real place ----------
+   Catching something from the ✏ used to mean typing a line and then going to find it wherever it
+   landed to give it a topic, a description, a date. Each destination now brings its own fields
+   into the sheet -- the same ones its add-row has on its own page, laid out the same way: one
+   line for what you are writing, then the optional fields and the save button.
+
+   The fields keep their own small store rather than borrowing the ones on the plan tab, so the
+   two never share an element id or overwrite each other's half-typed text. */
+const CAPTURE_FIELDS = {
+  habit:       {},                                                   // its real add-row is a name and nothing else
+  dream:       {topic:true, description:true, steps:true},
+  somedayTask: {topic:true, description:true, steps:true, body:true},
+  suggestion:  {who:true, replyDate:true, body:true},
+  dilemma:     {topic:true, decisionDate:true, body:true},
+  note:        {},                                                   // its destination picker is its fields
+};
+const CAPTURE_BODY_OPTS = {
+  somedayTask: {hideNote:true},
+  suggestion:  {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true},
+  dilemma:     {urgencyOptions:['objective','other','relief']},
+};
+let captureField = { topic:'', who:'', date:'', time:'', description:'', steps:[] };
+let captureDescOpen = false, captureStepsOpen = false, captureDateOpen = false;
+function resetCaptureFields(){
+  captureField = { topic:(data.domains[0] && data.domains[0].id) || '', who:'', date:'', time:'', description:'', steps:[] };
+  captureDescOpen = captureStepsOpen = captureDateOpen = false;
+  pendingBodyCheck.capture = {};
+  pendingBodyCheckOpen.capture = false;
+}
+function setCaptureTopic(v){ captureField.topic = v; }
+function setCaptureWho(v){ captureField.who = v; }
+function setCaptureDate(v){ captureField.date = v; }
+function setCaptureTime(v){ captureField.time = v; }
+function onCaptureDescInput(v){ captureField.description = v; }
+function toggleCaptureDesc(){ captureDescOpen = !captureDescOpen; renderCaptureFields(); }
+function toggleCaptureSteps(){ captureStepsOpen = !captureStepsOpen; renderCaptureFields(); }
+function toggleCaptureDate(){ captureDateOpen = !captureDateOpen; renderCaptureFields(); }
+function addCaptureStep(){
+  const el = document.getElementById('captureStepInput');
+  const t = el ? el.value.trim() : '';
+  if(!t) return;
+  captureField.steps.push({id:uid(), text:t, done:false});
+  renderCaptureFields();
+  requestAnimationFrame(()=>{ const i = document.getElementById('captureStepInput'); if(i) i.focus(); });
+}
+function removeCaptureStep(id){ captureField.steps = captureField.steps.filter(x=>x.id!==id); renderCaptureFields(); }
+function renderCaptureFields(){
+  const el = document.getElementById('captureFields');
+  const top = document.getElementById('captureFieldsTop');
+  if(!el) return;
+  const spec = CAPTURE_FIELDS[quickCaptureTarget];
+  if(!spec || !Object.keys(spec).length){
+    el.style.display = 'none'; el.innerHTML = '';
+    if(top){ top.style.display = 'none'; top.innerHTML = ''; }
+    return;
+  }
+  if(top){
+    top.style.display = spec.who ? '' : 'none';
+    top.innerHTML = spec.who ? `
+      <input type="text" id="captureWho" placeholder="מי הציע?" style="max-width:120px;" value="${escapeAttr(captureField.who)}" oninput="setCaptureWho(this.value)">
+      <span class="prefers-label">מעדיף ש -</span>` : '';
+  }
+  el.style.display = '';
+  PENDING_BODY_CHECK_OPTS.capture = CAPTURE_BODY_OPTS[quickCaptureTarget] || {hideNote:true};
+  const hasDesc = !!captureField.description.trim();
+  const dateLabel = spec.replyDate ? '+ תאריך תשובה' : '+ מועד להחליט';
+  el.innerHTML = `
+    ${spec.topic ? `<select id="captureTopic" onchange="setCaptureTopic(this.value)">${domainOptions(captureField.topic)}</select>` : ''}
+    ${spec.body ? pendingBodyCheckToggleBtnHtml('capture') : ''}
+    ${spec.description ? `<button type="button" class="subtask-toggle-btn ${hasDesc?'has-content':''}" onclick="toggleCaptureDesc()">${captureDescOpen?'▾':'▸'} תיאור</button>` : ''}
+    ${spec.steps ? `<button type="button" class="subtask-toggle-btn ${captureField.steps.length?'has-content':''}" onclick="toggleCaptureSteps()">${captureStepsOpen?'▾':'▸'} צעדים קטנים${captureField.steps.length?' ('+captureField.steps.length+')':''}</button>` : ''}
+    ${(spec.replyDate || spec.decisionDate) ? `<button type="button" class="add-domain-btn ${captureField.date?'has-content':''}" onclick="toggleCaptureDate()">${dateLabel}</button>` : ''}
+    ${spec.body && pendingBodyCheckOpen.capture ? pendingBodyCheckPanelHtml('capture') : ''}
+    ${spec.description && captureDescOpen ? `<textarea class="detail-desc" dir="auto" placeholder="הרחבה, הקשר, פרטים..." oninput="onCaptureDescInput(this.value)">${escapeHtml(captureField.description)}</textarea>` : ''}
+    ${spec.steps && captureStepsOpen ? `<div class="subtask-list">
+        ${captureField.steps.map(x=>`<div class="subtask-row"><span class="task-text" style="flex:1">${escapeHtml(x.text)}</span><span class="del-task" onclick="removeCaptureStep('${x.id}')">✕</span></div>`).join('')}
+      </div>
+      <div class="subtask-add-row">
+        <input type="text" id="captureStepInput" placeholder="צעד קטן..." onkeydown="if(event.key==='Enter'){event.preventDefault(); addCaptureStep();}">
+        <button type="button" onclick="addCaptureStep()">+ הוסף</button>
+      </div>` : ''}
+    ${(spec.replyDate || spec.decisionDate) && captureDateOpen ? `<div class="add-row pending-panel-row">
+        <label class="field-label">${spec.replyDate?'תשובה עד':'להחליט עד'}<input type="date" value="${captureField.date}" onchange="setCaptureDate(this.value)"></label>
+        ${spec.replyDate ? `<label class="field-label">שעה${timePickerHtml('captureTime', captureField.time, 'שעה')}</label>` : ''}
+      </div>` : ''}`;
+}
 function openInboxCapture(){
   const label = document.querySelector('#inboxCaptureSheet .inbox-capture-label');
   if(label) label.textContent = CAPTURE_TITLES[quickCaptureTarget] || 'תפיסה מהירה';
   if(quickCaptureTarget === 'note') captureDestInit();
+  resetCaptureFields();
   renderCaptureNoteDest();
+  renderCaptureFields();
   document.getElementById('inboxCaptureOverlay').style.display = '';
   document.getElementById('inboxCaptureSheet').style.display = '';
   requestAnimationFrame(()=>{ const el = document.getElementById('inboxCaptureInput'); if(el) el.focus(); });
@@ -13286,6 +13383,8 @@ function closeInboxCapture(){
   quickCaptureTarget = null;
   const dest = document.getElementById('captureNoteDest');
   if(dest) dest.style.display = 'none';
+  const fields = document.getElementById('captureFields');
+  if(fields){ fields.style.display = 'none'; fields.innerHTML = ''; }
   const overlay = document.getElementById('inboxCaptureOverlay'), sheet = document.getElementById('inboxCaptureSheet');
   if(overlay) overlay.style.display = 'none';
   if(sheet) sheet.style.display = 'none';
@@ -13296,9 +13395,39 @@ function commitInboxCapture(){
   const text = el ? el.value.trim() : '';
   const target = quickCaptureTarget;
   const container = captureNoteContainer, headerId = captureNoteHeader;
+  const timeEl = document.getElementById('captureTime');
+  if(timeEl) captureField.time = timeEl.value || '';
+  const f = { ...captureField, steps: captureField.steps.map(x=>({...x})) };
+  const bc = { ...pendingBodyCheck.capture };
   closeInboxCapture();
   if(!text) return;
   if(target === 'note'){ finishConvert('note', text, container, {headerId}); return; }
+  const spec = CAPTURE_FIELDS[target] || {};
+  const topic = (spec.topic && data.domains.some(d=>d.id===f.topic)) ? f.topic : '';
+  if(target === 'dream' || target === 'somedayTask'){
+    data.someday.push({id:uid(), dream: target==='dream', text,
+      domain: topic || (data.domains[0] && data.domains[0].id) || '',
+      description:f.description, subtasks:f.steps, favorite:false,
+      bodyCheck: spec.body ? bc : {}, draft:true, createdAt:Date.now()});
+    saveData(); renderSomeday(); renderPlanStrip();
+    flashStatus(target==='dream' ? 'נוסף לרעיונות וחלומות' : 'נוסף למשימות ללא מועד');
+    return;
+  }
+  if(target === 'suggestion'){
+    data.suggestions.push({id:uid(), who:f.who, text, answered:false, done:false,
+      replyDate:f.date, replyTime:f.time, bodyCheck:bc});
+    saveData(); renderSuggestions(); renderPlanStrip();
+    flashStatus('נוסף ל"הצעות ובקשות"');
+    return;
+  }
+  if(target === 'dilemma'){
+    if(!data.generalDilemmas) data.generalDilemmas = [];
+    data.generalDilemmas.push({id:uid(), text, domain:topic, decisionDate:f.date,
+      done:false, bodyCheck:bc, createdAt:Date.now()});
+    saveData(); renderGeneralDilemmaList(); renderPlanStrip();
+    flashStatus('נוסף להתלבטויות');
+    return;
+  }
   finishConvert(target || 'dream', text, '');
 }
 function deleteInboxItem(id){
