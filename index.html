@@ -3423,6 +3423,8 @@
   #toolsView .feel-block-header + *,
   #toolsView .tools-card-fold + *{ margin-top:10px; }
 
+  #timelineTodayBtn.active{ background:var(--gold); color:#241a06; border-color:transparent; font-weight:600; }
+
   .domain-page-topbar{ flex-wrap:wrap; }
   /* wrapped or not, the three chrome buttons sit at the left edge -- same place on every tab */
   .domain-page-topbar .header-actions{ margin-inline-start:auto; }
@@ -3917,6 +3919,7 @@
             <button type="button" class="timeline-fs-btn" onclick="zoomTimelineIn()" title="הגדלת תצוגה — יותר מקום לכיתוב של כל משימה/עוגן">🔍+</button>
             <button type="button" class="timeline-fs-btn" id="timelineDragModeBtn" onclick="toggleTimelineDesktopDragMode()" title="בעכבר, גרירה לא תמיד נתפסת כלחיצה ארוכה — המצב הזה מדליק גרירה מיידית">🖱 מצב גרירה</button>
             <button type="button" class="timeline-fs-btn" id="timelineFsBtn" onclick="toggleTimelineFullscreen()">⤢ מסך מלא</button>
+            <button type="button" class="timeline-fs-btn" id="timelineTodayBtn" onclick="toggleTimelineTodayView()">היום</button>
           </div>
           <div class="timeline-daynames" id="timelineDaynames"></div>
           <div id="timelineActionBarWrap"></div>
@@ -8324,6 +8327,15 @@ function toggleTimelineExpandedDay(dayIdx){
   timelineExpandedDay = (timelineExpandedDay === dayIdx) ? null : dayIdx;
   renderTimelineGrid();
 }
+/* Tapping a day's name already opens that day on its own. This is the same view without having to
+   find today among seven columns first -- and, because it says "היום" rather than a date, it also
+   brings you back to this week if you had wandered off to another one. Pressed again it says
+   "השבוע" and does the reverse. */
+function toggleTimelineTodayView(){
+  timelineExpandedDay = (timelineExpandedDay === null) ? new Date().getDay() : null;
+  weekOffset = 0;
+  renderScheduleGrid();   // redraws the week nav, the board and the timeline together
+}
 function timelineChipHtml(it, dayIdx, dateStr, lane, lanes, dayExpanded){
   const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
   const draft = !!it.data.draft;
@@ -9240,6 +9252,15 @@ function renderTimelineGrid(){
           title="${expanded?'חזרה לכל הימים':'פתיחת כל היום'}"
           onclick="toggleTimelineExpandedDay(${d.dayIdx})">${DAYS[d.dayIdx]}<br>${pad(d.dateObj.getDate())}/${pad(d.dateObj.getMonth()+1)}${hidden?'<span class="dayname-more-dot" title="יש כאן עוד באותו הזמן"></span>':''}</div>`;
       }).join('');
+  }
+  // the button names where the next tap takes you, never where you already are -- same rule as
+  // the view-cycle button beside the week label
+  const todayBtn = document.getElementById('timelineTodayBtn');
+  if(todayBtn){
+    const oneDay = timelineExpandedDay !== null;
+    todayBtn.textContent = oneDay ? 'השבוע' : 'היום';
+    todayBtn.title = oneDay ? 'חזרה לשבוע הנוכחי' : 'תצוגה של היום בלבד';
+    todayBtn.classList.toggle('active', oneDay);
   }
   if(barWrap) barWrap.innerHTML = timelineActionBarHtml();
 
