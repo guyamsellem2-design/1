@@ -3367,6 +3367,13 @@
   ul.tasks li.plan-pick-li{ cursor:pointer; gap:10px; }
   .plan-pick-li .task-text{ flex:1; min-width:0; }
   .plan-pick-li .pick-who{ font-size:12px; color:var(--muted2); flex-shrink:0; }
+  .pick-tag{
+    font-size:11px; padding:2px 8px; border-radius:var(--r-pill);
+    flex-shrink:0; white-space:nowrap; font-weight:600;
+  }
+  .pick-tag-none{ background:transparent; border:1px dashed var(--border-strong); color:var(--muted2); font-weight:400; }
+  .plan-bulk-btn.open{ background:var(--gold); color:#241a06; border-color:transparent; font-weight:600; }
+  .plan-topic-btn{ font-weight:600; }
   .plan-pick-li .pick-box{
     width:22px; height:22px; flex-shrink:0; border-radius:6px;
     border:1.5px solid var(--border-strong); background:var(--surface2);
@@ -3381,7 +3388,7 @@
     padding:10px 12px; margin:10px 0 0; display:flex; flex-direction:column; gap:8px;
   }
   .plan-bulk-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-  .plan-bulk-count{ font-size:13px; color:var(--muted); margin-inline-end:auto; }
+  .plan-bulk-count{ font-size:13px; color:var(--muted); }
   .plan-bulk-btn{
     font-family:inherit; font-size:12.5px; color:var(--text);
     background:var(--surface2); border:1px solid var(--border-strong);
@@ -5316,7 +5323,7 @@ function movePlanBlocksIntoPlanView(){
 function setPlanKind(key){
   // a selection belongs to the list it was made in -- carrying it across would mean deleting rows
   // you can no longer see
-  if(key !== activePlanKind){ planSelected.clear(); planMoveMenuOpen = false; }
+  if(key !== activePlanKind){ planSelected.clear(); planMoveMenuOpen = false; planTopicMenuOpen = false; }
   activePlanKind = key;
   const kind = PLAN_KINDS.find(k=>k.key===key) || PLAN_KINDS[0];
   const block = kind.block;
@@ -5357,6 +5364,10 @@ function setPlanKind(key){
 let planSelectMode = false;
 const planSelected = new Set();
 let planMoveMenuOpen = false;
+let planTopicMenuOpen = false;
+/* הצעות ובקשות is the one list with no topic of its own -- it is sorted by who is waiting on you,
+   not by which part of life it belongs to -- so it gets no topic tag and no "שנה נושא". */
+function planLensHasTopics(kind){ return kind !== 'suggestions'; }
 
 function planItemsOf(kind){
   if(kind==='dreams')       return (data.someday||[]).filter(x=>!!x.dream);
@@ -5373,6 +5384,7 @@ function togglePlanSelectMode(){
   planSelectMode = !planSelectMode;
   planSelected.clear();
   planMoveMenuOpen = false;
+  planTopicMenuOpen = false;
   const view = document.getElementById('planView');
   if(view) view.classList.toggle('select-mode', planSelectMode);
   planRenderActive();
@@ -5392,11 +5404,18 @@ function planPickAll(){
   planRenderActive();
   renderPlanBulkBar();
 }
+function planPickTagHtml(item){
+  if(!planLensHasTopics(activePlanKind)) return '';
+  const dom = data.domains.find(d=>d.id===item.domain);
+  if(!dom) return '<span class="pick-tag pick-tag-none">ללא נושא</span>';
+  return `<span class="pick-tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>`;
+}
 function planPickRowHtml(item, tailHtml){
   const picked = planSelected.has(item.id);
   return `<li class="plan-pick-li ${picked?'picked':''}" onclick="togglePlanPick('${item.id}')">
     <span class="pick-box">${picked?'✓':''}</span>
     <span class="task-text">${escapeHtml(item.text||'')}</span>
+    ${planPickTagHtml(item)}
     ${tailHtml||''}
   </li>`;
 }
@@ -5410,20 +5429,44 @@ function renderPlanBulkBar(){
   const targets = PLAN_KINDS.filter(k=>k.key!==activePlanKind);
   el.innerHTML = `
     <div class="plan-bulk">
+      <div class="plan-bulk-count">${n ? `נבחרו ${n}` : 'לבחור מהרשימה'}</div>
       <div class="plan-bulk-row">
-        <span class="plan-bulk-count">${n ? `נבחרו ${n}` : 'לבחור מהרשימה'}</span>
         <button type="button" class="plan-bulk-btn" onclick="planPickAll()">${allPicked?'לבטל הכל':'לבחור הכל'}</button>
-        <button type="button" class="plan-bulk-btn" onclick="togglePlanMoveMenu()" ${n?'':'disabled'}>העבר ל- ▾</button>
+        <button type="button" class="plan-bulk-btn ${planMoveMenuOpen?'open':''}" onclick="togglePlanMoveMenu()" ${n?'':'disabled'}>העבר ל- ▾</button>
+        ${planLensHasTopics(activePlanKind) ? `<button type="button" class="plan-bulk-btn ${planTopicMenuOpen?'open':''}" onclick="togglePlanTopicMenu()" ${n?'':'disabled'}>שנה נושא ▾</button>` : ''}
         <button type="button" class="plan-bulk-btn danger" onclick="planDeletePicked()" ${n?'':'disabled'}>מחק</button>
         <button type="button" class="plan-bulk-btn" onclick="togglePlanSelectMode()">סיום</button>
       </div>
       ${planMoveMenuOpen && n ? `<div class="plan-bulk-row plan-move-menu">
         ${targets.map(t=>`<button type="button" class="plan-bulk-btn" onclick="planMovePicked('${t.key}')">${escapeHtml(t.label)}</button>`).join('')}
       </div>` : ''}
+      ${planTopicMenuOpen && n ? `<div class="plan-bulk-row plan-move-menu">
+        ${data.domains.map(d=>`<button type="button" class="plan-bulk-btn plan-topic-btn" style="background:${d.color}; color:${contrastTextColor(d.color)}; border-color:transparent;" onclick="planSetTopicForPicked('${d.id}')">${escapeHtml(d.name)}</button>`).join('')}
+      </div>` : ''}
     </div>`;
 }
 function togglePlanMoveMenu(){
   planMoveMenuOpen = !planMoveMenuOpen;
+  planTopicMenuOpen = false;
+  renderPlanBulkBar();
+}
+function togglePlanTopicMenu(){
+  planTopicMenuOpen = !planTopicMenuOpen;
+  planMoveMenuOpen = false;
+  renderPlanBulkBar();
+}
+function planSetTopicForPicked(domainId){
+  const ids = planSelected.size ? [...planSelected] : [];
+  if(!ids.length) return;
+  const set = new Set(ids);
+  // the selection stays put: re-filing a batch is usually several rounds, and losing the picks
+  // after the first one would mean starting over each time
+  planItemsOf(activePlanKind).forEach(it=>{ if(set.has(it.id)) it.domain = domainId; });
+  planTopicMenuOpen = false;
+  saveData();
+  const dom = data.domains.find(d=>d.id===domainId);
+  flashStatus(`${ids.length} עברו ל"${dom ? dom.name : ''}"`);
+  planRenderActive();
   renderPlanBulkBar();
 }
 function planRemoveIds(kind, ids){
@@ -5471,6 +5514,7 @@ function planMovePicked(toKind){
   else data.generalDilemmas = (data.generalDilemmas||[]).concat(moved);
   planSelected.clear();
   planMoveMenuOpen = false;
+  planTopicMenuOpen = false;
   saveData();
   const label = (PLAN_KINDS.find(k=>k.key===toKind)||{}).label || '';
   flashStatus(`${moved.length} עברו ל"${label}"`);
