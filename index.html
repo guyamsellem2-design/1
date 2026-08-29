@@ -3335,9 +3335,11 @@
   }
   /* no heading left in the pane, so the hint line is the top of it -- one line, with "נקה הכל"
      sitting at its end rather than dropping to a line of its own */
-  .plan-section-head{ flex-wrap:nowrap; align-items:center; margin-bottom:10px; }
-  #planHost .plan-section-head .hint{ margin:0; flex:1; min-width:0; }
-  #planHost .plan-section-head .reset-btn{ flex-shrink:0; }
+  /* the line above the list is an explanation, not a label -- it gets the full width, and the
+     rarely-wanted "נקה הכל" sits under it rather than squeezing the paragraph from the side */
+  .plan-section-head{ flex-direction:column; align-items:stretch; gap:8px; margin-bottom:10px; }
+  #planHost .plan-section-head .hint{ margin:0; }
+  #planHost .plan-section-head .reset-btn{ align-self:flex-end; flex-shrink:0; }
   /* `.add-row button` paints every button in the row gold, which made "+ תאריך תשובה" -- a toggle
      for a detail you may not even want -- look exactly as much like the action as "הוסף" does */
   #dilemmasSectionBody .add-row .add-domain-btn{
@@ -3347,6 +3349,9 @@
   #dilemmasSectionBody .add-row .add-domain-btn:hover{ color:var(--text); border-color:var(--muted); }
 
   .prefers-label{ font-size:13.5px; color:var(--muted2); white-space:nowrap; align-self:center; }
+  /* quieter than the proposal it introduces -- it should be read, not read FIRST */
+  .prefers-inline{ color:var(--muted2); font-size:.88em; }
+  #planHost .plan-section-head .hint{ line-height:1.6; }
 
   ul.tasks li.suggestion-li{ flex-direction:column; align-items:stretch; gap:7px; }
   li.suggestion-li .sugg-line{ display:flex; align-items:center; gap:9px; }
@@ -3915,7 +3920,7 @@
 
   <section data-plan-block="suggestions">
     <div class="section-head plan-section-head">
-      <div class="hint" id="suggestionsHint">מישהו מחכה לתשובה. בלי לחץ להחליט עכשיו.</div>
+      <div class="hint" id="suggestionsHint">הצעות ובקשות הן לרוב העדפה של מישהו אחר, לא צורך ולא הכרח. מותר להתחשב גם בעצמי, מותר לומר גם לא, ומותר לשאול — מה אני מעדיף שיקרה?</div>
       <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-suggestions">
@@ -5163,7 +5168,8 @@ let noteWorld = 'domain'; // 'domain' | 'notebook'
 const PLAN_KINDS = [
   {key:'dreams',      label:'רעיונות וחלומות', block:'someday',     hint:'לכתוב ולשחרר. בלי מועד, בלי התחייבות.'},
   {key:'somedayTasks',label:'משימות ללא מועד', block:'someday',     hint:'מחכות לזמן שלהן. אין דחיפות.'},
-  {key:'suggestions', label:'הצעות ובקשות',    block:'suggestions', hint:'מישהו מחכה לתשובה.', sub:'others'},
+  {key:'suggestions', label:'הצעות ובקשות',    block:'suggestions', sub:'others',
+   hint:'הצעות ובקשות הן לרוב העדפה של מישהו אחר, לא צורך ולא הכרח. מותר להתחשב גם בעצמי, מותר לומר גם לא, ומותר לשאול — מה אני מעדיף שיקרה?'},
   {key:'dilemmas',    label:'התלבטויות',       block:'suggestions', hint:'משהו שעוד לא הוכרע.', sub:'general'},
 ];
 let activePlanKind = 'dreams';
@@ -9404,7 +9410,7 @@ function renderSuggestions(){
     <li class="suggestion-li ${s.done?'suggestion-done':''}" data-drag-id="${s.id}">
       <div class="sugg-line">
         <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
-        <span class="task-text" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
+        <span class="task-text" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}<span class="prefers-inline">${s.who?'מעדיף ש -':'מעדיפים ש -'}</span> ${escapeHtml(s.text)}</span>
         <span class="del-task" onclick="deleteSuggestion('${s.id}')" title="מחיקה">✕</span>
       </div>
       <div class="sugg-opts">
