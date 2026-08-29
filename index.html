@@ -11103,7 +11103,7 @@ function bodyCheckPanelHtml(kind, id, opts){
     </div>`}
     ${showReminderBtn ? `
       <button type="button" class="bc-reminder-btn" onclick="showSelfChoiceReminder('${kind}','${id}')">❤️‍🩹 תזכורת לבחור בעצמי</button>
-      ${shown!==null ? `<div class="bc-reminder-shown">${shown ? escapeHtml(shown) : 'עוד אין תזכורות בבנק — אפשר להוסיף אחת בסקציה "תזכורות לעצמי" (01).'}</div>` : ''}
+      ${shown!==null ? `<div class="bc-reminder-shown">${shown ? escapeHtml(shown) : 'עוד אין תזכורות בבנק — אפשר להוסיף אחת בסקציה "תובנות".'}</div>` : ''}
     ` : ''}
   </div>`;
 }
@@ -11204,10 +11204,13 @@ function resetPendingBodyCheck(kind){
 }
 
 /* ---------- reflection (insight banks) ---------- */
+/* The question used to be a heading with an empty box under it asking "מה עולה לך?" -- two
+   prompts for one answer, and the real question sat above the place you write. Now the question
+   is the placeholder: one thing on screen, and it is the thing being asked. */
 const REFLECT_QUESTIONS = [
+  {key:'insights', icon:'💡', label:'תובנות מהיום/השבוע'},
   {key:'fed', icon:'🟢', label:'מה הזין אותי היום/השבוע?'},
-  {key:'hard', icon:'🪫', label:'איפה הרגשתי עומס יתר / התרוקנות של אנרגיה?'},
-  {key:'insights', icon:'💡', label:'תובנות מהיום/השבוע'}
+  {key:'hard', icon:'🪫', label:'איפה הרגשתי עומס יתר / התרוקנות של אנרגיה?'}
 ];
 const expandedBanks = new Set();
 function weekKey(){ return ymd(currentWeekDates()[0]); }
@@ -11224,7 +11227,7 @@ function renderReflection(){
   }
   const fold = host && host.querySelector('.tools-card-fold');
   const open = isToolCardOpen('reflection');
-  if(fold) fold.textContent = `${open?'▾':'▸'} 📝 תזכורות לעצמי`;
+  if(fold) fold.textContent = `${open?'▾':'▸'} 📝 תובנות`;
   const wrap = document.getElementById('reflectionCardWrap');
   if(wrap) wrap.style.display = open ? '' : 'none';
   const el = document.getElementById('reflectionCard');
@@ -11243,8 +11246,7 @@ function renderReflection(){
           <span class="del-task" onclick="deleteBankEntry('${q.key}','${e.id}')" title="מחיקה">✕</span>
         </div>`).join('')}</div>` : '<div class="empty">עוד אין תובנות בבנק הזה</div>') : '';
     return `<div class="reflect-q">
-      <label>${q.icon} ${q.label}</label>
-      <textarea id="reflect-${q.key}" placeholder="מה עולה לך?"></textarea>
+      <textarea id="reflect-${q.key}" placeholder="${escapeAttr(q.icon + ' ' + q.label)}"></textarea>
       <div class="reflect-actions" onclick="toggleBank('${q.key}')">
         <button class="reflect-add-btn" onclick="event.stopPropagation(); addReflectionEntry('${q.key}')">+ הוסף תובנה</button>
         <span class="bank-toggle">${isOpen?'▾':'▸'} בנק תובנות (${entries.length})</span>
@@ -11291,9 +11293,8 @@ function renderSelfChoiceRemindersSection(){
         <span class="del-task" onclick="deleteSelfChoiceReminder('${e.id}')" title="מחיקה">✕</span>
       </div>`).join('')}</div>` : '<div class="empty">עוד אין תזכורות בבנק הזה</div>') : '';
   return `<div class="reflect-q">
-    <label>❤️‍🩹 תזכורות לבחור בעצמי</label>
     <div class="hint" style="margin:-2px 0 8px;">משפטים שכותבים ברגע רגוע, לרגע שבו קשה לבחור בעצמך.</div>
-    <textarea id="reflect-selfChoice" placeholder="מה הייתי רוצה להזכיר לעצמי?"></textarea>
+    <textarea id="reflect-selfChoice" placeholder="❤️‍🩹 מה הייתי רוצה להזכיר לעצמי, לרגע שבו קשה לבחור בעצמי?"></textarea>
     <div class="reflect-actions" onclick="toggleBank('selfChoice')">
       <button class="reflect-add-btn" onclick="event.stopPropagation(); addSelfChoiceReminder()">+ הוסף תזכורת</button>
       <span class="bank-toggle">${isOpen?'▾':'▸'} בנק תזכורות (${entries.length})</span>
