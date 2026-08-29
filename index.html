@@ -3467,15 +3467,17 @@
   /* משימות and עוגנים: how you look at the list, and the button that adds to it, on one line.
      `.add-row` re-wraps and re-gaps these rows from the mobile layer, so the intent is restated
      here where it wins on source order. */
-  /* "תצוגה" names the menus from its own small line above them, and a hairline keeps the action
-     button from reading as one of them */
-  .view-controls{ display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
-  .view-controls > .control-label{ font-size:11px; color:var(--muted2); }
+  /* "תצוגה" sits over the menus it names -- and only over them. It was above "+ הוסף", which it
+     does not name, because it and the row were stacked as a whole; now it shares a column with
+     the menus, beside the button. */
+  .view-controls-row > .view-menus{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .view-menus > .control-label{ font-size:11px; color:var(--muted2); }
+  .view-menus-row{ display:flex; gap:4px; align-items:center; min-width:0; }
   .view-divider{
     flex:0 0 auto; width:1px; align-self:stretch; margin-inline:2px;
     background:var(--border-strong); opacity:.7;
   }
-  .view-controls-row{ flex-wrap:nowrap; gap:4px; align-items:center; margin-bottom:0; }
+  .view-controls-row{ flex-wrap:nowrap; gap:4px; align-items:center; margin-bottom:10px; }
 
   /* As drawn: the task's own words get the first line to themselves, and everything you can do
      with it lines up underneath. With four pills sharing the line the title was being squeezed
@@ -3500,7 +3502,7 @@
      invisible to any measurement -- on a row holding three menus, a label and a button it was
      eating ~14px of every name. appearance:none hands it back, and the arrow goes with it: a menu
      that says "כל הנושאים" is readable as a menu without one, and the pixels go to the names. */
-  .view-controls-row > select{
+  .view-menus-row > select{
     flex:1 1 0; min-width:0; font-size:11px;
     appearance:none; -webkit-appearance:none;
     padding-inline:6px;
@@ -3512,13 +3514,9 @@
   /* The topics menu is the only one whose text isn't fixed -- it has to hold whatever a topic is
      called -- so it takes the lion's share, and the two menus with known, short labels take only
      what those labels need. */
-  .view-controls-row > #taskSortBy{ flex:0.9 1 0; }
-  .view-controls-row > #taskFilterDomain{ flex:2.3 1 0; }
-  .view-controls-row > #taskFilterRange{ flex:0.75 1 0; }
-  /* the button leads the row; "תצוגה" names the menus that follow it */
-  .view-controls-row .control-label{
-    flex:0 0 auto; font-size:11px; color:var(--muted2); white-space:nowrap;
-  }
+  .view-menus-row > #taskSortBy{ flex:0.9 1 0; }
+  .view-menus-row > #taskFilterDomain{ flex:2.3 1 0; }
+  .view-menus-row > #taskFilterRange{ flex:0.75 1 0; }
   /* the add button is rendered into a wrapper; let the button itself be the flex item */
   .view-controls-row > #taskAddRowWrap{ display:contents; }
 
@@ -3539,11 +3537,11 @@
   ul.tasks li.possibility-li .task-text{ flex:1; min-width:0; }
   /* looking at the list, as opposed to adding to it */
   .list-controls-row{ margin-bottom:10px; }
-  .list-controls-row select{ flex:1 1 0; min-width:0; }
+  .list-controls-row .view-menus-row > select{ flex:1 1 0; min-width:0; }
   /* the button is the smallest of the three, so it gives up the width the two selects need to
      show their labels rather than clipping them to "כל הנוׂ" */
   .list-controls-row .reset-btn{ flex-shrink:0; padding:8px 8px; font-size:12px; }
-  .list-controls-row select{ padding-inline:6px 20px; font-size:13px; }
+  .list-controls-row .view-menus-row > select{ padding-inline:6px 20px; font-size:13px; }
 
   #timelineTodayBtn.active{ background:var(--gold); color:#241a06; border-color:transparent; font-weight:600; }
 
@@ -4070,11 +4068,12 @@
 
       <div id="scheduleTabTasks" style="display:none;">
         <div class="card">
-          <div class="view-controls">
-          <span class="control-label">תצוגה</span>
           <div class="add-row view-controls-row">
             <span id="taskAddRowWrap"></span>
             <span class="view-divider"></span>
+            <div class="view-menus">
+            <span class="control-label">תצוגה</span>
+            <div class="view-menus-row">
             <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
               <option value="manual">ידני</option>
               <option value="time" selected>לפי זמן</option>
@@ -4087,7 +4086,8 @@
               <option value="week">השבוע</option>
               <option value="month">החודש</option>
             </select>
-          </div>
+            </div>
+            </div>
           </div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="taskList"></ul>
@@ -4101,10 +4101,7 @@
 
       <div id="scheduleTabAnchors" style="display:none;">
         <div class="card">
-          <div class="view-controls">
-            <span class="control-label" id="anchorViewLabel">תצוגה</span>
-            <div class="add-row view-controls-row" id="anchorAddRowWrap"></div>
-          </div>
+          <div class="add-row view-controls-row" id="anchorAddRowWrap"></div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="anchorsList"></ul>
         </div>
@@ -4139,14 +4136,20 @@
         <button onclick="addSomeday()">הוסף</button>
       </div>
       <!-- and one row to look at it with: which topics, in what order, how much of it -->
-      <div class="add-row list-controls-row">
-        <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
-        <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
-          <option value="manual">לפי סדר ידני</option>
-          <option value="date">לפי תאריך</option>
-          <option value="domain" selected>לפי נושא</option>
-        </select>
-        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">▾ הרחב רשימה</button>
+      <div class="section-divider"></div>
+      <div class="add-row view-controls-row list-controls-row">
+        <div class="view-menus">
+          <span class="control-label">תצוגה</span>
+          <div class="view-menus-row">
+            <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
+            <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
+              <option value="manual">לפי סדר ידני</option>
+              <option value="date">לפי תאריך</option>
+              <option value="domain" selected>לפי נושא</option>
+            </select>
+            <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">▾ הרחב רשימה</button>
+          </div>
+        </div>
       </div>
       <div class="section-divider"></div>
       <ul class="tasks scroll-cap" id="somedayList"></ul>
@@ -9727,18 +9730,18 @@ function renderAnchorsTab(){
   if(!el) return;
   const addRowWrap = document.getElementById('anchorAddRowWrap');
   // adding comes first, then how you are looking at what is already there -- same order as משימות
+  const filterHtml = anchorFilterHtml();
   if(addRowWrap) addRowWrap.innerHTML =
     `<button type="button" class="add-anchor-btn" onclick="addFromTab(${new Date().getDay()}, '', true)">+ הוסף</button>`
-    + (anchorFilterHtml() ? `<span class="view-divider"></span>` + anchorFilterHtml() : '');
+    + (filterHtml ? `<span class="view-divider"></span>
+        <div class="view-menus"><span class="control-label">תצוגה</span>
+        <div class="view-menus-row">${filterHtml}</div></div>` : '');
   const list = data.anchors.filter(a => !anchorFilterDomain || a.domain === anchorFilterDomain).sort((a,b)=>{
     const da = (a.repeatType||'weekly')==='weekly' ? a.day : 7;
     const db = (b.repeatType||'weekly')==='weekly' ? b.day : 7;
     if(da!==db) return da-db;
     return (a.time||'').localeCompare(b.time||'');
   });
-  // no topics in use yet means no menus, and then there is nothing for "תצוגה" to name
-  const viewLabel = document.getElementById('anchorViewLabel');
-  if(viewLabel) viewLabel.style.display = anchorFilterHtml() ? '' : 'none';
   el.innerHTML = list.length ? list.map(anchorRowHtml).join('')
     : `<li class="empty">${anchorFilterDomain ? 'אין עוגנים בנושא הזה' : 'אין עדיין עוגנים קבועים'}</li>`;
 }
