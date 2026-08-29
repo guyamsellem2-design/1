@@ -4543,7 +4543,25 @@ function updateUndoRedoButtons(){
 // chip-headers/item-sublists themselves, since those ARE the top level there) -- those alone already
 // answer "is anything open on this tab", so sub-toggles inside an already-closed block don't need
 // their own separate tracking for this check.
+/* Which list the floating "מזער הכל" is looking at in טיוטות -- two of the four lenses share the
+   someday list, the other two each have their own. */
+function planListKeyOf(kind){
+  return planBlockOf(kind)==='someday' ? 'someday' : (kind==='suggestions' ? 'suggestion' : 'dilemma');
+}
+function planDetailsRowOpen(id){
+  const el = document.getElementById(id);
+  return !!el && el.style.display !== 'none' && el.style.display !== '';
+}
 function isEverythingCollapsedOnCurrentView(){
+  if(mainView==='plan'){
+    if(listExpandState[planListKeyOf(activePlanKind)]) return false;
+    if(editingSomedayId || editingSuggestionId || editingDilemmaId) return false;
+    if(expandedSomeday.size || bodyCheckOpenIds.size || decisionHelperOpenIds.size || answerDraftOpenIds.size) return false;
+    if(pendingSomedayDescOpen || pendingSomedaySubtasksOpen) return false;
+    if(['someday','suggestion','dilemma'].some(k=>pendingBodyCheckOpen[k])) return false;
+    if(planDetailsRowOpen('suggDetailsFields') || planDetailsRowOpen('dilemmaDetailsFields')) return false;
+    return true;
+  }
   if(mainView==='home'){
     if(SECTION_KEYS.some(k=>!isSectionCollapsed(k))) return false;
     return !feelBlockOpen && !todayIdeasOpen;
@@ -4609,6 +4627,19 @@ function collapseAllOnCurrentView(){
     feelNoteMinimized.add('procTrueWant');
     renderProcrastinationBlock();
     renderInspiringVideos();
+  } else if(mainView==='plan'){
+    // one list, but plenty that can be standing open on top of it: the list itself unfolded, an
+    // item being edited, a description, a body-check, a decision helper, a date row
+    listExpandState[planListKeyOf(activePlanKind)] = false;
+    editingSomedayId = null; editingSuggestionId = null; editingDilemmaId = null;
+    expandedSomeday.clear();
+    bodyCheckOpenIds.clear(); decisionHelperOpenIds.clear(); answerDraftOpenIds.clear();
+    pendingSomedayDescOpen = false; pendingSomedaySubtasksOpen = false;
+    ['someday','suggestion','dilemma'].forEach(k=>{ pendingBodyCheckOpen[k] = false; renderPendingBodyCheck(k); });
+    ['suggDetailsFields','dilemmaDetailsFields'].forEach(id=>{ const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+    renderPendingSomedayDesc();
+    renderPendingSomedaySubtasks();
+    planRenderActive();
   } else if(mainView==='topics'){
     if(activeNoteDomain){
       collapseUnpinnedNotesForTopic(activeNoteDomain);
@@ -7757,6 +7788,7 @@ function applyListCap(key, itemCount){
   if(btn) btn.innerHTML = `<span class="chev">${expanded?'▴':'▾'}</span> ${expanded?'כווץ בחזרה':'הרחב רשימה'}`;
   // a twin of the same toggle, up at the top of the list (next to the sort/filter row) -- so
   // collapsing back doesn't require scrolling all the way down to the bottom-edge button first
+  updateCollapseAllButton();
   const topBtn = document.getElementById(key+'TopMinimizeBtn');
   if(topBtn){
     topBtn.style.display = needsCap ? '' : 'none';
@@ -9705,6 +9737,7 @@ let pendingSomedayDesc = '';
 function togglePendingSomedayDesc(){
   pendingSomedayDescOpen = !pendingSomedayDescOpen;
   renderPendingSomedayDesc();
+  updateCollapseAllButton();
 }
 function onPendingSomedayDescInput(val){ pendingSomedayDesc = val; }
 function renderPendingSomedayDesc(){
@@ -9726,6 +9759,7 @@ let pendingSomedaySubtasks = [];
 function togglePendingSomedaySubtasks(){
   pendingSomedaySubtasksOpen = !pendingSomedaySubtasksOpen;
   renderPendingSomedaySubtasks();
+  updateCollapseAllButton();
 }
 function addPendingSomedaySubtask(){
   const input = document.getElementById('pendingSomedaySubInput');
@@ -10006,6 +10040,7 @@ function saveSuggestionEdit(id){
 function toggleSuggDetails(){
   const fields = document.getElementById('suggDetailsFields');
   fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
+  updateCollapseAllButton();
 }
 function addSuggestion(){
   const whoInput = document.getElementById('suggWho');
@@ -10098,6 +10133,7 @@ function generalDilemmasSubViewHtml(){
 function toggleDilemmaDetails(){
   const fields = document.getElementById('dilemmaDetailsFields');
   fields.style.display = fields.style.display==='none' ? 'flex' : 'none';
+  updateCollapseAllButton();
 }
 function addGeneralDilemma(){
   const textInput = document.getElementById('dilemmaText');
@@ -10816,6 +10852,7 @@ let pendingBodyCheckOpen = { task:false, someday:false, suggestion:false, dilemm
 function togglePendingBodyCheck(kind){
   pendingBodyCheckOpen[kind] = !pendingBodyCheckOpen[kind];
   renderPendingBodyCheck(kind);
+  updateCollapseAllButton();
 }
 function pendingBodyCheckToggleBtnHtml(kind){
   const bc = pendingBodyCheck[kind];
