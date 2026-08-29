@@ -3342,11 +3342,54 @@
   #planHost .plan-section-head .reset-btn{ align-self:flex-end; flex-shrink:0; }
   /* `.add-row button` paints every button in the row gold, which made "+ תאריך תשובה" -- a toggle
      for a detail you may not even want -- look exactly as much like the action as "הוסף" does */
+  #planHost .add-row .reset-btn{
+    background:transparent; border:1px solid var(--border-strong); color:var(--muted2);
+    font-weight:400; box-shadow:none;
+  }
   #dilemmasSectionBody .add-row .add-domain-btn{
     background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
     font-weight:400; box-shadow:none;
   }
   #dilemmasSectionBody .add-row .add-domain-btn:hover{ color:var(--text); border-color:var(--muted); }
+
+  .plan-head-actions{ display:flex; gap:8px; align-self:flex-end; }
+  /* in the רעיונות וחלומות lens the body-check has nothing to weigh: a dream is not somebody
+     asking you for something. the field stays on the record, only the prompt goes away. */
+  #planView.lens-dreams .dreams-hidden{ display:none; }
+
+  /* nothing on screen but the list and what you can do with it */
+  #planView.select-mode #planHost .add-row,
+  #planView.select-mode #planHost .section-divider,
+  #planView.select-mode #planHost .list-expand-row,
+  #planView.select-mode #planHost [id^="pendingBodyCheck-"],
+  #planView.select-mode #planHost [id^="pendingSomeday"]{ display:none; }
+
+  ul.tasks li.plan-pick-li{ cursor:pointer; gap:10px; }
+  .plan-pick-li .task-text{ flex:1; min-width:0; }
+  .plan-pick-li .pick-who{ font-size:12px; color:var(--muted2); flex-shrink:0; }
+  .plan-pick-li .pick-box{
+    width:22px; height:22px; flex-shrink:0; border-radius:6px;
+    border:1.5px solid var(--border-strong); background:var(--surface2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; color:#241a06; line-height:1;
+  }
+  .plan-pick-li.picked .pick-box{ background:var(--gold); border-color:transparent; font-weight:700; }
+  .plan-pick-li.picked{ background:rgba(212,162,76,.10); }
+
+  .plan-bulk{
+    background:var(--surface); border:1px solid var(--border-strong); border-radius:14px;
+    padding:10px 12px; margin:10px 0 0; display:flex; flex-direction:column; gap:8px;
+  }
+  .plan-bulk-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .plan-bulk-count{ font-size:13px; color:var(--muted); margin-inline-end:auto; }
+  .plan-bulk-btn{
+    font-family:inherit; font-size:12.5px; color:var(--text);
+    background:var(--surface2); border:1px solid var(--border-strong);
+    border-radius:var(--r-pill); padding:6px 12px; cursor:pointer; white-space:nowrap;
+  }
+  .plan-bulk-btn:disabled{ opacity:.4; cursor:default; }
+  .plan-bulk-btn.danger:not(:disabled){ color:#c0453f; border-color:rgba(192,69,63,.5); }
+  .plan-move-menu{ border-top:1px dashed var(--border-strong); padding-top:8px; }
 
   /* the page is the only scroller: no inner box, so a swipe that starts on a row moves the page */
   ul.tasks.scroll-cap{ overflow:visible; max-height:none; }
@@ -3892,7 +3935,10 @@
   <section data-plan-block="someday">
     <div class="section-head plan-section-head">
       <div class="hint" id="somedayHint">לכתוב ולשחרר. בלי מועד, בלי התחייבות.</div>
-      <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
+      <div class="plan-head-actions">
+        <button class="reset-btn" onclick="togglePlanSelectMode()">✏ עריכה</button>
+        <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
+      </div>
     </div>
     <div id="secbody-someday">
     <div class="card">
@@ -3902,7 +3948,7 @@
         <button onclick="addSomeday()">הוסף</button>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-        <div id="pendingBodyCheck-someday"></div>
+        <div id="pendingBodyCheck-someday" class="dreams-hidden"></div>
         <div id="pendingSomedayDescWrap"></div>
         <div id="pendingSomedaySubtasksWrap"></div>
       </div>
@@ -3925,7 +3971,10 @@
   <section data-plan-block="suggestions">
     <div class="section-head plan-section-head">
       <div class="hint" id="suggestionsHint">הצעות ובקשות הן לרוב העדפה של מישהו אחר, לא צורך ולא הכרח. מותר להתחשב גם בעצמי, מותר לומר גם לא, ומותר לשאול — מה אני מעדיף שיקרה?</div>
-      <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
+      <div class="plan-head-actions">
+        <button class="reset-btn" onclick="togglePlanSelectMode()">✏ עריכה</button>
+        <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
+      </div>
     </div>
     <div id="secbody-suggestions">
     <div class="card">
@@ -3995,6 +4044,7 @@
     </div>
   </div>
   <div class="topic-tab-strip" id="planTabStrip"></div>
+  <div id="planBulkBar"></div>
   <div id="planHost"></div>
 </div>
 
@@ -5264,6 +5314,9 @@ function movePlanBlocksIntoPlanView(){
   planBlocksMoved = true;
 }
 function setPlanKind(key){
+  // a selection belongs to the list it was made in -- carrying it across would mean deleting rows
+  // you can no longer see
+  if(key !== activePlanKind){ planSelected.clear(); planMoveMenuOpen = false; }
   activePlanKind = key;
   const kind = PLAN_KINDS.find(k=>k.key===key) || PLAN_KINDS[0];
   const block = kind.block;
@@ -5282,9 +5335,161 @@ function setPlanKind(key){
   // no heading -- the chip already names the lens, so the one line left says what it is FOR
   const hint = document.getElementById(block === 'someday' ? 'somedayHint' : 'suggestionsHint');
   if(hint) hint.textContent = kind.hint;
+  const view = document.getElementById('planView');
+  if(view){
+    view.classList.toggle('lens-dreams', key === 'dreams');
+    view.classList.toggle('select-mode', planSelectMode);
+  }
   renderPlanPanes();
   renderPlanStrip();
+  renderPlanBulkBar();
   rememberView();
+}
+/* ---------- picking several at once ----------
+   These four lists were filled in over a long time, under names that have since changed, so most
+   of what is in them is in the wrong one -- and moving a hundred items one at a time is not a
+   thing anyone does. "עריכה" turns the list into a plain pick list: tap rows, then move them all
+   somewhere else or delete them together.
+
+   Moving keeps the whole item and only adds what the destination needs, so a field the new list
+   has no place for (a description, a "מי הציע") is still there if you move it back. Both actions
+   go through saveData(), so the app's own ↶ undoes a whole batch in one press. */
+let planSelectMode = false;
+const planSelected = new Set();
+let planMoveMenuOpen = false;
+
+function planItemsOf(kind){
+  if(kind==='dreams')       return (data.someday||[]).filter(x=>!!x.dream);
+  if(kind==='somedayTasks') return (data.someday||[]).filter(x=>!x.dream);
+  if(kind==='suggestions')  return data.suggestions || (data.suggestions = []);
+  return data.generalDilemmas || (data.generalDilemmas = []);
+}
+function planRenderActive(){
+  if(planBlockOf(activePlanKind)==='someday') renderSomeday();
+  else if(activePlanKind==='suggestions') renderSuggestions();
+  else renderGeneralDilemmaList();
+}
+function togglePlanSelectMode(){
+  planSelectMode = !planSelectMode;
+  planSelected.clear();
+  planMoveMenuOpen = false;
+  const view = document.getElementById('planView');
+  if(view) view.classList.toggle('select-mode', planSelectMode);
+  planRenderActive();
+  renderPlanBulkBar();
+}
+function togglePlanPick(id){
+  if(planSelected.has(id)) planSelected.delete(id); else planSelected.add(id);
+  planRenderActive();
+  renderPlanBulkBar();
+}
+function planPickAll(){
+  const ids = planItemsOf(activePlanKind).map(x=>x.id);
+  // one button for both directions: if everything is already picked, this clears the selection
+  const allPicked = ids.length>0 && ids.every(id=>planSelected.has(id));
+  planSelected.clear();
+  if(!allPicked) ids.forEach(id=>planSelected.add(id));
+  planRenderActive();
+  renderPlanBulkBar();
+}
+function planPickRowHtml(item, tailHtml){
+  const picked = planSelected.has(item.id);
+  return `<li class="plan-pick-li ${picked?'picked':''}" onclick="togglePlanPick('${item.id}')">
+    <span class="pick-box">${picked?'✓':''}</span>
+    <span class="task-text">${escapeHtml(item.text||'')}</span>
+    ${tailHtml||''}
+  </li>`;
+}
+function renderPlanBulkBar(){
+  const el = document.getElementById('planBulkBar');
+  if(!el) return;
+  if(!planSelectMode || mainView!=='plan'){ el.innerHTML = ''; return; }
+  const n = planSelected.size;
+  const total = planItemsOf(activePlanKind).length;
+  const allPicked = total>0 && n===total;
+  const targets = PLAN_KINDS.filter(k=>k.key!==activePlanKind);
+  el.innerHTML = `
+    <div class="plan-bulk">
+      <div class="plan-bulk-row">
+        <span class="plan-bulk-count">${n ? `נבחרו ${n}` : 'לבחור מהרשימה'}</span>
+        <button type="button" class="plan-bulk-btn" onclick="planPickAll()">${allPicked?'לבטל הכל':'לבחור הכל'}</button>
+        <button type="button" class="plan-bulk-btn" onclick="togglePlanMoveMenu()" ${n?'':'disabled'}>העבר ל- ▾</button>
+        <button type="button" class="plan-bulk-btn danger" onclick="planDeletePicked()" ${n?'':'disabled'}>מחק</button>
+        <button type="button" class="plan-bulk-btn" onclick="togglePlanSelectMode()">סיום</button>
+      </div>
+      ${planMoveMenuOpen && n ? `<div class="plan-bulk-row plan-move-menu">
+        ${targets.map(t=>`<button type="button" class="plan-bulk-btn" onclick="planMovePicked('${t.key}')">${escapeHtml(t.label)}</button>`).join('')}
+      </div>` : ''}
+    </div>`;
+}
+function togglePlanMoveMenu(){
+  planMoveMenuOpen = !planMoveMenuOpen;
+  renderPlanBulkBar();
+}
+function planRemoveIds(kind, ids){
+  const set = new Set(ids);
+  if(kind==='dreams' || kind==='somedayTasks') data.someday = (data.someday||[]).filter(x=>!set.has(x.id));
+  else if(kind==='suggestions') data.suggestions = (data.suggestions||[]).filter(x=>!set.has(x.id));
+  else data.generalDilemmas = (data.generalDilemmas||[]).filter(x=>!set.has(x.id));
+}
+/* every field of the original survives the move -- only the ones the destination needs are added
+   or corrected, so nothing is quietly thrown away on the way across */
+function planAdaptItem(item, toKind){
+  const it = {...item};
+  if(toKind==='dreams' || toKind==='somedayTasks'){
+    it.dream = (toKind==='dreams');
+    // somedayRowHtml paints a colour from this, so it has to name a topic that still exists
+    if(!data.domains.some(d=>d.id===it.domain)) it.domain = (data.domains[0] && data.domains[0].id) || '';
+    if(!Array.isArray(it.subtasks)) it.subtasks = [];
+    if(typeof it.description !== 'string') it.description = '';
+    if(typeof it.favorite !== 'boolean') it.favorite = false;
+    if(typeof it.createdAt !== 'number') it.createdAt = Date.now();
+  } else if(toKind==='suggestions'){
+    delete it.dream;
+    if(typeof it.who !== 'string') it.who = '';
+    if(typeof it.answered !== 'boolean') it.answered = false;
+    if(typeof it.replyDate !== 'string') it.replyDate = '';
+    if(typeof it.replyTime !== 'string') it.replyTime = '';
+  } else {
+    delete it.dream;
+    if(typeof it.domain !== 'string') it.domain = '';
+    if(typeof it.decisionDate !== 'string') it.decisionDate = '';
+  }
+  if(typeof it.done !== 'boolean') it.done = false;
+  if(!it.bodyCheck || typeof it.bodyCheck !== 'object') it.bodyCheck = {};
+  return it;
+}
+function planMovePicked(toKind){
+  const ids = [...planSelected];
+  if(!ids.length) return;
+  const from = activePlanKind;
+  const picked = planItemsOf(from).filter(x=>planSelected.has(x.id));
+  planRemoveIds(from, ids);
+  const moved = picked.map(it=>planAdaptItem(it, toKind));
+  if(toKind==='dreams' || toKind==='somedayTasks') data.someday = (data.someday||[]).concat(moved);
+  else if(toKind==='suggestions') data.suggestions = (data.suggestions||[]).concat(moved);
+  else data.generalDilemmas = (data.generalDilemmas||[]).concat(moved);
+  planSelected.clear();
+  planMoveMenuOpen = false;
+  saveData();
+  const label = (PLAN_KINDS.find(k=>k.key===toKind)||{}).label || '';
+  flashStatus(`${moved.length} עברו ל"${label}"`);
+  planRenderActive();
+  renderPlanBulkBar();
+  renderPlanStrip();
+}
+function planDeletePicked(){
+  const ids = [...planSelected];
+  if(!ids.length) return;
+  if(!confirm(`למחוק ${ids.length} פריטים? אפשר לבטל אחר כך עם ↶.`)) return;
+  planRemoveIds(activePlanKind, ids);
+  ids.forEach(id=>{ expandedSomeday.delete(id); });
+  planSelected.clear();
+  saveData();
+  flashStatus(`${ids.length} נמחקו`);
+  planRenderActive();
+  renderPlanBulkBar();
+  renderPlanStrip();
 }
 function renderPlanPanes(){
   const block = planBlockOf(activePlanKind);
@@ -7378,6 +7583,8 @@ function ensureListExpanded(key){
    long list doesn't eat the screen -- but the page stays the only thing that scrolls, and a finger
    anywhere on it moves the page. "הצג את כל הרשימה" now really does show the rest. */
 function applyRowCap(listEl, capped){
+  // while picking, the cap is off: the whole point is to go through everything at once
+  if(planSelectMode) capped = false;
   let shown = 0, past = false;
   for(const el of listEl.children){
     el.classList.remove('capped-hidden');
@@ -7395,7 +7602,7 @@ function applyListCap(key, itemCount){
   const expandRow = document.getElementById(key+'ListExpandRow');
   if(!listEl || !expandRow) return;
   listEl.dataset.itemCount = itemCount;
-  const needsCap = itemCount > LIST_CAP_THRESHOLD;
+  const needsCap = itemCount > LIST_CAP_THRESHOLD && !planSelectMode;
   const expanded = listExpandState[key];
   listEl.classList.toggle('capped', needsCap && !expanded);
   applyRowCap(listEl, needsCap && !expanded);
@@ -9117,6 +9324,7 @@ function renderSomeday(){
     const parts = [];
     let dividerInserted = false;
     list.forEach((s,i)=>{
+      if(planSelectMode){ parts.push(planPickRowHtml(s)); return; }
       if(!dividerInserted && i>0 && list[i-1].favorite && !s.favorite){
         parts.push('<li class="fav-divider"></li>');
         dividerInserted = true;
@@ -9142,7 +9350,7 @@ function somedayRowHtml(s){
     <select class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};" onclick="event.stopPropagation()" onchange="quickChangeSomedayDomain('${s.id}', this.value)" title="שינוי נושא">${domainOptions(s.domain)}</select>
     <span class="expand-btn ${hasContent?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')" title="תיאור וצעדים קטנים">${isExpanded?'▾':'▸'} תיאור${subCount?' · '+subCount:''}</span>
     <span class="del-task" onclick="deleteSomeday('${s.id}')" title="מחיקה">✕</span>
-    ${bodyCheckStatusBadgesHtml(s, {})}
+    ${activePlanKind==='dreams' ? '' : bodyCheckStatusBadgesHtml(s, {})}
   </li>`;
   if(isExpanded) html += somedayDetailHtml(s);
   return html;
@@ -9156,10 +9364,10 @@ function somedayEditFormHtml(s){
         <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
       </div>
       <div class="edit-form-row">
-        ${bodyCheckToggleBtnHtml('someday', s.id)}
+        ${activePlanKind==='dreams' ? '' : bodyCheckToggleBtnHtml('someday', s.id)}
         <span class="expand-btn ${isExpanded?'has-content':''}" onclick="toggleSomedayExpand('${s.id}')">${isExpanded?'▾':'▸'} תיאור</span>
       </div>
-      ${bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {hideNote:true}) : ''}
+      ${activePlanKind!=='dreams' && bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {hideNote:true}) : ''}
       ${isExpanded ? somedayDescSubtasksHtml(s) : ''}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
@@ -9502,6 +9710,7 @@ function renderSuggestions(){
   }
   const sorted = data.suggestions.slice().sort((a,b)=>suggestionSortWeight(a)-suggestionSortWeight(b));
   el.innerHTML = sorted.map(s=>{
+    if(planSelectMode) return planPickRowHtml(s, s.who?`<span class="pick-who">${escapeHtml(s.who)}</span>`:'');
     if(editingSuggestionId===s.id) return suggestionEditFormHtml(s);
     return `
     <li class="suggestion-li ${s.done?'suggestion-done':''}" data-drag-id="${s.id}">
@@ -10023,6 +10232,7 @@ function renderGeneralDilemmaList(){
   }
   const sorted = list.slice().sort((a,b)=>suggestionSortWeight(a)-suggestionSortWeight(b));
   el.innerHTML = sorted.map(d=>{
+    if(planSelectMode) return planPickRowHtml(d);
     if(editingDilemmaId===d.id) return dilemmaEditFormHtml(d);
     const dom = d.domain ? domainById(d.domain) : null;
     return `
