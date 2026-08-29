@@ -422,7 +422,10 @@
   .anchor-form-actions{display:flex; gap:6px; flex-wrap:wrap;}
   .anchor-form-actions button{flex:1; font-size:13.5px; padding:5px; border-radius:6px; border:none; cursor:pointer; font-family:inherit;}
   .save-btn{background:var(--gold); color:#1a1206; font-weight:600;}
-  .cancel-btn{background:var(--gold); color:#1a1206; font-weight:600;}
+  /* it sat in gold right beside "שמירה", so the two read as an equal pair and the one that
+     throws your typing away was as loud as the one that keeps it */
+  .cancel-btn{background:transparent; color:var(--muted); font-weight:500; border:1px solid var(--border-strong);}
+  .cancel-btn:hover{color:var(--text); border-color:var(--muted);}
   .delete-btn{background:#7d1f2e; color:#fbe6e6; font-weight:600;}
 
   .card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px; transition:box-shadow .3s ease;}
@@ -3457,6 +3460,13 @@
   .add-row .reset-btn:hover{ color:var(--text); border-color:var(--muted); }
   .add-row .subtask-toggle-btn.has-content{ color:var(--gold); border-color:var(--gold); border-style:solid; }
 
+  /* the two destination menus share the line under the world tabs */
+  #captureNoteDest{ margin-bottom:10px; }
+  #captureNoteDest .schedule-tabs{ margin-bottom:8px; }
+  .capture-dest-row{ margin-bottom:0; }
+  .capture-dest-row select{ flex:1 1 0; min-width:0; }
+  .schedule-tab-btn:disabled{ opacity:.45; cursor:default; }
+
   ul.tasks li.possibility-li{ flex-direction:row; align-items:center; gap:9px; }
   ul.tasks li.possibility-li .task-text{ flex:1; min-width:0; }
   /* looking at the list, as opposed to adding to it */
@@ -3859,6 +3869,12 @@
 <div class="inbox-capture-sheet" id="inboxCaptureSheet" style="display:none;">
   <div class="timeline-sheet-handle"></div>
   <div class="inbox-capture-label">מה עולה לך?</div>
+  <!-- only for a note: where it lands. The same two worlds as the notebook's own tabs, then the
+       container, then its sub-heading if that container has any. -->
+  <div id="captureNoteDest" style="display:none;">
+    <div class="schedule-tabs" id="captureWorldSwitch"></div>
+    <div class="add-row capture-dest-row" id="captureDestRow"></div>
+  </div>
   <textarea id="inboxCaptureInput" class="inbox-capture-textarea" dir="auto" placeholder="כותבים, וזה נוחת במקום שבחרת." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); commitInboxCapture(); } else if(event.key==='Escape'){ closeInboxCapture(); }"></textarea>
   <div class="timeline-sheet-actions">
     <button type="button" class="save-btn" onclick="commitInboxCapture()">שמירה</button>
@@ -12810,15 +12826,74 @@ const CAPTURE_TITLES = {
   suggestion:'הצעה או בקשה', note:'פתק חדש', dilemma:'התלבטות',
   todayIdea:'משהו שבא לי היום'
 };
+/* Catching a note from the floating ✏ used to drop it wherever you happened to be standing, which
+   is fine when you are already in the right topic and wrong the rest of the time. The sheet now
+   asks the same question the notebook asks -- life-domain or notebook, which one, and which
+   heading inside it -- and starts on where you are, so the common case is still one tap. */
+let captureNoteWorld = 'domain';
+let captureNoteContainer = null;
+let captureNoteHeader = '';
+function captureDestInit(){
+  captureNoteWorld = (activeNoteDomain && worldOfContainer(activeNoteDomain)) || 'domain';
+  if(!containersOfWorld(captureNoteWorld).length) captureNoteWorld = 'domain';
+  captureNoteContainer = (activeNoteDomain && containerById(activeNoteDomain))
+    ? activeNoteDomain : firstContainerOf(captureNoteWorld);
+  captureNoteHeader = '';
+}
+function setCaptureWorld(world){
+  if(captureNoteWorld === world) return;
+  captureNoteWorld = world;
+  captureNoteContainer = firstContainerOf(world);
+  captureNoteHeader = '';
+  renderCaptureNoteDest();
+}
+function setCaptureContainer(id){
+  captureNoteContainer = id;
+  captureNoteHeader = '';
+  renderCaptureNoteDest();
+}
+function setCaptureHeader(id){ captureNoteHeader = id; }
+function renderCaptureNoteDest(){
+  const wrap = document.getElementById('captureNoteDest');
+  if(!wrap) return;
+  if(quickCaptureTarget !== 'note'){ wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  const worlds = [
+    {key:'domain',   label:'🌱 תחומי חיים', list:(data.domains || [])},
+    {key:'notebook', label:'📓 מחברות',     list:notebookList()},
+  ];
+  document.getElementById('captureWorldSwitch').innerHTML = worlds.map(w => `
+    <button type="button" class="schedule-tab-btn ${captureNoteWorld===w.key?'active':''}"
+      ${w.list.length ? '' : 'disabled title="עדיין אין כאן כלום"'}
+      onclick="setCaptureWorld('${w.key}')">${w.label}${w.list.length?` (${w.list.length})`:''}</button>`).join('');
+
+  const containers = containersOfWorld(captureNoteWorld);
+  if(captureNoteContainer && !containers.some(c=>c.id===captureNoteContainer)) captureNoteContainer = containers.length ? containers[0].id : null;
+  const headers = captureNoteContainer ? ensureDomainNoteHeaders(captureNoteContainer) : [];
+  document.getElementById('captureDestRow').innerHTML = `
+    <select id="captureContainerSelect" onchange="setCaptureContainer(this.value)">
+      ${containers.length
+        ? containers.map(c=>`<option value="${c.id}" ${c.id===captureNoteContainer?'selected':''}>${escapeHtml(c.name)}</option>`).join('')
+        : `<option value="">${captureNoteWorld==='notebook' ? 'עדיין אין מחברות' : 'עדיין אין תחומי חיים'}</option>`}
+    </select>
+    ${headers.length ? `<select id="captureHeaderSelect" onchange="setCaptureHeader(this.value)">
+      <option value="">ללא כותרת</option>
+      ${headers.map(h=>`<option value="${h.id}" ${h.id===captureNoteHeader?'selected':''}>${escapeHtml(h.label)}</option>`).join('')}
+    </select>` : ''}`;
+}
 function openInboxCapture(){
   const label = document.querySelector('#inboxCaptureSheet .inbox-capture-label');
   if(label) label.textContent = CAPTURE_TITLES[quickCaptureTarget] || 'תפיסה מהירה';
+  if(quickCaptureTarget === 'note') captureDestInit();
+  renderCaptureNoteDest();
   document.getElementById('inboxCaptureOverlay').style.display = '';
   document.getElementById('inboxCaptureSheet').style.display = '';
   requestAnimationFrame(()=>{ const el = document.getElementById('inboxCaptureInput'); if(el) el.focus(); });
 }
 function closeInboxCapture(){
   quickCaptureTarget = null;
+  const dest = document.getElementById('captureNoteDest');
+  if(dest) dest.style.display = 'none';
   const overlay = document.getElementById('inboxCaptureOverlay'), sheet = document.getElementById('inboxCaptureSheet');
   if(overlay) overlay.style.display = 'none';
   if(sheet) sheet.style.display = 'none';
@@ -12828,8 +12903,10 @@ function commitInboxCapture(){
   const el = document.getElementById('inboxCaptureInput');
   const text = el ? el.value.trim() : '';
   const target = quickCaptureTarget;
+  const container = captureNoteContainer, headerId = captureNoteHeader;
   closeInboxCapture();
   if(!text) return;
+  if(target === 'note'){ finishConvert('note', text, container, {headerId}); return; }
   finishConvert(target || 'dream', text, '');
 }
 function deleteInboxItem(id){
@@ -12958,10 +13035,11 @@ function finishConvert(destKind, text, domain, extra={}){
     const domainId = domain || activeNoteDomain || (data.domains[0] && data.domains[0].id);
     if(!domainId) return;
     const notes = ensureDomainNotes(domainId);
-    notes.unshift({id:uid(), text, color:'', drawing:'', memos:[], pinned:false});
+    const headerId = extra.headerId || '';
+    notes.unshift({id:uid(), text, color:'', drawing:'', memos:[], pinned:false, headerId});
     saveData();
     if(activeNoteDomain===domainId) renderKeepGrid(domainId);
-    flashStatus('נוסף לפתקים');
+    flashStatus(`נוסף ל"${containerName(domainId)}"`);
   }
 }
 // each route both creates the real record in its destination system (same shape the destination's
