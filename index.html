@@ -3336,7 +3336,11 @@
      room, which put the buttons in a different place on every item. Now it is
      always two: what it says, then what you can do about it.
      --------------------------------------------------------------------------- */
-  #planTabStrip{ gap:6px; }
+  /* measured: the header sat flush against the lens chips (0px), and the chips sat 8px above
+     "עריכה / נקה הכל" on the three lenses whose explanation is hidden -- so on those it read as
+     one block of buttons. Both gaps are now the same on all four. */
+  #planView .domain-page-topbar{ margin-bottom:10px; }
+  #planTabStrip{ gap:6px; margin-bottom:14px; }
   #planTabStrip .plan-chip{
     flex:1 1 0; min-width:0; justify-content:center;
     padding:7px 5px; border-radius:12px; text-align:center;
