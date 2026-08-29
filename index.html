@@ -3465,6 +3465,8 @@
   #captureNoteDest .schedule-tabs{ margin-bottom:8px; }
   .capture-dest-row{ margin-bottom:0; }
   .capture-dest-row select{ flex:1 1 0; min-width:0; }
+  .capture-dest-row .capture-new-row{ flex:1 1 0; min-width:0; display:flex; align-items:center; gap:4px; }
+  .capture-dest-row .capture-new-row .feel-chip-add-input{ flex:1 1 0; min-width:0; }
   .schedule-tab-btn:disabled{ opacity:.45; cursor:default; }
 
   ul.tasks li.possibility-li{ flex-direction:row; align-items:center; gap:9px; }
@@ -6021,7 +6023,7 @@ function renderKeepGrid(id){
   if(!el) return;
   const notes = ensureDomainNotes(id);
   const manageEl = document.getElementById('keepNoteHeaderManage');
-  if(manageEl) manageEl.innerHTML = notes.length ? noteHeaderManageHtml(id) : '';
+  if(manageEl) manageEl.innerHTML = noteHeaderManageHtml(id);
   if(notes.length===0){ el.innerHTML = '<div class="empty" onclick="addDomainNote()" style="cursor:pointer;">עדיין אין פתקים כאן — לחיצה על "+ פתק חדש" תתחיל אחד</div>'; return; }
   const headers = ensureDomainNoteHeaders(id);
   withFocusPreserved('keepGrid', ()=>{
@@ -12833,23 +12835,88 @@ const CAPTURE_TITLES = {
 let captureNoteWorld = 'domain';
 let captureNoteContainer = null;
 let captureNoteHeader = '';
+// "+ חדש" inside each menu, so a note that belongs somewhere that doesn't exist yet doesn't send
+// you off to another tab to make the place first and then come back and retype the note
+let captureNewContainerOpen = false;
+let captureNewHeaderOpen = false;
+const NEW_DOMAIN_COLORS = ['#e2a34c','#3aa9a0','#e08a72','#b98fc4','#e2903f','#4fb4d6','#cf9a5c','#3fae7a','#9d84c9','#3fb0ac'];
+function onCaptureContainerPick(v){
+  if(v === '__new'){ captureNewContainerOpen = true; renderCaptureNoteDest(); return; }
+  setCaptureContainer(v);
+}
+function cancelCaptureNewContainer(){ captureNewContainerOpen = false; renderCaptureNoteDest(); }
+function commitCaptureNewContainer(){
+  const input = document.getElementById('captureNewContainerInput');
+  const name = input ? input.value.trim() : '';
+  if(!name){ cancelCaptureNewContainer(); return; }
+  let id;
+  if(captureNoteWorld === 'notebook'){
+    const nb = {id: uid(), name};
+    notebookList().push(nb);
+    id = nb.id;
+  } else {
+    const d = {id: uid(), name, color: NEW_DOMAIN_COLORS[Math.floor(Math.random()*NEW_DOMAIN_COLORS.length)]};
+    data.domains.push(d);
+    id = d.id;
+  }
+  saveData();
+  captureNewContainerOpen = false;
+  captureNoteContainer = id;
+  captureNoteHeader = '';
+  renderCaptureNoteDest();
+  renderDomainEditor();   // the notebook's own tabs learn about it too
+  flashStatus(captureNoteWorld === 'notebook' ? 'המחברת נוצרה' : 'התחום נוצר');
+}
+function onCaptureHeaderPick(v){
+  if(v === '__new'){ captureNewHeaderOpen = true; renderCaptureNoteDest(); return; }
+  setCaptureHeader(v);
+}
+function cancelCaptureNewHeader(){ captureNewHeaderOpen = false; renderCaptureNoteDest(); }
+function commitCaptureNewHeader(){
+  const input = document.getElementById('captureNewHeaderInput');
+  const label = input ? input.value.trim() : '';
+  if(!label || !captureNoteContainer){ cancelCaptureNewHeader(); return; }
+  const h = {id: uid(), label};
+  ensureDomainNoteHeaders(captureNoteContainer).push(h);
+  saveData();
+  captureNewHeaderOpen = false;
+  captureNoteHeader = h.id;
+  renderCaptureNoteDest();
+  if(activeNoteDomain === captureNoteContainer) renderKeepGrid(captureNoteContainer);
+  flashStatus('הכותרת נוצרה');
+}
+function captureNewInputHtml(id, placeholder, commitFn, cancelFn){
+  return `<span class="feel-chip-add-row capture-new-row">
+    <input type="text" id="${id}" class="feel-chip-add-input" placeholder="${placeholder}"
+      onkeydown="if(event.key==='Enter'){event.preventDefault(); ${commitFn};} if(event.key==='Escape'){event.preventDefault(); ${cancelFn};}">
+    <span class="feel-chip-add-confirm" onclick="${commitFn}" title="הוספה">✓</span>
+    <span class="feel-chip-add-cancel" onclick="${cancelFn}" title="ביטול">✕</span>
+  </span>`;
+}
 function captureDestInit(){
   captureNoteWorld = (activeNoteDomain && worldOfContainer(activeNoteDomain)) || 'domain';
   if(!containersOfWorld(captureNoteWorld).length) captureNoteWorld = 'domain';
   captureNoteContainer = (activeNoteDomain && containerById(activeNoteDomain))
     ? activeNoteDomain : firstContainerOf(captureNoteWorld);
   captureNoteHeader = '';
+  captureNewContainerOpen = false;
+  captureNewHeaderOpen = false;
 }
 function setCaptureWorld(world){
   if(captureNoteWorld === world) return;
   captureNoteWorld = world;
   captureNoteContainer = firstContainerOf(world);
   captureNoteHeader = '';
+  captureNewHeaderOpen = false;
+  // switching into a world with nothing in it: go straight to naming the first one, rather than
+  // showing a menu whose only entry is "+ חדש"
+  captureNewContainerOpen = !captureNoteContainer;
   renderCaptureNoteDest();
 }
 function setCaptureContainer(id){
   captureNoteContainer = id;
   captureNoteHeader = '';
+  captureNewHeaderOpen = false;
   renderCaptureNoteDest();
 }
 function setCaptureHeader(id){ captureNoteHeader = id; }
@@ -12862,24 +12929,35 @@ function renderCaptureNoteDest(){
     {key:'domain',   label:'🌱 תחומי חיים', list:(data.domains || [])},
     {key:'notebook', label:'📓 מחברות',     list:notebookList()},
   ];
+  // an empty world is no longer a dead end -- its menu offers making the first one
   document.getElementById('captureWorldSwitch').innerHTML = worlds.map(w => `
     <button type="button" class="schedule-tab-btn ${captureNoteWorld===w.key?'active':''}"
-      ${w.list.length ? '' : 'disabled title="עדיין אין כאן כלום"'}
       onclick="setCaptureWorld('${w.key}')">${w.label}${w.list.length?` (${w.list.length})`:''}</button>`).join('');
 
   const containers = containersOfWorld(captureNoteWorld);
   if(captureNoteContainer && !containers.some(c=>c.id===captureNoteContainer)) captureNoteContainer = containers.length ? containers[0].id : null;
   const headers = captureNoteContainer ? ensureDomainNoteHeaders(captureNoteContainer) : [];
+  const newContainerLabel = captureNoteWorld === 'notebook' ? '+ מחברת חדשה' : '+ תחום חיים חדש';
   document.getElementById('captureDestRow').innerHTML = `
-    <select id="captureContainerSelect" onchange="setCaptureContainer(this.value)">
-      ${containers.length
-        ? containers.map(c=>`<option value="${c.id}" ${c.id===captureNoteContainer?'selected':''}>${escapeHtml(c.name)}</option>`).join('')
-        : `<option value="">${captureNoteWorld==='notebook' ? 'עדיין אין מחברות' : 'עדיין אין תחומי חיים'}</option>`}
-    </select>
-    ${headers.length ? `<select id="captureHeaderSelect" onchange="setCaptureHeader(this.value)">
-      <option value="">ללא כותרת</option>
-      ${headers.map(h=>`<option value="${h.id}" ${h.id===captureNoteHeader?'selected':''}>${escapeHtml(h.label)}</option>`).join('')}
-    </select>` : ''}`;
+    ${captureNewContainerOpen
+      ? captureNewInputHtml('captureNewContainerInput',
+          captureNoteWorld === 'notebook' ? 'שם המחברת...' : 'שם התחום...',
+          'commitCaptureNewContainer()', 'cancelCaptureNewContainer()')
+      : `<select id="captureContainerSelect" onchange="onCaptureContainerPick(this.value)">
+          ${containers.map(c=>`<option value="${c.id}" ${c.id===captureNoteContainer?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+          <option value="__new">${newContainerLabel}</option>
+        </select>`}
+    ${captureNewHeaderOpen
+      ? captureNewInputHtml('captureNewHeaderInput', 'שם הכותרת...',
+          'commitCaptureNewHeader()', 'cancelCaptureNewHeader()')
+      : `<select id="captureHeaderSelect" onchange="onCaptureHeaderPick(this.value)" ${captureNoteContainer?'':'disabled'}>
+          <option value="" ${captureNoteHeader?'':'selected'}>ללא כותרת</option>
+          ${headers.map(h=>`<option value="${h.id}" ${h.id===captureNoteHeader?'selected':''}>${escapeHtml(h.label)}</option>`).join('')}
+          <option value="__new">+ כותרת חדשה</option>
+        </select>`}`;
+  const fresh = document.getElementById(captureNewContainerOpen ? 'captureNewContainerInput'
+              : captureNewHeaderOpen ? 'captureNewHeaderInput' : '');
+  if(fresh) requestAnimationFrame(()=>fresh.focus());
 }
 function openInboxCapture(){
   const label = document.querySelector('#inboxCaptureSheet .inbox-capture-label');
@@ -13752,7 +13830,8 @@ function clearPossibilities(){
 }
 function possibilitiesListHtml(){
   const all = data.possibilities || [];
-  if(!all.length) return '<li class="empty">עדיין לא נכתב כלום כאן</li>';
+  // an empty list here says nothing worth a line: the card already opens with the invitation
+  if(!all.length) return '';
   // newest first, so the four you see when it opens are the four you just thought of
   const ordered = all.slice().reverse();
   const list = possibilitiesExpanded ? ordered : ordered.slice(0, POSSIBILITIES_PREVIEW);
