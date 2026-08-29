@@ -3423,6 +3423,53 @@
   #toolsView .feel-block-header + *,
   #toolsView .tools-card-fold + *{ margin-top:10px; }
 
+  /* Each optional field is a wrapper holding a toggle button and, when open, its panel. Letting
+     the wrapper vanish as a box (display:contents) puts the button straight into the add-row as
+     one more item, and the panel too -- and a panel is flex-basis:100%, so it lands on its own
+     line underneath instead of squeezing the row. One row of everything you can attach, and
+     whatever you opened, below it. */
+  .add-row.pending-host > div{ display:contents; }
+  /* the thing itself gets a line; the optional fields and הוסף share the next one */
+  .add-row.pending-host > .add-line{
+    display:flex; flex-basis:100%; gap:8px; align-items:center; min-width:0;
+  }
+  .add-row.pending-host > .add-line > input{ flex:1 1 80px; min-width:0; }
+  .add-row.pending-host > .add-line > select{ flex:0 1 145px; min-width:0; }
+  /* whatever a toggle opens always lands last, under the whole row */
+  .add-row.pending-host .bodycheck-panel,
+  .add-row.pending-host .detail-desc,
+  .add-row.pending-host .pending-panel-row,
+  .add-row.pending-host .subtask-list,
+  .add-row.pending-host .subtask-add-row{ order:99; }
+  #planHost .add-row .subtask-toggle-btn,
+  #planHost .add-row .add-domain-btn{ font-size:12px; padding:4px 9px; }
+  /* measured: the three optional toggles plus הוסף came to 338px of a 332px row, so the row broke
+     in two. 6px of gap instead of 8, and 14px of side padding on הוסף instead of 18, brings it to
+     324 and the whole thing sits on one line. */
+  .add-row.pending-host{ gap:6px; }
+  #planHost .add-row > button{ padding:10px 14px; }
+  .add-row.pending-host .bodycheck-panel,
+  .add-row.pending-host .detail-desc,
+  .add-row.pending-host .pending-panel-row,
+  .add-row.pending-host .subtask-list,
+  .add-row.pending-host .subtask-add-row{ flex-basis:100%; margin-bottom:0; }
+  .add-row.pending-host .pending-panel-row{ margin-top:2px; }
+  /* `.add-row button` paints every button in the row gold; in here only "הוסף" is the action */
+  #planHost .add-row .subtask-toggle-btn,
+  #planHost .add-row .add-domain-btn,
+  #planHost .add-row .reset-btn{
+    background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
+    font-weight:400; box-shadow:none;
+  }
+  #planHost .add-row .subtask-toggle-btn.has-content{ color:var(--gold); border-color:var(--gold); border-style:solid; }
+  /* looking at the list, as opposed to adding to it */
+  .list-controls-row{ margin-bottom:10px; }
+  .list-controls-row select{ flex:1 1 0; min-width:0; }
+  /* the button is the smallest of the three, so it gives up the width the two selects need to
+     show their labels rather than clipping them to "כל הנוׂ" */
+  .list-controls-row .reset-btn{ flex-shrink:0; padding:8px 8px; font-size:12px; }
+  .list-controls-row select{ padding-inline:6px 20px; font-size:13px; }
+
   #timelineTodayBtn.active{ background:var(--gold); color:#241a06; border-color:transparent; font-weight:600; }
 
   .domain-page-topbar{ flex-wrap:wrap; }
@@ -3988,24 +4035,28 @@
     </div>
     <div id="secbody-someday">
     <div class="card">
-      <div class="add-row">
-        <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
-        <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
-        <button onclick="addSomeday()">הוסף</button>
-      </div>
-      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+      <!-- One row to add something with: what it is, which topic, and every optional field it
+           can carry. The panels those toggles open are flex-basis:100% so they drop underneath
+           without breaking the row apart. -->
+      <div class="add-row pending-host">
+        <div class="add-line">
+          <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
+          <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
+        </div>
         <div id="pendingBodyCheck-someday" class="dreams-hidden"></div>
         <div id="pendingSomedayDescWrap"></div>
         <div id="pendingSomedaySubtasksWrap"></div>
+        <button onclick="addSomeday()">הוסף</button>
       </div>
-      <div class="add-row" style="margin-bottom:10px;">
-        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">🔽 הצג את כל הרשימה</button>
-        <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
-          <option value="manual">מיון לפי: ידני (גרירה)</option>
-          <option value="date">מיון לפי: תאריך הוספה</option>
-          <option value="domain" selected>מיון לפי: נושא</option>
-        </select>
+      <!-- and one row to look at it with: which topics, in what order, how much of it -->
+      <div class="add-row list-controls-row">
         <select id="somedayFilterDomain" onchange="setSomedayFilterDomain(this.value)"></select>
+        <select id="somedaySortBy" onchange="setSomedaySortBy(this.value)">
+          <option value="manual">לפי סדר ידני</option>
+          <option value="date">לפי תאריך</option>
+          <option value="domain" selected>לפי נושא</option>
+        </select>
+        <button class="reset-btn" onclick="toggleListExpand('someday')" id="somedayTopMinimizeBtn" style="display:none;">▾ הרחב רשימה</button>
       </div>
       <div class="section-divider"></div>
       <ul class="tasks scroll-cap" id="somedayList"></ul>
@@ -7688,7 +7739,7 @@ function applyListCap(key, itemCount){
   applyRowCap(listEl, needsCap && !expanded);
   expandRow.style.display = needsCap ? 'flex' : 'none';
   const btn = expandRow.querySelector('.list-expand-btn');
-  if(btn) btn.innerHTML = `<span class="chev">${expanded?'▴':'▾'}</span> ${expanded?'כווץ בחזרה':'הצג את כל הרשימה'}`;
+  if(btn) btn.innerHTML = `<span class="chev">${expanded?'▴':'▾'}</span> ${expanded?'כווץ בחזרה':'הרחב רשימה'}`;
   // a twin of the same toggle, up at the top of the list (next to the sort/filter row) -- so
   // collapsing back doesn't require scrolling all the way down to the bottom-edge button first
   const topBtn = document.getElementById(key+'TopMinimizeBtn');
@@ -7696,7 +7747,7 @@ function applyListCap(key, itemCount){
     topBtn.style.display = needsCap ? '' : 'none';
     // the button's own action is always "what the list currently isn't" -- collapsed by default
     // means tapping it EXPANDS, so the label has to say that, not "מזער" (that named the opposite action)
-    topBtn.textContent = expanded ? '🗕 כווץ בחזרה' : '🔽 הצג את כל הרשימה';
+    topBtn.textContent = expanded ? '▴ כווץ בחזרה' : '▾ הרחב רשימה';
   }
 }
 function renderTasks(){
@@ -9750,18 +9801,20 @@ function renderDilemmasSection(){
 }
 function suggestionsSubViewHtml(){
   return `
-    <div class="add-row">
-      <input type="text" id="suggWho" placeholder="מי הציע?" style="max-width:120px;">
-      <span class="prefers-label">מעדיף ש -</span>
-      <input type="text" id="suggText" placeholder="מה ההצעה...">
+    <div class="add-row pending-host">
+      <div class="add-line">
+        <input type="text" id="suggWho" placeholder="מי הציע?" style="max-width:110px;">
+        <span class="prefers-label">מעדיף ש -</span>
+        <input type="text" id="suggText" placeholder="מה ההצעה...">
+      </div>
       <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ תאריך תשובה</button>
+      <div id="pendingBodyCheck-suggestion"></div>
       <button onclick="addSuggestion()">הוסף</button>
+      <div class="add-row pending-panel-row" id="suggDetailsFields" style="display:none;">
+        <label class="field-label">תשובה עד<input type="date" id="suggReplyDate"></label>
+        ${timePickerHtml('suggReplyTime', '', 'שעה')}
+      </div>
     </div>
-    <div class="add-row" id="suggDetailsFields" style="display:none;">
-      <label class="field-label">תשובה עד<input type="date" id="suggReplyDate"></label>
-      ${timePickerHtml('suggReplyTime', '', 'שעה')}
-    </div>
-    <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
     <ul class="tasks scroll-cap" id="suggestionList"></ul>
     <div class="list-expand-row" id="suggestionListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('suggestion')"></button></div>
   `;
@@ -10011,16 +10064,18 @@ function reorderSuggestions(fromId, toId){
 let editingDilemmaId = null;
 function generalDilemmasSubViewHtml(){
   return `
-    <div class="add-row">
-      <input type="text" id="dilemmaText" placeholder="במה אני מתלבט/ת...">
-      <select id="dilemmaDomain">${domainOptionsWithEmpty('')}</select>
+    <div class="add-row pending-host">
+      <div class="add-line">
+        <input type="text" id="dilemmaText" placeholder="במה אני מתלבט/ת...">
+        <select id="dilemmaDomain">${domainOptionsWithEmpty('')}</select>
+      </div>
       <button type="button" class="add-domain-btn" onclick="toggleDilemmaDetails()" id="dilemmaDetailsToggle">+ מועד להחליט</button>
+      <div id="pendingBodyCheck-dilemma"></div>
       <button onclick="addGeneralDilemma()">הוסף</button>
+      <div class="add-row pending-panel-row" id="dilemmaDetailsFields" style="display:none;">
+        <label class="field-label">להחליט עד<input type="date" id="dilemmaDate"></label>
+      </div>
     </div>
-    <div class="add-row" id="dilemmaDetailsFields" style="display:none;">
-      <label class="field-label">להחליט עד<input type="date" id="dilemmaDate"></label>
-    </div>
-    <div id="pendingBodyCheck-dilemma" style="margin-bottom:8px;"></div>
     <ul class="tasks scroll-cap" id="dilemmaList"></ul>
     <div class="list-expand-row" id="dilemmaListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('dilemma')"></button></div>
   `;
