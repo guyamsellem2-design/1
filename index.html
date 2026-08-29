@@ -5233,6 +5233,10 @@ function rememberView(){
       mainView, scheduleActiveTab, calendarView,
       planKind: activePlanKind,
       noteContainer: activeNoteDomain,
+      // the week is stored as the date it starts on, not as an offset from today: an offset saved
+      // on a Saturday would point at a different week when the app is opened on Sunday
+      weekStart: (typeof weekDatesForOffset === 'function') ? ymd(weekDatesForOffset(weekOffset)[0]) : '',
+      timelineDay: timelineExpandedDay,
       scrollY: Math.round(window.scrollY || 0),
     }));
   }catch(e){}
@@ -5249,6 +5253,13 @@ function restoreViewState(){
   if(['home','plan','topics','tools'].includes(v.mainView)) mainView = v.mainView;
   if(['calendar','habits','tasks','anchors'].includes(v.scheduleActiveTab)) scheduleActiveTab = v.scheduleActiveTab;
   if(CALENDAR_VIEWS.includes(v.calendarView)) calendarView = v.calendarView;
+  // a refresh used to drop you back on this week even when you were reading another one
+  if(v.weekStart){
+    for(let o = WEEK_OFFSET_MIN; o <= WEEK_OFFSET_MAX; o++){
+      if(ymd(weekDatesForOffset(o)[0]) === v.weekStart){ weekOffset = o; break; }
+    }
+  }
+  if(typeof v.timelineDay === 'number' && v.timelineDay >= 0 && v.timelineDay <= 6) timelineExpandedDay = v.timelineDay;
   if(PLAN_KINDS.some(k=>k.key===v.planKind)) activePlanKind = v.planKind;
   // a topic can have been deleted since; falling back to the first one beats landing on nothing
   if(v.noteContainer && containerById(v.noteContainer)){
@@ -8346,6 +8357,7 @@ function changeWeek(delta){
   if(next < WEEK_OFFSET_MIN || next > WEEK_OFFSET_MAX) return;
   weekOffset = next;
   renderScheduleGrid();
+  rememberView();
 }
 function weekRangeLabel(offset){
   const dates = weekDatesForOffset(offset);
@@ -8679,6 +8691,7 @@ let timelineExpandedDay = null;
 function toggleTimelineExpandedDay(dayIdx){
   timelineExpandedDay = (timelineExpandedDay === dayIdx) ? null : dayIdx;
   renderTimelineGrid();
+  rememberView();
 }
 /* Tapping a day's name already opens that day on its own. This is the same view without having to
    find today among seven columns first -- and, because it says "היום" rather than a date, it also
@@ -8688,6 +8701,7 @@ function toggleTimelineTodayView(){
   timelineExpandedDay = (timelineExpandedDay === null) ? new Date().getDay() : null;
   weekOffset = 0;
   renderScheduleGrid();   // redraws the week nav, the board and the timeline together
+  rememberView();
 }
 function timelineChipHtml(it, dayIdx, dateStr, lane, lanes, dayExpanded){
   const picked = timelinePickedItem && timelinePickedItem.kind===it.kind && timelinePickedItem.id===it.data.id;
