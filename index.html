@@ -3460,6 +3460,21 @@
   .add-row .reset-btn:hover{ color:var(--text); border-color:var(--muted); }
   .add-row .subtask-toggle-btn.has-content{ color:var(--gold); border-color:var(--gold); border-style:solid; }
 
+  /* משימות and עוגנים: how you look at the list, and the button that adds to it, on one line.
+     `.add-row` re-wraps and re-gaps these rows from the mobile layer, so the intent is restated
+     here where it wins on source order. */
+  .view-controls-row{ flex-wrap:nowrap; gap:5px; align-items:center; }
+  /* three menus and a button on a 332px row: the menus give up nothing but the space around
+     their text, and the button gives up its generous padding, so "כל הנושאים" still reads whole */
+  .view-controls-row > select{ flex:1 1 0; min-width:0; font-size:12px; padding-inline:6px 16px; }
+  .view-controls-row button{ flex:0 0 auto; padding:9px 12px; font-size:13px; }
+  /* an equal third each cut "כל הנושאים" short while "הכל" sat in space it had no use for --
+     so the width follows the labels: topics widest, the date range narrowest */
+  .view-controls-row > #taskFilterDomain{ flex:1.5 1 0; }
+  .view-controls-row > #taskFilterRange{ flex:0.7 1 0; }
+  /* the add button is rendered into a wrapper; let the button itself be the flex item */
+  .view-controls-row > #taskAddRowWrap{ display:contents; }
+
   /* the two destination menus share the line under the world tabs */
   #captureNoteDest{ margin-bottom:10px; }
   #captureNoteDest .schedule-tabs{ margin-bottom:8px; }
@@ -4001,24 +4016,20 @@
 
       <div id="scheduleTabTasks" style="display:none;">
         <div class="card">
-          <div class="add-row" id="taskAddRowWrap"></div>
-          <div class="section-divider"></div>
-          <div class="view-controls">
-            <span class="control-label">תצוגה</span>
-            <div class="add-row view-controls-row" style="margin-bottom:10px;">
-              <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
-                <option value="manual">ידני (גרירה)</option>
-                <option value="time" selected>לפי זמן</option>
-                <option value="topic">לפי נושא</option>
-              </select>
-              <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
-              <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
-                <option value="all" selected>הכל</option>
-                <option value="today">היום</option>
-                <option value="week">השבוע</option>
-                <option value="month">החודש</option>
-              </select>
-            </div>
+          <div class="add-row view-controls-row">
+            <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
+              <option value="manual">ידני (גרירה)</option>
+              <option value="time" selected>לפי זמן</option>
+              <option value="topic">לפי נושא</option>
+            </select>
+            <select id="taskFilterDomain" onchange="setTaskFilterDomain(this.value)"></select>
+            <select id="taskFilterRange" onchange="setTaskFilterRange(this.value)">
+              <option value="all" selected>הכל</option>
+              <option value="today">היום</option>
+              <option value="week">השבוע</option>
+              <option value="month">החודש</option>
+            </select>
+            <span id="taskAddRowWrap"></span>
           </div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="taskList"></ul>
@@ -4029,7 +4040,7 @@
 
       <div id="scheduleTabAnchors" style="display:none;">
         <div class="card">
-          <div class="add-row" id="anchorAddRowWrap"></div>
+          <div class="add-row view-controls-row" id="anchorAddRowWrap"></div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="anchorsList"></ul>
         </div>
@@ -9434,15 +9445,19 @@ function anchorRowHtml(a){
 // the filter only offers topics that actually have an anchor, so it never lists empty choices
 let anchorFilterDomain = '';
 function setAnchorFilterDomain(id){ anchorFilterDomain = id; renderAnchorsTab(); }
+/* It used to be a row of coloured chips, one per topic. That read beautifully and looked like
+   nothing else in the app -- the same job on the משימות board is a plain menu. One filter, one
+   shape. (Chips would also be far too much on the busier board, so the menu is the one that can
+   be the same in both places.) */
 function anchorFilterHtml(){
   const used = (data.domains||[]).filter(d => (data.anchors||[]).some(a => a.domain === d.id));
   if(!used.length) return '';
+  if(anchorFilterDomain && !used.some(d=>d.id===anchorFilterDomain)) anchorFilterDomain = '';
   const n = id => (data.anchors||[]).filter(a => id ? a.domain === id : true).length;
-  return `<div class="anchor-filter-row">
-    <button type="button" class="anchor-filter-chip ${!anchorFilterDomain?'active':''}" onclick="setAnchorFilterDomain('')">הכל (${n('')})</button>
-    ${used.map(d => `<button type="button" class="anchor-filter-chip ${anchorFilterDomain===d.id?'active':''}" onclick="setAnchorFilterDomain('${d.id}')">
-      <span class="chip-dot" style="background:${d.color}"></span>${escapeHtml(d.name)} (${n(d.id)})</button>`).join('')}
-  </div>`;
+  return `<select id="anchorFilterDomain" onchange="setAnchorFilterDomain(this.value)">
+    <option value="" ${anchorFilterDomain?'':'selected'}>כל הנושאים (${n('')})</option>
+    ${used.map(d => `<option value="${d.id}" ${anchorFilterDomain===d.id?'selected':''}>${escapeHtml(d.name)} (${n(d.id)})</option>`).join('')}
+  </select>`;
 }
 function renderAnchorsTab(){
   const el = document.getElementById('anchorsList');
@@ -14408,6 +14423,73 @@ window.addEventListener('touchmove', (e)=>{
 }, {passive:true});
 window.addEventListener('touchend', gestureEnd, {passive:true});
 window.addEventListener('touchcancel', gestureCancel, {passive:true});
+
+/* ---------- the back gesture closes what is open, before it leaves ----------
+   On a phone, back is how you dismiss things. With a sheet or a menu standing open, it was
+   throwing the whole app away instead -- and on a PWA that means losing your place entirely.
+
+   The trick is one "guard" entry on the history stack, present exactly while something is open.
+   Back pops the guard, we close the topmost thing and, if more is still open, arm it again. When
+   the last thing is closed by its own ✕ instead, we take the guard back off ourselves, so a later
+   back press isn't silently swallowed.
+
+   Nothing here touches the sixteen places that open something: a sheet or a menu is always the
+   result of a tap or a key, so re-checking right after those two events catches every case. */
+const OVERLAY_LAYERS = [
+  { open: ()=> partyMode,                                close: ()=> endPartyMode(true) },
+  { open: ()=> isDisplayed('timelineSheet'),             close: ()=> closeTimelineSheet() },
+  { open: ()=> isDisplayed('searchSheet'),               close: ()=> closeSearch() },
+  { open: ()=> isDisplayed('inboxCaptureSheet'),         close: ()=> closeInboxCapture() },
+  { open: ()=> timelineFullscreen,                       close: ()=> toggleTimelineFullscreen() },
+  { open: ()=> navOpen,                                  close: ()=> closeNav() },
+  { open: ()=> fabMenuOpen,                              close: ()=> closeFabMenu() },
+  { open: ()=> optionsMenuOpen,                          close: ()=> closeOptionsMenu() },
+  { open: ()=> syncMenuOpen,                             close: ()=> closeSyncMenu() },
+];
+function isDisplayed(id){
+  const el = document.getElementById(id);
+  return !!el && el.style.display !== 'none';
+}
+function anyOverlayOpen(){ return OVERLAY_LAYERS.some(l => { try{ return l.open(); }catch(e){ return false; } }); }
+function closeTopOverlay(){
+  const l = OVERLAY_LAYERS.find(x => { try{ return x.open(); }catch(e){ return false; } });
+  if(!l) return false;
+  try{ l.close(); }catch(e){}
+  return true;
+}
+let overlayGuard = false;      // a guard entry of ours is sitting on the history stack
+let poppingOwnGuard = false;   // ...and we are the ones taking it back off
+function armOverlayGuard(){
+  if(overlayGuard || !anyOverlayOpen()) return;
+  try{ history.pushState({appOverlay:true}, ''); overlayGuard = true; }catch(e){}
+}
+function releaseOverlayGuard(){
+  if(!overlayGuard || anyOverlayOpen()) return;
+  overlayGuard = false;
+  poppingOwnGuard = true;
+  try{ history.back(); }catch(e){ poppingOwnGuard = false; }
+}
+function syncOverlayGuard(){ if(anyOverlayOpen()) armOverlayGuard(); else releaseOverlayGuard(); }
+window.addEventListener('popstate', ()=>{
+  if(poppingOwnGuard){ poppingOwnGuard = false; return; }
+  if(!overlayGuard) return;   // not our entry -- let the browser do what it was going to do
+  overlayGuard = false;
+  if(closeTopOverlay()) armOverlayGuard();
+});
+/* The two listeners below catch anything opened by a tap or a key. The wrap catches the rest --
+   an overlay opened from code, from a timer, or from another overlay -- without adding a line to
+   each of the sixteen functions that open or close one. */
+['openInboxCapture','closeInboxCapture','openSearch','closeSearch',
+ 'openTimelineSheet','closeTimelineSheet','toggleNav','closeNav','openNav',
+ 'onInboxFabClick','openFabMenu','closeFabMenu','fabCreate',
+ 'toggleOptionsMenu','closeOptionsMenu','toggleSyncMenu','closeSyncMenu',
+ 'toggleTimelineFullscreen','startPartyMode','endPartyMode'].forEach(name=>{
+  const fn = window[name];
+  if(typeof fn !== 'function') return;
+  window[name] = function(){ const out = fn.apply(this, arguments); syncOverlayGuard(); return out; };
+});
+document.addEventListener('click', ()=>{ setTimeout(syncOverlayGuard, 0); }, true);
+document.addEventListener('keydown', ()=>{ setTimeout(syncOverlayGuard, 0); }, true);
 
 setupPWA();
 loadData();
