@@ -4081,7 +4081,10 @@
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="taskList"></ul>
           <div class="list-expand-row" id="taskListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('task')"></button></div>
-          <button class="reset-btn" onclick="clearAllTasks()" style="margin-top:10px;">🧹 נקה הכל</button>
+          <div class="add-row" style="margin-top:10px; margin-bottom:0;">
+            <button class="reset-btn" onclick="clearPastTasks()">🧹 נקה מה שעבר</button>
+            <button class="reset-btn" onclick="clearAllTasks()">🧹 נקה הכל</button>
+          </div>
         </div>
       </div>
 
@@ -4282,7 +4285,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalDeletedEventIds: [], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -4340,6 +4343,7 @@ function loadData(){
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.gcalWriteCalendarId = parsed.gcalWriteCalendarId || null;
+      data.gcalDeletedEventIds = Array.isArray(parsed.gcalDeletedEventIds) ? parsed.gcalDeletedEventIds : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
@@ -7178,6 +7182,8 @@ function runGcalSync(quiet){
       oneTimeEvents.forEach(({ev,calId})=>{
         const gid = calId+':'+ev.id;
         if(existingTaskIds.has(gid)){ gcalDiag.skippedExisting++; return; }
+        // deleted here on purpose -- it does not come back just because Google still has it
+        if(isGcalTombstoned(gid)){ gcalDiag.skippedExisting++; return; }
         existingTaskIds.add(gid);
         let date='', time='', endTime='';
         if(ev.start && ev.start.date){
@@ -8062,7 +8068,7 @@ function taskRowHtml(t){
     <div class="task-row-meta">
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
       ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
-      ${isOverdue ? `<span class="promote" onclick="pushTaskToTomorrow('${t.id}')">→ מחר</span>` : ''}
+      ${isOverdue ? `<button type="button" class="subtask-toggle-btn" onclick="openTimelineSheet('task','${t.id}')">שנה מועד</button>` : ''}
       <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
     ${bodyCheckStatusBadgesHtml(t, {urgencyOptions:['objective','other','relief'], showEnergy:true})}
@@ -8275,14 +8281,43 @@ function cycleEnergy(id){
   saveData();
   renderTasks();
 }
-function deleteTask(id){
+/* Deleting something here used to be undone by the next sync: the event was still in Google, so
+   it came straight back. Now every deleted event is remembered by id and the importer skips it --
+   deleted means deleted, whatever Google still holds.
+
+   Whether GOOGLE should lose it too is a different question, and only worth asking about something
+   that hasn't happened yet. A date that has already passed is history: it is removed from here
+   and left alone there. */
+function gcalTombstones(){ return data.gcalDeletedEventIds || (data.gcalDeletedEventIds = []); }
+function gcalRawEventId(evId){ return evId.indexOf(':')===-1 ? evId : evId.split(':').slice(1).join(':'); }
+function rememberDeletedGcalEvent(evId){
+  if(!evId) return;
+  const list = gcalTombstones();
+  [evId, gcalRawEventId(evId)].forEach(v=>{ if(v && list.indexOf(v)===-1) list.push(v); });
+  if(list.length > 800) list.splice(0, list.length - 800);
+}
+function isGcalTombstoned(gid){
+  const list = gcalTombstones();
+  if(!list.length) return false;
+  return list.indexOf(gid)!==-1 || list.indexOf(gcalRawEventId(gid))!==-1;
+}
+function taskDateHasPassed(t){ return !!(t && t.date) && t.date < ymd(new Date()); }
+/* opts.alsoGoogle: true/false decides for us, undefined asks. only future-dated items ever ask. */
+function deleteTask(id, opts){
   const removed = data.tasks.find(t=>t.id===id);
   data.tasks = data.tasks.filter(t=>t.id!==id);
   expandedTasks.delete(id);
   saveData();
   renderTasks();
   renderScheduleGrid();
-  if(data.gcalConnected && removed && removed.googleEventId) deleteEventFromGcal(removed.googleEventId, ()=>{});
+  if(!removed || !removed.googleEventId) return;
+  rememberDeletedGcalEvent(removed.googleEventId);
+  if(!data.gcalConnected) return;
+  if(taskDateHasPassed(removed)) return;      // history: gone from here, untouched there
+  const alsoGoogle = (opts && typeof opts.alsoGoogle === 'boolean')
+    ? opts.alsoGoogle
+    : confirm(`למחוק את "${removed.text||'האירוע'}" גם מיומן גוגל?`);
+  if(alsoGoogle) deleteEventFromGcal(removed.googleEventId, ()=>{});
 }
 
 /* ---------- weekly schedule (anchors + dated tasks together) ---------- */
@@ -8700,7 +8735,7 @@ function timelineUntimedChipHtml(it, dayIdx, dateStr){
     ? ({daily:'🔁 מדי יום', monthly:'🔁 מדי חודש', yearly:'🔁 מדי שנה'}[repeatType])
     : null;
   const dayOrRepeat = repeatLabel || DAYS[dayIdx];
-  return `<div class="timeline-untimed-chip ${draft?'chip-draft':''}" onclick="openTimelineSheet('${it.kind}','${it.data.id}')">
+  return `<div class="timeline-untimed-chip ${draft?'chip-draft':''}" onclick="openTimelineSheet('${it.kind}','${it.data.id}', false, true)">
     <span>${dayOrRepeat}${it.time?' · '+it.time:''} — ${escapeHtml(timelineItemLabel(it))}</span>
     <span class="del-task" onclick="event.stopPropagation(); deleteUntimedTimelineItem('${it.kind}','${it.data.id}')" title="מחיקה">✕</span>
   </div>`;
@@ -8981,7 +9016,7 @@ function onTimelineChipClick(kind, id, dayIdx, slot, dateStr){
     commitTimelineMoveTo(dayIdx, slot, dateStr);
     return;
   }
-  openTimelineSheet(kind, id);
+  openTimelineSheet(kind, id, false, true);
 }
 function onTimelineColClick(e, dayIdx, dateStr){
   if(e.target !== e.currentTarget) return; // a click that landed on a child (an item, the add input, the select marker) isn't a click on empty space
@@ -9038,11 +9073,16 @@ function anchorDayIdxInViewedWeek(a){
   const idx = dates.findIndex((d,i)=>anchorAppliesToDate(a, d, i));
   return idx>=0 ? idx : a.day;
 }
-function openTimelineSheet(kind, id, isNew){
+/* Moving something to another day by picking it up and putting it down is a timetable gesture --
+   there are columns there to put it into. Opened from the משימות list, from a converted item, or
+   from a search result there is no grid on screen, so the option was offering a move to nowhere. */
+let timelineSheetFromTimeline = false;
+function openTimelineSheet(kind, id, isNew, fromTimeline){
   const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
   if(!rec) return;
   timelineSheetItem = {kind, id};
   timelineSheetIsNew = !!isNew;
+  timelineSheetFromTimeline = !!fromTimeline;
   timelineSheetDayIdx = kind==='task' ? dayIdxForDateStr(rec.date) : anchorDayIdxInViewedWeek(rec);
   timelineSheetSelectedDays = new Set([timelineSheetDayIdx]);
   timelineSheetExpanded = false;
@@ -9253,7 +9293,7 @@ function renderTimelineSheet(){
       ${deleteButtonsHtml}
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
-    <button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה ליום אחר</button>
+    ${timelineSheetFromTimeline ? `<button type="button" class="subtask-toggle-btn timeline-sheet-more" onclick="quickMoveFromSheet()">↕ הזזה מהירה ליום אחר</button>` : ''}
     ${alwaysExpanded ? '' : `<button type="button" class="subtask-toggle-btn timeline-sheet-more" id="timelineSheetExpandBtn" onclick="toggleTimelineSheetExpanded()">עוד אפשרויות ›</button>`}
   `;
   timelineSheetAlwaysExpanded = alwaysExpanded;
@@ -11322,6 +11362,7 @@ function importData(e){
       data.gcalLastSync = parsed.gcalLastSync || null;
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.gcalWriteCalendarId = parsed.gcalWriteCalendarId || null;
+      data.gcalDeletedEventIds = Array.isArray(parsed.gcalDeletedEventIds) ? parsed.gcalDeletedEventIds : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
@@ -11550,15 +11591,33 @@ function clearDoneTasks(){
 }
 // clears ALL tasks, not just done ones -- deliberately doesn't touch data.anchors, since the
 // weekly schedule syncs with Google Calendar separately and shouldn't be affected by this at all
-function clearAllTasks(){
-  if(data.tasks.length===0){ flashStatus('רשימת המשימות כבר ריקה'); return; }
-  if(!confirm(`למחוק את כל ${data.tasks.length} המשימות (כולל מה שלא בוצע)? זה לא נוגע ללוח השבועי/יומן גוגל. לא ניתן לביטול — מומלץ להוריד גיבוי קודם.`)) return;
-  data.tasks = [];
+/* One question for the whole batch instead of one per task, and the same rule as a single delete:
+   only what is still ahead of you is worth asking Google about. */
+function clearTasks(which){
+  const past = which === 'past';
+  const doomed = past ? data.tasks.filter(taskDateHasPassed) : data.tasks.slice();
+  if(!doomed.length){ flashStatus(past ? 'אין משימות שעבר זמנן' : 'רשימת המשימות כבר ריקה'); return; }
+  const what = past ? `${doomed.length} המשימות שעבר זמנן` : `כל ${doomed.length} המשימות (כולל מה שלא בוצע)`;
+  if(!confirm(`למחוק את ${what}? אפשר לבטל אחר כך עם ↶.`)) return;
+  const future = doomed.filter(t=>t.googleEventId && !taskDateHasPassed(t));
+  let alsoGoogle = false;
+  if(data.gcalConnected && future.length){
+    alsoGoogle = confirm(`${future.length} מהן עדיין לפניך ויושבות גם ביומן גוגל. למחוק אותן גם משם?`);
+  }
+  doomed.forEach(t=>{
+    if(!t.googleEventId) return;
+    rememberDeletedGcalEvent(t.googleEventId);
+    if(alsoGoogle && !taskDateHasPassed(t)) deleteEventFromGcal(t.googleEventId, ()=>{});
+  });
+  const gone = new Set(doomed.map(t=>t.id));
+  data.tasks = data.tasks.filter(t=>!gone.has(t.id));
   saveData();
   renderTasks();
   renderScheduleGrid();
-  flashStatus('רשימת המשימות נוקתה');
+  flashStatus(past ? 'מה שעבר נוקה' : 'רשימת המשימות נוקתה');
 }
+function clearAllTasks(){ clearTasks('all'); }
+function clearPastTasks(){ clearTasks('past'); }
 // clears both lenses together (הצעות ובקשות + התלבטויות) -- after a couple of weeks
 // a stale request from someone else is just as irrelevant as a stale general dilemma
 function clearDilemmasSection(){
