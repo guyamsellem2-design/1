@@ -3463,15 +3463,40 @@
   /* משימות and עוגנים: how you look at the list, and the button that adds to it, on one line.
      `.add-row` re-wraps and re-gaps these rows from the mobile layer, so the intent is restated
      here where it wins on source order. */
-  .view-controls-row{ flex-wrap:nowrap; gap:5px; align-items:center; }
+  .view-controls-row{ flex-wrap:nowrap; gap:4px; align-items:center; }
   /* three menus and a button on a 332px row: the menus give up nothing but the space around
      their text, and the button gives up its generous padding, so "כל הנושאים" still reads whole */
-  .view-controls-row > select{ flex:1 1 0; min-width:0; font-size:12px; padding-inline:6px 16px; }
-  .view-controls-row button{ flex:0 0 auto; padding:9px 12px; font-size:13px; }
+  /* A native <select> reserves room for its arrow on top of whatever padding it is given, so the
+     inline-end padding here is the arrow's room, not the text's -- the widths below were measured
+     against what actually renders, not against padding arithmetic. */
+  /* A native <select> reserves room for its arrow on top of whatever padding it is given, and
+     that reserve is invisible to measurement -- it was quietly eating ~14px of every label here,
+     where there are three menus and a button on one row. appearance:none hands the width back;
+     the chevron is then drawn from two gradients (a data-URL arrow silently lost the argument
+     with the shared `background:` shorthand these inputs already carry). */
+  /* A native <select> reserves room for its arrow on top of its padding, and that reserve is
+     invisible to any measurement -- on a row holding three menus, a label and a button it was
+     eating ~14px of every name. appearance:none hands it back, and the arrow goes with it: a menu
+     that says "כל הנושאים" is readable as a menu without one, and the pixels go to the names. */
+  .view-controls-row > select{
+    flex:1 1 0; min-width:0; font-size:11px;
+    appearance:none; -webkit-appearance:none;
+    padding-inline:6px;
+    text-overflow:ellipsis;
+  }
+  .view-controls-row button{ flex:0 0 auto; padding:9px 10px; font-size:13px; }
   /* an equal third each cut "כל הנושאים" short while "הכל" sat in space it had no use for --
      so the width follows the labels: topics widest, the date range narrowest */
-  .view-controls-row > #taskFilterDomain{ flex:1.5 1 0; }
-  .view-controls-row > #taskFilterRange{ flex:0.7 1 0; }
+  /* The topics menu is the only one whose text isn't fixed -- it has to hold whatever a topic is
+     called -- so it takes the lion's share, and the two menus with known, short labels take only
+     what those labels need. */
+  .view-controls-row > #taskSortBy{ flex:0.9 1 0; }
+  .view-controls-row > #taskFilterDomain{ flex:2.3 1 0; }
+  .view-controls-row > #taskFilterRange{ flex:0.75 1 0; }
+  /* the button leads the row; "תצוגה" names the menus that follow it */
+  .view-controls-row .control-label{
+    flex:0 0 auto; font-size:11px; color:var(--muted2); white-space:nowrap;
+  }
   /* the add button is rendered into a wrapper; let the button itself be the flex item */
   .view-controls-row > #taskAddRowWrap{ display:contents; }
 
@@ -4017,8 +4042,10 @@
       <div id="scheduleTabTasks" style="display:none;">
         <div class="card">
           <div class="add-row view-controls-row">
+            <span id="taskAddRowWrap"></span>
+            <span class="control-label">תצוגה</span>
             <select id="taskSortBy" onchange="setTaskSortBy(this.value)">
-              <option value="manual">ידני (גרירה)</option>
+              <option value="manual">ידני</option>
               <option value="time" selected>לפי זמן</option>
               <option value="topic">לפי נושא</option>
             </select>
@@ -4029,7 +4056,6 @@
               <option value="week">השבוע</option>
               <option value="month">החודש</option>
             </select>
-            <span id="taskAddRowWrap"></span>
           </div>
           <div class="section-divider"></div>
           <ul class="tasks scroll-cap" id="taskList"></ul>
@@ -9463,8 +9489,10 @@ function renderAnchorsTab(){
   const el = document.getElementById('anchorsList');
   if(!el) return;
   const addRowWrap = document.getElementById('anchorAddRowWrap');
-  if(addRowWrap) addRowWrap.innerHTML = anchorFilterHtml()
-    + `<button type="button" class="add-anchor-btn" onclick="addFromTab(${new Date().getDay()}, '', true)">+ הוסף</button>`;
+  // adding comes first, then how you are looking at what is already there -- same order as משימות
+  if(addRowWrap) addRowWrap.innerHTML =
+    `<button type="button" class="add-anchor-btn" onclick="addFromTab(${new Date().getDay()}, '', true)">+ הוסף</button>`
+    + (anchorFilterHtml() ? `<span class="control-label">תצוגה</span>` + anchorFilterHtml() : '');
   const list = data.anchors.filter(a => !anchorFilterDomain || a.domain === anchorFilterDomain).sort((a,b)=>{
     const da = (a.repeatType||'weekly')==='weekly' ? a.day : 7;
     const db = (b.repeatType||'weekly')==='weekly' ? b.day : 7;
