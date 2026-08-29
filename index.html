@@ -3348,6 +3348,10 @@
   }
   #dilemmasSectionBody .add-row .add-domain-btn:hover{ color:var(--text); border-color:var(--muted); }
 
+  /* the page is the only scroller: no inner box, so a swipe that starts on a row moves the page */
+  ul.tasks.scroll-cap{ overflow:visible; max-height:none; }
+  ul.tasks > .capped-hidden{ display:none; }
+
   .prefers-label{ font-size:13.5px; color:var(--muted2); white-space:nowrap; align-self:center; }
   /* quieter than the proposal it introduces -- it should be read, not read FIRST */
   .prefers-inline{ color:var(--muted2); font-size:.88em; }
@@ -4229,8 +4233,11 @@ function loadData(){
   migrateListsIntoNotebook();
   migrateInboxAway();
   normaliseLongHabits();
+  // after activeNoteDomain has been defaulted, so a remembered topic wins over the first one
+  restoreViewState();
   lastSnapshotJSON = JSON.stringify(data);
   render();
+  finishViewRestore();
 }
 /* ---------- lists and notes become one thing: המחברת ----------
    A note and a list were never two kinds of object — each was simply missing what the other had.
@@ -4950,6 +4957,70 @@ function renderNavList(){
   `;
 }
 /* ---------- two main tabs: בית / נושאים ---------- */
+/* ---------- where you were ----------
+   A refresh used to drop you back on the home screen at the top of the page, which on a phone
+   happens by accident all the time -- the browser reloads a backgrounded tab and your place is
+   gone. This remembers it: the tab, the tab-within-the-tab, and how far down you had scrolled.
+
+   It lives in its own localStorage key rather than in `data`, on purpose. `data` syncs between
+   devices, and where you happen to be standing on the laptop is not something the phone should
+   inherit -- this is about one device picking up exactly where it left off. */
+const VIEW_KEY = 'planner-view-v1';
+let restoringView = false;
+function rememberView(){
+  // the boot render walks through setScheduleTab/setPlanKind and the restore scrolls the page in
+  // steps -- writing during any of that would overwrite the very position being put back
+  if(restoringView) return;
+  try{
+    localStorage.setItem(VIEW_KEY, JSON.stringify({
+      mainView, scheduleActiveTab, calendarView,
+      planKind: activePlanKind,
+      noteContainer: activeNoteDomain,
+      scrollY: Math.round(window.scrollY || 0),
+    }));
+  }catch(e){}
+}
+let rememberViewTimer = null;
+function rememberViewSoon(){
+  clearTimeout(rememberViewTimer);
+  rememberViewTimer = setTimeout(rememberView, 400);
+}
+function restoreViewState(){
+  let v = null;
+  try{ v = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null'); }catch(e){}
+  if(!v) return;
+  if(['home','plan','topics','tools'].includes(v.mainView)) mainView = v.mainView;
+  if(['calendar','habits','tasks','anchors'].includes(v.scheduleActiveTab)) scheduleActiveTab = v.scheduleActiveTab;
+  if(CALENDAR_VIEWS.includes(v.calendarView)) calendarView = v.calendarView;
+  if(PLAN_KINDS.some(k=>k.key===v.planKind)) activePlanKind = v.planKind;
+  // a topic can have been deleted since; falling back to the first one beats landing on nothing
+  if(v.noteContainer && containerById(v.noteContainer)){
+    activeNoteDomain = v.noteContainer;
+    noteWorld = worldOfContainer(v.noteContainer);
+  }
+  restoringView = true;
+  pendingScrollRestore = Math.max(0, Number(v.scrollY) || 0);
+}
+let pendingScrollRestore = 0;
+/* The page grows as it renders -- fonts land, lists fill in -- so a single scrollTo right after
+   render lands short. Keep asking until the document is actually tall enough to hold the position,
+   then stop and hand scrolling back to the user. */
+function finishViewRestore(){
+  const target = pendingScrollRestore;
+  pendingScrollRestore = 0;
+  if(!target){ restoringView = false; return; }
+  let tries = 0;
+  const tick = () => {
+    window.scrollTo(0, target);
+    if(++tries < 10 && Math.abs(window.scrollY - target) > 2) setTimeout(tick, 60);
+    else restoringView = false;
+  };
+  requestAnimationFrame(tick);
+}
+window.addEventListener('scroll', rememberViewSoon, {passive:true});
+window.addEventListener('pagehide', rememberView);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') rememberView(); });
+
 let mainView = 'home';
 function navigateToDomain(id){ activeNoteDomain = id; switchMainView('topics'); }
 function navigateHome(){ switchMainView('home'); }
@@ -4965,6 +5036,7 @@ function switchMainView(view){
   saveData();
   applyMainViewState();
   closeNav();
+  rememberView();
 }
 /* ---------- the floating button, per screen ---------- */
 /* ---------- the ✏️ : one button, every destination ----------
@@ -5068,7 +5140,7 @@ function applyMainViewState(){
   if(mainView==='plan'){
     movePlanBlocksIntoPlanView();
     setPlanKind(activePlanKind);
-    window.scrollTo(0,0);
+    if(!restoringView) window.scrollTo(0,0);
   }
   if(mainView==='topics'){
     if(!activeNoteDomain || !containerById(activeNoteDomain)) activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
@@ -5076,11 +5148,11 @@ function applyMainViewState(){
     renderDomainEditor();
     renderKeepGrid(activeNoteDomain);
     updateAddNoteBtnColor();
-    window.scrollTo(0,0);
+    if(!restoringView) window.scrollTo(0,0);
   }
   if(mainView==='tools'){
     renderToolsView();
-    window.scrollTo(0,0);
+    if(!restoringView) window.scrollTo(0,0);
   } else {
     // leaving the tools tab: don't let the breathing animation or its sound cues, or a running
     // countdown timer, keep going silently in the background once they're no longer on screen
@@ -5212,6 +5284,7 @@ function setPlanKind(key){
   if(hint) hint.textContent = kind.hint;
   renderPlanPanes();
   renderPlanStrip();
+  rememberView();
 }
 function renderPlanPanes(){
   const block = planBlockOf(activePlanKind);
@@ -7296,6 +7369,27 @@ function ensureListExpanded(key){
     applyListCap(key, el ? Number(el.dataset.itemCount||0) : 0);
   }
 }
+/* A capped list used to be a 300px box with its own scrollbar. That box swallowed every vertical
+   swipe that started on top of it: because it also carries overscroll-behavior:contain, the swipe
+   never chained on to the page, so once a list filled the screen the only way to move the page at
+   all was a narrow strip of margin beside it.
+
+   So the cap hides the extra rows instead of shrinking the space they live in. Same promise -- a
+   long list doesn't eat the screen -- but the page stays the only thing that scrolls, and a finger
+   anywhere on it moves the page. "הצג את כל הרשימה" now really does show the rest. */
+function applyRowCap(listEl, capped){
+  let shown = 0, past = false;
+  for(const el of listEl.children){
+    el.classList.remove('capped-hidden');
+    if(!capped) continue;
+    // notices and the "empty" placeholder aren't rows and never count against the cap
+    if(el.tagName !== 'LI' || el.classList.contains('empty')) continue;
+    if(past){ el.classList.add('capped-hidden'); continue; }
+    // a divider is scenery: it rides along with the rows above it but doesn't use one up
+    if(el.classList.contains('fav-divider')) continue;
+    if(++shown >= LIST_CAP_THRESHOLD) past = true;
+  }
+}
 function applyListCap(key, itemCount){
   const listEl = document.getElementById(key+'List');
   const expandRow = document.getElementById(key+'ListExpandRow');
@@ -7304,6 +7398,7 @@ function applyListCap(key, itemCount){
   const needsCap = itemCount > LIST_CAP_THRESHOLD;
   const expanded = listExpandState[key];
   listEl.classList.toggle('capped', needsCap && !expanded);
+  applyRowCap(listEl, needsCap && !expanded);
   expandRow.style.display = needsCap ? 'flex' : 'none';
   const btn = expandRow.querySelector('.list-expand-btn');
   if(btn) btn.innerHTML = `<span class="chev">${expanded?'▴':'▾'}</span> ${expanded?'כווץ בחזרה':'הצג את כל הרשימה'}`;
@@ -7754,6 +7849,7 @@ function cycleCalendarView(){
 // switching tabs scrolls the tab row to the top, so what you just chose is the first thing you
 // see instead of wherever the previous tab happened to leave the page
 function scrollScheduleTabsToTop(){
+  if(restoringView) return;
   const tabs = document.getElementById('scheduleTabs');
   if(!tabs) return;
   requestAnimationFrame(()=>{
@@ -7772,6 +7868,7 @@ function setScheduleTab(tab){
   else if(tab==='habits') renderHabits();
   else if(tab==='anchors') renderAnchorsTab();
   else if(tab==='tasks') renderTasks();
+  rememberView();
 }
 function renderScheduleTabs(){
   document.querySelectorAll('.schedule-tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===scheduleActiveTab));
@@ -13333,6 +13430,7 @@ function openSection(key){
   scrollSectionHeaderToTop(key);
 }
 function scrollSectionHeaderToTop(key){
+  if(restoringView) return;
   const body = document.getElementById('secbody-'+key);
   const section = body && body.closest('section');
   if(!section) return;
