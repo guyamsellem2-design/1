@@ -3175,7 +3175,7 @@
   .note-chiplist{ margin-top:8px; }
 
   /* ---------------------------------------------------------------------------
-     42. תכנון — the third tab.
+     42. טיוטות — the third tab.
      The three drafts of a life used to be three sections stacked down the home
      screen. Here they are three tabs of one place, so the home screen can go
      back to being about today. Their own section headings stay, because each
@@ -3313,6 +3313,59 @@
     font-size:clamp(24px,5.4vw,32px); line-height:1.15;
     color:var(--text); margin:2px 0 6px;
   }
+
+  /* ---------------------------------------------------------------------------
+     46. טיוטות — the four lenses, and the rows underneath them.
+
+     Four chips in one row: each takes an equal quarter and lets its own label
+     wrap, so no lens is pushed onto a line of its own no matter how long its
+     name is or how many items are waiting in it.
+
+     The rows below used to be one long line that wrapped wherever it ran out of
+     room, which put the buttons in a different place on every item. Now it is
+     always two: what it says, then what you can do about it.
+     --------------------------------------------------------------------------- */
+  #planTabStrip{ gap:6px; }
+  #planTabStrip .plan-chip{
+    flex:1 1 0; min-width:0; justify-content:center;
+    padding:7px 5px; border-radius:12px; text-align:center;
+  }
+  #planTabStrip .plan-chip .chip-name{
+    white-space:normal; font-size:12.5px; line-height:1.25; overflow-wrap:anywhere;
+  }
+  /* no heading left in the pane, so the hint line is the top of it -- one line, with "נקה הכל"
+     sitting at its end rather than dropping to a line of its own */
+  .plan-section-head{ flex-wrap:nowrap; align-items:center; margin-bottom:10px; }
+  #planHost .plan-section-head .hint{ margin:0; flex:1; min-width:0; }
+  #planHost .plan-section-head .reset-btn{ flex-shrink:0; }
+  /* `.add-row button` paints every button in the row gold, which made "+ תאריך תשובה" -- a toggle
+     for a detail you may not even want -- look exactly as much like the action as "הוסף" does */
+  #dilemmasSectionBody .add-row .add-domain-btn{
+    background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
+    font-weight:400; box-shadow:none;
+  }
+  #dilemmasSectionBody .add-row .add-domain-btn:hover{ color:var(--text); border-color:var(--muted); }
+
+  .prefers-label{ font-size:13.5px; color:var(--muted2); white-space:nowrap; align-self:center; }
+
+  ul.tasks li.suggestion-li{ flex-direction:column; align-items:stretch; gap:7px; }
+  li.suggestion-li .sugg-line{ display:flex; align-items:center; gap:9px; }
+  li.suggestion-li .sugg-line .task-text{ flex:1; min-width:0; }
+  /* One line, measured: the four controls plus their gaps have to clear 284px of row on a 390px
+     phone, and at the sizes they carry elsewhere in the app they land on exactly 284 -- close
+     enough that a rounding remainder wraps "הזזה" onto a second line. They are secondary to the
+     words above them, so they give up the few pixels rather than the row giving up its shape. */
+  li.suggestion-li .sugg-opts{ display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
+  li.suggestion-li .sugg-opts .promote{ font-size:12px; padding:3px 7px; }
+  li.suggestion-li .sugg-opts .suggestion-badge{ font-size:11.5px; padding:4px 7px; }
+  li.suggestion-li .sugg-opts .say-no-btn{ font-size:12px; padding:4px 9px; min-height:26px; }
+  .move-btn{
+    font-family:inherit; font-size:12px; color:var(--muted2);
+    background:transparent; border:1px dashed var(--border-strong);
+    border-radius:var(--r-pill); padding:4px 8px; cursor:grab;
+    touch-action:none; user-select:none; white-space:nowrap;
+  }
+  .move-btn:hover{ color:var(--text); border-color:var(--muted2); }
 
 </style>
 </head>
@@ -3692,7 +3745,7 @@
   <div class="nav-app-name">המפה השבועית שלי</div>
   <hr>
   <div class="nav-home-link" onclick="navigateHome()">🏠 היומן</div>
-  <div class="nav-home-link" onclick="switchMainView('plan')">🗺 תכנון</div>
+  <div class="nav-home-link" onclick="switchMainView('plan')">🗺 טיוטות</div>
   <div class="nav-home-link" onclick="switchMainView('topics')">📓 המחברת</div>
   <div class="nav-home-link" onclick="switchMainView('tools')">🧰 כלים</div>
   <hr>
@@ -3703,7 +3756,7 @@
 
 <div class="main-tab-bar">
   <button class="main-tab-btn" id="mainTabHomeBtn" onclick="switchMainView('home')">🏠 היומן</button>
-  <button class="main-tab-btn" id="mainTabPlanBtn" onclick="switchMainView('plan')">🗺 תכנון</button>
+  <button class="main-tab-btn" id="mainTabPlanBtn" onclick="switchMainView('plan')">🗺 טיוטות</button>
   <button class="main-tab-btn" id="mainTabTopicsBtn" onclick="switchMainView('topics')">📓 המחברת</button>
   <button class="main-tab-btn" id="mainTabToolsBtn" onclick="switchMainView('tools')">🧰 כלים</button>
 </div>
@@ -3828,9 +3881,8 @@
 
 
   <section data-plan-block="someday">
-    <div class="section-head">
-      <h2 onclick="toggleSection('someday')"><span id="somedayHeading">רעיונות וחלומות</span> <span class="chev" id="chev-someday">▾</span></h2>
-      <div class="hint">רעיונות ומשימות בלי מועד. לגעת מתי שבא, בלי התחייבות.</div>
+    <div class="section-head plan-section-head">
+      <div class="hint" id="somedayHint">לכתוב ולשחרר. בלי מועד, בלי התחייבות.</div>
       <button class="reset-btn" onclick="clearSomeday()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-someday">
@@ -3862,17 +3914,12 @@
   </section>
 
   <section data-plan-block="suggestions">
-    <div class="section-head">
-      <h2 onclick="toggleSection('suggestions')"><span id="suggestionsHeading">הצעות ובקשות</span> <span class="chev" id="chev-suggestions">▾</span></h2>
-      <div class="hint">מישהו מחכה לתשובה, או משהו שעוד לא הוכרע. בלי לחץ להחליט עכשיו.</div>
+    <div class="section-head plan-section-head">
+      <div class="hint" id="suggestionsHint">מישהו מחכה לתשובה. בלי לחץ להחליט עכשיו.</div>
       <button class="reset-btn" onclick="clearDilemmasSection()">🧹 נקה הכל</button>
     </div>
     <div id="secbody-suggestions">
     <div class="card">
-      <div class="dilemma-subtabs">
-        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabOthersBtn" onclick="setDilemmaSubTab('others')">העדפות של אחרים</button>
-        <button type="button" class="dilemma-subtab-btn" id="dilemmaSubtabGeneralBtn" onclick="setDilemmaSubTab('general')">התלבטויות כלליות</button>
-      </div>
       <div id="dilemmasSectionBody"></div>
     </div>
     </div>
@@ -3931,14 +3978,13 @@
 
 <div id="planView" style="display:none;">
   <div class="domain-page-topbar">
-    <div class="domain-page-header"><h1>🗺 תכנון</h1></div>
+    <div class="domain-page-header"><h1>🗺 טיוטות</h1></div>
     <div class="header-actions">
       <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
       <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
       <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
     </div>
   </div>
-  <p class="hint" style="margin:0 0 12px;">כל מה שעוד לא קיבל זמן. אין כאן מועדים ואין לחץ — רק מקום לדברים שמחכים.</p>
   <div class="topic-tab-strip" id="planTabStrip"></div>
   <div id="planHost"></div>
 </div>
@@ -4498,7 +4544,7 @@ function renderWorldSwitch(){
   const nNotebook = countIn(notebookList());
   // Dividers in a notebook, not another row of chips: they overlap, they sit ON the page rather
   // than floating above it, and only the one you are standing in takes a colour. The order runs
-  // תכנון → תחומי חיים → מחברות, from the draft of a life outward to the things beside it.
+  // תחומי חיים → מחברות, from a part of a life outward to the things beside it.
   const worlds = [
     {key:'domain',   label:'🌱 תחומי חיים', count:nDomain},
     {key:'notebook', label:'📓 מחברות',     count:nNotebook},
@@ -5101,7 +5147,7 @@ function ensureDomainNotes(id){ if(!data.domainNotes) data.domainNotes = {}; if(
    this line is shared. */
 let noteWorld = 'domain'; // 'domain' | 'notebook'
 
-/* ---------- the third tab: תכנון ----------
+/* ---------- the third tab: טיוטות ----------
    The concrete plan is the calendar. Everything else about organising a life is a draft of one:
    things to do with no date, things to keep at, and things still being weighed up. Those three
    were three separate sections stacked down the home screen; here they are three tabs of one
@@ -5115,10 +5161,10 @@ let noteWorld = 'domain'; // 'domain' | 'notebook'
    matters because "לתקן את האופניים" and "לנסוע ליפן" are not the same kind of thing, and mixing
    them is exactly what makes such a list feel like too much. */
 const PLAN_KINDS = [
-  {key:'dreams',      label:'רעיונות וחלומות', block:'someday'},
-  {key:'somedayTasks',label:'משימות ללא מועד', block:'someday'},
-  {key:'suggestions', label:'הצעות ובקשות',    block:'suggestions'},
-  {key:'dilemmas',    label:'התלבטויות',       block:'suggestions'},
+  {key:'dreams',      label:'רעיונות וחלומות', block:'someday',     hint:'לכתוב ולשחרר. בלי מועד, בלי התחייבות.'},
+  {key:'somedayTasks',label:'משימות ללא מועד', block:'someday',     hint:'מחכות לזמן שלהן. אין דחיפות.'},
+  {key:'suggestions', label:'הצעות ובקשות',    block:'suggestions', hint:'מישהו מחכה לתשובה.', sub:'others'},
+  {key:'dilemmas',    label:'התלבטויות',       block:'suggestions', hint:'משהו שעוד לא הוכרע.', sub:'general'},
 ];
 let activePlanKind = 'dreams';
 function planBlockOf(key){ const k = PLAN_KINDS.find(x=>x.key===key); return k ? k.block : 'someday'; }
@@ -5141,19 +5187,23 @@ function movePlanBlocksIntoPlanView(){
 }
 function setPlanKind(key){
   activePlanKind = key;
-  const block = planBlockOf(key);
+  const kind = PLAN_KINDS.find(k=>k.key===key) || PLAN_KINDS[0];
+  const block = kind.block;
   // these blocks each carry their own collapse toggle from when they lived on the home screen;
   // inside a tab of their own, collapsed would just mean an empty page
   openSection(block);
   // and each one is drawn by the home render pass, which no longer runs here -- so draw the one
   // being shown, or you get its empty shell from boot time
   if(block === 'someday'){ renderSomeday(); }
-  else { renderDilemmasSection(); renderSuggestions(); }
-  // one block, two lenses -- so its heading has to say which lens you are looking through
-  const h1 = document.getElementById('somedayHeading');
-  if(h1) h1.textContent = key === 'dreams' ? 'רעיונות וחלומות' : 'משימות ללא מועד';
-  const h2 = document.getElementById('suggestionsHeading');
-  if(h2) h2.textContent = key === 'suggestions' ? 'הצעות ובקשות' : 'התלבטויות';
+  else {
+    // the chip is the only switch: הצעות ובקשות and התלבטויות used to be a second row of sub-tabs
+    // underneath, which meant choosing the same thing twice
+    dilemmaSubTab = kind.sub;
+    renderDilemmasSection();
+  }
+  // no heading -- the chip already names the lens, so the one line left says what it is FOR
+  const hint = document.getElementById(block === 'someday' ? 'somedayHint' : 'suggestionsHint');
+  if(hint) hint.textContent = kind.hint;
   renderPlanPanes();
   renderPlanStrip();
 }
@@ -5490,7 +5540,7 @@ function keepNoteHtml(id, n){
           : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
         <span class="del-task" onclick="deleteDomainNote('${id}','${n.id}')" title="מחיקה">✕</span>
       </div>
-      <input type="text" class="keep-note-title" dir="auto" placeholder="שם (לא חובה)" value="${escapeAttr(n.title||'')}"
+      <input type="text" class="keep-note-title" dir="auto" placeholder="שם" value="${escapeAttr(n.title||'')}"
         data-field-key="notetitle-${n.id}" oninput="onKeepNoteTitleInput('${id}','${n.id}', this.value)">
       <div class="keep-note-toolbar">
         <span class="keep-note-fmt-btn fmt-bold" onmousedown="event.preventDefault()" onclick="execNoteFormat('bold')" title="מודגש">B</span>
@@ -9263,8 +9313,8 @@ function reorderSomedaySubtasks(somedayId, fromId, toId){
   saveData();
   renderSomeday();
 }
-/* ---------- התלבטויות: "העדפות של אחרים" (existing) + "התלבטויות כלליות" (new) share this one
-   numbered section, switched by a small sub-tab strip -- she wanted the two kept apart (others'
+/* ---------- "הצעות ובקשות" + "התלבטויות" share one body, switched by the טיוטות chips -- the
+   two are kept apart (others'
    suggestions almost always have a real reply deadline; general dilemmas often don't) but sharing
    the same body-check and "עוד" decision-helper panel, since both are really the same underlying
    question: "what do I do about this." only one sub-tab's list/form is ever rendered at a time. ---------- */
@@ -9276,10 +9326,6 @@ function setDilemmaSubTab(tab){
 function renderDilemmasSection(){
   const el = document.getElementById('dilemmasSectionBody');
   if(!el) return;
-  const othersBtn = document.getElementById('dilemmaSubtabOthersBtn');
-  const generalBtn = document.getElementById('dilemmaSubtabGeneralBtn');
-  if(othersBtn) othersBtn.classList.toggle('active', dilemmaSubTab==='others');
-  if(generalBtn) generalBtn.classList.toggle('active', dilemmaSubTab==='general');
   withFocusPreserved('dilemmasSectionBody', ()=>{
     el.innerHTML = dilemmaSubTab==='general' ? generalDilemmasSubViewHtml() : suggestionsSubViewHtml();
   });
@@ -9294,13 +9340,14 @@ function renderDilemmasSection(){
 function suggestionsSubViewHtml(){
   return `
     <div class="add-row">
-      <input type="text" id="suggWho" placeholder="מי הציע? (רשות)" style="max-width:150px;">
+      <input type="text" id="suggWho" placeholder="מי הציע?" style="max-width:120px;">
+      <span class="prefers-label">מעדיף ש -</span>
       <input type="text" id="suggText" placeholder="מה ההצעה...">
-      <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ תאריך תשובה (רשות)</button>
+      <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ תאריך תשובה</button>
       <button onclick="addSuggestion()">הוסף</button>
     </div>
     <div class="add-row" id="suggDetailsFields" style="display:none;">
-      <label class="field-label">תשובה עד (לא חובה)<input type="date" id="suggReplyDate"></label>
+      <label class="field-label">תשובה עד<input type="date" id="suggReplyDate"></label>
       ${timePickerHtml('suggReplyTime', '', 'שעה')}
     </div>
     <div id="pendingBodyCheck-suggestion" style="margin-bottom:8px;"></div>
@@ -9355,15 +9402,17 @@ function renderSuggestions(){
     if(editingSuggestionId===s.id) return suggestionEditFormHtml(s);
     return `
     <li class="suggestion-li ${s.done?'suggestion-done':''}" data-drag-id="${s.id}">
-      <span class="grip" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
-      <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
-      <span class="task-text" style="flex:1" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
-      <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 הוסף ליומן</span>
-      <span class="answer-stack">
+      <div class="sugg-line">
+        <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
+        <span class="task-text" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}${escapeHtml(s.text)}</span>
+        <span class="del-task" onclick="deleteSuggestion('${s.id}')" title="מחיקה">✕</span>
+      </div>
+      <div class="sugg-opts">
+        <span class="promote" onclick="convertSuggestionToTask('${s.id}')">🔁 ליומן</span>
         <span class="suggestion-badge ${s.answered?'answered':''}" onclick="toggleSuggestionAnswered('${s.id}')">${s.answered?'החזרת תשובה.':'החזרת תשובה?'}</span>
         ${s.answered ? '' : `<button type="button" class="say-no-btn" onpointerdown="startSayNoHold(event)" onclick="sayNoToSuggestion('${s.id}', event)">לא!</button>`}
-      </span>
-      <span class="del-task" onclick="deleteSuggestion('${s.id}')" title="מחיקה">✕</span>
+        <button type="button" class="move-btn" onpointerdown="startListDrag(event,'${s.id}','.suggestion-li',reorderSuggestions)" title="להחזיק ולהזיז">⠿ הזזה</button>
+      </div>
       ${(s.replyDate || s.replyTime) ? `<div class="sugg-reply-due" onclick="openSuggestionEdit('${s.id}')" title="לחיצה לשינוי מועד התשובה">⏰ תשובה עד: ${formatDateTimeHe(s.replyDate, s.replyTime)}${urgencyInlineText(s)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(s, {urgencyOptions:['objective','other','relief','waitDiscomfort'], showEnergy:true, hideUrgency: !!(s.replyDate || s.replyTime)})}
     </li>`;
@@ -9374,8 +9423,9 @@ function suggestionEditFormHtml(s){
   return `<li class="edit-li" data-drag-id="${s.id}">
     <div class="anchor-form">
       <div class="edit-form-row">
+        <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע?" style="max-width:120px;">
+        <span class="prefers-label">מעדיף ש -</span>
         <input type="text" id="suggEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="מה ההצעה..." style="flex:2;">
-        <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע? (רשות)">
       </div>
       <div class="edit-form-row">
         <label class="field-label">תשובה עד<input type="date" id="suggEditDate-${s.id}" value="${s.replyDate||''}" onchange="onSuggReplyDateChange('${s.id}', this.value)"></label>
@@ -9552,11 +9602,11 @@ function generalDilemmasSubViewHtml(){
     <div class="add-row">
       <input type="text" id="dilemmaText" placeholder="במה אני מתלבט/ת...">
       <select id="dilemmaDomain">${domainOptionsWithEmpty('')}</select>
-      <button type="button" class="add-domain-btn" onclick="toggleDilemmaDetails()" id="dilemmaDetailsToggle">+ מועד קבלת ההחלטה (רשות)</button>
+      <button type="button" class="add-domain-btn" onclick="toggleDilemmaDetails()" id="dilemmaDetailsToggle">+ מועד להחליט</button>
       <button onclick="addGeneralDilemma()">הוסף</button>
     </div>
     <div class="add-row" id="dilemmaDetailsFields" style="display:none;">
-      <label class="field-label">יש מועד שרוצים להחליט עד אליו? (לא חובה)<input type="date" id="dilemmaDate"></label>
+      <label class="field-label">להחליט עד<input type="date" id="dilemmaDate"></label>
     </div>
     <div id="pendingBodyCheck-dilemma" style="margin-bottom:8px;"></div>
     <ul class="tasks scroll-cap" id="dilemmaList"></ul>
@@ -9874,13 +9924,17 @@ function renderGeneralDilemmaList(){
     const dom = d.domain ? domainById(d.domain) : null;
     return `
     <li class="suggestion-li ${d.done?'suggestion-done':''}" data-drag-id="${d.id}">
-      <span class="grip" onpointerdown="startListDrag(event,'${d.id}','.suggestion-li',reorderGeneralDilemmas)" title="החזק ללחיצה ארוכה כדי לגרור">⠿</span>
-      <div class="chk ${d.done?'done':''}" onclick="toggleDilemmaDone('${d.id}')"></div>
-      <span class="task-text" style="flex:1" onclick="openDilemmaEdit('${d.id}')">${escapeHtml(d.text)}</span>
-      ${dom ? `<span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>` : ''}
-      <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 הוסף ליומן</span>
-      <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
-      <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')" title="מחיקה">✕</span>
+      <div class="sugg-line">
+        <div class="chk ${d.done?'done':''}" onclick="toggleDilemmaDone('${d.id}')"></div>
+        <span class="task-text" onclick="openDilemmaEdit('${d.id}')">${escapeHtml(d.text)}</span>
+        ${dom ? `<span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>` : ''}
+        <span class="del-task" onclick="deleteGeneralDilemma('${d.id}')" title="מחיקה">✕</span>
+      </div>
+      <div class="sugg-opts">
+        <span class="promote" onclick="convertDilemmaToTask('${d.id}')">🔁 ליומן</span>
+        <span class="suggestion-badge ${d.done?'answered':''}" onclick="toggleDilemmaDone('${d.id}')">${d.done?'התקבלה החלטה.':'התקבלה החלטה?'}</span>
+        <button type="button" class="move-btn" onpointerdown="startListDrag(event,'${d.id}','.suggestion-li',reorderGeneralDilemmas)" title="להחזיק ולהזיז">⠿ הזזה</button>
+      </div>
       ${d.decisionDate ? `<div class="sugg-reply-due">⏰ להחליט עד: ${formatDateHe(d.decisionDate)}</div>` : ''}
       ${bodyCheckStatusBadgesHtml(d, {urgencyOptions:['objective','other','relief']})}
     </li>`;
@@ -10705,7 +10759,7 @@ function renderAllDependent(){
 }
 
 function resetAll(){
-  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההעדפות של אחרים, ההתלבטויות הכלליות, תיבת הקליטה, ורעיונות ומשימות לעתיד? בנק התובנות, בנק התזכורות לבחור בעצמי, ובנק המשפטים/הקישורים/התשובות המוכנות לעזרה בקבלת החלטה יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
+  if(!confirm('לאפס את כל הנושאים, העוגנים, המשימות, הפתקים, ההצעות והבקשות, ההתלבטויות, תיבת הקליטה, ורעיונות ומשימות לעתיד? בנק התובנות, בנק התזכורות לבחור בעצמי, ובנק המשפטים/הקישורים/התשובות המוכנות לעזרה בקבלת החלטה יישארו שמורים. פעולה זו לא ניתנת לביטול — מומלץ להוריד גיבוי קודם.')) return;
   const keepReflection = data.reflectionBanks;
   const keepSelfChoiceReminders = data.selfChoiceReminders;
   const keepGoodThings = data.goodThingsList;
@@ -10749,12 +10803,12 @@ function clearAllTasks(){
   renderScheduleGrid();
   flashStatus('רשימת המשימות נוקתה');
 }
-// clears both sub-tabs together (העדפות של אחרים + התלבטויות כלליות) -- after a couple of weeks
+// clears both lenses together (הצעות ובקשות + התלבטויות) -- after a couple of weeks
 // a stale request from someone else is just as irrelevant as a stale general dilemma
 function clearDilemmasSection(){
   const total = (data.suggestions||[]).length + (data.generalDilemmas||[]).length;
   if(total===0){ flashStatus('אין כרגע כלום לנקות בהתלבטויות'); return; }
-  if(!confirm(`למחוק את כל ${total} הפריטים בהתלבטויות (גם העדפות של אחרים וגם התלבטויות כלליות)? לא ניתן לביטול — מומלץ להוריד גיבוי קודם.`)) return;
+  if(!confirm(`למחוק את כל ${total} הפריטים (גם הצעות ובקשות וגם התלבטויות)? לא ניתן לביטול — מומלץ להוריד גיבוי קודם.`)) return;
   // clear out the linked reply-date tasks too, or they'd be left stranded on the schedule/gcal
   // with nothing left pointing back at them
   (data.suggestions||[]).forEach(s=>{
@@ -12398,7 +12452,7 @@ function finishConvert(destKind, text, domain, extra={}){
   } else if(destKind==='suggestion'){
     data.suggestions.push({id:uid(), who:'', text, answered:false, done:false, replyDate:'', replyTime:'', bodyCheck:{}});
     saveData(); renderSuggestions();
-    flashStatus('נוסף ל"העדפות של אחרים"');
+    flashStatus('נוסף ל"הצעות ובקשות"');
   } else if(destKind==='dilemma'){
     if(!data.generalDilemmas) data.generalDilemmas = [];
     data.generalDilemmas.push({id:uid(), text, domain: domain||'', decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()});
@@ -13635,7 +13689,7 @@ window.addEventListener('touchcancel', gestureCancel, {passive:true});
 
 setupPWA();
 loadData();
-// the draft blocks live in the home markup but belong to the notebook's תכנון tab -- relocate them
+// the draft blocks live in the home markup but belong to the טיוטות tab -- relocate them
 // at boot rather than the first time that tab is opened, or a fresh load shows them on the home
 // page until you happen to go there
 movePlanBlocksIntoPlanView();
