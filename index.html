@@ -220,7 +220,13 @@
   .keep-note-editor:focus{outline:none;}
   .keep-note-editor.note-clip{max-height:110px;}
   .keep-note-editor-wrap{position:relative;}
-  .note-clip-more{position:absolute; bottom:0; left:50%; transform:translateX(-50%); font-size:16px; line-height:1; letter-spacing:2px; padding:2px 10px 0; color:var(--note-fg-muted, var(--muted2)); cursor:pointer;}
+  .note-clip-more{
+    font-size:15px; font-weight:700; letter-spacing:2px; line-height:1;
+    padding:5px 14px; border-radius:var(--r-pill); cursor:pointer; white-space:nowrap;
+    color:var(--gold); background:transparent; border:1.5px solid var(--gold);
+    font-family:inherit;
+  }
+  .note-clip-more:hover{ background:rgba(212,162,76,.12); }
   .keep-note-editor:empty::before{content:attr(data-placeholder); color:var(--muted2);}
   .note-size-btn{cursor:pointer; font-size:12.5px; color:var(--muted2); padding:4px 10px; border-radius:999px; border:1px solid var(--border-strong); background:var(--surface3); white-space:nowrap;}
   .note-size-btn:hover{background:var(--surface2);}
@@ -3238,11 +3244,12 @@
   }
   .habit-panel-head{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
   .habit-panel-name{ flex:1; min-width:0; font-size:17px; font-weight:600; cursor:pointer; overflow-wrap:anywhere; }
-  /* Short labels made all five fit across a phone, so this is a plain row again — no scrolling,
-     nothing hidden past an edge, and "עשיתי 🙂" is always in reach. It still scrolls rather than
-     wrapping if a narrower screen than 390px ever turns up. */
+  /* Six controls across a phone: measured, they come to 341px of a 302px row at the old size, so
+     each gives up a little of the space around its text. Once a day and hour are actually set the
+     first button carries a label of its own and the row does run past the edge -- it scrolls
+     rather than wrapping, so "עשיתי 🙂" is never pushed onto a second line. */
   .habit-actions{
-    display:flex; flex-wrap:nowrap; gap:4px;
+    display:flex; flex-wrap:nowrap; gap:3px;
     overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
   }
   .habit-actions::-webkit-scrollbar{ display:none; }
@@ -3251,7 +3258,7 @@
      that lives on add-rows cannot claim these */
   .habit-actions .habit-act{
     background:transparent; border:1px dashed var(--border-strong); color:var(--muted);
-    border-radius:var(--r-pill); padding:6px 8px; font-size:12.5px; font-family:inherit;
+    border-radius:var(--r-pill); padding:6px 6px; font-size:11.5px; font-family:inherit;
     cursor:pointer; white-space:nowrap; min-height:36px;
   }
   .habit-actions .habit-act:hover{ color:var(--text); border-color:var(--muted); }
@@ -3568,6 +3575,44 @@
      phone, and at the sizes they carry elsewhere in the app they land on exactly 284 -- close
      enough that a rounding remainder wraps "הזזה" onto a second line. They are secondary to the
      words above them, so they give up the few pixels rather than the row giving up its shape. */
+  /* A thing you chose for today, glowing quietly until it is done or unchosen. The tint is the
+     app's gold, not a new colour, so it reads as emphasis rather than as a status of its own. */
+  .today-idea-row.today-idea-chosen{
+    box-shadow:0 0 0 1.5px rgba(212,162,76,.45), 0 0 14px -2px var(--glow-gold);
+    border-radius:12px;
+  }
+  body.night-mode .today-idea-row.today-idea-chosen{
+    box-shadow:0 0 0 1.5px rgba(231,200,120,.5), 0 0 18px -2px rgba(231,200,120,.45);
+  }
+
+  /* the three that matter right now, wherever a topic chip is drawn */
+  .domain-chip.topic-important{
+    box-shadow:0 0 0 1.5px var(--tint), 0 0 14px -3px var(--tint);
+  }
+  .add-domain-btn.important-topics-btn.active{
+    background:var(--gold); color:#241a06; border-style:solid; border-color:transparent; font-weight:600;
+  }
+  /* on the home screen: no heading, just the names */
+  .important-topics-strip{ display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 14px; }
+  .important-topic-chip{
+    font-size:13px; font-weight:600; padding:5px 13px; border-radius:var(--r-pill);
+    color:var(--text); background:var(--surface); cursor:pointer;
+    border:1.5px solid var(--tint);
+    box-shadow:0 0 12px -3px var(--tint);
+  }
+
+  .leave-ask-overlay{
+    position:fixed; inset:0; z-index:5200; background:rgba(0,0,0,.45);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .leave-ask-box{
+    background:var(--surface); border:1.5px solid var(--card-line); border-radius:18px;
+    padding:20px 22px; box-shadow:var(--lift-3); max-width:320px; width:100%;
+  }
+  .leave-ask-title{ font-size:17px; font-weight:700; color:var(--text); margin-bottom:16px; }
+  .leave-ask-actions{ display:flex; gap:10px; }
+  .leave-ask-actions button{ flex:1; padding:11px 14px; border-radius:10px; font-family:inherit; font-size:15px; cursor:pointer; }
+
   .timeline-sheet-tools{ gap:6px; margin-top:2px; }
   .sheet-subtasks{ margin-bottom:10px; }
 
@@ -3921,7 +3966,7 @@
      overlay no matter which section is collapsed or which tab is active -- opening it from
      elsewhere (someday, today's ideas, a list item...) must never require that section to already
      be expanded, and must never move/scroll the person away from wherever they actually are. -->
-<div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="dismissTimelineSheet()" style="display:none;"></div>
+<div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="backgroundLeaveTimelineSheet()" style="display:none;"></div>
 <div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
 
 <!-- global quick-capture: reachable from any tab, any scroll position, any collapsed section --
@@ -3934,7 +3979,7 @@
      offering both: create the thing this screen is about, or still just catch the thought. -->
 <button type="button" class="inbox-fab" id="inboxFab" onclick="onInboxFabClick()" title="תפיסת מחשבה מהירה">✏️</button>
 <div class="fab-menu" id="fabMenu" style="display:none;"></div>
-<div class="inbox-capture-overlay" id="inboxCaptureOverlay" onclick="closeInboxCapture()" style="display:none;"></div>
+<div class="inbox-capture-overlay" id="inboxCaptureOverlay" onclick="backgroundLeaveCapture()" style="display:none;"></div>
 <div class="inbox-capture-sheet" id="inboxCaptureSheet" style="display:none;">
   <div class="timeline-sheet-handle"></div>
   <div class="inbox-capture-label">מה עולה לך?</div>
@@ -3957,6 +4002,35 @@
 <!-- global search: same top-level placement as the inbox capture sheet, reachable from any tab --
      one place to find a task/note/list-item/someday-item/habit without remembering which of the
      several places it might have ended up in. -->
+<!-- Tapping the background is how a sheet gets closed by accident, and it was taking whatever
+     you had typed with it. It asks now, in the app's own shape rather than the browser's. -->
+<div class="leave-ask-overlay" id="leaveAskOverlay" style="display:none;">
+  <div class="leave-ask-box">
+    <div class="leave-ask-title" id="leaveAskTitle">לשמור את מה שכתבת?</div>
+    <div class="leave-ask-actions">
+      <button type="button" class="save-btn" onclick="confirmLeaveSheet()">שמור</button>
+      <button type="button" class="cancel-btn" onclick="cancelLeaveSheet()">בטל</button>
+    </div>
+  </div>
+</div>
+
+<div class="inbox-capture-overlay" id="backupOverlay" onclick="closeBackupSheet()" style="display:none;"></div>
+<div class="inbox-capture-sheet" id="backupSheet" style="display:none;">
+  <div class="timeline-sheet-handle"></div>
+  <div class="inbox-capture-label">גיבוי והעברה</div>
+  <p class="hint" style="margin:0 0 12px;">קובץ אחד עם כל התוכן, כדאי לפני שינוי גדול · אם הדפדפן תומך אפשר לבחור שם ומיקום, אחרת הוא יורד לתיקיית ההורדות</p>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="add-domain-btn" onclick="exportData()">⬇ הורדת גיבוי</button>
+    <button class="add-domain-btn" onclick="document.getElementById('importFile').click()">⬆ טעינת גיבוי (מחליף הכל)</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+    <button class="add-domain-btn" onclick="document.getElementById('importMergeFile').click()">➕ הוספת תוכן מקובץ (לא מוחק כלום)</button>
+    <input type="file" id="importMergeFile" accept="application/json" style="display:none" onchange="importDataMerge(event)">
+  </div>
+  <div class="timeline-sheet-actions">
+    <button type="button" class="cancel-btn" onclick="closeBackupSheet()">סגירה</button>
+  </div>
+</div>
+
 <div class="inbox-capture-overlay" id="searchOverlay" onclick="closeSearch()" style="display:none;"></div>
 <div class="inbox-capture-sheet search-sheet" id="searchSheet" style="display:none;">
   <div class="timeline-sheet-handle"></div>
@@ -3996,6 +4070,7 @@
       <button class="reset-btn" id="redoBtn" onclick="performRedo()" disabled title="בצע שוב">↷ בצע שוב</button>
       <button class="soft-btn mode-toggle-night" id="nightBtn" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
       <button class="soft-btn mode-toggle-soft" id="softBtn" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+      <button class="reset-btn" onclick="openBackupSheet()">💾 גיבוי והעברה</button>
     </div>
   </div>
   <button class="reset-btn" id="collapseAllBtn" onclick="collapseAllOnCurrentView()" disabled title="ממזער הכל בדף הזה, כולל פתקים">🗕 מזער הכל</button>
@@ -4025,13 +4100,14 @@
   <div id="onboardingCard"></div>
 
   <div class="feel-block" id="dayIntentionBlock"></div>
+  <!-- only drawn when something is actually marked: nothing to say is said with nothing -->
+  <div class="important-topics-strip" id="importantTopicsStrip" style="display:none;"></div>
 
 
   <div class="feel-block" id="todayPicksBlock"></div>
 
   <section>
     <div id="secbody-schedule">
-      <div class="schedule-reminder">מה ירחיב אותי? מה יעורר בי השראה?</div>
       <div class="schedule-tabs" id="scheduleTabs">
         <button type="button" class="schedule-tab-btn" data-tab="calendar" onclick="setScheduleTab('calendar')">יומן</button>
         <button type="button" class="schedule-tab-btn" data-tab="habits" onclick="setScheduleTab('habits')">הרגלים</button>
@@ -4096,7 +4172,7 @@
           <ul class="tasks scroll-cap" id="taskList"></ul>
           <div class="list-expand-row" id="taskListExpandRow" style="display:none;"><button class="list-expand-btn" onclick="toggleListExpand('task')"></button></div>
           <div class="add-row" style="margin-top:10px; margin-bottom:0;">
-            <button class="reset-btn" onclick="clearPastTasks()">🧹 נקה מה שעבר</button>
+            <button class="reset-btn" onclick="clearPastTasks()">🧹 נקה עבר זמנן/בוצעו</button>
             <button class="reset-btn" onclick="clearAllTasks()">🧹 נקה הכל</button>
           </div>
         </div>
@@ -4178,26 +4254,9 @@
 
 
 
-  <section>
-    <div class="section-head">
-      <h2 onclick="toggleSection('backup')">גיבוי והעברה <span class="chev" id="chev-backup">▾</span></h2>
-      <div class="hint">קובץ אחד עם כל התוכן, כדאי לפני שינוי גדול · אם הדפדפן תומך אפשר לבחור שם ומיקום, אחרת הוא יורד לתיקיית ההורדות</div>
-    </div>
-    <div id="secbody-backup">
-    <div class="card" style="display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="add-domain-btn" onclick="exportData()">⬇ הורדת גיבוי</button>
-      <button class="add-domain-btn" onclick="document.getElementById('importFile').click()">⬆ טעינת גיבוי (מחליף הכל)</button>
-      <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
-      <button class="add-domain-btn" onclick="document.getElementById('importMergeFile').click()">➕ הוספת תוכן מקובץ (לא מוחק כלום)</button>
-      <input type="file" id="importMergeFile" accept="application/json" style="display:none" onchange="importDataMerge(event)">
-    </div>
-    </div>
-  </section>
 
   <footer>
-    <span>אין חובה למלא הכל בבת אחת — תובנה אחת ברגע שהיא קופצת מספיקה.</span>
-    <button class="reset-btn" onclick="clearDoneTasks()">🧹 ניקוי משימות שבוצעו</button>
-    <button class="reset-btn" onclick="resetAll()">איפוס הכל</button>
+    <button class="reset-btn" onclick="resetAll()">איפוס כל התוכן באפליקציה</button>
   </footer>
 
 </div>
@@ -4302,7 +4361,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalDeletedEventIds: [], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalDeletedEventIds: [], uiState:{}, importantTopics: [], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -4361,6 +4420,8 @@ function loadData(){
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.gcalWriteCalendarId = parsed.gcalWriteCalendarId || null;
       data.gcalDeletedEventIds = Array.isArray(parsed.gcalDeletedEventIds) ? parsed.gcalDeletedEventIds : [];
+      data.uiState = (parsed.uiState && typeof parsed.uiState === 'object') ? parsed.uiState : {};
+      data.importantTopics = Array.isArray(parsed.importantTopics) ? parsed.importantTopics : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
@@ -4456,17 +4517,16 @@ function loadData(){
   }catch(e){
     data.domains = STARTER_DOMAINS.map(d=>({...d}));
   }
-  // every fresh app open starts fully minimized, on purpose -- a calm, uncluttered first screen
-  // instead of whatever happened to be left expanded last time. this overrides whatever was
-  // saved, every load, not just the very first one.
-  data.collapsedSections = {};
-  SECTION_KEYS.forEach(k=>{ data.collapsedSections[k] = true; });
+  // Everything used to be forced shut on every load, so a refresh was never just a refresh -- it
+  // undid whatever you had open. What is open or closed is now remembered like everything else.
+  if(!data.collapsedSections) data.collapsedSections = {};
   activeNoteDomain = data.domains[0] ? data.domains[0].id : null;
   migrateOldNotesToDomainNotes();
   migrateListsIntoNotebook();
   migrateInboxAway();
   normaliseLongHabits();
   // after activeNoteDomain has been defaulted, so a remembered topic wins over the first one
+  restoreUiState();
   restoreViewState();
   lastSnapshotJSON = JSON.stringify(data);
   render();
@@ -4832,6 +4892,50 @@ function renderWorldSwitch(){
   const page = document.getElementById('noteWorldPage');
   if(page) page.className = 'note-world-page world-' + noteWorld;
 }
+/* ---------- נושאים חשובים בתקופה זו ----------
+   Not a permanent property of a topic -- a period passes and what matters changes -- so it is a
+   mode you step into, mark at most three, and step out of. Three is the point: a list where
+   everything is important is the same list with more words on it.
+
+   Where topics can be filtered, "חשובים בתקופה זו" joins the menu as one more choice; and on the
+   home screen they sit under the intention as a quiet reminder, only if any are marked. */
+const IMPORTANT_TOPICS_MAX = 3;
+let importantTopicsMode = false;
+function importantTopicIds(){ return data.importantTopics || (data.importantTopics = []); }
+function isImportantTopic(id){ return importantTopicIds().indexOf(id) !== -1; }
+function importantTopicsInUse(){ return importantTopicIds().filter(id=>data.domains.some(d=>d.id===id)); }
+function toggleImportantTopicsMode(){
+  importantTopicsMode = !importantTopicsMode;
+  renderDomainEditor();
+}
+function toggleImportantTopic(id){
+  const list = importantTopicIds();
+  const at = list.indexOf(id);
+  if(at !== -1) list.splice(at, 1);
+  else {
+    if(list.length >= IMPORTANT_TOPICS_MAX){
+      flashStatus(`אפשר לסמן עד ${IMPORTANT_TOPICS_MAX} — אחד מהם צריך לרדת קודם`);
+      return;
+    }
+    list.push(id);
+  }
+  saveData();
+  renderDomainEditor();
+  renderImportantTopicsStrip();
+  renderTaskFilterSelect();
+}
+function renderImportantTopicsStrip(){
+  const el = document.getElementById('importantTopicsStrip');
+  if(!el) return;
+  const ids = importantTopicsInUse();
+  // nothing marked means nothing here at all -- no heading, no empty-state line
+  if(!ids.length){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = ids.map(id=>{
+    const d = data.domains.find(x=>x.id===id);
+    return `<span class="important-topic-chip" style="--tint:${d.color}" onclick="navigateToDomain('${d.id}')">${escapeHtml(d.name)}</span>`;
+  }).join('');
+}
 function renderDomainEditor(){
   renderWorldSwitch();
   const el = document.getElementById('topicTabStrip');
@@ -4839,9 +4943,16 @@ function renderDomainEditor(){
   if(noteWorld === 'notebook'){ renderNotebookStrip(el); return; }
   const emptyHint = data.domains.length===0 ? '<div class="empty" style="flex-basis:100%;">עדיין אין כאן נושאים — זה בית ריק שמחכה לך. תתחיל/י עם הכפתור "+ נושא" למטה 🌱</div>' : '';
   el.innerHTML = emptyHint + data.domains.map((d,i)=>{
+    if(importantTopicsMode){
+      const on = isImportantTopic(d.id);
+      return `<div class="domain-chip ${on?'topic-important':''}" data-id="${d.id}" style="--tint:${d.color}" onclick="toggleImportantTopic('${d.id}')">
+        <span class="chip-dot" style="background:${d.color}"></span>
+        <span class="chip-name">${on?'⭐ ':''}${escapeHtml(d.name)}</span>
+      </div>`;
+    }
     if(d.id!==activeNoteDomain){
       // compact when not selected, so short topic names don't leave dead space before the next tab wraps
-      return `<div class="domain-chip" data-id="${d.id}" onclick="selectTopicTab('${d.id}')">
+      return `<div class="domain-chip ${isImportantTopic(d.id)?'topic-important':''}" data-id="${d.id}" style="--tint:${d.color}" onclick="selectTopicTab('${d.id}')">
         <span class="chip-dot" style="background:${d.color}"></span>
         <span class="chip-name">${escapeHtml(d.name)}</span>
       </div>`;
@@ -4855,7 +4966,9 @@ function renderDomainEditor(){
         oninput="updateDomainNameLive('${d.id}', this.value); sizeChipInput(this)">
       <span class="rm" style="color:${activeChipFg};" onclick="event.stopPropagation(); deleteDomain('${d.id}')" title="מחיקת נושא">✕</span>
     </div>`;
-  }).join('') + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
+  }).join('')
+    + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
+    + `<button class="add-domain-btn important-topics-btn ${importantTopicsMode?'active':''}" onclick="toggleImportantTopicsMode()">${importantTopicsMode?'✓ סיום':'⭐ נושאים חשובים בתקופה זו'}</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
   el.querySelectorAll('input[type="text"]').forEach(sizeChipInput);
   renderNavList();
@@ -5597,6 +5710,32 @@ let drawSize = 5;
 // the page scrolls instead -- 1 (medium) = a short clipped preview you can still edit -- 2 (small) =
 // the single-line collapsed preview. minimizing/expanding steps one size at a time in either direction.
 const noteSizeLevel = new Map();
+/* These started life as module variables, which meant every one of them reset to closed on load --
+   so a refresh quietly undid whatever you had open. They are written down with the rest of the
+   state and read back at boot, and each toggle records the change. */
+function persistUiState(){
+  data.uiState = {
+    feelBlockOpen, todayIdeasOpen, procBlockOpen, videosBlockOpen, overdueSectionOpen,
+    listExpandState: {...listExpandState},
+    noteSizeLevel: [...noteSizeLevel.entries()],
+  };
+  saveData();
+}
+function restoreUiState(){
+  const u = data.uiState;
+  if(!u || typeof u !== 'object') return;
+  if(typeof u.feelBlockOpen === 'boolean') feelBlockOpen = u.feelBlockOpen;
+  if(typeof u.todayIdeasOpen === 'boolean') todayIdeasOpen = u.todayIdeasOpen;
+  if(typeof u.procBlockOpen === 'boolean') procBlockOpen = u.procBlockOpen;
+  if(typeof u.videosBlockOpen === 'boolean') videosBlockOpen = u.videosBlockOpen;
+  if(typeof u.overdueSectionOpen === 'boolean') overdueSectionOpen = u.overdueSectionOpen;
+  if(u.listExpandState) Object.keys(listExpandState).forEach(k=>{
+    if(typeof u.listExpandState[k] === 'boolean') listExpandState[k] = u.listExpandState[k];
+  });
+  if(Array.isArray(u.noteSizeLevel)) u.noteSizeLevel.forEach(([k,v])=>{
+    if(typeof v === 'number') noteSizeLevel.set(k, v);
+  });
+}
 const expandedMemoNoteIds = new Set();
 let openMemoId = null;
 let recordingNoteId = null;
@@ -5613,6 +5752,7 @@ function getNoteLevel(domainId, noteId){
 function setNoteLevel(domainId, noteId, level){
   level = Math.max(0, Math.min(2, level));
   noteSizeLevel.set(noteId, level);
+  persistUiState();
   renderKeepGrid(domainId);
   updateCollapseAllButton();
 }
@@ -6252,7 +6392,6 @@ function keepNoteHtml(id, n){
         <div class="keep-note-editor ${isMedium?'note-clip':''}" contenteditable="true" dir="auto" data-placeholder="כתוב כאן..." data-field-key="note-${n.id}"
           oninput="onKeepNoteRichInput('${id}','${n.id}', this)" onkeydown="onKeepNoteEditorKeydown(event)" onpaste="onKeepNoteEditorPaste(event)"
         >${noteEditorHtml(n)}</div>
-        ${isMedium ? `<div class="note-clip-more" onclick="expandNoteStep('${id}','${n.id}')" title="יש עוד טקסט — לחיצה להרחבה" style="display:none; background:linear-gradient(to top, ${n.color||'var(--surface2)'} 55%, transparent);">⋯</div>` : ''}
       </div>
       ${n.chipList ? noteChipListHtml(n) : ''}
       ${noteChecksHtml(id, n)}
@@ -6274,6 +6413,7 @@ function keepNoteHtml(id, n){
         ${(n.links||[]).length ? '' : `<button type="button" class="keep-note-add-btn" onclick="addNoteLink('${id}','${n.id}')">＋ קישור</button>`}
       </div>
       <div class="keep-note-draw-row">
+        ${isMedium ? `<button type="button" class="note-clip-more" onclick="expandNoteStep('${id}','${n.id}')" title="יש עוד טקסט — לחיצה להרחבה" style="display:none;">⋯ עוד</button>` : ''}
         <span class="pencil-btn ${isDrawing?'active':''}" onclick="toggleNoteDrawing('${id}','${n.id}')" title="ציור">✏️</span>
         ${isDrawing ? `
           <span class="note-size-btn" onclick="clearNoteDrawing('${id}','${n.id}')" title="ניקוי תוכן הציור">🧽 מחק</span>
@@ -6333,7 +6473,8 @@ function renderKeepGrid(id){
     // medium-sized note regardless of length -- otherwise a short note would misleadingly imply
     // there's more to see
     el.querySelectorAll('.keep-note-editor.note-clip').forEach(ed=>{
-      const indicator = ed.parentElement ? ed.parentElement.querySelector('.note-clip-more') : null;
+      const noteEl = ed.closest('.keep-note');
+      const indicator = noteEl ? noteEl.querySelector('.note-clip-more') : null;
       if(indicator) indicator.style.display = ed.scrollHeight > ed.clientHeight + 2 ? '' : 'none';
     });
   });
@@ -6588,7 +6729,29 @@ function onKeepNoteEditorKeydown(e){
     } else {
       insertLineBreak(el, '');
     }
+    // A new line at the bottom edge left the caret below the visible area: the view only caught up
+    // on the NEXT keystroke, so you were typing into a place you could not see. Follow it now.
+    scrollCaretIntoView(el);
   }
+}
+/* the caret has no box of its own, so a zero-width marker is put where it is, measured, and removed */
+function scrollCaretIntoView(el){
+  requestAnimationFrame(()=>{
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0).cloneRange();
+    const marker = document.createElement('span');
+    marker.textContent = '\u200b';
+    try{ range.collapse(false); range.insertNode(marker); }catch(err){ return; }
+    const r = marker.getBoundingClientRect();
+    const pad = 24;
+    if(r.bottom > window.innerHeight - pad) window.scrollBy(0, r.bottom - (window.innerHeight - pad));
+    else if(r.top < pad) window.scrollBy(0, r.top - pad);
+    const parent = marker.parentNode;
+    if(parent){ parent.removeChild(marker); parent.normalize && parent.normalize(); }
+    // putting the caret back where it was before the marker was taken out
+    try{ sel.removeAllRanges(); sel.addRange(range); }catch(err){}
+  });
 }
 function onKeepNoteRichInput(domainId, noteId, el){
   const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
@@ -7914,8 +8077,12 @@ function setTaskFilterRange(val){ taskFilterRange = val; renderTasks(); }
 function renderTaskFilterSelect(){
   const el = document.getElementById('taskFilterDomain');
   if(!el) return;
-  if(taskFilterDomain && !data.domains.some(d=>d.id===taskFilterDomain)) taskFilterDomain = '';
-  el.innerHTML = `<option value="">כל הנושאים</option>` + data.domains.map(d=>`<option value="${d.id}" ${d.id===taskFilterDomain?'selected':''}>${escapeHtml(d.name)}</option>`).join('');
+  if(taskFilterDomain && taskFilterDomain!=='__important' && !data.domains.some(d=>d.id===taskFilterDomain)) taskFilterDomain = '';
+  if(taskFilterDomain === '__important' && !importantTopicsInUse().length) taskFilterDomain = '';
+  const important = importantTopicsInUse();
+  el.innerHTML = `<option value="">כל הנושאים</option>`
+    + (important.length ? `<option value="__important" ${taskFilterDomain==='__important'?'selected':''}>⭐ חשובים בתקופה זו</option>` : '')
+    + data.domains.map(d=>`<option value="${d.id}" ${d.id===taskFilterDomain?'selected':''}>${escapeHtml(d.name)}</option>`).join('');
 }
 function taskMatchesDateRange(t, range){
   if(range==='all') return true;
@@ -7970,10 +8137,11 @@ function reorderTaskSubtasks(taskId, fromId, toId){
   renderTasks();
 }
 let overdueSectionOpen = false;
-function toggleOverdueSection(){ overdueSectionOpen = !overdueSectionOpen; renderTasks(); }
+function toggleOverdueSection(){ overdueSectionOpen = !overdueSectionOpen; persistUiState(); renderTasks(); }
 const LIST_CAP_THRESHOLD = 5;
 const listExpandState = { task:false, someday:false, suggestion:false, dilemma:false };
 function toggleListExpand(key){
+  setTimeout(persistUiState, 0);
   listExpandState[key] = !listExpandState[key];
   const el = document.getElementById(key+'List');
   applyListCap(key, el ? Number(el.dataset.itemCount||0) : 0);
@@ -8047,7 +8215,10 @@ function renderTasks(){
   let list = data.tasks;
   const notice = data.softMode ? '<div class="soft-notice">מצב רגוע — משימות בלי רמת אנרגיה מוצגות מעומעמות 🟢</div>' : '';
   if(data.softMode) list = list.filter(t=>t.energy==='low' || !t.energy);
-  if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain);
+  if(taskFilterDomain === '__important'){
+    const important = importantTopicIds();
+    list = list.filter(t=>important.indexOf(t.domain)!==-1);
+  } else if(taskFilterDomain) list = list.filter(t=>t.domain===taskFilterDomain);
   const today = ymd(new Date());
   const isTucked = t => t.done || !!(t.date && t.date < today);
   const sorted = sortTasksForDisplay(list);
@@ -8064,7 +8235,7 @@ function renderTasks(){
       <li class="overdue-divider">
         <div class="overdue-divider-line"></div>
         <div class="overdue-divider-title" onclick="toggleOverdueSection()">
-          <span class="chev">${overdueSectionOpen?'▾':'▸'}</span> משימות שעבר זמנן (${overdue.length})
+          <span class="chev">${overdueSectionOpen?'▾':'▸'}</span> עבר זמנן/בוצעו (${overdue.length})
         </div>
       </li>
       ${overdueSectionOpen ? overdue.map(t=>taskRowHtml(t)).join('') : ''}
@@ -8330,6 +8501,9 @@ function isGcalTombstoned(gid){
   return list.indexOf(gid)!==-1 || list.indexOf(gcalRawEventId(gid))!==-1;
 }
 function taskDateHasPassed(t){ return !!(t && t.date) && t.date < ymd(new Date()); }
+/* the same rule the board's "עבר זמנן/בוצעו" group uses, so the button clears exactly what that
+   group shows rather than a slightly different set */
+function taskIsBehindMe(t){ return !!t.done || taskDateHasPassed(t); }
 /* opts.alsoGoogle: true/false decides for us, undefined asks. only future-dated items ever ask. */
 function deleteTask(id, opts){
   const removed = data.tasks.find(t=>t.id===id);
@@ -9143,11 +9317,46 @@ function commitSheetFieldsToRecord(){
   if(buffer) rec.buffer = buffer.checked;
   return rec;
 }
-/* the background, the ✕ and the swipe all come through here: keep it, then close */
+/* ---------- leaving a sheet by accident ----------
+   A tap on the background is the easiest thing in the world to do by mistake, and it used to end
+   the thing you were in the middle of. It asks instead: "שמור" finishes what you started, "בטל"
+   cancels the leaving and puts you back exactly where you were, with everything still typed.
+
+   The ✕ and the "סגירה" button are deliberate, so they just save and go. */
+let leaveAskAction = null;
+function askBeforeLeaving(kindLabel, onSave){
+  leaveAskAction = onSave;
+  const title = document.getElementById('leaveAskTitle');
+  if(title) title.textContent = kindLabel;
+  document.getElementById('leaveAskOverlay').style.display = '';
+}
+function closeLeaveAsk(){
+  leaveAskAction = null;
+  const el = document.getElementById('leaveAskOverlay');
+  if(el) el.style.display = 'none';
+}
+function confirmLeaveSheet(){
+  const fn = leaveAskAction;
+  closeLeaveAsk();
+  if(fn) fn();
+}
+function cancelLeaveSheet(){ closeLeaveAsk(); }   // stay exactly where you were
+
+/* the ✕, the swipe and "סגירה": keep what is there, then close */
 function dismissTimelineSheet(){
   commitSheetFieldsToRecord();
   saveData();
   closeTimelineSheet();
+}
+/* the background: ask first */
+function backgroundLeaveTimelineSheet(){
+  askBeforeLeaving('לשמור את המשימה?', dismissTimelineSheet);
+}
+function backgroundLeaveCapture(){
+  const el = document.getElementById('inboxCaptureInput');
+  // nothing written yet is nothing to lose
+  if(!el || !el.value.trim()){ closeInboxCapture(); return; }
+  askBeforeLeaving('לשמור את מה שכתבת?', commitInboxCapture);
 }
 function closeTimelineSheet(){
   if(timelineSheetIsNew && timelineSheetItem){
@@ -9900,8 +10109,12 @@ function onSomedayDomainChange(val){
 function renderSomedayFilterSelect(){
   const el = document.getElementById('somedayFilterDomain');
   if(!el) return;
-  if(somedayFilterDomain && !data.domains.some(d=>d.id===somedayFilterDomain)) somedayFilterDomain = '';
-  el.innerHTML = `<option value="">כל הנושאים</option>` + data.domains.map(d=>`<option value="${d.id}" ${d.id===somedayFilterDomain?'selected':''}>${escapeHtml(d.name)}</option>`).join('');
+  if(somedayFilterDomain && somedayFilterDomain!=='__important' && !data.domains.some(d=>d.id===somedayFilterDomain)) somedayFilterDomain = '';
+  const importantSome = importantTopicsInUse();
+  if(somedayFilterDomain === '__important' && !importantSome.length) somedayFilterDomain = '';
+  el.innerHTML = `<option value="">כל הנושאים</option>`
+    + (importantSome.length ? `<option value="__important" ${somedayFilterDomain==='__important'?'selected':''}>⭐ חשובים בתקופה זו</option>` : '')
+    + data.domains.map(d=>`<option value="${d.id}" ${d.id===somedayFilterDomain?'selected':''}>${escapeHtml(d.name)}</option>`).join('');
 }
 function renderSomeday(){
   const el = document.getElementById('somedayList');
@@ -9909,7 +10122,10 @@ function renderSomeday(){
   // רעיונות וחלומות and משימות ללא מועד are one list seen through two lenses
   const wantDreams = activePlanKind === 'dreams';
   let list = data.someday.filter(x => !!x.dream === wantDreams);
-  if(somedayFilterDomain) list = list.filter(s=>s.domain===somedayFilterDomain);
+  if(somedayFilterDomain === '__important'){
+    const important = importantTopicIds();
+    list = list.filter(s=>important.indexOf(s.domain)!==-1);
+  } else if(somedayFilterDomain) list = list.filter(s=>s.domain===somedayFilterDomain);
   list.sort((a,b)=>{
     const fav = (b.favorite?1:0)-(a.favorite?1:0);
     if(fav!==0) return fav;
@@ -10255,8 +10471,8 @@ function suggestionsSubViewHtml(){
   return `
     <div class="add-row pending-host">
       <div class="add-line">
-        <input type="text" id="suggWho" placeholder="מי הציע?" style="max-width:110px;">
-        <span class="prefers-label">מעדיף ש -</span>
+        <input type="text" id="suggWho" placeholder="מי הציע/ה?" style="max-width:110px;">
+        <span class="prefers-label">מעדיף/ה ש -</span>
         <input type="text" id="suggText" placeholder="מה ההצעה...">
       </div>
       <button type="button" class="add-domain-btn" onclick="toggleSuggDetails()" id="suggDetailsToggle">+ תאריך תשובה</button>
@@ -10321,7 +10537,7 @@ function renderSuggestions(){
     <li class="suggestion-li ${s.done?'suggestion-done':''}" data-drag-id="${s.id}">
       <div class="sugg-line">
         <div class="chk ${s.done?'done':''}" onclick="toggleSuggestionDone('${s.id}')"></div>
-        <span class="task-text" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}<span class="prefers-inline">${s.who?'מעדיף ש -':'מעדיפים ש -'}</span> ${escapeHtml(s.text)}</span>
+        <span class="task-text" onclick="openSuggestionEdit('${s.id}')">${s.who?`<b style="font-weight:600;">${escapeHtml(s.who)}:</b> `:''}<span class="prefers-inline">${s.who?'מעדיף/ה ש -':'מעדיפים ש -'}</span> ${escapeHtml(s.text)}</span>
         <span class="del-task" onclick="deleteSuggestion('${s.id}')" title="מחיקה">✕</span>
       </div>
       <div class="sugg-opts">
@@ -10340,8 +10556,8 @@ function suggestionEditFormHtml(s){
   return `<li class="edit-li" data-drag-id="${s.id}">
     <div class="anchor-form">
       <div class="edit-form-row">
-        <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע?" style="max-width:120px;">
-        <span class="prefers-label">מעדיף ש -</span>
+        <input type="text" id="suggEditWho-${s.id}" value="${escapeAttr(s.who||'')}" placeholder="מי הציע/ה?" style="max-width:120px;">
+        <span class="prefers-label">מעדיף/ה ש -</span>
         <input type="text" id="suggEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="מה ההצעה..." style="flex:2;">
       </div>
       <div class="edit-form-row">
@@ -11511,6 +11727,8 @@ function importData(e){
       data.gcalCalendarIds = (parsed.gcalCalendarIds && parsed.gcalCalendarIds.length) ? parsed.gcalCalendarIds : ['primary'];
       data.gcalWriteCalendarId = parsed.gcalWriteCalendarId || null;
       data.gcalDeletedEventIds = Array.isArray(parsed.gcalDeletedEventIds) ? parsed.gcalDeletedEventIds : [];
+      data.uiState = (parsed.uiState && typeof parsed.uiState === 'object') ? parsed.uiState : {};
+      data.importantTopics = Array.isArray(parsed.importantTopics) ? parsed.importantTopics : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
@@ -11743,9 +11961,9 @@ function clearDoneTasks(){
    only what is still ahead of you is worth asking Google about. */
 function clearTasks(which){
   const past = which === 'past';
-  const doomed = past ? data.tasks.filter(taskDateHasPassed) : data.tasks.slice();
-  if(!doomed.length){ flashStatus(past ? 'אין משימות שעבר זמנן' : 'רשימת המשימות כבר ריקה'); return; }
-  const what = past ? `${doomed.length} המשימות שעבר זמנן` : `כל ${doomed.length} המשימות (כולל מה שלא בוצע)`;
+  const doomed = past ? data.tasks.filter(taskIsBehindMe) : data.tasks.slice();
+  if(!doomed.length){ flashStatus(past ? 'אין משימות שעבר זמנן או שבוצעו' : 'רשימת המשימות כבר ריקה'); return; }
+  const what = past ? `${doomed.length} המשימות שעבר זמנן או שבוצעו` : `כל ${doomed.length} המשימות (כולל מה שלא בוצע)`;
   if(!confirm(`למחוק את ${what}? אפשר לבטל אחר כך עם ↶.`)) return;
   const future = doomed.filter(t=>t.googleEventId && !taskDateHasPassed(t));
   let alsoGoogle = false;
@@ -12231,7 +12449,7 @@ function toggleChipHeaderCollapse(bank, headerId){
   rerenderChipBank(bank);
   updateCollapseAllButton();
 }
-function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; renderFeelBar(); updateCollapseAllButton(); }
+function toggleFeelBlock(){ feelBlockOpen = !feelBlockOpen; persistUiState(); renderFeelBar(); updateCollapseAllButton(); }
 function toggleEmotionsBank(){ emotionsBankOpen = !emotionsBankOpen; renderFeelBar(); }
 function toggleNeedsBank(){ needsBankOpen = !needsBankOpen; renderFeelBar(); }
 function toggleBodyBank(){ bodyBankOpen = !bodyBankOpen; renderFeelBar(); }
@@ -12393,7 +12611,7 @@ function renderFeelBar(){
       <div class="feel-block-header" onclick="toggleFeelBlock()">${feelBlockOpen?'▾':'▸'} 🌤️ איך אני מרגיש/ה עכשיו</div>
       ${feelBlockOpen ? `
       <div class="hint" style="margin:0 0 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-        <span>הקשה מסמנת · החזקה וגרירה מסדרת</span>
+        <span>עצרו. עצמו עיניים. והתחברו פנימה ובאמת תרגישו רגע לפני שמסמנים.</span>
         <button type="button" class="reset-btn" onclick="resetFeelBar()">🧹 איפוס הכל</button>
       </div>
       <div class="feel-energy-row">
@@ -12461,7 +12679,7 @@ function renderFeelBar(){
    actually feel good right now than to just default into whatever's easiest to numb out with. */
 let procBlockOpen = false;
 let procExplainOpen = false;
-function toggleProcBlock(){ procBlockOpen = !procBlockOpen; renderProcrastinationBlock(); updateCollapseAllButton(); }
+function toggleProcBlock(){ procBlockOpen = !procBlockOpen; persistUiState(); renderProcrastinationBlock(); updateCollapseAllButton(); }
 function toggleProcExplain(){ procExplainOpen = !procExplainOpen; renderProcrastinationBlock(); }
 function jumpToFeelMoreQuestions(){
   switchMainView('home');
@@ -12516,7 +12734,7 @@ function renderProcrastinationBlock(){
 /* ---------- inspiring videos ---------- shown by their own title, never the raw link */
 let videosBlockOpen = false;
 const expandedVideos = new Set();
-function toggleVideosBlock(){ videosBlockOpen = !videosBlockOpen; renderInspiringVideos(); updateCollapseAllButton(); }
+function toggleVideosBlock(){ videosBlockOpen = !videosBlockOpen; persistUiState(); renderInspiringVideos(); updateCollapseAllButton(); }
 function addInspiringVideo(){
   const titleInput = document.getElementById('videoTitleInput');
   const urlInput = document.getElementById('videoUrlInput');
@@ -12716,12 +12934,50 @@ function markHabitDoneToday(id){
 }
 // whatever you wrote in "תיאור" travels with it, so the calendar entry opens already explaining
 // itself instead of as a bare line of text
+/* A habit is allowed to have a time without that time being a commitment. Writing "Sunday, 8am"
+   next to it is how you find out whether it fits at all -- so it stays here, in the habit, and
+   goes nowhere near the calendar until "+ ליומן" is pressed. Then it travels along, already
+   filled in, and the calendar is where it becomes something you are actually holding. */
+let habitTimeOpenFor = null;
+function toggleHabitTime(id){
+  habitTimeOpenFor = (habitTimeOpenFor === id) ? null : id;
+  renderHabits();
+}
+function setHabitDay(id, dayIdx){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  const v = dayIdx === '' ? null : Number(dayIdx);
+  h.day = (h.day === v) ? null : v;
+  saveData();
+  renderHabits();
+}
+function setHabitTime(id, val){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  h.time = val || '';
+  saveData();
+  renderHabits();
+}
+function clearHabitTime(id){
+  const h = data.habits.find(h=>h.id===id);
+  if(!h) return;
+  h.day = null; h.time = '';
+  saveData();
+  renderHabits();
+}
+const DAY_LETTERS = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+function habitTimeLabel(h){
+  if(h.day === null || h.day === undefined){ return h.time ? h.time : ''; }
+  return DAY_LETTERS[h.day] + (h.time ? ' · ' + h.time : '');
+}
 function addHabitToCalendar(id, useSmallStart){
   const h = data.habits.find(h=>h.id===id);
   if(!h) return;
   const text = useSmallStart ? habitSmallStartText(h) : h.text;
   if(!text) return;
-  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:'', time:'', endTime:'',
+  // whatever time the habit was carrying comes with it, so the sheet opens already filled in
+  const date = (h.day === null || h.day === undefined) ? '' : ymd(viewedWeekDates()[h.day]);
+  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date, time: h.time || '', endTime:'',
                    description: h.description || '', subtasks:[], draft:true, createdAt:Date.now()};
   data.tasks.push(newTask);
   saveData();
@@ -12767,6 +13023,7 @@ function habitPanelHtml(h){
   const lastDone = habitLastDoneLabel(h.lastDoneDate);
   const small = habitSmallStartText(h);
   const open = HABIT_FIELDS.find(f=>f.key===habitFieldOpen);
+  const timeLabel = habitTimeLabel(h);
   return `<div class="habit-panel" style="border-color:${c};">
     <div class="habit-panel-head">
       ${inlineEditIds.has('habit:'+h.id)
@@ -12776,10 +13033,23 @@ function habitPanelHtml(h){
       <span class="del-task" onclick="deleteHabit('${h.id}')" title="מחיקה">✕</span>
     </div>
     <div class="habit-actions">
+      <button type="button" class="habit-act ${timeLabel?'filled':''} ${habitTimeOpenFor===h.id?'open':''}" onclick="toggleHabitTime('${h.id}')">${timeLabel || 'זמן'}</button>
       <button type="button" class="habit-act" onclick="addHabitToCalendar('${h.id}', false)">+ ליומן</button>
       ${HABIT_FIELDS.map(f=>`<button type="button" class="habit-act ${h[f.key]?'filled':''} ${habitFieldOpen===f.key?'open':''}" onclick="toggleHabitField('${f.key}')">${f.label}</button>`).join('')}
       <button type="button" class="habit-act habit-done-btn ${doneToday?'filled':''}" onclick="markHabitDoneToday('${h.id}')">${doneToday?'✓ עשיתי 🙂':'עשיתי 🙂'}</button>
     </div>
+    ${habitTimeOpenFor===h.id ? `
+      <div class="habit-field habit-time-field">
+        <div class="timeline-sheet-daypicker">
+          ${DAYS.map((dn,di)=>`<button type="button" class="timeline-sheet-day-btn ${h.day===di?'active':''}" onclick="setHabitDay('${h.id}',${di})">${dn}</button>`).join('')}
+        </div>
+        <div class="edit-form-row">
+          ${timePickerHtml('habitTimeInput-'+h.id, h.time||'', 'שעה')}
+          <button type="button" class="habit-act" onclick="setHabitTime('${h.id}', (document.getElementById('habitTimeInput-${h.id}')||{}).value||'')">שמירת שעה</button>
+          ${timeLabel ? `<button type="button" class="habit-act" onclick="clearHabitTime('${h.id}')">ניקוי</button>` : ''}
+        </div>
+        <div class="hint" style="margin:2px 0 0;">זה נשאר כאן בלבד — ליומן זה מגיע רק דרך "+ ליומן".</div>
+      </div>` : ''}
     ${open ? `
       <div class="habit-field">
         <input type="text" id="habitFieldInput" data-field-key="habitfield-${open.key}" dir="auto"
@@ -13480,8 +13750,8 @@ function renderCaptureFields(){
   if(top){
     top.style.display = spec.who ? '' : 'none';
     top.innerHTML = spec.who ? `
-      <input type="text" id="captureWho" placeholder="מי הציע?" style="max-width:120px;" value="${escapeAttr(captureField.who)}" oninput="setCaptureWho(this.value)">
-      <span class="prefers-label">מעדיף ש -</span>` : '';
+      <input type="text" id="captureWho" placeholder="מי הציע/ה?" style="max-width:120px;" value="${escapeAttr(captureField.who)}" oninput="setCaptureWho(this.value)">
+      <span class="prefers-label">מעדיף/ה ש -</span>` : '';
   }
   el.style.display = '';
   PENDING_BODY_CHECK_OPTS.capture = CAPTURE_BODY_OPTS[quickCaptureTarget] || {hideNote:true};
@@ -13506,6 +13776,17 @@ function renderCaptureFields(){
         <label class="field-label">${spec.replyDate?'תשובה עד':'להחליט עד'}<input type="date" value="${captureField.date}" onchange="setCaptureDate(this.value)"></label>
         ${spec.replyDate ? `<label class="field-label">שעה${timePickerHtml('captureTime', captureField.time, 'שעה')}</label>` : ''}
       </div>` : ''}`;
+}
+function openBackupSheet(){
+  closeOptionsMenu();
+  document.getElementById('backupOverlay').style.display = '';
+  document.getElementById('backupSheet').style.display = '';
+  syncOverlayGuard();
+}
+function closeBackupSheet(){
+  document.getElementById('backupOverlay').style.display = 'none';
+  document.getElementById('backupSheet').style.display = 'none';
+  syncOverlayGuard();
 }
 function openInboxCapture(){
   const label = document.querySelector('#inboxCaptureSheet .inbox-capture-label');
@@ -13888,7 +14169,7 @@ function jumpToSearchResult(type, id, extra){
    the noise of the full dump doesn't have to stay in front of her once she's decided. no calendar,
    no times, ever, in this list -- promoting to a task is the only way something gets a time. */
 let todayIdeasOpen = false;
-function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; renderTodayIdeas(); updateCollapseAllButton(); }
+function toggleTodayIdeasBlock(){ todayIdeasOpen = !todayIdeasOpen; persistUiState(); renderTodayIdeas(); updateCollapseAllButton(); }
 // no more daily wipe -- this used to reset the whole list back to 3 blanks every day, which is
 // exactly what kept adding empty rows on every open. now it only ever tops the list UP to 3 (never
 // down, never touching existing content): the very first time there's nothing yet, and again any
@@ -14143,7 +14424,7 @@ document.addEventListener('pointerdown', (e)=>{
 });
 function todayIdeaRowHtml(item){
   return `
-    <div class="today-idea-row" data-drag-id="${item.id}" onpointerdown="startTodayIdeaPress(event,'${item.id}')" ${todayIdeasDragMode?'style="touch-action:none;"':''}>
+    <div class="today-idea-row ${(item.favorite && !item.done)?'today-idea-chosen':''}" data-drag-id="${item.id}" onpointerdown="startTodayIdeaPress(event,'${item.id}')" ${todayIdeasDragMode?'style="touch-action:none;"':''}>
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleTodayIdeaFavorite('${item.id}')" title="${item.favorite?'הסרה מהנבחרים':'סימון כנבחר להיום'}">${item.favorite?'★':'☆'}</span>
       <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
       <input type="text" class="today-idea-input ${item.done?'done':''}" data-field-key="idea-${item.id}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)" onkeydown="onTodayIdeaKeydown(event)" ${todayIdeasDragMode?'readonly':''}>
@@ -14193,7 +14474,6 @@ function renderDayIntention(){
   withFocusPreserved('dayIntentionBlock', ()=>{
     if(text && !dayIntentionEditing){
       el.innerHTML = `
-        <h2 class="intention-heading">הכוונה היומית</h2>
         <div class="intention-row">
           <div class="intention-text" onclick="startEditDayIntention()" title="לחיצה לעריכה">${escapeHtml(text)}</div>
           <div class="intention-actions">
@@ -14203,7 +14483,6 @@ function renderDayIntention(){
         </div>`;
     } else {
       el.innerHTML = `
-        <h2 class="intention-heading">הכוונה היומית</h2>
         <div class="intention-add">
           <input type="text" id="dayIntentionInput" dir="rtl" data-field-key="dayIntention"
             placeholder="מה היא הכוונה שלי להיום?" value="${escapeAttr(text)}" maxlength="${DAY_INTENTION_MAX}"
@@ -14463,9 +14742,8 @@ function deletePossibility(id){
    State rides in collapsedSections, which loadData deliberately wipes on every app open so the
    first screen is always calm. That is the behaviour we want here too: every launch starts with
    "הכל אפשרי" folded and the rest open, and whatever you unfold stays unfolded for that session. */
-/* Opening כלים should be a quiet page of names, not four open panels you have to read past to
-   find the one you came for. Everything starts folded on each app open (collapsedSections is
-   wiped on load), and whatever you unfold after that stays unfolded for the rest of the session. */
+/* Folded is what a card starts as the first time it is ever seen -- כלים should open as a quiet
+   page of names, not four open panels. After that it is remembered, including across a refresh. */
 function isToolCardOpen(key){
   const stored = data.collapsedSections ? data.collapsedSections['tool:'+key] : undefined;
   if(stored === undefined) return false;
@@ -14562,6 +14840,7 @@ function render(){
   renderOnboardingCard();
   renderInbox();
   renderDayIntention();
+  renderImportantTopicsStrip();
   renderFeelBar();
   renderProcrastinationBlock();
   renderInspiringVideos();
@@ -14583,7 +14862,7 @@ function render(){
 
 /* ---------- collapsible sections ---------- */
 // 'schedule' is gone from here: the calendar IS this page now, so it has no heading to fold away
-const SECTION_KEYS = ['suggestions','someday','backup'];
+const SECTION_KEYS = ['suggestions','someday'];
 function isSectionCollapsed(key){
   if(!data.collapsedSections || !(key in data.collapsedSections)) return false;
   return !!data.collapsedSections[key];
@@ -14982,10 +15261,12 @@ window.addEventListener('touchcancel', gestureCancel, {passive:true});
    Nothing here touches the sixteen places that open something: a sheet or a menu is always the
    result of a tap or a key, so re-checking right after those two events catches every case. */
 const OVERLAY_LAYERS = [
+  { open: ()=> isDisplayed('leaveAskOverlay'),           close: ()=> cancelLeaveSheet() },
   { open: ()=> partyMode,                                close: ()=> endPartyMode(true) },
   { open: ()=> isDisplayed('timelineSheet'),             close: ()=> closeTimelineSheet() },
   { open: ()=> isDisplayed('searchSheet'),               close: ()=> closeSearch() },
   { open: ()=> isDisplayed('inboxCaptureSheet'),         close: ()=> closeInboxCapture() },
+  { open: ()=> isDisplayed('backupSheet'),               close: ()=> closeBackupSheet() },
   { open: ()=> timelineFullscreen,                       close: ()=> toggleTimelineFullscreen() },
   { open: ()=> navOpen,                                  close: ()=> closeNav() },
   { open: ()=> fabMenuOpen,                              close: ()=> closeFabMenu() },
@@ -15025,7 +15306,7 @@ window.addEventListener('popstate', ()=>{
 /* The two listeners below catch anything opened by a tap or a key. The wrap catches the rest --
    an overlay opened from code, from a timer, or from another overlay -- without adding a line to
    each of the sixteen functions that open or close one. */
-['openInboxCapture','closeInboxCapture','openSearch','closeSearch',
+['openInboxCapture','closeInboxCapture','openSearch','closeSearch','openBackupSheet','closeBackupSheet',
  'openTimelineSheet','closeTimelineSheet','toggleNav','closeNav','openNav',
  'onInboxFabClick','openFabMenu','closeFabMenu','fabCreate',
  'toggleOptionsMenu','closeOptionsMenu','toggleSyncMenu','closeSyncMenu',
