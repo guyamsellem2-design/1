@@ -3601,6 +3601,10 @@
     box-shadow:0 0 12px -3px var(--tint);
   }
 
+  /* only when there is actually something to clean -- otherwise it is one more grey button */
+  .reset-btn.gcal-dup-btn{ border-color:var(--gold); color:var(--gold); font-weight:600; }
+  .gcal-dup-note{ margin-top:6px; font-size:12.5px; line-height:1.5; color:var(--gold); }
+
   .leave-ask-overlay{
     position:fixed; inset:0; z-index:5200; background:rgba(0,0,0,.45);
     display:flex; align-items:center; justify-content:center; padding:24px;
@@ -7282,6 +7286,52 @@ function parseGcalRecurrence(recurrenceArr, fallbackDate){
   }
   return null;
 }
+/* ---------- one event, one row ----------
+   Two mail accounts means the same real event arrives twice, once from each calendar, and an event
+   id is only unique INSIDE its own calendar -- so "calId:eventId" can never answer "is this the same
+   event?" across two of them. That is the whole reason the board filled up with pairs.
+
+   These keys can answer it, in descending order of certainty:
+     · iCalUID -- Google's cross-calendar identity. An invitation carries the same one in every
+       calendar it reaches, in every account, which is exactly the case that was breaking.
+     · the raw event id without its calendar prefix -- the same event read from two calendars, and
+       also anything this app pushed itself (it stores the raw id; the pull sees a prefixed one).
+     · what it says and when -- the last resort, for an event typed by hand into both accounts,
+       where nothing technical connects the two copies at all.
+   Any one of them matching is enough to say "already here". A second copy of something already on
+   the board is never the right answer, and a genuine second event with the same name at the same
+   minute is indistinguishable from a duplicate anyway. */
+function gcalTextKey(s){ return (s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function gcalWhenKey(text, date, time, endTime){
+  const t = gcalTextKey(text);
+  if(!t || !date) return '';
+  return 'when:'+t+'|'+date+'|'+(time||'')+'|'+(endTime||'');
+}
+function gcalTaskKeys(t){
+  const keys = [];
+  if(t.googleEventId){
+    keys.push('gid:'+t.googleEventId);
+    keys.push('raw:'+gcalRawEventId(t.googleEventId));
+  }
+  if(t.googleICalUID) keys.push('uid:'+gcalTextKey(t.googleICalUID));
+  const w = gcalWhenKey(t.text, t.date, t.time, t.endTime);
+  if(w) keys.push(w);
+  return keys;
+}
+function gcalEventKeys(ev, gid, date, time, endTime){
+  const keys = ['gid:'+gid, 'raw:'+ev.id];
+  if(ev.iCalUID) keys.push('uid:'+gcalTextKey(ev.iCalUID));
+  const w = gcalWhenKey(ev.summary||'', date, time, endTime);
+  if(w) keys.push(w);
+  return keys;
+}
+/* An anchor's signature has to carry the day: one weekly recurring event legitimately becomes
+   several anchors, one per day it repeats on, and they are not copies of each other. */
+function gcalAnchorSig(a){
+  const t = gcalTextKey(a.label);
+  return t ? ('recwhen:'+t+'|'+a.day+'|'+(a.time||'')) : '';
+}
+
 function runGcalSync(quiet){
   if(gcalSyncing) return;
   gcalSyncing = true;
@@ -7303,19 +7353,14 @@ function runGcalSync(quiet){
       .catch(err=>{ gcalDiag.failures.push({calId, code:(err && err.message ? err.message : '?')}); return []; })
   )).then(resultsPerCal=>{
     const allEvents = resultsPerCal.flat();
-    const existingTaskIds = new Set();
-    data.tasks.forEach(t=>{
-      if(!t.googleEventId) return;
-      existingTaskIds.add(t.googleEventId);
-      // tasks pushed from the app store the raw event id with no calendar prefix, but incoming
-      // events here are keyed "calId:eventId" — without this, a task we ourselves pushed to gcal
-      // would look "new" on the very next pull and get duplicated into the weekly board
-      if(t.googleEventId.indexOf(':')===-1){
-        calIds.forEach(calId=>existingTaskIds.add(calId+':'+t.googleEventId));
-        existingTaskIds.add('primary:'+t.googleEventId);
-      }
-    });
+    // every way we already know an event, from every task on the board -- including tasks written
+    // here by hand, so an event that says the same thing at the same hour is not imported on top of
+    // one you already wrote yourself
+    const seenKeys = new Set();
+    data.tasks.forEach(t=>{ gcalTaskKeys(t).forEach(k=>seenKeys.add(k)); });
     const existingAnchorRecIds = new Set(data.anchors.filter(a=>a.googleRecurringEventId).map(a=>a.googleRecurringEventId));
+    const seenAnchorSigs = new Set();
+    data.anchors.forEach(a=>{ const sig = gcalAnchorSig(a); if(sig) seenAnchorSigs.add(sig); });
 
     const recurringGroups = new Map();
     const oneTimeEvents = [];
@@ -7339,6 +7384,14 @@ function runGcalSync(quiet){
         .then(master=>({group, master}));
     })).then(masterResults=>{
       let addedAnchors = 0;
+      // the same weekly thing, arriving once from each account, is one anchor and not two
+      const pushAnchor = (a)=>{
+        const sig = gcalAnchorSig(a);
+        if(sig && seenAnchorSigs.has(sig)) return;
+        if(sig) seenAnchorSigs.add(sig);
+        data.anchors.push(a);
+        addedAnchors++;
+      };
       masterResults.forEach(({group, master})=>{
         const sampleEv = group.instances[0];
         const sampleDate = (sampleEv.start && sampleEv.start.dateTime) ? new Date(sampleEv.start.dateTime) : null;
@@ -7354,14 +7407,12 @@ function runGcalSync(quiet){
           const label = sampleEv.summary||'(ללא כותרת)';
           if(recurrence.repeatType==='weekly'){
             recurrence.days.forEach(dayIdx=>{
-              data.anchors.push({id:uid(), day:dayIdx, time, endTime, label,
+              pushAnchor({id:uid(), day:dayIdx, time, endTime, label,
                 domain:'', buffer:false, repeatType:'weekly', date:'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
-              addedAnchors++;
             });
           } else {
-            data.anchors.push({id:uid(), day:sampleDate.getDay(), time, endTime, label,
+            pushAnchor({id:uid(), day:sampleDate.getDay(), time, endTime, label,
               domain:'', buffer:false, repeatType:recurrence.repeatType, date:recurrence.date||'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
-            addedAnchors++;
           }
         } else {
           // recurrence type we don't model as an anchor (or master fetch failed) - fall back to syncing each instance as a regular task
@@ -7372,10 +7423,7 @@ function runGcalSync(quiet){
       let addedTasks = 0;
       oneTimeEvents.forEach(({ev,calId})=>{
         const gid = calId+':'+ev.id;
-        if(existingTaskIds.has(gid)){ gcalDiag.skippedExisting++; return; }
-        // deleted here on purpose -- it does not come back just because Google still has it
-        if(isGcalTombstoned(gid)){ gcalDiag.skippedExisting++; return; }
-        existingTaskIds.add(gid);
+        // when it is has to be worked out first: it is part of how we recognise the event
         let date='', time='', endTime='';
         if(ev.start && ev.start.date){
           date = ev.start.date;
@@ -7388,8 +7436,14 @@ function runGcalSync(quiet){
             endTime = pad(ed.getHours())+':'+pad(ed.getMinutes());
           }
         }
+        const keys = gcalEventKeys(ev, gid, date, time, endTime);
+        if(keys.some(k=>seenKeys.has(k))){ gcalDiag.skippedExisting++; return; }
+        // deleted here on purpose -- it does not come back just because Google still has it
+        if(isGcalTombstoned(gid)){ gcalDiag.skippedExisting++; return; }
+        keys.forEach(k=>seenKeys.add(k));
         data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:'', done:false, energy:'',
-          date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:gid, createdAt:Date.now()});
+          date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:gid,
+          googleICalUID: ev.iCalUID||'', createdAt:Date.now()});
         addedTasks++;
       });
 
@@ -7445,6 +7499,107 @@ window.addEventListener('focus', maybeAutoPullGcal);
 window.addEventListener('online', maybeAutoPullGcal);
 // and a slow heartbeat, for a session left open all day on a desktop
 setInterval(()=>{ if(!document.hidden) maybeAutoPullGcal(); }, 5*60*1000);
+
+/* ---------- the pairs that are already here ----------
+   Stopping new duplicates does nothing about the ones that arrived before the rule existed, so
+   this finds them and takes the extra copies off the board. Nothing is touched in Google: the
+   event is real, it is only the second row here that is not.
+
+   Which copy stays is not "whichever came first" -- it is whichever carries the most of your own
+   work on it. A copy you gave a topic, a description, small steps or a tick to is the copy you
+   have been using; the bare one that arrived from the other account is the one to drop. */
+function taskDupScore(t){
+  let s = 0;
+  if(t.domain) s += 4;
+  if((t.description||'').trim()) s += 3;
+  if((t.subtasks||[]).length) s += 3;
+  if(t.done) s += 2;
+  if(!t.googleEventId) s += 2;   // written here by hand, so it is the original, not the echo
+  if(t.energy) s += 1;
+  if(t.favorite) s += 1;
+  return s;
+}
+/* Tasks that share ANY identity key belong together, even in a chain: A and B share an iCalUID, B
+   and C share a time and a name, so all three are one event. A plain "group by key" would miss that
+   and leave a copy behind, so the groups are grown by union instead. */
+function gcalDuplicateGroups(){
+  const parent = new Map();
+  data.tasks.forEach(t=>parent.set(t.id, t.id));
+  const find = (id)=>{ while(parent.get(id) !== id){ parent.set(id, parent.get(parent.get(id))); id = parent.get(id); } return id; };
+  const firstFor = new Map();
+  data.tasks.forEach(t=>{
+    gcalTaskKeys(t).forEach(k=>{
+      if(!firstFor.has(k)){ firstFor.set(k, t.id); return; }
+      const a = find(firstFor.get(k)), b = find(t.id);
+      if(a !== b) parent.set(b, a);
+    });
+  });
+  const groups = new Map();
+  data.tasks.forEach(t=>{
+    const r = find(t.id);
+    if(!groups.has(r)) groups.set(r, []);
+    groups.get(r).push(t);
+  });
+  return [...groups.values()].filter(g=>g.length > 1);
+}
+function gcalDuplicateCount(){
+  return gcalDuplicateGroups().reduce((n,g)=>n + g.length - 1, 0);
+}
+function anchorDupScore(a){
+  let s = 0;
+  if(a.domain) s += 3;
+  if(!a.googleRecurringEventId) s += 2;
+  if(a.buffer) s += 1;
+  return s;
+}
+function duplicateAnchorIds(){
+  const groups = new Map();
+  data.anchors.forEach(a=>{
+    const sig = gcalAnchorSig(a);
+    if(!sig) return;
+    if(!groups.has(sig)) groups.set(sig, []);
+    groups.get(sig).push(a);
+  });
+  const doomed = new Set();
+  groups.forEach(g=>{
+    if(g.length < 2) return;
+    g.slice().sort((x,y)=> (anchorDupScore(y)-anchorDupScore(x)) || ((x.createdAt||0)-(y.createdAt||0)))
+     .slice(1).forEach(a=>doomed.add(a.id));
+  });
+  return doomed;
+}
+function cleanGcalDuplicates(){
+  const groups = gcalDuplicateGroups();
+  const doomed = [];
+  groups.forEach(g=>{
+    g.slice().sort((x,y)=> (taskDupScore(y)-taskDupScore(x)) || ((x.createdAt||0)-(y.createdAt||0)))
+     .slice(1).forEach(t=>doomed.push(t));
+  });
+  const doomedAnchors = duplicateAnchorIds();
+  const total = doomed.length + doomedAnchors.size;
+  if(!total){ flashStatus('לא נמצאו כפילויות 🌱'); return; }
+  const parts = [];
+  if(doomed.length) parts.push(doomed.length + ' משימות');
+  if(doomedAnchors.size) parts.push(doomedAnchors.size + ' עוגנים');
+  if(!confirm('נמצאו ' + parts.join(' ו-') + ' שהם עותק כפול של משהו שכבר קיים אצלך.\n\nלמחוק את העותקים הכפולים?\nביומן גוגל עצמו לא ייגע כלום — האירוע נשאר שם.')) return;
+  const ids = new Set(doomed.map(t=>t.id));
+  // the copy that stays may share a raw event id with the one leaving (that is exactly what
+  // "the same event from two calendars" means), so its id is never tombstoned out from under it
+  const keptRaw = new Set(data.tasks.filter(t=>!ids.has(t.id) && t.googleEventId).map(t=>gcalRawEventId(t.googleEventId)));
+  const list = gcalTombstones();
+  doomed.forEach(t=>{
+    if(!t.googleEventId) return;
+    if(list.indexOf(t.googleEventId)===-1) list.push(t.googleEventId);
+    const raw = gcalRawEventId(t.googleEventId);
+    if(raw && !keptRaw.has(raw) && list.indexOf(raw)===-1) list.push(raw);
+  });
+  if(list.length > 800) list.splice(0, list.length - 800);
+  data.tasks = data.tasks.filter(t=>!ids.has(t.id));
+  data.anchors = data.anchors.filter(a=>!doomedAnchors.has(a.id));
+  saveData();
+  renderTasks(); renderScheduleGrid(); renderAnchorsTab(); renderGcalStatus();
+  flashStatus('נוקו ' + total + ' כפילויות');
+}
 
 let syncMenuOpen = false;
 function toggleSyncMenu(){
@@ -7507,7 +7662,8 @@ function renderGcalStatus(){
         </div>`;
       }).join('') : '<div class="empty">לא נבחרו יומנים</div>'}
       <div class="hint" style="margin-top:6px; font-size:12px; line-height:1.5;">
-        האפליקציה כותבת רק ליומן הראשי. משאר היומנים היא רק קוראת.
+        האפליקציה כותבת רק ליומן הראשי. משאר היומנים היא רק קוראת.<br>
+        אותו אירוע שמופיע בשני יומנים מיובא פעם אחת בלבד.
       </div>
       <div class="add-row" style="margin:8px 0 0;">
         <input type="text" id="gcalAddCalendarInput" placeholder="מייל/מזהה של יומן נוסף...">
@@ -7571,6 +7727,10 @@ function renderGcalStatus(){
     diagHtml = `<div class="gcal-status" style="font-size:12.5px; line-height:1.5; margin-top:6px;">
       ${escapeHtml(bits.join(' · '))}${which}${failed}</div>`;
   }
+  const dupCount = gcalDuplicateCount() + duplicateAnchorIds().size;
+  const dupHtml = dupCount
+    ? `<div class="gcal-status gcal-dup-note">🧹 יש כאן ${dupCount} עותקים כפולים של אירועים שכבר קיימים — לחיצה על "ניקוי כפילויות" מורידה אותם מכאן, ולא נוגעת ביומן גוגל.</div>`
+    : '';
   const syncErrorHtml = (!currentSyncUser && lastSyncSignInError)
     ? `<div class="gcal-status" style="color:#e06060; margin-top:4px;">⚠️ סנכרון בין מכשירים נכשל: ${escapeHtml(lastSyncSignInError)}</div>`
     : '';
@@ -7580,9 +7740,10 @@ function renderGcalStatus(){
       <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
       <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
+      <button class="reset-btn ${dupCount?'gcal-dup-btn':''}" onclick="cleanGcalDuplicates()">🧹 ניקוי כפילויות${dupCount?' ('+dupCount+')':''}</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
-    ${syncErrorHtml}${diagHtml}
+    ${dupHtml}${syncErrorHtml}${diagHtml}
     ${pickerHtml}
   `;
 }
