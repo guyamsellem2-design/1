@@ -3568,6 +3568,9 @@
      phone, and at the sizes they carry elsewhere in the app they land on exactly 284 -- close
      enough that a rounding remainder wraps "הזזה" onto a second line. They are secondary to the
      words above them, so they give up the few pixels rather than the row giving up its shape. */
+  .timeline-sheet-tools{ gap:6px; margin-top:2px; }
+  .sheet-subtasks{ margin-bottom:10px; }
+
   li.suggestion-li .sugg-opts{ display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
   li.suggestion-li .sugg-opts .promote{ font-size:12px; padding:3px 7px; }
   li.suggestion-li .sugg-opts .suggestion-badge{ font-size:11.5px; padding:4px 7px; }
@@ -3918,7 +3921,7 @@
      overlay no matter which section is collapsed or which tab is active -- opening it from
      elsewhere (someday, today's ideas, a list item...) must never require that section to already
      be expanded, and must never move/scroll the person away from wherever they actually are. -->
-<div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="closeTimelineSheet()" style="display:none;"></div>
+<div class="timeline-sheet-overlay" id="timelineSheetOverlay" onclick="dismissTimelineSheet()" style="display:none;"></div>
 <div class="timeline-sheet" id="timelineSheet" style="display:none;"></div>
 
 <!-- global quick-capture: reachable from any tab, any scroll position, any collapsed section --
@@ -9118,11 +9121,41 @@ function openTimelineSheet(kind, id, isNew, fromTimeline){
   document.getElementById('timelineSheet').style.display = '';
   renderTimelineSheet();
 }
+/* Writes whatever is currently on screen onto the record, without any of the checks "שמירה" makes.
+   Saving is for finishing something; this is for not losing it -- it runs whenever the sheet is
+   about to close or redraw, so a tap on the background, the ✕, a swipe down, or adding a subtask
+   all keep what was typed. */
+function commitSheetFieldsToRecord(){
+  if(!timelineSheetItem) return null;
+  const {kind, id} = timelineSheetItem;
+  const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
+  if(!rec) return null;
+  const val = elId => { const el = document.getElementById(elId); return el ? el.value : null; };
+  const title = val('timelineSheetTitleInput');
+  if(title !== null){ if(kind==='task') rec.text = title.trim(); else rec.label = title.trim(); }
+  const dom = val('timelineSheetDomain'); if(dom !== null) rec.domain = dom;
+  const energy = val('timelineSheetEnergy'); if(energy !== null && kind==='task') rec.energy = energy;
+  const desc = val('timelineSheetDesc'); if(desc !== null) rec.description = desc;
+  const time = val('timelineSheetTime'); if(time !== null) rec.time = time;
+  const endTime = val('timelineSheetEndTime'); if(endTime !== null) rec.endTime = endTime;
+  const date = val('timelineSheetDate'); if(date !== null && sheetScheduleMode === 'date') rec.date = date;
+  const buffer = document.getElementById('timelineSheetBuffer');
+  if(buffer) rec.buffer = buffer.checked;
+  return rec;
+}
+/* the background, the ✕ and the swipe all come through here: keep it, then close */
+function dismissTimelineSheet(){
+  commitSheetFieldsToRecord();
+  saveData();
+  closeTimelineSheet();
+}
 function closeTimelineSheet(){
   if(timelineSheetIsNew && timelineSheetItem){
     const {kind, id} = timelineSheetItem;
     const rec = kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
-    const label = rec ? (kind==='task' ? rec.text : rec.label) : '';
+    // whatever is in the field right now counts as written, even if it was never saved
+    const typed = (document.getElementById('timelineSheetTitleInput')||{}).value || '';
+    const label = (rec ? (kind==='task' ? rec.text : rec.label) : '') || typed;
     if(rec && !label.trim()){
       if(kind==='task') data.tasks = data.tasks.filter(x=>x.id!==id); else data.anchors = data.anchors.filter(x=>x.id!==id);
       saveData();
@@ -9221,6 +9254,71 @@ function currentRoundedTimeSlot(){
   h = Math.max(TIMELINE_START_HOUR, Math.min(h, TIMELINE_END_HOUR-1));
   return pad(h)+':'+pad(m);
 }
+/* Subtasks used to exist only on the board, after the task was already made -- so breaking
+   something down meant creating it, finding it, and opening it again. They are here now, on the
+   same record, edited in place.
+
+   Every one of these redraws the sheet, so each writes the fields down first: the title you were
+   halfway through typing is not a price for adding a step. */
+let sheetSubtasksOpen = false;
+function toggleSheetSubtasks(){
+  commitSheetFieldsToRecord();
+  sheetSubtasksOpen = !sheetSubtasksOpen;
+  saveData();
+  renderTimelineSheet();
+  if(sheetSubtasksOpen) requestAnimationFrame(()=>{ const i = document.getElementById('timelineSheetSubInput'); if(i) i.focus(); });
+}
+function sheetRecord(){
+  if(!timelineSheetItem) return null;
+  const {kind, id} = timelineSheetItem;
+  return kind==='task' ? data.tasks.find(x=>x.id===id) : data.anchors.find(x=>x.id===id);
+}
+function addSheetSubtask(){
+  const rec = commitSheetFieldsToRecord();
+  const input = document.getElementById('timelineSheetSubInput');
+  const text = input ? input.value.trim() : '';
+  if(!rec || !text) return;
+  if(!Array.isArray(rec.subtasks)) rec.subtasks = [];
+  rec.subtasks.push({id:uid(), text, done:false});
+  saveData();
+  renderTimelineSheet();
+  renderTasks();
+  requestAnimationFrame(()=>{ const i = document.getElementById('timelineSheetSubInput'); if(i) i.focus(); });
+}
+function toggleSheetSubtask(subId){
+  const rec = commitSheetFieldsToRecord();
+  const sub = rec && (rec.subtasks||[]).find(x=>x.id===subId);
+  if(!sub) return;
+  sub.done = !sub.done;
+  saveData(); renderTimelineSheet(); renderTasks();
+}
+function deleteSheetSubtask(subId){
+  const rec = commitSheetFieldsToRecord();
+  if(!rec) return;
+  rec.subtasks = (rec.subtasks||[]).filter(x=>x.id!==subId);
+  saveData(); renderTimelineSheet(); renderTasks();
+}
+/* The same thing again at another time: everything travels except when it happens. A date carried
+   over would be the one field you always have to clear, and a copy sitting on top of the original
+   is the one mistake this button could make. */
+function duplicateFromSheet(){
+  const rec = commitSheetFieldsToRecord();
+  if(!rec) return;
+  const {kind} = timelineSheetItem;
+  const label = kind==='task' ? rec.text : rec.label;
+  if(!(label||'').trim()){ flashStatus('אין עדיין מה לשכפל'); return; }
+  saveData();
+  const copy = {...rec, id: uid(), createdAt: Date.now(),
+    subtasks: (rec.subtasks||[]).map(x=>({...x, id: uid()})),
+    date: ymd(new Date()), time: '', endTime: rec.endTime || '',
+    googleEventId: null, googleRecurringEventId: null, done: false, draft: true};
+  if(kind==='task') data.tasks.push(copy); else data.anchors.push(copy);
+  saveData();
+  renderTasks(); renderScheduleGrid();
+  closeTimelineSheet();
+  openTimelineSheet(kind, copy.id, true);
+  flashStatus('שוכפל — נשאר לבחור מתי');
+}
 function renderTimelineSheet(){
   const sheet = document.getElementById('timelineSheet');
   if(!sheet || !timelineSheetItem) return;
@@ -9286,7 +9384,22 @@ function renderTimelineSheet(){
         ${freqHtml}
       </div>`;
   // one shared block — the two forms are the same form now
+  const subs = rec.subtasks || [];
+  const subCount = subs.length;
+  const subtasksHtml = sheetSubtasksOpen ? `
+      <div class="sheet-subtasks">
+        ${subs.map(x=>`<div class="subtask-row">
+            <div class="chk ${x.done?'done':''}" onclick="toggleSheetSubtask('${x.id}')"></div>
+            <span class="task-text" style="flex:1">${escapeHtml(x.text)}</span>
+            <span class="del-task" onclick="deleteSheetSubtask('${x.id}')" title="מחיקה">✕</span>
+          </div>`).join('')}
+        <div class="subtask-add-row">
+          <input type="text" id="timelineSheetSubInput" placeholder="צעד קטן..." onkeydown="if(event.key==='Enter'){event.preventDefault(); addSheetSubtask();}">
+          <button type="button" onclick="addSheetSubtask()">+ הוסף</button>
+        </div>
+      </div>` : '';
   const extraFieldsHtml = `
+      ${subtasksHtml}
       <textarea class="detail-desc" id="timelineSheetDesc" placeholder="הרחבה, הקשר, פרטים...">${escapeHtml(rec.description||'')}</textarea>
       <label class="buf-label"><input type="checkbox" id="timelineSheetBuffer" ${rec.buffer?'checked':''}> זמן נשימה של 15 דק׳ אחרי</label>
       ${gcalFieldHtml}
@@ -9297,7 +9410,7 @@ function renderTimelineSheet(){
   const alwaysExpanded = true;
   sheet.innerHTML = `
     <div class="timeline-sheet-topbar">
-      <button type="button" class="timeline-sheet-close-btn" onclick="closeTimelineSheet()" title="ביטול">✕</button>
+      <button type="button" class="timeline-sheet-close-btn" onclick="dismissTimelineSheet()" title="סגירה — מה שכתבת נשמר">✕</button>
       <div class="timeline-sheet-handle-hit" id="timelineSheetHandle"><span class="timeline-sheet-handle-bar"></span></div>
     </div>
     <div class="timeline-sheet-title-row">
@@ -9315,9 +9428,13 @@ function renderTimelineSheet(){
     </div>
     ${dateRowHtml}
     <div class="timeline-sheet-extra" id="timelineSheetExtra" style="display:none;">${extraFieldsHtml}</div>
+    <div class="edit-form-row timeline-sheet-tools">
+      <button type="button" class="subtask-toggle-btn ${subCount?'has-content':''}" onclick="toggleSheetSubtasks()">${sheetSubtasksOpen?'▾':'▸'} תת-משימות${subCount?' ('+subCount+')':''}</button>
+      <button type="button" class="subtask-toggle-btn" onclick="duplicateFromSheet()" title="שומר את מה שכאן ופותח עוד אחת זהה, בלי תאריך">⧉ שכפול</button>
+    </div>
     <div class="timeline-sheet-actions">
       <button type="button" class="save-btn" onclick="saveTimelineSheet()">שמירה</button>
-      <button type="button" class="cancel-btn" onclick="closeTimelineSheet()">ביטול</button>
+      <button type="button" class="cancel-btn" onclick="dismissTimelineSheet()">סגירה</button>
       ${deleteButtonsHtml}
       ${timelineSheetConvertedFrom ? `<button type="button" class="delete-btn" onclick="deleteConvertedSourceItem()">🗑 מחק מ"דברים לעשות"</button>` : ''}
     </div>
