@@ -13780,22 +13780,38 @@ function ensureTodayIdeas(){
   if(!data.todayIdeas) data.todayIdeas = [];
   while(data.todayIdeas.length < 3) data.todayIdeas.push({id: uid(), text:'', done:false, favorite:false});
 }
+/* Enter (and the phone keyboard's return key) goes on to the next thing, the way a list of things
+   is actually written -- one after another, without reaching for a button between each. On the
+   last row there is nothing to go on to, so it makes one. */
+function onTodayIdeaKeydown(e){
+  if(e.key !== 'Enter' || e.shiftKey) return;
+  e.preventDefault();
+  const inputs = [...document.querySelectorAll('#todayIdeasList .today-idea-input')];
+  const i = inputs.indexOf(e.target);
+  if(i > -1 && i < inputs.length - 1){
+    const next = inputs[i+1];
+    next.focus();
+    try{ next.setSelectionRange(next.value.length, next.value.length); }catch(err){}
+    return;
+  }
+  // "נבחרים" shows only starred rows, and a brand-new one has no star -- it would be created
+  // straight out of sight, so there the last row simply puts the keyboard away
+  if(data.todayIdeasShowFavOnly){ e.target.blur(); return; }
+  addTodayIdeaSlot();
+}
 function onTodayIdeaInput(id, inputEl){
   const val = inputEl.value;
   const item = data.todayIdeas.find(x=>x.id===id);
   if(item){ item.text = val; saveData(); }
-  // toggle the promote arrow directly instead of a full re-render, which would drop focus mid-typing
+  // add or remove the button directly instead of a full re-render, which would drop focus mid-typing
   const row = inputEl.closest('.today-idea-row');
-  let promoteBtn = row.querySelector('.today-idea-promote');
-  if(val.trim() && !promoteBtn){
-    promoteBtn = document.createElement('span');
-    promoteBtn.className = 'today-idea-promote';
-    promoteBtn.title = 'הפיכה למשימה/עוגן עם זמן';
-    promoteBtn.textContent = '➜ משימה';
-    promoteBtn.onclick = () => promoteTodayIdeaToTask(id);
-    row.insertBefore(promoteBtn, row.querySelector('.today-idea-del'));
-  } else if(!val.trim() && promoteBtn){
-    promoteBtn.remove();
+  let moveBtn = row.querySelector('.move-to-btn');
+  if(val.trim() && !moveBtn){
+    const holder = document.createElement('div');
+    holder.innerHTML = moveToBtnHtml('todayIdea', id);
+    row.insertBefore(holder.firstElementChild, row.querySelector('.today-idea-del'));
+  } else if(!val.trim() && moveBtn){
+    moveBtn.remove();
   }
 }
 function toggleTodayIdeaDone(id){
@@ -14013,7 +14029,7 @@ function todayIdeaRowHtml(item){
     <div class="today-idea-row" data-drag-id="${item.id}" onpointerdown="startTodayIdeaPress(event,'${item.id}')" ${todayIdeasDragMode?'style="touch-action:none;"':''}>
       <span class="fav-star ${item.favorite?'active':''}" onclick="toggleTodayIdeaFavorite('${item.id}')" title="${item.favorite?'הסרה מהנבחרים':'סימון כנבחר להיום'}">${item.favorite?'★':'☆'}</span>
       <input type="checkbox" class="today-idea-check" ${item.done?'checked':''} onchange="toggleTodayIdeaDone('${item.id}')" title="בוצע">
-      <input type="text" class="today-idea-input ${item.done?'done':''}" data-field-key="idea-${item.id}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)" ${todayIdeasDragMode?'readonly':''}>
+      <input type="text" class="today-idea-input ${item.done?'done':''}" data-field-key="idea-${item.id}" value="${escapeAttr(item.text)}" placeholder="רעיון ליום..." oninput="onTodayIdeaInput('${item.id}', this)" onkeydown="onTodayIdeaKeydown(event)" ${todayIdeasDragMode?'readonly':''}>
       ${(item.text.trim() && !todayIdeasDragMode) ? moveToBtnHtml('todayIdea', item.id) : ''}
       ${!todayIdeasDragMode ? `<span class="today-idea-del" onclick="deleteTodayIdea('${item.id}')" title="מחיקה">✕</span>` : ''}
     </div>
