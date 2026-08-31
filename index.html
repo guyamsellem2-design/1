@@ -3605,6 +3605,16 @@
   .reset-btn.gcal-dup-btn{ border-color:var(--gold); color:var(--gold); font-weight:600; }
   .gcal-dup-note{ margin-top:6px; font-size:12.5px; line-height:1.5; color:var(--gold); }
 
+  /* a marked topic whose row is open reads as pressed, so the strip says which one you are in */
+  .important-topic-chip.topic-chip-open{ background:var(--tint); color:#1a1206; }
+  .topic-action-item{ margin-bottom:10px; }
+  .topic-action-item:last-child{ margin-bottom:0; }
+  .topic-action-tag{
+    font-size:12.5px; font-weight:700; color:var(--tint);
+    margin:0 2px 5px; letter-spacing:.01em;
+  }
+  .topic-action-item .today-idea-input::placeholder{ font-size:13px; }
+
   .leave-ask-overlay{
     position:fixed; inset:0; z-index:5200; background:rgba(0,0,0,.45);
     display:flex; align-items:center; justify-content:center; padding:24px;
@@ -4106,6 +4116,8 @@
   <div class="feel-block" id="dayIntentionBlock"></div>
   <!-- only drawn when something is actually marked: nothing to say is said with nothing -->
   <div class="important-topics-strip" id="importantTopicsStrip" style="display:none;"></div>
+  <!-- one action per important topic, in the order the topics are marked in -->
+  <div class="feel-block" id="topicActionsBlock" style="display:none;"></div>
 
 
   <div class="feel-block" id="todayPicksBlock"></div>
@@ -4365,7 +4377,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalDeletedEventIds: [], uiState:{}, importantTopics: [], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalDeletedEventIds: [], uiState:{}, importantTopics: [], topicActions: [], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -4426,6 +4438,7 @@ function loadData(){
       data.gcalDeletedEventIds = Array.isArray(parsed.gcalDeletedEventIds) ? parsed.gcalDeletedEventIds : [];
       data.uiState = (parsed.uiState && typeof parsed.uiState === 'object') ? parsed.uiState : {};
       data.importantTopics = Array.isArray(parsed.importantTopics) ? parsed.importantTopics : [];
+      data.topicActions = Array.isArray(parsed.topicActions) ? parsed.topicActions : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
@@ -4926,6 +4939,7 @@ function toggleImportantTopic(id){
   saveData();
   renderDomainEditor();
   renderImportantTopicsStrip();
+  renderTopicActions();
   renderTaskFilterSelect();
 }
 function renderImportantTopicsStrip(){
@@ -4937,9 +4951,114 @@ function renderImportantTopicsStrip(){
   el.style.display = '';
   el.innerHTML = ids.map(id=>{
     const d = data.domains.find(x=>x.id===id);
-    return `<span class="important-topic-chip" style="--tint:${d.color}" onclick="navigateToDomain('${d.id}')">${escapeHtml(d.name)}</span>`;
+    const open = topicActionRowShown(d.id);
+    return `<span class="important-topic-chip ${open?'topic-chip-open':''}" style="--tint:${d.color}"
+      onclick="toggleTopicAction('${d.id}')" title="פעולה אחת בתחום הזה">${escapeHtml(d.name)}</span>`;
   }).join('');
 }
+/* ---------- פעולה אחת בכל תחום חשוב ----------
+   The topics you marked as mattering right now are the headings; under each of them there is room
+   for exactly one thing you could do today in it. One, not a list -- three important topics with a
+   list under each is just the task board again, and the whole point of naming three is to end up
+   with three small, doable things instead of everything. Anything beyond one belongs where lists
+   belong: the board, "רעיונות וחלומות", "משימות ללא מועד".
+
+   Tapping a topic name opens its row; the rows that hold something stay open on their own, so the
+   home screen ends up showing one action per topic and nothing else. */
+function topicActions(){ return data.topicActions || (data.topicActions = []); }
+function topicActionFor(domainId){ return topicActions().find(a=>a.domain === domainId) || null; }
+const openTopicActionRows = new Set();
+function topicActionRowShown(domainId){
+  const a = topicActionFor(domainId);
+  return !!a || openTopicActionRows.has(domainId);
+}
+function toggleTopicAction(domainId){
+  if(topicActionFor(domainId)){
+    // already written: bring the cursor to it rather than folding away something you wrote
+    focusTopicActionInput(domainId);
+    return;
+  }
+  if(openTopicActionRows.has(domainId)) openTopicActionRows.delete(domainId);
+  else openTopicActionRows.add(domainId);
+  persistUiState();
+  renderImportantTopicsStrip();
+  renderTopicActions();
+  if(openTopicActionRows.has(domainId)) focusTopicActionInput(domainId);
+}
+function focusTopicActionInput(domainId){
+  requestAnimationFrame(()=>{
+    const el = document.querySelector(`#topicActionsBlock [data-topic-action="${domainId}"]`);
+    if(!el) return;
+    el.focus();
+    try{ el.setSelectionRange(el.value.length, el.value.length); }catch(e){}
+  });
+}
+function onTopicActionInput(domainId, inputEl){
+  const val = inputEl.value;
+  let a = topicActionFor(domainId);
+  if(!a){
+    if(!val.trim()) return;                       // an empty row is not yet an action
+    a = {id:uid(), domain:domainId, text:val, done:false, createdAt:Date.now()};
+    topicActions().push(a);
+  } else {
+    a.text = val;
+  }
+  saveData();
+  // the button is added and removed by hand instead of re-rendering, which would drop the cursor
+  const row = inputEl.closest('.today-idea-row');
+  const moveBtn = row.querySelector('.move-to-btn');
+  if(val.trim() && !moveBtn){
+    const holder = document.createElement('div');
+    holder.innerHTML = moveToBtnHtml('topicAction', a.id);
+    row.insertBefore(holder.firstElementChild, row.querySelector('.today-idea-del'));
+  } else if(!val.trim() && moveBtn){
+    moveBtn.remove();
+  }
+}
+function toggleTopicActionDone(domainId){
+  const a = topicActionFor(domainId);
+  if(!a) return;
+  a.done = !a.done;
+  saveData();
+  renderTopicActions();
+}
+function deleteTopicAction(domainId){
+  data.topicActions = topicActions().filter(a=>a.domain !== domainId);
+  openTopicActionRows.delete(domainId);
+  persistUiState();
+  saveData();
+  renderImportantTopicsStrip();
+  renderTopicActions();
+}
+const TOPIC_ACTION_PLACEHOLDER = 'פעולה אחת שאני יכול/ה לעשות היום בתחום הזה';
+function renderTopicActions(){
+  const el = document.getElementById('topicActionsBlock');
+  if(!el) return;
+  const ids = importantTopicsInUse().filter(topicActionRowShown);
+  if(!ids.length){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  withFocusPreserved('topicActionsBlock', ()=>{
+    el.innerHTML = ids.map(id=>{
+      const d = data.domains.find(x=>x.id===id);
+      const a = topicActionFor(id);
+      const text = a ? (a.text||'') : '';
+      return `<div class="topic-action-item" style="--tint:${d.color}">
+        <div class="topic-action-tag">${escapeHtml(d.name)}</div>
+        <div class="today-idea-row">
+          <input type="checkbox" class="today-idea-check" ${(a && a.done)?'checked':''}
+            onchange="toggleTopicActionDone('${id}')" title="בוצע">
+          <input type="text" class="today-idea-input ${(a && a.done)?'done':''}" dir="rtl"
+            data-topic-action="${id}" data-field-key="topicAction-${id}"
+            value="${escapeAttr(text)}" placeholder="${escapeAttr(TOPIC_ACTION_PLACEHOLDER)}"
+            oninput="onTopicActionInput('${id}', this)">
+          ${(a && text.trim()) ? moveToBtnHtml('topicAction', a.id) : ''}
+          <span class="today-idea-del" onclick="deleteTopicAction('${id}')" title="מחיקה">✕</span>
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
 function renderDomainEditor(){
   renderWorldSwitch();
   const el = document.getElementById('topicTabStrip');
@@ -5464,6 +5583,7 @@ const MOVE_SOURCES = {
   dilemma:    { list: ()=>data.generalDilemmas,  text:'text',  after: ()=>renderGeneralDilemmaList() },
   habit:      { list: ()=>data.habits,           text:'text',  after: ()=>renderHabits() },
   todayIdea:  { list: ()=>data.todayIdeas,       text:'text',  after: ()=>renderTodayIdeas() },
+  topicAction:{ list: ()=>topicActions(),         text:'text',  after: ()=>{ renderImportantTopicsStrip(); renderTopicActions(); } },
 };
 let moveMenuSource = null;
 function closeMoveMenu(){
@@ -5506,6 +5626,7 @@ function moveToBtnHtml(sourceKind, id){
   return `<button type="button" class="subtask-toggle-btn move-to-btn"
     onclick="openMoveMenu(event,'${sourceKind}','${id}')" title="העברה למקום אחר באתר">העבר ל...</button>`;
 }
+function topicActionById(id){ return topicActions().find(a=>a.id===id) || null; }
 function moveSourceRecord(src){
   const def = MOVE_SOURCES[src.kind];
   const list = def && def.list();
@@ -5535,6 +5656,11 @@ function removeMoveSource(src){
   else if(src.kind==='dilemma') data.generalDilemmas = (data.generalDilemmas||[]).filter(x=>x.id!==src.id);
   else if(src.kind==='habit') data.habits = data.habits.filter(x=>x.id!==src.id);
   else if(src.kind==='todayIdea') data.todayIdeas = data.todayIdeas.filter(x=>x.id!==src.id);
+  else if(src.kind==='topicAction'){
+    const gone = topicActionById(src.id);
+    if(gone) openTopicActionRows.delete(gone.domain);   // moved away, so the empty row goes too
+    data.topicActions = topicActions().filter(x=>x.id!==src.id);
+  }
   if(def) def.after();
 }
 const MOVE_DEST_LABEL = {
@@ -5722,6 +5848,7 @@ function persistUiState(){
     feelBlockOpen, todayIdeasOpen, procBlockOpen, videosBlockOpen, overdueSectionOpen,
     listExpandState: {...listExpandState},
     noteSizeLevel: [...noteSizeLevel.entries()],
+    openTopicActionRows: [...openTopicActionRows],
   };
   saveData();
 }
@@ -5739,6 +5866,7 @@ function restoreUiState(){
   if(Array.isArray(u.noteSizeLevel)) u.noteSizeLevel.forEach(([k,v])=>{
     if(typeof v === 'number') noteSizeLevel.set(k, v);
   });
+  if(Array.isArray(u.openTopicActionRows)) u.openTopicActionRows.forEach(k=>openTopicActionRows.add(k));
 }
 const expandedMemoNoteIds = new Set();
 let openMemoId = null;
@@ -6607,7 +6735,19 @@ function addDomainNote(){
   noteSizeLevel.set(newNote.id, 0); // freshly created -- open, not minimized, since it's about to be typed into
   saveData();
   renderKeepGrid(activeNoteDomain);
-  requestAnimationFrame(()=>{ const ta = document.querySelector('#keepGrid .keep-note-editor'); if(ta) ta.focus(); });
+  // a note you just opened is a note you are already writing in: it comes to you, rather than
+  // being left somewhere further down the page for you to go and find
+  requestAnimationFrame(()=>{
+    const ta = document.querySelector(`#keepGrid [data-field-key="note-${newNote.id}"]`)
+            || document.querySelector('#keepGrid .keep-note-editor');
+    if(!ta) return;
+    const card = ta.closest('.keep-note') || ta;
+    const r = card.getBoundingClientRect(), pad = 16;
+    if(r.top < pad || r.bottom > window.innerHeight - pad){
+      window.scrollBy({top: r.top - pad, behavior:'smooth'});
+    }
+    ta.focus();
+  });
 }
 function onKeepNoteInput(domainId, noteId, val){
   const n = ensureDomainNotes(domainId).find(n=>n.id===noteId);
@@ -7114,28 +7254,104 @@ function setGcalWriteCalendar(calId){
   renderGcalStatus();
   flashStatus('היומן הראשי עודכן');
 }
-function pushEventToGcal(eventBody, existingEventId, onSuccess){
-  const calId = gcalWriteCalendarId();
-  const method = existingEventId ? 'PATCH' : 'POST';
-  const url = existingEventId
-    ? `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(existingEventId)}`
-    : `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
-  fetch(url, { method, headers:{ Authorization: 'Bearer '+gcalAccessToken, 'Content-Type':'application/json' }, body: JSON.stringify(eventBody) })
-    .then(r=>{
-      if(r.status===401 || r.status===403){
-        gcalAccessToken = null;
-        clearPersistedGcalToken();
-        // no confirm() here on purpose (same reasoning as everywhere else in the app) -- just say what
-        // happened and let the user reconnect via the button whenever they're ready, instead of a
-        // blocking dialog that can hang/fail silently on mobile and forces an immediate decision
-        flashStatus('ההרשאה ליומן גוגל פגה — לחיצה על "חיבור ליומן גוגל" תחדש אותה');
-        return null;
-      }
+/* ---------- one task here, one event there ----------
+   This is what filled the calendar with pairs, and it was on THIS side, not the reading side.
+
+   Two mail accounts means two connections to Google, each holding its own copy of the same task
+   list. "Create this event" was a plain POST, and a POST always makes something new -- so whichever
+   connection pushed first created the event, and the other, having nothing to recognise it by,
+   created it again. Same task, two events, and every later edit made more.
+
+   Google lets the client choose an event's id when it inserts, and refuses an insert whose id is
+   already taken. Deriving that id from the task's own id turns "create this event" from something
+   that can happen any number of times into something that can happen exactly once: every device,
+   on every account, asks for the same id, and only the first request creates anything. The rest are
+   told 409 and update what is already there instead.
+
+   Base32hex is the alphabet Google allows (a-v and 0-9). Hex digits all live inside it, so
+   hex-encoding the local id yields a legal event id with no collisions and nothing to escape. */
+const GCAL_ID_PREFIX_TASK = 'mps';
+const GCAL_ID_PREFIX_ANCHOR = 'mpa';
+const GCAL_ID_PREFIX_SUBTASK = 'mpt';
+function gcalDeterministicId(prefix, localId){
+  let out = '';
+  for(const ch of String(localId||'')) out += ch.charCodeAt(0).toString(16).padStart(4,'0');
+  return out ? (prefix + out).slice(0, 900) : '';
+}
+/* and back again, so an event we made can be traced to the task that made it even if that task
+   lost its link along the way (a cross-device merge can drop it) */
+function gcalLocalIdFromEventId(evId, prefix){
+  const raw = gcalRawEventId(evId||'');
+  if(!raw || raw.indexOf(prefix) !== 0) return '';
+  const hex = raw.slice(prefix.length);
+  if(!hex || hex.length % 4) return '';
+  let out = '';
+  for(let i=0; i<hex.length; i+=4){
+    const n = parseInt(hex.slice(i, i+4), 16);
+    if(!(n > 0)) return '';
+    out += String.fromCharCode(n);
+  }
+  return out;
+}
+/* An event imported from a calendar carries that calendar's name in front of its id, and it has to
+   be updated THERE. Sending it to the write calendar -- which is what happened until now -- asks
+   for an id that calendar has never heard of, and has been failing silently every time. */
+function gcalTargetFor(existingEventId){
+  const at = existingEventId ? existingEventId.indexOf(':') : -1;
+  if(at !== -1) return { calId: existingEventId.slice(0, at), evId: existingEventId.slice(at+1) };
+  return { calId: gcalWriteCalendarId(), evId: existingEventId || '' };
+}
+function gcalEventsUrl(calId){
+  return `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
+}
+function pushEventToGcal(eventBody, existingEventId, onSuccess, wantedId){
+  const tgt = gcalTargetFor(existingEventId);
+  const headers = { Authorization: 'Bearer '+gcalAccessToken, 'Content-Type':'application/json' };
+  // no confirm() here on purpose (same reasoning as everywhere else in the app) -- just say what
+  // happened and let the user reconnect via the button whenever they're ready, instead of a
+  // blocking dialog that can hang/fail silently on mobile and forces an immediate decision
+  const authGone = ()=>{
+    gcalAccessToken = null;
+    clearPersistedGcalToken();
+    flashStatus('ההרשאה ליומן גוגל פגה — לחיצה על "חיבור ליומן גוגל" תחדש אותה');
+  };
+  const done = (ev)=>{ if(ev){ onSuccess(ev); flashStatus('עודכן ביומן גוגל'); } };
+  const fail = ()=>{ flashStatus('העדכון ביומן גוגל נכשל'); };
+
+  // update the one that is already there, under the id we asked for
+  const adopt = ()=>{
+    fetch(gcalEventsUrl(gcalWriteCalendarId())+'/'+encodeURIComponent(wantedId), {
+      method:'PATCH', headers, body: JSON.stringify({...eventBody, status:'confirmed'})
+    }).then(r=>{
+      if(r.status===401){ authGone(); return null; }
       if(!r.ok) throw new Error('http_'+r.status);
       return r.json();
-    })
-    .then(ev=>{ if(ev){ onSuccess(ev); flashStatus('עודכן ביומן גוגל'); } })
-    .catch(()=>{ flashStatus('העדכון ביומן גוגל נכשל'); });
+    }).then(done).catch(fail);
+  };
+  const insert = ()=>{
+    const body = wantedId ? {...eventBody, id: wantedId} : eventBody;
+    fetch(gcalEventsUrl(gcalWriteCalendarId()), { method:'POST', headers, body: JSON.stringify(body) })
+      .then(r=>{
+        if(r.status===401 || r.status===403){ authGone(); return null; }
+        // 409: this id is taken, which is exactly the answer we want -- the event exists already,
+        // put there by the other account, and there is nothing to create
+        if(r.status===409 && wantedId){ adopt(); return null; }
+        if(!r.ok) throw new Error('http_'+r.status);
+        return r.json();
+      }).then(done).catch(fail);
+  };
+
+  if(!tgt.evId){ insert(); return; }
+  fetch(gcalEventsUrl(tgt.calId)+'/'+encodeURIComponent(tgt.evId), {
+    method:'PATCH', headers, body: JSON.stringify(eventBody)
+  }).then(r=>{
+    if(r.status===401){ authGone(); return null; }
+    // gone from Google, or an id belonging to a calendar we cannot write to: make it again -- and
+    // making it again is safe now, because it can only ever land on the one id we chose
+    if(r.status===403 || r.status===404 || r.status===410){ insert(); return null; }
+    if(!r.ok) throw new Error('http_'+r.status);
+    return r.json();
+  }).then(done).catch(fail);
 }
 function pushTaskToGcal(t){
   if(!t.date) return;
@@ -7153,7 +7369,15 @@ function pushTaskToGcal(t){
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() }
     };
-    pushEventToGcal(body, t.googleEventId, ev=>{ t.googleEventId = ev.id; saveData(); });
+    // the cross-device merge can replace the whole task list while this request is in the air, and
+    // writing the new event id onto an object nothing points at any more is how a task ends up with
+    // no link at all -- which is how it got created in Google a second time
+    pushEventToGcal(body, t.googleEventId, ev=>{
+      const live = data.tasks.find(x=>x.id===t.id);
+      if(live) live.googleEventId = ev.id;
+      t.googleEventId = ev.id;
+      saveData();
+    }, gcalDeterministicId(GCAL_ID_PREFIX_TASK, t.id));
   });
 }
 function anchorRecurrenceRule(a){
@@ -7197,13 +7421,20 @@ function pushAnchorToGcal(a){
       end: { dateTime: end.toISOString() }
     };
     if(recur) body.recurrence = [recur];
-    pushEventToGcal(body, a.googleRecurringEventId, ev=>{ a.googleRecurringEventId = ev.id; saveData(); });
+    pushEventToGcal(body, a.googleRecurringEventId, ev=>{
+      const live = data.anchors.find(x=>x.id===a.id);
+      if(live) live.googleRecurringEventId = ev.id;
+      a.googleRecurringEventId = ev.id;
+      saveData();
+    }, gcalDeterministicId(GCAL_ID_PREFIX_ANCHOR, a.id));
   });
 }
 function deleteEventFromGcal(eventId, onDone){
   ensureGcalWriteToken(()=>{
-    const calId = gcalSelectedCalendarIds()[0] || 'primary';
-    fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`, {
+    // an imported event names its own calendar; anything else was written by us, to the write
+    // calendar. "the first calendar in the list" was neither, and quietly deleted nothing.
+    const tgt = gcalTargetFor(eventId);
+    fetch(gcalEventsUrl(tgt.calId)+'/'+encodeURIComponent(tgt.evId), {
       method:'DELETE', headers:{ Authorization: 'Bearer '+gcalAccessToken }
     }).then(()=>{ onDone(); flashStatus('הוסר מיומן גוגל'); }).catch(()=>{ onDone(); });
   });
@@ -7314,6 +7545,8 @@ function gcalTaskKeys(t){
     keys.push('raw:'+gcalRawEventId(t.googleEventId));
   }
   if(t.googleICalUID) keys.push('uid:'+gcalTextKey(t.googleICalUID));
+  // the id this task's event WOULD have, whether or not the link survived
+  keys.push('raw:'+gcalDeterministicId(GCAL_ID_PREFIX_TASK, t.id));
   const w = gcalWhenKey(t.text, t.date, t.time, t.endTime);
   if(w) keys.push(w);
   return keys;
@@ -7374,7 +7607,15 @@ function runGcalSync(quiet){
         oneTimeEvents.push({ev,calId});
       }
     });
-    const newRecurringKeys = [...recurringGroups.keys()].filter(key=>!existingAnchorRecIds.has(recurringGroups.get(key).recurringEventId));
+    const newRecurringKeys = [...recurringGroups.keys()].filter(key=>{
+      const recId = recurringGroups.get(key).recurringEventId;
+      if(existingAnchorRecIds.has(recId)) return false;
+      // a repeating event this app made: give the anchor its link back rather than adding another
+      const ownerId = gcalLocalIdFromEventId(recId, GCAL_ID_PREFIX_ANCHOR);
+      const owner = ownerId && data.anchors.find(a=>a.id===ownerId);
+      if(owner){ if(!owner.googleRecurringEventId) owner.googleRecurringEventId = recId; return false; }
+      return true;
+    });
 
     return Promise.all(newRecurringKeys.map(key=>{
       const group = recurringGroups.get(key);
@@ -7423,6 +7664,17 @@ function runGcalSync(quiet){
       let addedTasks = 0;
       oneTimeEvents.forEach(({ev,calId})=>{
         const gid = calId+':'+ev.id;
+        // an event this app made, coming back to us. if the task behind it lost its link, this is
+        // where it gets it back -- instead of arriving as a second, unconnected task
+        const ownerId = gcalLocalIdFromEventId(ev.id, GCAL_ID_PREFIX_TASK);
+        if(ownerId){
+          const owner = data.tasks.find(x=>x.id===ownerId);
+          if(owner){
+            if(!owner.googleEventId) owner.googleEventId = ev.id;
+            gcalDiag.skippedExisting++;
+            return;
+          }
+        }
         // when it is has to be worked out first: it is part of how we recognise the event
         let date='', time='', endTime='';
         if(ev.start && ev.start.date){
@@ -7601,6 +7853,119 @@ function cleanGcalDuplicates(){
   flashStatus('נוקו ' + total + ' כפילויות');
 }
 
+/* ---------- the pairs already sitting in Google ----------
+   Stopping the app from creating a second event does nothing about the second events it already
+   created, and those are in Google, not here -- so this goes and looks at the calendars themselves.
+
+   The line it will not cross: it only ever deletes an event THIS APP wrote. Every event it creates
+   says so in its description, and that signature is the whole permission slip. An event you or
+   anyone else made in Google is counted, named, and left exactly where it is, even when it is
+   plainly one of a pair -- deleting something out of a real calendar on a guess is not a thing to
+   do on your behalf. Within a group of copies the human-made one is always the one kept. */
+const GCAL_APP_SIGNATURE = 'המפה השבועית';
+function gcalMadeHere(ev){
+  return !!(ev && ev.description && ev.description.indexOf(GCAL_APP_SIGNATURE) !== -1);
+}
+function gcalEventWhen(ev){
+  const st = (ev.start && (ev.start.dateTime || ev.start.date)) || '';
+  const en = (ev.end && (ev.end.dateTime || ev.end.date)) || '';
+  return st + '|' + en;
+}
+function gcalEventGroupKey(ev){
+  const t = gcalTextKey(ev.summary || '');
+  const when = gcalEventWhen(ev);
+  return (t && when !== '|') ? (t + '|' + when) : '';
+}
+let gcalDupScanRunning = false;
+function cleanGoogleCalendarDuplicates(){
+  if(gcalDupScanRunning) return;
+  if(!data.gcalConnected){ flashStatus('צריך קודם להתחבר ליומן'); return; }
+  gcalDupScanRunning = true;
+  renderGcalStatus();
+  ensureGcalWriteToken(()=>{
+    const startDates = weekDatesForOffset(WEEK_OFFSET_MIN);
+    const endDates = weekDatesForOffset(WEEK_OFFSET_MAX);
+    const timeMin = new Date(startDates[0].getFullYear(), startDates[0].getMonth(), startDates[0].getDate(), 0,0,0).toISOString();
+    const timeMax = new Date(endDates[6].getFullYear(), endDates[6].getMonth(), endDates[6].getDate(), 23,59,59).toISOString();
+    // singleEvents=false on purpose: a repeating event is ONE event here, and expanding it into its
+    // instances would read a weekly anchor as fifty copies of itself
+    const params = new URLSearchParams({ timeMin, timeMax, singleEvents:'false', maxResults:'2500' });
+    const calIds = gcalSelectedCalendarIds();
+    Promise.all(calIds.map(calId=>
+      fetch(gcalEventsUrl(calId)+'?'+params.toString(), { headers:{ Authorization: 'Bearer '+gcalAccessToken } })
+        .then(r=>{ if(!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(json=>(json.items||[]).filter(ev=>ev.id && ev.status!=='cancelled').map(ev=>({ev, calId})))
+        .catch(()=>[])
+    )).then(per=>{
+      const groups = new Map();
+      per.flat().forEach(({ev, calId})=>{
+        const k = gcalEventGroupKey(ev);
+        if(!k) return;
+        if(!groups.has(k)) groups.set(k, []);
+        groups.get(k).push({ev, calId});
+      });
+      const doomed = [];
+      let untouchable = 0;
+      groups.forEach(list=>{
+        if(list.length < 2) return;
+        // what stays: something a person made, over anything the app made; then the copy carrying
+        // the id the app will keep using from now on; then simply the oldest
+        const ranked = list.slice().sort((a,b)=>{
+          const human = (gcalMadeHere(a.ev)?1:0) - (gcalMadeHere(b.ev)?1:0);
+          if(human) return human;
+          const ours = (gcalLocalIdFromEventId(b.ev.id, GCAL_ID_PREFIX_TASK) || gcalLocalIdFromEventId(b.ev.id, GCAL_ID_PREFIX_ANCHOR) ? 1 : 0)
+                     - (gcalLocalIdFromEventId(a.ev.id, GCAL_ID_PREFIX_TASK) || gcalLocalIdFromEventId(a.ev.id, GCAL_ID_PREFIX_ANCHOR) ? 1 : 0);
+          if(ours) return ours;
+          return String(a.ev.created||'').localeCompare(String(b.ev.created||''));
+        });
+        ranked.slice(1).forEach(x=>{
+          if(gcalMadeHere(x.ev)) doomed.push(x);
+          else untouchable++;
+        });
+      });
+      gcalDupScanRunning = false;
+      renderGcalStatus();
+      if(!doomed.length){
+        flashStatus(untouchable
+          ? `נמצאו ${untouchable} כפילויות שלא נוצרו כאן — אותן צריך למחוק ביומן גוגל עצמו`
+          : 'לא נמצאו כפילויות ביומן גוגל 🌱');
+        return;
+      }
+      const names = [...new Set(doomed.map(x=>x.ev.summary||'(ללא כותרת)'))].slice(0,6);
+      const extra = untouchable ? `\n\nעוד ${untouchable} כפילויות לא נוצרו על ידי האפליקציה, ולכן לא ייגעו בהן — אותן צריך למחוק ביומן גוגל עצמו.` : '';
+      if(!confirm(`נמצאו ${doomed.length} אירועים כפולים ביומן גוגל שהאפליקציה יצרה.\n\n${names.map(n=>'· '+n).join('\n')}${doomed.length>names.length?'\n· ...':''}\n\nלמחוק אותם מיומן גוגל? מכל קבוצה יישאר עותק אחד.${extra}`)) return;
+      let failed = 0;
+      const gone = [];
+      const step = (i)=>{
+        if(i >= doomed.length){
+          const ok = gone.length;
+          // only what actually left Google is written off, so a copy that could not be deleted is
+          // still allowed to come back here rather than quietly vanishing from both sides
+          gone.forEach(x=>rememberDeletedGcalEvent(x.calId+':'+x.ev.id));
+          saveData();
+          flashStatus(failed
+            ? `נמחקו ${ok} כפילויות מיומן גוגל · ${failed} לא ניתנות למחיקה מהחשבון הזה`
+            : `נמחקו ${ok} כפילויות מיומן גוגל`);
+          renderGcalStatus();
+          return;
+        }
+        const x = doomed[i];
+        fetch(gcalEventsUrl(x.calId)+'/'+encodeURIComponent(x.ev.id), {
+          method:'DELETE', headers:{ Authorization: 'Bearer '+gcalAccessToken }
+        }).then(r=>{ if(r.ok || r.status===410) gone.push(x); else failed++; })
+          .catch(()=>{ failed++; })
+          .then(()=>step(i+1));
+      };
+      flashStatus('מוחק כפילויות מיומן גוגל...');
+      step(0);
+    }).catch(()=>{
+      gcalDupScanRunning = false;
+      renderGcalStatus();
+      flashStatus('בדיקת הכפילויות ביומן נכשלה');
+    });
+  });
+}
+
 let syncMenuOpen = false;
 function toggleSyncMenu(){
   syncMenuOpen = !syncMenuOpen;
@@ -7728,9 +8093,7 @@ function renderGcalStatus(){
       ${escapeHtml(bits.join(' · '))}${which}${failed}</div>`;
   }
   const dupCount = gcalDuplicateCount() + duplicateAnchorIds().size;
-  const dupHtml = dupCount
-    ? `<div class="gcal-status gcal-dup-note">🧹 יש כאן ${dupCount} עותקים כפולים של אירועים שכבר קיימים — לחיצה על "ניקוי כפילויות" מורידה אותם מכאן, ולא נוגעת ביומן גוגל.</div>`
-    : '';
+  const dupHtml = `<div class="gcal-status gcal-dup-note">🧹 ${dupCount ? dupCount+' עותקים כפולים כאן על הלוח · ' : ''}"כפילויות ביומן גוגל" סורק את היומנים עצמם ומוחק שם עותקים שהאפליקציה יצרה פעמיים. אירוע שלא נוצר כאן לא ייגע.</div>`;
   const syncErrorHtml = (!currentSyncUser && lastSyncSignInError)
     ? `<div class="gcal-status" style="color:#e06060; margin-top:4px;">⚠️ סנכרון בין מכשירים נכשל: ${escapeHtml(lastSyncSignInError)}</div>`
     : '';
@@ -7740,7 +8103,8 @@ function renderGcalStatus(){
       <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
       <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
-      <button class="reset-btn ${dupCount?'gcal-dup-btn':''}" onclick="cleanGcalDuplicates()">🧹 ניקוי כפילויות${dupCount?' ('+dupCount+')':''}</button>
+      <button class="reset-btn ${dupCount?'gcal-dup-btn':''}" onclick="cleanGcalDuplicates()">🧹 כפילויות כאן${dupCount?' ('+dupCount+')':''}</button>
+      <button class="reset-btn gcal-dup-btn" onclick="cleanGoogleCalendarDuplicates()" ${gcalDupScanRunning?'disabled':''}>${gcalDupScanRunning?'🔍 בודק...':'🧹 כפילויות ביומן גוגל'}</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
     ${dupHtml}${syncErrorHtml}${diagHtml}
@@ -7776,10 +8140,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','possibilities','customTimerPresets','inbox'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','possibilities','customTimerPresets','inbox','topicActions'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote','onboardingDismissed'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], notebooks:[], possibilities:[], customTimerPresets:[], inbox:[], onboardingDismissed:false, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], notebooks:[], possibilities:[], customTimerPresets:[], inbox:[], topicActions:[], onboardingDismissed:false, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -7871,7 +8235,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','generalDilemmas','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','generalDilemmas','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','topicActions'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -8570,7 +8934,13 @@ function pushSubtaskToGcal(taskId, s){
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() }
     };
-    pushEventToGcal(body, s.googleEventId, ev=>{ s.googleEventId = ev.id; saveData(); });
+    pushEventToGcal(body, s.googleEventId, ev=>{
+      const liveTask = data.tasks.find(x=>x.id===taskId);
+      const live = liveTask && (liveTask.subtasks||[]).find(x=>x.id===s.id);
+      if(live) live.googleEventId = ev.id;
+      s.googleEventId = ev.id;
+      saveData();
+    }, gcalDeterministicId(GCAL_ID_PREFIX_SUBTASK, s.id));
   });
 }
 function applyGcalSyncForSubtask(taskId, s, timingOrSyncChanged){
@@ -11890,6 +12260,7 @@ function importData(e){
       data.gcalDeletedEventIds = Array.isArray(parsed.gcalDeletedEventIds) ? parsed.gcalDeletedEventIds : [];
       data.uiState = (parsed.uiState && typeof parsed.uiState === 'object') ? parsed.uiState : {};
       data.importantTopics = Array.isArray(parsed.importantTopics) ? parsed.importantTopics : [];
+      data.topicActions = Array.isArray(parsed.topicActions) ? parsed.topicActions : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
@@ -12101,7 +12472,7 @@ function resetAll(){
   const keepGcalAccountEmail = data.gcalAccountEmail;
   const keepGcalWriteCalendarId = data.gcalWriteCalendarId;
   const keepNotebooks = data.notebooks;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, notebooks:keepNotebooks, notebookMigrated:true, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalWriteCalendarId:keepGcalWriteCalendarId, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], onboardingDismissed:true};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, notebooks:keepNotebooks, notebookMigrated:true, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalWriteCalendarId:keepGcalWriteCalendarId, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], topicActions:[], onboardingDismissed:true};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -15002,6 +15373,7 @@ function render(){
   renderInbox();
   renderDayIntention();
   renderImportantTopicsStrip();
+  renderTopicActions();
   renderFeelBar();
   renderProcrastinationBlock();
   renderInspiringVideos();
