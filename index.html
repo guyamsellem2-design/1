@@ -609,6 +609,7 @@
      a clear "this is where it's about to land" cue, set inline per-drag via --drag-color */
   .feel-chip.list-drag-over{outline:2px dashed var(--gold); outline-offset:2px;}
   .feel-chip.list-drag-over-reassign, .chip-group.list-drag-over-reassign{outline:2.5px dashed var(--drag-color, var(--gold)); outline-offset:3px;}
+  #addNoteHeaderBtn{ flex:0 0 auto; }
   .chip-header-manage{display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:2px 2px 10px; border-bottom:1px dashed var(--border); margin-bottom:4px;}
   .chip-header-pill{display:inline-flex; align-items:center; font-size:12.5px; padding:4px 10px; border-radius:999px; border:1.5px dashed var(--border); color:var(--muted); cursor:pointer;}
   .chip-header-pill:hover{color:var(--text); border-color:var(--text);}
@@ -4291,8 +4292,12 @@
     <div class="topic-tab-strip" id="topicTabStrip"></div>
   </div>
   <div class="notebook-body" id="notesBody">
+    <!-- both ways of starting something here belong on the same line: a note, or the heading a
+         note will sit under. The headings that already exist are managed on the row below. -->
     <div class="add-row">
       <button id="addNoteBtn" onclick="addDomainNote()">+ פתק חדש</button>
+      <button class="add-domain-btn" id="addNoteHeaderBtn"
+        onclick="startAddNoteHeader(activeNoteDomain)">+ כותרת</button>
     </div>
 
     <div id="keepNoteHeaderManage"></div>
@@ -6304,6 +6309,9 @@ function deleteNoteHeader(domainId, headerId){
 }
 function noteHeaderManageHtml(domainId){
   const headers = ensureDomainNoteHeaders(domainId);
+  // "+ כותרת" moved up next to "+ פתק חדש"; with no headings yet and nothing being typed there is
+  // nothing left to show, and an empty bordered strip under the button is just a line
+  if(!headers.length && addingNoteHeaderDomain !== domainId) return '';
   return `<div class="chip-header-manage">
     ${headers.map(h => editingNoteHeaderKey===(domainId+':'+h.id) ? `
       <span class="feel-chip-add-row">
@@ -6322,7 +6330,7 @@ function noteHeaderManageHtml(domainId){
         <span class="feel-chip-add-confirm" onclick="commitAddNoteHeader('${domainId}')" title="הוספה">✓</span>
         <span class="feel-chip-add-cancel" onclick="cancelAddNoteHeader()" title="ביטול">✕</span>
       </span>
-    ` : `<span class="chip-header-pill" onclick="startAddNoteHeader('${domainId}')">+ כותרת</span>`}
+    ` : ''}
   </div>`;
 }
 const collapsedNoteHeaders = new Set(); // keyed by "domainId:headerId" ('' headerId = the "ללא כותרת" group)
@@ -15736,7 +15744,12 @@ function navDrawerDragSettle(g, willOpen){
   navOpen = willOpen;
   applyNavState();
 }
-function navDrawerDragEnd(g){ navDrawerDragSettle(g, ((g.openPx||0)/g.width) > 0.5); }
+function navDrawerDragEnd(g){
+  // with no width there is no ratio, only NaN -- and NaN > 0.5 is false, which used to quietly
+  // mean "close it". A drag that measured nothing decides nothing: leave the drawer as it was.
+  if(!g.width){ navDrawerDragSettle(g, navOpen); return; }
+  navDrawerDragSettle(g, (g.openPx==null ? (navOpen?g.width:0) : g.openPx) / g.width > 0.5);
+}
 function navDrawerDragCancel(g){ navDrawerDragSettle(g, navOpen); }
 
 /* tab carousel: home <-> topics */
@@ -15818,20 +15831,34 @@ function closeTopOverlay(){
   return true;
 }
 let overlayGuard = false;      // a guard entry of ours is sitting on the history stack
-let poppingOwnGuard = false;   // ...and we are the ones taking it back off
+/* history.back() does not happen when you call it -- the pop lands a moment later, and on a phone
+   that moment can be long. Opening something in that window used to push a fresh guard entry which
+   the still-pending back() then swallowed: the flag said "guarded", the stack held nothing, and the
+   next pop from anywhere at all closed whatever was open. That is the drawer shutting by itself a
+   few seconds after you opened it, with nobody touching anything.
+
+   So a release in flight is counted, not flagged, and nothing new is pushed until it lands. */
+let pendingOwnPops = 0;
+let rearmAfterPop = false;
 function armOverlayGuard(){
   if(overlayGuard || !anyOverlayOpen()) return;
+  if(pendingOwnPops > 0){ rearmAfterPop = true; return; }   // wait for our own back() to arrive
   try{ history.pushState({appOverlay:true}, ''); overlayGuard = true; }catch(e){}
 }
 function releaseOverlayGuard(){
+  rearmAfterPop = false;
   if(!overlayGuard || anyOverlayOpen()) return;
   overlayGuard = false;
-  poppingOwnGuard = true;
-  try{ history.back(); }catch(e){ poppingOwnGuard = false; }
+  pendingOwnPops++;
+  try{ history.back(); }catch(e){ pendingOwnPops--; }
 }
 function syncOverlayGuard(){ if(anyOverlayOpen()) armOverlayGuard(); else releaseOverlayGuard(); }
 window.addEventListener('popstate', ()=>{
-  if(poppingOwnGuard){ poppingOwnGuard = false; return; }
+  if(pendingOwnPops > 0){
+    pendingOwnPops--;
+    if(rearmAfterPop){ rearmAfterPop = false; armOverlayGuard(); }
+    return;
+  }
   if(!overlayGuard) return;   // not our entry -- let the browser do what it was going to do
   overlayGuard = false;
   if(closeTopOverlay()) armOverlayGuard();
