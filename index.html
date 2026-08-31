@@ -3616,6 +3616,89 @@
   }
   .topic-action-item .today-idea-input::placeholder{ font-size:13px; }
 
+  /* ---------- דף הנושא ---------- */
+  #topicFocusTitle{ letter-spacing:-.01em; }
+  .focus-hero{
+    background:var(--surface); border:1.5px solid var(--card-line); border-left:none; border-right:none;
+    border-radius:16px; padding:14px 16px 12px; margin:2px 0 16px;
+    border:1.5px solid var(--tint); box-shadow:0 0 22px -12px var(--tint);
+  }
+  .focus-hero-q{ font-size:14.5px; font-weight:700; color:var(--tint); margin-bottom:9px; line-height:1.4; }
+  .focus-hero .today-idea-input{ font-size:15px; }
+
+  .focus-sec{
+    background:var(--surface); border:1px solid var(--card-line); border-radius:16px;
+    padding:12px 14px 10px; margin-bottom:12px;
+  }
+  .focus-sec-head{
+    display:flex; align-items:center; gap:8px; margin-bottom:8px;
+    padding-bottom:7px; border-bottom:1px solid var(--border);
+  }
+  .focus-sec-title{ font-size:14.5px; font-weight:700; color:var(--text); }
+  .focus-sec-count{
+    font-size:11.5px; font-weight:700; color:var(--tint);
+    border:1.2px solid var(--tint); border-radius:999px; padding:1px 8px; min-width:22px; text-align:center;
+  }
+  .focus-sec-body{ display:flex; flex-direction:column; gap:2px; }
+  .focus-empty{ font-size:13px; color:var(--muted2); padding:4px 2px 6px; }
+
+  /* one line per thing: what it is fits here, what it holds opens over the page */
+  .focus-row{
+    display:flex; align-items:center; gap:7px; min-width:0;
+    padding:6px 4px; border-radius:9px; transition:background .15s ease;
+  }
+  .focus-row:hover{ background:var(--surface2); }
+  /* A row you cannot read is not compact, it is just short. Short things stay on one line -- most
+     do -- and a long one takes a second line rather than ending in an ellipsis. */
+  .focus-row-text{
+    flex:1 1 auto; min-width:42%; font-size:14.5px; color:var(--text); cursor:pointer;
+    line-height:1.35; overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .focus-row .task-date-badge{ font-size:11px; padding:2px 6px; }
+  .focus-row.is-done .focus-row-text{ text-decoration:line-through; color:var(--muted2); }
+  .focus-row-note{ font-size:11.5px; color:var(--muted2); flex-shrink:0; }
+  .focus-note-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .focus-row .move-to-btn{ font-size:11px; padding:2px 6px; min-height:0; flex-shrink:0; }
+  .focus-row .task-date-badge{ flex-shrink:0; }
+  .focus-row .fav-star{ flex-shrink:0; padding:2px; }
+  .focus-row .chk{ flex-shrink:0; }
+  .focus-row .energy-dot{ flex-shrink:0; }
+
+  .focus-add{ display:flex; gap:6px; align-items:center; margin-top:8px; }
+  .focus-add input{
+    flex:1; min-width:0; background:var(--surface2); border:1px dashed var(--border);
+    border-radius:9px; padding:8px 11px; color:var(--text); font-family:inherit; font-size:14px;
+  }
+  .focus-add input:focus{ outline:none; border-style:solid; border-color:var(--tint); }
+  .focus-add button{
+    flex:0 0 auto; width:38px; min-height:36px; border-radius:9px; cursor:pointer;
+    background:transparent; border:1px dashed var(--tint); color:var(--tint);
+    font-family:inherit; font-size:17px; line-height:1;
+  }
+
+  .focus-sheet-overlay{
+    position:fixed; inset:0; z-index:5000; background:rgba(0,0,0,.5);
+    display:flex; align-items:flex-start; justify-content:center; padding:38px 14px 20px; overflow-y:auto;
+  }
+  .focus-sheet{
+    background:var(--surface); border:1.5px solid var(--card-line); border-radius:18px;
+    box-shadow:var(--lift-3); width:100%; max-width:520px; padding:14px 16px 16px;
+  }
+  .focus-sheet-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-size:15px; font-weight:700; color:var(--text); margin-bottom:10px;
+  }
+  .focus-sheet-list{ list-style:none; margin:0; padding:0; }
+  .focus-sheet-note .keep-note{ margin-bottom:0; }
+
+  @media (min-width:760px){
+    /* on a wide screen the sections sit side by side instead of running down forever */
+    #topicFocusBody{ column-count:2; column-gap:14px; }
+    #topicFocusBody > *{ break-inside:avoid; }
+    .focus-hero{ column-span:all; }
+  }
+
   .leave-ask-overlay{
     position:fixed; inset:0; z-index:5200; background:rgba(0,0,0,.45);
     display:flex; align-items:center; justify-content:center; padding:24px;
@@ -4337,6 +4420,29 @@
   <div class="feel-block" id="inspiringVideosBlock"></div>
 </div>
 
+<!-- one topic, everything in the app that belongs to it, reachable only from the side menu -->
+<div id="topicFocusView" style="display:none;">
+  <div class="domain-page-topbar">
+    <div class="domain-page-header"><h1 id="topicFocusTitle"></h1></div>
+    <div class="header-actions">
+      <button class="hamburger-btn" onclick="toggleNav()" title="ניווט">☰</button>
+      <button class="soft-btn mode-toggle-night" onclick="toggleNightMode()"><span class="btn-icon">🌙</span> מצב לילה</button>
+      <button class="soft-btn mode-toggle-soft" onclick="toggleSoftMode()"><span class="btn-icon">🍃</span> מצב רגוע</button>
+    </div>
+  </div>
+  <div id="topicFocusBody"></div>
+</div>
+
+<div id="focusSheetOverlay" class="focus-sheet-overlay" style="display:none;" onclick="if(event.target===this) closeFocusSheet()">
+  <div class="focus-sheet">
+    <div class="focus-sheet-head">
+      <span id="focusSheetTitle"></span>
+      <span class="del-task" onclick="closeFocusSheet()" title="סגירה">✕</span>
+    </div>
+    <div id="focusSheetBody"></div>
+  </div>
+</div>
+
 <div id="listsView" style="display:none;" hidden>
   <div class="domain-page-topbar">
     <div class="domain-page-header"><h1>🗂 רשימות</h1></div>
@@ -4382,7 +4488,7 @@ const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שי
 const DAYS_ICAL = ['SU','MO','TU','WE','TH','FR','SA'];
 const STORAGE_KEY = 'planner-data-v3';
 
-let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalDeletedEventIds: [], uiState:{}, importantTopics: [], topicActions: [], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
+let data = { domains: [], anchors: [], tasks: [], someday: [], notes: {}, reflectionBanks:{fed:[],hard:[],insights:[]}, softMode:false, nightMode:false, collapsedSections:{}, suggestions: [], domainNotes: {}, domainNoteHeaders: {}, notebooks: [], notebookMigrated:false, gcalConnected:false, gcalLastSync:null, gcalCalendarIds:['primary'], gcalWriteCalendarId:null, gcalDeletedEventIds: [], uiState:{}, importantTopics: [], topicActions: [], topicWeeklyActions: [], gcalAccountEmail:null, notesMigrated:false, scheduleViewMode:'grid', selfChoiceReminders: [], homeEnergy:60, activeEmotions: [], activeNeeds: [], activeGoodThings: [], emotionNote: '', needNote: '', emotionsList: [], needsList: [], goodThingsList: [], chipBanksSeeded: false, goodThingsRestoredOnce: false, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas: [], todayIdeasDate: '', todayIdeasShowFavOnly: false, dayIntention:'', dayIntentionDate:'', bodyLocationsList: [], activeBodyLocations: [], bodyNote: '', bodyBankSeeded: false, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos: [], habits: [], lists: [], possibilities: [], customTimerPresets: [], inbox: [], onboardingDismissed: false };
 const minimizedDays = new Set(DAYS.map((_,i)=>i).filter(i=>i!==new Date().getDay()));
 function toggleDayMinimize(dayIdx){
   if(minimizedDays.has(dayIdx)) minimizedDays.delete(dayIdx); else minimizedDays.add(dayIdx);
@@ -4444,6 +4550,7 @@ function loadData(){
       data.uiState = (parsed.uiState && typeof parsed.uiState === 'object') ? parsed.uiState : {};
       data.importantTopics = Array.isArray(parsed.importantTopics) ? parsed.importantTopics : [];
       data.topicActions = Array.isArray(parsed.topicActions) ? parsed.topicActions : [];
+      data.topicWeeklyActions = Array.isArray(parsed.topicWeeklyActions) ? parsed.topicWeeklyActions : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.scheduleViewMode = parsed.scheduleViewMode === 'list' ? 'list' : 'grid';
@@ -4519,7 +4626,8 @@ function loadData(){
         if(data.replyScripts.length===0) data.replyScripts = SEED_REPLY_SCRIPTS.map(s=>({...s}));
         data.replyScriptsSeeded = true;
       }
-      mainView = ['topics','tools','lists'].includes(parsed.mainView) ? parsed.mainView : 'home';
+      mainView = ['topics','tools','lists','focus'].includes(parsed.mainView) ? parsed.mainView : 'home';
+      focusDomainId = parsed.focusDomainId || null;
     } else {
       data.domains = STARTER_DOMAINS.map(d=>({...d}));
       data.emotionsList = seedChipList(SEED_EMOTIONS, []);
@@ -5064,6 +5172,316 @@ function renderTopicActions(){
   });
 }
 
+
+/* ============================================================================
+   דף הנושא — one topic, everything in the app that belongs to it
+
+   The side menu used to lead into a topic's notes. But a topic is not a notebook:
+   it has tasks in the week, anchors in the timetable, dreams, undated things,
+   dilemmas and notes, and until now the only way to see them together was to
+   filter five different lists by hand and hold the result in your head.
+
+   The rules this page follows, in order:
+     · nothing is folded. If it belongs to this topic it is on the screen.
+     · every row is one line. What a thing IS fits on a line; what it CONTAINS
+       opens in a window over the page, so reading never costs you your place.
+     · adding is typing and pressing Enter, and the field stays for the next one
+       — the same way "מה אעשה היום" works, because that is the one that feels
+       like writing rather than filling in a form.
+     · nothing is a reduced version of itself: every row keeps its topic, its
+       "העבר ל...", its star, its full editor.
+   ============================================================================ */
+let focusDomainId = null;
+function openTopicFocus(id){
+  focusDomainId = id;
+  activeNoteDomain = id;          // so the notes here and the notebook stay the same place
+  switchMainView('focus');
+  renderTopicFocus();
+}
+function focusDomain(){ return data.domains.find(d=>d.id===focusDomainId) || null; }
+
+/* ---------- the one action for the week ---------- */
+function topicWeeklyActions(){ return data.topicWeeklyActions || (data.topicWeeklyActions = []); }
+function weeklyActionFor(domainId){ return topicWeeklyActions().find(a=>a.domain===domainId) || null; }
+function onWeeklyActionInput(domainId, el){
+  const val = el.value;
+  let a = weeklyActionFor(domainId);
+  if(!a){
+    if(!val.trim()) return;
+    a = {id:uid(), domain:domainId, text:val, done:false, createdAt:Date.now()};
+    topicWeeklyActions().push(a);
+  } else a.text = val;
+  saveData();
+}
+function toggleWeeklyActionDone(domainId){
+  const a = weeklyActionFor(domainId);
+  if(!a) return;
+  a.done = !a.done;
+  saveData();
+  renderTopicFocus();
+}
+function clearWeeklyAction(domainId){
+  data.topicWeeklyActions = topicWeeklyActions().filter(a=>a.domain!==domainId);
+  saveData();
+  renderTopicFocus();
+}
+
+/* ---------- what belongs to this topic ---------- */
+function focusItems(kind, id){
+  if(kind==='task')    return data.tasks.filter(t=>t.domain===id);
+  if(kind==='anchor')  return (data.anchors||[]).filter(a=>a.domain===id);
+  if(kind==='dream')   return (data.someday||[]).filter(x=>x.domain===id && !!x.dream);
+  if(kind==='someday') return (data.someday||[]).filter(x=>x.domain===id && !x.dream);
+  if(kind==='dilemma') return (data.generalDilemmas||[]).filter(x=>x.domain===id);
+  if(kind==='note')    return ensureDomainNotes(id);
+  return [];
+}
+const FOCUS_SECTIONS = [
+  {kind:'task',    title:'משימות',            add:'משימה חדשה בנושא הזה...'},
+  {kind:'anchor',  title:'עוגנים',            add:'עוגן קבוע בנושא הזה...'},
+  {kind:'dream',   title:'רעיונות וחלומות',   add:'רעיון או חלום בנושא הזה...'},
+  {kind:'someday', title:'משימות ללא מועד',   add:'משהו שאין לו עדיין מועד...'},
+  {kind:'dilemma', title:'התלבטויות',         add:'משהו שאני מתלבט/ת לגביו...'},
+  {kind:'note',    title:'פתקים',             add:'פתק חדש בנושא הזה...'},
+];
+
+/* ---------- adding: type, Enter, and the field is ready for the next one ---------- */
+function onFocusAddKeydown(e, kind){
+  if(e.key !== 'Enter' || e.shiftKey) return;
+  e.preventDefault();
+  focusAdd(kind);
+}
+function focusAdd(kind){
+  const el = document.getElementById('focusAdd-'+kind);
+  const text = el ? el.value.trim() : '';
+  if(!text) return;
+  const id = focusDomainId;
+  if(kind==='task'){
+    data.tasks.push({id:uid(), text, domain:id, done:false, energy:'', date:'', time:'', endTime:'',
+      description:'', subtasks:[], bodyCheck:{}, createdAt:Date.now()});
+  } else if(kind==='anchor'){
+    data.anchors.push({id:uid(), day:new Date().getDay(), time:'09:00', endTime:'', label:text,
+      domain:id, buffer:false, repeatType:'weekly', date:'', createdAt:Date.now()});
+  } else if(kind==='dream' || kind==='someday'){
+    data.someday.push({id:uid(), dream: kind==='dream', text, domain:id, description:'',
+      subtasks:[], bodyCheck:{}, createdAt:Date.now()});
+  } else if(kind==='dilemma'){
+    (data.generalDilemmas || (data.generalDilemmas = [])).push({id:uid(), text, domain:id,
+      decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()});
+  } else if(kind==='note'){
+    ensureDomainNotes(id).unshift({id:uid(), text, color:'', drawing:'', memos:[], pinned:false, headerId:''});
+  }
+  saveData();
+  renderTopicFocus();
+  // the field comes back empty and still holds the cursor, so the next one is just more typing
+  requestAnimationFrame(()=>{
+    const again = document.getElementById('focusAdd-'+kind);
+    if(again){ again.value = ''; again.focus(); }
+  });
+}
+
+/* ---------- one line per thing ---------- */
+function focusRowHtml(kind, it){
+  const move = moveToBtnHtml(FOCUS_MOVE_KIND[kind] || 'task', it.id);
+  if(kind==='task'){
+    const energy = it.energy || '';
+    return `<div class="focus-row ${it.done?'is-done':''}">
+      <div class="chk ${it.done?'done':''}" onclick="toggleTask('${it.id}')"></div>
+      <span class="focus-row-text" onclick="openTimelineSheet('task','${it.id}')" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>
+      ${it.date ? `<span class="task-date-badge">${focusWhen(it.date, it.time)}</span>` : ''}
+      <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}"
+        onclick="cycleEnergy('${it.id}')" title="רמת אנרגיה"></div>
+      ${move}
+      <span class="del-task" onclick="deleteTask('${it.id}')" title="מחיקה">✕</span>
+    </div>`;
+  }
+  if(kind==='anchor'){
+    const repeat = {once:'חד-פעמי', daily:'כל יום', weekly:DAY_LETTERS[it.day], monthly:'כל חודש', yearly:'כל שנה'}[it.repeatType||'weekly'] || DAY_LETTERS[it.day];
+    return `<div class="focus-row">
+      <span class="task-date-badge">${escapeHtml(repeat)}${it.time?' · '+it.time:''}</span>
+      <span class="focus-row-text" onclick="openTimelineSheet('anchor','${it.id}')" title="לחיצה לעריכה">${escapeHtml(it.label||'')}</span>
+      ${move}
+      <span class="del-task" onclick="deleteAnchor('${it.id}')" title="מחיקה">✕</span>
+    </div>`;
+  }
+  if(kind==='dream' || kind==='someday'){
+    const subs = (it.subtasks||[]).length;
+    return `<div class="focus-row">
+      <span class="fav-star ${it.favorite?'active':''}" onclick="toggleSomedayFavorite('${it.id}')" title="${it.favorite?'הסרה מהנבחרים':'סימון כנבחר'}">${it.favorite?'★':'☆'}</span>
+      <span class="focus-row-text" onclick="openFocusSheet('someday','${it.id}')" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>
+      ${subs ? `<span class="focus-row-note">${subs} צעדים</span>` : ''}
+      ${move}
+      <span class="del-task" onclick="deleteSomeday('${it.id}'); renderTopicFocus();" title="מחיקה">✕</span>
+    </div>`;
+  }
+  if(kind==='dilemma'){
+    return `<div class="focus-row ${it.done?'is-done':''}">
+      <div class="chk ${it.done?'done':''}" onclick="toggleDilemmaDone('${it.id}')"></div>
+      <span class="focus-row-text" onclick="openFocusSheet('dilemma','${it.id}')" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>
+      ${it.decisionDate ? `<span class="task-date-badge">${focusWhen(it.decisionDate, '')}</span>` : ''}
+      ${move}
+      <span class="del-task" onclick="deleteGeneralDilemma('${it.id}'); renderTopicFocus();" title="מחיקה">✕</span>
+    </div>`;
+  }
+  // a note: its first line is what it is, the rest opens in a window
+  const plain = focusNotePreview(it);
+  const extras = [];
+  if((it.checks||[]).length) extras.push('☑ ' + it.checks.length);
+  if((it.links||[]).length) extras.push('🔗 ' + it.links.length);
+  if(it.drawing) extras.push('✎');
+  return `<div class="focus-row" ${it.color?`style="--note-tint:${it.color}"`:''}>
+    ${it.color ? `<span class="focus-note-dot" style="background:${it.color}"></span>` : ''}
+    <span class="focus-row-text" onclick="openFocusSheet('note','${it.id}')" title="לחיצה לפתיחת הפתק">${escapeHtml(plain || 'פתק ריק')}</span>
+    ${extras.length ? `<span class="focus-row-note">${extras.join(' · ')}</span>` : ''}
+    <span class="del-task" onclick="deleteFocusNote('${it.id}')" title="מחיקה">✕</span>
+  </div>`;
+}
+const FOCUS_MOVE_KIND = {task:'task', anchor:'anchor', dream:'someday', someday:'someday', dilemma:'dilemma'};
+function focusWhen(date, time){
+  if(!date) return time || '';
+  const d = new Date(date+'T00:00:00');
+  if(isNaN(d.getTime())) return time || '';
+  const today = ymd(new Date());
+  const label = date===today ? 'היום' : (DAY_LETTERS[d.getDay()] + ' ' + pad(d.getDate()) + '.' + pad(d.getMonth()+1));
+  return label + (time ? ' ' + time : '');
+}
+function focusNotePreview(n){
+  const raw = (n.html != null) ? String(n.html).replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '') : (n.text || '');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = raw;
+  return (n.title ? n.title + ' — ' : '') + (tmp.textContent || '').trim().split('\n')[0];
+}
+function deleteFocusNote(noteId){
+  data.domainNotes[focusDomainId] = ensureDomainNotes(focusDomainId).filter(n=>n.id!==noteId);
+  noteSizeLevel.delete(noteId);
+  saveData();
+  if(focusSheetRef && focusSheetRef.id === noteId) closeFocusSheet();
+  renderTopicFocus();
+}
+
+/* ---------- the page ---------- */
+function renderTopicFocus(){
+  const el = document.getElementById('topicFocusBody');
+  if(!el) return;
+  const d = focusDomain();
+  const title = document.getElementById('topicFocusTitle');
+  if(!d){
+    if(title) title.textContent = 'נושא';
+    el.innerHTML = '<div class="empty">הנושא הזה כבר לא קיים</div>';
+    return;
+  }
+  // the page is named after the topic, in the topic's own colour -- nothing else on it needs a name
+  if(title){ title.textContent = d.name; title.style.color = d.color; }
+  const wk = weeklyActionFor(d.id);
+  withFocusPreserved('topicFocusBody', ()=>{
+    const hero = `
+      <div class="focus-hero" style="--tint:${d.color}">
+        <div class="focus-hero-q">פעולה אחת שאוכל לעשות בשביל התחום הזה השבוע?</div>
+        <div class="today-idea-row">
+          <input type="checkbox" class="today-idea-check" ${(wk && wk.done)?'checked':''}
+            onchange="toggleWeeklyActionDone('${d.id}')" title="בוצע">
+          <input type="text" class="today-idea-input ${(wk && wk.done)?'done':''}" dir="rtl"
+            id="focusWeeklyAction" data-field-key="weeklyAction-${d.id}"
+            value="${escapeAttr(wk ? (wk.text||'') : '')}" placeholder="משהו אחד. קטן מספיק כדי שיקרה."
+            oninput="onWeeklyActionInput('${d.id}', this)">
+          ${wk ? `<span class="today-idea-del" onclick="clearWeeklyAction('${d.id}')" title="ניקוי">✕</span>` : ''}
+        </div>
+      </div>`;
+    const sections = FOCUS_SECTIONS.map(sec=>{
+      const items = focusItems(sec.kind, d.id);
+      return `<section class="focus-sec" style="--tint:${d.color}">
+        <div class="focus-sec-head">
+          <span class="focus-sec-title">${sec.title}</span>
+          <span class="focus-sec-count">${items.length}</span>
+        </div>
+        <div class="focus-sec-body">
+          ${items.length ? items.map(it=>focusRowHtml(sec.kind, it)).join('') : '<div class="focus-empty">אין כאן כלום עדיין</div>'}
+        </div>
+        <div class="focus-add">
+          <input type="text" id="focusAdd-${sec.kind}" dir="rtl" placeholder="${escapeAttr(sec.add)}"
+            onkeydown="onFocusAddKeydown(event,'${sec.kind}')">
+          <button type="button" onclick="focusAdd('${sec.kind}')">+</button>
+        </div>
+      </section>`;
+    }).join('');
+    el.innerHTML = hero + sections;
+  });
+}
+/* Everything on this page is a live view of the same lists the rest of the app draws, so it
+   redraws whenever any of them do -- an edit made in a floating window lands here with no wiring
+   of its own. */
+function refreshTopicFocus(){ if(mainView==='focus') renderTopicFocus(); }
+
+/* ---------- the windows over the page ----------
+   These hold the app's OWN editors, not simplified copies of them: the same form, with the same
+   fields and the same save. The only care needed is that the list underneath must not draw the
+   same form at the same time, or two elements would share one id and the save would read the
+   wrong one -- which is what focusSheetOwnsEdit prevents. */
+let focusSheetRef = null;        // {kind, id}
+let focusSheetOwnsEdit = false;
+function openFocusSheet(kind, id){
+  focusSheetRef = {kind, id};
+  focusSheetOwnsEdit = true;
+  if(kind==='someday'){ editingSomedayId = id; }
+  if(kind==='dilemma'){ editingDilemmaId = id; }
+  document.getElementById('focusSheetOverlay').style.display = '';
+  renderFocusSheet();
+  syncOverlayGuard();
+}
+function closeFocusSheet(){
+  if(!focusSheetRef) return;
+  const kind = focusSheetRef.kind;
+  focusSheetRef = null;
+  focusSheetOwnsEdit = false;
+  if(kind==='someday') editingSomedayId = null;
+  if(kind==='dilemma') editingDilemmaId = null;
+  const ov = document.getElementById('focusSheetOverlay');
+  if(ov) ov.style.display = 'none';
+  saveData();
+  renderTopicFocus();
+  syncOverlayGuard();
+}
+function renderFocusSheet(){
+  if(!focusSheetRef) return;
+  const body = document.getElementById('focusSheetBody');
+  const head = document.getElementById('focusSheetTitle');
+  if(!body) return;
+  const {kind, id} = focusSheetRef;
+  if(kind==='someday'){
+    const it = (data.someday||[]).find(x=>x.id===id);
+    if(!it){ closeFocusSheet(); return; }
+    head.textContent = it.dream ? 'רעיון או חלום' : 'משימה ללא מועד';
+    const wasKind = activePlanKind;
+    activePlanKind = it.dream ? 'dreams' : 'someday';
+    try{ body.innerHTML = `<ul class="tasks focus-sheet-list">${somedayEditFormHtml(it)}</ul>`; }
+    finally{ activePlanKind = wasKind; }
+    return;
+  }
+  if(kind==='dilemma'){
+    const it = (data.generalDilemmas||[]).find(x=>x.id===id);
+    if(!it){ closeFocusSheet(); return; }
+    head.textContent = 'התלבטות';
+    body.innerHTML = `<ul class="tasks focus-sheet-list">${dilemmaEditFormHtml(it)}</ul>`;
+    return;
+  }
+  if(kind==='note'){
+    const it = ensureDomainNotes(focusDomainId).find(n=>n.id===id);
+    if(!it){ closeFocusSheet(); return; }
+    head.textContent = 'פתק';
+    noteSizeLevel.set(it.id, 0);       // a note opened on purpose opens fully
+    body.innerHTML = `<div class="keep-grid focus-sheet-note">${keepNoteHtml(focusDomainId, it)}</div>`;
+    requestAnimationFrame(()=>{
+      body.querySelectorAll('.keep-note-editor:not(.note-clip)').forEach(autoGrowNoteTextarea);
+      if(drawingNoteId === it.id){
+        const c = document.getElementById('canvas-'+it.id);
+        if(c) initDrawCanvas(c);
+      }
+    });
+    return;
+  }
+}
+function refreshFocusSheet(){ if(focusSheetRef) renderFocusSheet(); }
+
 function renderDomainEditor(){
   renderWorldSwitch();
   const el = document.getElementById('topicTabStrip');
@@ -5382,7 +5800,9 @@ function toggleNavDragMode(){
 }
 function onNavDomainRowClick(id){
   if(navEditMode || navDragMode) return;
-  navigateToDomain(id);
+  // the side menu used to drop you into that topic's notes. A topic is more than its notes, and
+  // this is the one door to the page that holds all of it.
+  openTopicFocus(id);
 }
 let navDragPressState = null;
 function startNavDragPress(e, id){
@@ -5477,7 +5897,7 @@ function rememberView(){
   if(restoringView) return;
   try{
     localStorage.setItem(VIEW_KEY, JSON.stringify({
-      mainView, scheduleActiveTab, calendarView,
+      mainView, scheduleActiveTab, calendarView, focusDomainId,
       planKind: activePlanKind,
       noteContainer: activeNoteDomain,
       // the week is stored as the date it starts on, not as an offset from today: an offset saved
@@ -5497,7 +5917,8 @@ function restoreViewState(){
   let v = null;
   try{ v = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null'); }catch(e){}
   if(!v) return;
-  if(['home','plan','topics','tools'].includes(v.mainView)) mainView = v.mainView;
+  if(['home','plan','topics','tools','focus'].includes(v.mainView)) mainView = v.mainView;
+  if(v.focusDomainId) focusDomainId = v.focusDomainId;
   if(['calendar','habits','tasks','anchors'].includes(v.scheduleActiveTab)) scheduleActiveTab = v.scheduleActiveTab;
   if(CALENDAR_VIEWS.includes(v.calendarView)) calendarView = v.calendarView;
   // a refresh used to drop you back on this week even when you were reading another one
@@ -5548,6 +5969,7 @@ function switchMainView(view){
   if(mainView==='lists' && view!=='lists') activeListId = null;
   mainView = view;
   data.mainView = view;
+  data.focusDomainId = focusDomainId;
   saveData();
   applyMainViewState();
   closeNav();
@@ -5795,6 +6217,8 @@ function applyMainViewState(){
   const listsBtn = document.getElementById('mainTabListsBtn');
   const planView = document.getElementById('planView');
   const planBtn = document.getElementById('mainTabPlanBtn');
+  const focusView = document.getElementById('topicFocusView');
+  if(focusView) focusView.style.display = mainView==='focus' ? '' : 'none';
   home.style.display = mainView==='home' ? '' : 'none';
   topicsView.style.display = mainView==='topics' ? '' : 'none';
   if(toolsView) toolsView.style.display = mainView==='tools' ? '' : 'none';
@@ -5831,6 +6255,10 @@ function applyMainViewState(){
   if(mainView==='lists'){
     renderListsView();
     window.scrollTo(0,0);
+  }
+  if(mainView==='focus'){
+    renderTopicFocus();
+    if(!restoringView) window.scrollTo(0,0);
   }
   updateInboxFab();
 }
@@ -8148,10 +8576,10 @@ const SYNC_BASE_KEY = 'planner-sync-base-v1';
 // todayIdeas/emotionsList/needsList/goodThingsList were added well after this sync system, and
 // never got wired into it -- they lived only in this device's localStorage, which is exactly why
 // things typed on the phone never showed up on the computer even once sync was connected there.
-const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','possibilities','customTimerPresets','inbox','topicActions'];
+const SYNCED_LIST_FIELDS = ['domains','anchors','tasks','someday','suggestions','generalDilemmas','decisionHelperQuotes','decisionHelperLinks','replyScripts','selfChoiceReminders','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','possibilities','customTimerPresets','inbox','topicActions','topicWeeklyActions'];
 const SYNCED_SCALAR_FIELDS = ['activeEmotions','activeNeeds','activeGoodThings','emotionNote','needNote','homeEnergy','breathIn','breathHold','breathOut','breathSoundOn','activeBodyLocations','bodyNote','qSoulNote','qPowerNote','qHealingNote','qFreeSelfNote','qExpressNote','procWantNote','procTrueWantNote','onboardingDismissed'];
 function emptySyncSkeleton(){
-  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], notebooks:[], possibilities:[], customTimerPresets:[], inbox:[], topicActions:[], onboardingDismissed:false, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
+  return { domains:[], anchors:[], tasks:[], someday:[], suggestions:[], generalDilemmas:[], decisionHelperQuotes:[], decisionHelperLinks:[], replyScripts:[], selfChoiceReminders:[], todayIdeas:[], emotionsList:[], needsList:[], goodThingsList:[], bodyLocationsList:[], inspiringVideos:[], habits:[], lists:[], notebooks:[], possibilities:[], customTimerPresets:[], inbox:[], topicActions:[], topicWeeklyActions:[], onboardingDismissed:false, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', homeEnergy:60, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, activeBodyLocations:[], bodyNote:'', qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', notes:{}, domainNotes:{}, domainNoteHeaders:{}, reflectionBanks:{fed:[],hard:[],insights:[]} };
 }
 // null (not emptySyncSkeleton()) when this device has never actually recorded a base -- callers
 // need to tell "no history yet" apart from "history that happens to be empty" (see runFullSync)
@@ -8243,7 +8671,7 @@ function mergeDictOfObjects(localDict, baseDict, remoteDict){
 // whatever order its own internal bookkeeping happens to land on, silently dropping the reorder. these
 // two helpers carry the order itself through the same kind of 3-way merge used everywhere else here,
 // then reapply it on top of the already content-merged arrays.
-const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','generalDilemmas','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','topicActions'];
+const ORDERED_LIST_FIELDS = ['domains','tasks','someday','suggestions','generalDilemmas','todayIdeas','emotionsList','needsList','goodThingsList','bodyLocationsList','inspiringVideos','habits','lists','notebooks','topicActions','topicWeeklyActions'];
 function mergeOrderList(localOrder, baseOrder, remoteOrder){
   localOrder = localOrder||[]; baseOrder = baseOrder||[]; remoteOrder = remoteOrder||[];
   if(deepEqual(localOrder, remoteOrder)) return localOrder;
@@ -10693,8 +11121,13 @@ function renderSomeday(){
   }
   applyListCap('someday', list.length);
 }
+function somedayRowPlainHtml(s){
+  const was = editingSomedayId;
+  editingSomedayId = null;
+  try{ return somedayRowHtml(s); } finally { editingSomedayId = was; }
+}
 function somedayRowHtml(s){
-  if(editingSomedayId===s.id) return somedayEditFormHtml(s);
+  if(editingSomedayId===s.id) return focusSheetOwnsEdit ? somedayRowPlainHtml(s) : somedayEditFormHtml(s);
   const dom = domainById(s.domain);
   const subCount = (s.subtasks||[]).length;
   const isExpanded = expandedSomeday.has(s.id);
@@ -11597,7 +12030,7 @@ function renderGeneralDilemmaList(){
   const sorted = list.slice().sort((a,b)=>suggestionSortWeight(a)-suggestionSortWeight(b));
   el.innerHTML = sorted.map(d=>{
     if(planSelectMode) return planPickRowHtml(d);
-    if(editingDilemmaId===d.id) return dilemmaEditFormHtml(d);
+    if(editingDilemmaId===d.id && !focusSheetOwnsEdit) return dilemmaEditFormHtml(d);
     const dom = d.domain ? domainById(d.domain) : null;
     return `
     <li class="suggestion-li ${d.done?'suggestion-done':''}" data-drag-id="${d.id}">
@@ -12269,6 +12702,7 @@ function importData(e){
       data.uiState = (parsed.uiState && typeof parsed.uiState === 'object') ? parsed.uiState : {};
       data.importantTopics = Array.isArray(parsed.importantTopics) ? parsed.importantTopics : [];
       data.topicActions = Array.isArray(parsed.topicActions) ? parsed.topicActions : [];
+      data.topicWeeklyActions = Array.isArray(parsed.topicWeeklyActions) ? parsed.topicWeeklyActions : [];
       data.gcalAccountEmail = parsed.gcalAccountEmail || null;
       data.notesMigrated = !!parsed.notesMigrated;
       data.selfChoiceReminders = parsed.selfChoiceReminders || [];
@@ -12480,7 +12914,7 @@ function resetAll(){
   const keepGcalAccountEmail = data.gcalAccountEmail;
   const keepGcalWriteCalendarId = data.gcalWriteCalendarId;
   const keepNotebooks = data.notebooks;
-  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, notebooks:keepNotebooks, notebookMigrated:true, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalWriteCalendarId:keepGcalWriteCalendarId, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], topicActions:[], onboardingDismissed:true};
+  data = {domains: DEFAULT_DOMAINS.map(d=>({...d})), anchors:[], tasks:[], someday:[], notes:{}, reflectionBanks:keepReflection, softMode:false, nightMode:keepNight, collapsedSections:keepCollapsed, suggestions:[], generalDilemmas:[], decisionHelperQuotes:keepDecisionHelperQuotes, decisionHelperLinks:keepDecisionHelperLinks, decisionHelperQuotesSeeded:true, replyScripts:keepReplyScripts, replyScriptsSeeded:true, domainNotes:{}, domainNoteHeaders:{}, notebooks:keepNotebooks, notebookMigrated:true, gcalConnected:keepGcalConnected, gcalLastSync:null, gcalCalendarIds:keepGcalCalendarIds, gcalWriteCalendarId:keepGcalWriteCalendarId, gcalAccountEmail:keepGcalAccountEmail, selfChoiceReminders:keepSelfChoiceReminders, homeEnergy:60, activeEmotions:[], activeNeeds:[], activeGoodThings:[], emotionNote:'', needNote:'', emotionsList:seedChipList(SEED_EMOTIONS,[]), needsList:seedChipList(SEED_NEEDS,[]), goodThingsList:keepGoodThings, chipBanksSeeded:true, goodThingsRestoredOnce:true, breathIn:3, breathHold:3, breathOut:6, breathSoundOn:true, todayIdeas:[], todayIdeasDate:'', todayIdeasShowFavOnly:false, bodyLocationsList:seedChipList(SEED_BODY_LOCATIONS,[]), activeBodyLocations:[], bodyNote:'', bodyBankSeeded:true, qSoulNote:'', qPowerNote:'', qHealingNote:'', qFreeSelfNote:'', qExpressNote:'', procWantNote:'', procTrueWantNote:'', inspiringVideos:[], habits:keepHabits, lists:keepLists, possibilities:keepPossibilities, customTimerPresets:keepCustomTimerPresets, inbox:[], topicActions:[], topicWeeklyActions:[], onboardingDismissed:true};
   activeNoteDomain = data.domains[0].id;
   document.body.classList.remove('soft');
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
@@ -15810,6 +16244,7 @@ const OVERLAY_LAYERS = [
   { open: ()=> isDisplayed('leaveAskOverlay'),           close: ()=> cancelLeaveSheet() },
   { open: ()=> partyMode,                                close: ()=> endPartyMode(true) },
   { open: ()=> isDisplayed('timelineSheet'),             close: ()=> closeTimelineSheet() },
+  { open: ()=> isDisplayed('focusSheetOverlay'),         close: ()=> closeFocusSheet() },
   { open: ()=> isDisplayed('searchSheet'),               close: ()=> closeSearch() },
   { open: ()=> isDisplayed('inboxCaptureSheet'),         close: ()=> closeInboxCapture() },
   { open: ()=> isDisplayed('backupSheet'),               close: ()=> closeBackupSheet() },
@@ -15866,6 +16301,33 @@ window.addEventListener('popstate', ()=>{
 /* The two listeners below catch anything opened by a tap or a key. The wrap catches the rest --
    an overlay opened from code, from a timer, or from another overlay -- without adding a line to
    each of the sixteen functions that open or close one. */
+/* Every list this page mirrors redraws it, and every list the open window edits redraws that too.
+   One place, instead of a call added to the tail of each of them (and forgotten in the next one). */
+/* The forms in those windows are the app's own, and their buttons end an edit by clearing the
+   editing id and redrawing the list behind them. Here that list is not what you are looking at, so
+   ending the edit has to end the window too. */
+['closeSomedayEdit','saveSomedayEdit','convertSomedayToTask','closeDilemmaEdit','saveDilemmaEdit']
+  .forEach(name=>{
+    const fn = window[name];
+    if(typeof fn !== 'function') return;
+    window[name] = function(){
+      const out = fn.apply(this, arguments);
+      if(focusSheetOwnsEdit) closeFocusSheet();
+      return out;
+    };
+  });
+
+['renderTasks','renderAnchorsTab','renderSomeday','renderGeneralDilemmaList','renderKeepGrid',
+ 'renderScheduleGrid'].forEach(name=>{
+  const fn = window[name];
+  if(typeof fn !== 'function') return;
+  window[name] = function(){
+    const out = fn.apply(this, arguments);
+    try{ refreshTopicFocus(); refreshFocusSheet(); }catch(e){}
+    return out;
+  };
+});
+
 ['openInboxCapture','closeInboxCapture','openSearch','closeSearch','openBackupSheet','closeBackupSheet',
  'openTimelineSheet','closeTimelineSheet','toggleNav','closeNav','openNav',
  'onInboxFabClick','openFabMenu','closeFabMenu','fabCreate',
