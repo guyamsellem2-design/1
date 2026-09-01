@@ -9851,18 +9851,38 @@ function cycleCalendarView(){
   renderScheduleTabs();
   if(calendarView === 'timeline') renderTimelineGrid(); else renderScheduleGrid();
 }
-// switching tabs scrolls the tab row to the top, so what you just chose is the first thing you
-// see instead of wherever the previous tab happened to leave the page
-/* Putting the tab strip itself at the top of the screen showed the tab and cut off what was
-   under it. Landing one block higher -- on "מה אעשה היום?" -- costs a couple of centimetres and
-   in exchange the whole thing below fits: the full day in the timetable, or the whole list of
-   habits / tasks / anchors. Same landing spot whichever tab you pressed. */
+/* Switching tabs scrolls, so that what you just chose is the first thing you see instead of
+   wherever the previous tab happened to leave the page.
+
+   Which place, exactly, was the whole question. The tab strip at the very top showed the tab and
+   cut off everything under it. Landing on "מה אעשה היום?" instead was right only while that block
+   was closed: opened, it is a list with its own controls, and putting ITS top at the top of the
+   screen pushes the calendar clean off the bottom -- which is the one thing this scroll exists to
+   show you.
+
+   So the landing place is not an element at all: it is the place the calendar sits when that block
+   is closed. We measure how tall the block would be closed -- its header, its padding, its
+   border, the gap under it -- and put the tab strip exactly that far down. Closed, that lands on
+   the block's own heading, as before. Open, the list scrolls up out of the way and the calendar
+   arrives in the very same place. Same view either way, which is the point. */
+function collapsedPicksOffset(){
+  const block = document.getElementById('todayPicksBlock');
+  if(!block) return 0;
+  const cs = getComputedStyle(block);
+  const header = block.querySelector('.feel-block-header');
+  const headerH = header ? header.getBoundingClientRect().height : 0;
+  const box = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+            + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  const gapBelow = parseFloat(cs.marginBottom) || 0;
+  const h = headerH + box + gapBelow;
+  return isFinite(h) ? h : 0;
+}
 function scrollScheduleTabsToTop(){
   if(restoringView) return;
-  const anchor = document.getElementById('todayPicksBlock') || document.getElementById('scheduleTabs');
-  if(!anchor) return;
+  const tabs = document.getElementById('scheduleTabs');
+  if(!tabs) return;
   requestAnimationFrame(()=>{
-    const y = anchor.getBoundingClientRect().top + window.scrollY - 8;
+    const y = tabs.getBoundingClientRect().top + window.scrollY - collapsedPicksOffset() - 8;
     window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
   });
 }
