@@ -6207,7 +6207,7 @@ function moveItemTo(destKind){
   removeMoveSource(src);
 
   if(destKind==='task'){
-    const t = {id:uid(), text:p.text, domain: validDomain || (data.domains[0]&&data.domains[0].id) || '',
+    const t = {id:uid(), text:p.text, domain: validDomain,
       done:false, energy:p.energy||'', date:p.date||'', time:p.time||'', endTime:p.endTime||'',
       description:p.description, subtasks:p.subtasks, bodyCheck:p.bodyCheck, draft:true, createdAt:Date.now()};
     pushTask(t);
@@ -7556,8 +7556,6 @@ function nextDateForDay(dayIdx, hour, min){
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()+diff, hour, min, 0);
 }
 function anchorCalendarUrl(a){
-  const dom = a.domain ? domainById(a.domain) : null;
-  const domainNote = dom ? ` · נושא: ${dom.name}` : '';
   const [sh, sm] = (a.time||'09:00').split(':').map(Number);
   let endH, endM;
   if(a.endTime){ [endH, endM] = a.endTime.split(':').map(Number); }
@@ -7586,15 +7584,13 @@ function anchorCalendarUrl(a){
     action:'TEMPLATE',
     text:a.label,
     dates:fmtDate(start)+'/'+fmtDate(end),
-    details:`עוגן קבוע מתוך "המפה השבועית"${domainNote}`,
+    details: a.description || '',
   });
   if(recur) params.set('recur', recur);
   return 'https://calendar.google.com/calendar/render?'+params.toString();
 }
 function taskCalendarUrl(t){
-  const dom = t.domain ? domainById(t.domain) : null;
-  const domainNote = dom ? ` · נושא: ${dom.name}` : '';
-  let start, end, note;
+  let start, end;
   if(t.date){
     const [y,m,d] = t.date.split('-').map(Number);
     const [h,mi] = (t.time||'09:00').split(':').map(Number);
@@ -7605,14 +7601,12 @@ function taskCalendarUrl(t){
     } else {
       end = new Date(y, m-1, d, h+1, mi, 0);
     }
-    note = `משימה מתוזמנת מתוך "המפה השבועית"${domainNote}`;
   } else {
     const now = new Date();
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
     end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0);
-    note = `משימה מתוך "המפה השבועית"${domainNote} — לא תוזמנה לתאריך מסוים, אפשר לשנות תאריך ושעה לפני השמירה`;
   }
-  const params = new URLSearchParams({ action:'TEMPLATE', text:t.text, dates:fmtDate(start)+'/'+fmtDate(end), details:note });
+  const params = new URLSearchParams({ action:'TEMPLATE', text:t.text, dates:fmtDate(start)+'/'+fmtDate(end), details: t.description || '' });
   return 'https://calendar.google.com/calendar/render?'+params.toString();
 }
 
@@ -7902,7 +7896,8 @@ function pushTaskToGcal(t){
     else { end = new Date(y,m-1,d,h+1,mi,0); }
     const body = {
       summary: t.text,
-      description: `משימה מתוך "המפה השבועית"${dom?' · נושא: '+dom.name:''}`,
+      description: t.description || '',
+      extendedProperties: gcalOutgoingProps(t),
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() }
     };
@@ -7953,7 +7948,8 @@ function pushAnchorToGcal(a){
     const recur = anchorRecurrenceRule(a);
     const body = {
       summary: a.label,
-      description: `עוגן קבוע מתוך "המפה השבועית"${dom?' · נושא: '+dom.name:''}`,
+      description: a.description || '',
+      extendedProperties: gcalOutgoingProps(a),
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() }
     };
@@ -8095,6 +8091,71 @@ function gcalEventKeys(ev, gid, date, time, endTime){
   if(w) keys.push(w);
   return keys;
 }
+/* ---------- a description is yours, and a topic is a topic ----------
+   The app used to write its own sentence into the Google event's description -- 'משימה מתוך "המפה
+   השבועית" · נושא: פרויקטים' -- and in doing so did two wrong things at once. It overwrote whatever
+   description you had actually written, so your own words never reached Google at all. And it wrote
+   the topic down as WORDS, so when the event came back the topic arrived as a sentence in the
+   description box while the topic field itself stayed empty and showed the first topic on the list.
+   A topic you can read but cannot filter by is not a topic.
+
+   What goes to Google now is your description and nothing else. What the app needs to remember
+   about the event travels in extendedProperties, where Google keeps machine-readable notes -- out
+   of sight, and out of the description box.
+
+   The old sentence still exists in events written before this, so it is recognised on the way back
+   in: the description it occupies is emptied, and if it names a topic, that becomes the topic. */
+const GCAL_PROP_TOPIC = 'wmTopic';
+function gcalAppNoteTopic(text){
+  const raw = (text||'').replace(/ /g,' ').trim();
+  if(!raw) return null;
+  const m = raw.match(/^(?:משימה מתוך "המפה השבועית"|עוגן קבוע מתוך "המפה השבועית"|תת-משימה של "[^"]*")(?:\s*[·•]\s*נושא:\s*(.+?))?$/);
+  return m ? { topicName: (m[1]||'').trim() } : null;
+}
+function domainIdByName(name){
+  if(!name) return '';
+  const n = gcalTextKey(name);
+  const d = (data.domains||[]).find(x=>gcalTextKey(x.name) === n);
+  return d ? d.id : '';
+}
+/* Everything an incoming event should become here, worked out in one place so a task and an anchor
+   never disagree about it. */
+function gcalIncomingFields(ev){
+  const props = (ev && ev.extendedProperties && ev.extendedProperties.private) || {};
+  const note = gcalAppNoteTopic(ev && ev.description);
+  let domain = '';
+  const claimed = props[GCAL_PROP_TOPIC];
+  if(claimed && (data.domains||[]).some(d=>d.id === claimed)) domain = claimed;
+  else if(note) domain = domainIdByName(note.topicName);
+  return { domain, description: note ? '' : ((ev && ev.description) || '') };
+}
+function gcalOutgoingProps(rec){
+  const props = {};
+  if(rec && rec.domain) props[GCAL_PROP_TOPIC] = rec.domain;
+  return { private: props };
+}
+/* And for the ones that already carry the sentence: it is taken out of the description box and,
+   where it named a topic the record never got, turned into that topic. Runs on load and costs
+   nothing once there is nothing left to find. */
+function migrateGcalNotesOutOfDescriptions(){
+  let touched = 0;
+  const fix = (rec)=>{
+    if(!rec) return;
+    const note = gcalAppNoteTopic(rec.description);
+    if(!note) return;
+    rec.description = '';
+    if(!rec.domain){
+      const id = domainIdByName(note.topicName);
+      if(id) rec.domain = id;
+    }
+    touched++;
+  };
+  (data.tasks||[]).forEach(t=>{ fix(t); (t.subtasks||[]).forEach(fix); });
+  (data.anchors||[]).forEach(fix);
+  if(touched) saveData();
+  return touched;
+}
+
 /* An anchor's signature has to carry the day: one weekly recurring event legitimately becomes
    several anchors, one per day it repeats on, and they are not copies of each other. */
 function gcalAnchorSig(a){
@@ -8183,14 +8244,15 @@ function runGcalSync(quiet){
             endTime = pad(ed.getHours())+':'+pad(ed.getMinutes());
           }
           const label = sampleEv.summary||'(ללא כותרת)';
+          const fields = gcalIncomingFields(master || sampleEv);
           if(recurrence.repeatType==='weekly'){
             recurrence.days.forEach(dayIdx=>{
-              pushAnchor({id:uid(), day:dayIdx, time, endTime, label,
-                domain:'', buffer:false, repeatType:'weekly', date:'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
+              pushAnchor({id:uid(), day:dayIdx, time, endTime, label, description:fields.description,
+                domain:fields.domain, buffer:false, repeatType:'weekly', date:'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
             });
           } else {
-            pushAnchor({id:uid(), day:sampleDate.getDay(), time, endTime, label,
-              domain:'', buffer:false, repeatType:recurrence.repeatType, date:recurrence.date||'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
+            pushAnchor({id:uid(), day:sampleDate.getDay(), time, endTime, label, description:fields.description,
+              domain:fields.domain, buffer:false, repeatType:recurrence.repeatType, date:recurrence.date||'', googleRecurringEventId:group.recurringEventId, createdAt:Date.now()});
           }
         } else {
           // recurrence type we don't model as an anchor (or master fetch failed) - fall back to syncing each instance as a regular task
@@ -8230,8 +8292,10 @@ function runGcalSync(quiet){
         // deleted here on purpose -- it does not come back just because Google still has it
         if(isGcalTombstoned(gid)){ gcalDiag.skippedExisting++; return; }
         keys.forEach(k=>seenKeys.add(k));
-        data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:'', done:false, energy:'',
-          date, time, endTime, description:ev.description||'', subtasks:[], googleEventId:gid,
+        // the topic arrives as a topic and the description as your own words -- see gcalIncomingFields
+        const fields = gcalIncomingFields(ev);
+        data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:fields.domain, done:false, energy:'',
+          date, time, endTime, description:fields.description, subtasks:[], googleEventId:gid,
           googleICalUID: ev.iCalUID||'', createdAt:Date.now()});
         addedTasks++;
       });
@@ -9468,7 +9532,8 @@ function pushSubtaskToGcal(taskId, s){
     else { end = new Date(y,m-1,d,h+1,mi,0); }
     const body = {
       summary: s.text,
-      description: `תת-משימה של "${t.text}"${dom?' · נושא: '+dom.name:''}`,
+      description: s.description || '',
+      extendedProperties: gcalOutgoingProps(t),
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() }
     };
@@ -10672,7 +10737,9 @@ function renderTimelineSheet(){
   const label = kind==='task' ? rec.text : rec.label;
   // squeezed into the same row as the name, at its left edge, instead of a row of its own, so it
   // doesn't grow the sheet -- shown for both tasks and anchors now
-  const domainPickerHtml = `<select id="timelineSheetDomain" class="timeline-sheet-domain">${domainOptions(rec.domain)}</select>`;
+  // With no "ללא נושא" here, a thing that has no topic silently showed the FIRST one and became it
+  // the moment you saved -- which is how a task ended up filed under a topic nobody chose.
+  const domainPickerHtml = `<select id="timelineSheetDomain" class="timeline-sheet-domain">${domainOptionsWithEmpty(rec.domain)}</select>`;
   // both kinds now open with a real time rather than an empty field, since neither can be saved
   // without one
   const timeValue = rec.time || currentRoundedTimeSlot();
@@ -11160,12 +11227,12 @@ function renderTimelineGrid(){
    schedule just to change something. "עוד אפשרויות" inside the sheet expands in place (recurrence
    type, buffer, per-item gcal sync) when that's actually needed. */
 function anchorRowHtml(a){
-  const dom = domainById(a.domain);
+  const dom = a.domain ? domainById(a.domain) : null;
   const repeatLabel = {once:'חד-פעמי', daily:'מדי יום', weekly:'מדי שבוע', monthly:'מדי חודש', yearly:'מדי שנה'}[a.repeatType||'weekly'] || 'מדי שבוע';
   const dayLabel = (a.repeatType||'weekly')==='weekly' ? DAYS[a.day] : repeatLabel;
   return `<li class="task-li anchor-li ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" onclick="openTimelineSheet('anchor','${a.id}')">
     <span class="task-text" style="flex:1">${escapeHtml(a.label)}${a.draft?' <span class="draft-badge">🌱 טיוטה</span>':''}</span>
-    <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>
+    <span class="tag ${dom?'':'tag-empty'}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}">${dom?escapeHtml(dom.name):'ללא נושא'}</span>
     <span class="task-date-badge">${dayLabel}${a.time?' · '+a.time:''}</span>
   </li>`;
 }
@@ -11338,7 +11405,7 @@ function convertSomedayToTask(id){
   // the someday item is NOT removed here -- it stays in "דברים לעשות" until she explicitly chooses
   // to remove it from the sheet that opens next (מחק מ"דברים לעשות"), so a promotion to a task is
   // never also a silent deletion decided on her behalf
-  const newTask = pushTask({id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()});
+  const newTask = pushTask({id:uid(), text:s.text, domain:s.domain||'', done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()});
   editingSomedayId = null;
   saveData();
   renderSomeday();
@@ -11478,7 +11545,7 @@ function convertSomedaySubtaskToTask(id, subId){
   const sub = (s.subtasks||[]).find(x=>x.id===subId);
   if(!sub) return;
   // same as convertSomedayToTask above -- the small step stays put until explicitly removed from the sheet
-  const newTask = pushTask({id:uid(), text:sub.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:sub.done||false, energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()});
+  const newTask = pushTask({id:uid(), text:sub.text, domain:s.domain||'', done:sub.done||false, energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()});
   saveData();
   renderSomeday();
   renderTasks();
@@ -12175,7 +12242,8 @@ function reorderGeneralDilemmas(fromId, toId){
 function convertDilemmaToTask(id){
   const d = (data.generalDilemmas||[]).find(d=>d.id===id);
   if(!d) return;
-  const newTask = pushTask({id:uid(), text: `להחליט: ${d.text}`, domain:d.domain||'', done:false, energy:'', date:d.decisionDate||'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()});
+  const newTask = pushTask({id:uid(), text: `להחליט: ${d.text}`, domain:d.domain||'', done:false, energy:'', date:d.decisionDate||'', time:'', endTime:'', description:'', subtasks:[],
+    bodyCheck: (d.bodyCheck && typeof d.bodyCheck==='object') ? {...d.bodyCheck} : {}, createdAt:Date.now()});
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -14433,7 +14501,7 @@ function reorderListSubitems(listId, itemId, fromId, toId){
   renderListsView();
 }
 function createTaskFromText(text){
-  const task = pushTask({id:uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false, createdAt:Date.now()});
+  const task = pushTask({id:uid(), text, domain:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false, createdAt:Date.now()});
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -15073,7 +15141,7 @@ function convertBlankTo(destKind, dayIdx, dateStr){
 function finishConvert(destKind, text, domain, extra={}){
   text = (text||'').trim();
   if(destKind==='task'){
-    const newTask = pushTask({id:uid(), text, domain: domain||(data.domains[0]?data.domains[0].id:''), done:false, energy:'', date:extra.dateStr||'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()});
+    const newTask = pushTask({id:uid(), text, domain: domain||'', done:false, energy:'', date:extra.dateStr||'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()});
     saveData(); renderTasks(); renderScheduleGrid();
     openTimelineSheet('task', newTask.id, true);
   } else if(destKind==='anchor'){
@@ -15402,7 +15470,7 @@ function promoteTodayIdeaToTask(id){
   const item = data.todayIdeas.find(x=>x.id===id);
   if(!item || !item.text.trim()) return;
   const text = item.text.trim();
-  const task = pushTask({id: uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false});
+  const task = pushTask({id: uid(), text, domain:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false});
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -16559,6 +16627,10 @@ document.addEventListener('keydown', ()=>{ setTimeout(syncOverlayGuard, 0); }, t
 
 setupPWA();
 loadData();
+// events written before this app stopped putting its own sentence in the description box brought
+// that sentence back with them; it is taken out here, and where it named a topic, that becomes the
+// topic it should have been all along
+migrateGcalNotesOutOfDescriptions();
 // the draft blocks live in the home markup but belong to the טיוטות tab -- relocate them
 // at boot rather than the first time that tab is opened, or a fresh load shows them on the home
 // page until you happen to go there
