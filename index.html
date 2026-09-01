@@ -5326,6 +5326,16 @@ function onFocusAddKeydown(e, kind){
   e.preventDefault();
   focusAdd(kind);
 }
+/* The keyboard's own go key submits the form -- a route no input method can swallow. It counts as
+   the same press as anything else that arrived for it, so a keyboard that sends both does not add
+   the thing twice. */
+function focusAddFromSubmit(ev, kind){
+  if(ev && ev.preventDefault) ev.preventDefault();
+  if(enterAlreadyAnswered()) return false;
+  markEnterAnswered();
+  focusAdd(kind);
+  return false;
+}
 function focusAdd(kind){
   const el = document.getElementById('focusAdd-'+kind);
   const text = el ? el.value.trim() : '';
@@ -5486,7 +5496,7 @@ function renderTopicFocus(){
         ${(sec.kind==='task' || sec.kind==='anchor')
           ? `<div class="focus-add"><button type="button" class="add-anchor-btn focus-add-btn"
                onclick="focusAddScheduled('${sec.kind}')">+ הוסף</button></div>`
-          : `<form class="focus-add" onsubmit="focusAdd('${sec.kind}'); return false;">
+          : `<form class="focus-add" onsubmit="return focusAddFromSubmit(event,'${sec.kind}')">
               <input type="text" id="focusAdd-${sec.kind}" dir="rtl" enterkeyhint="done"
                 placeholder="${escapeAttr(sec.add)}" onkeydown="onFocusAddKeydown(event,'${sec.kind}')">
               <button type="submit">+</button>
@@ -16448,6 +16458,66 @@ window.addEventListener('popstate', ()=>{
 /* The two listeners below catch anything opened by a tap or a key. The wrap catches the rest --
    an overlay opened from code, from a timer, or from another overlay -- without adding a line to
    each of the sixteen functions that open or close one. */
+/* ---------- Enter, as a phone actually sends it ----------
+   On a computer Enter is a keydown that says key:"Enter", and every handler in this file reads
+   exactly that. On a phone it often is not. Android keyboards type through an input method, and
+   while that is composing, keydown reports no key at all -- keyCode 229, key "Unidentified". The
+   handler never sees an Enter, and nothing happens. Which disguise you get depends on the keyboard,
+   the language and whether suggestions are on -- which is why it worked some of the time and not
+   the rest, and why it looked like a different bug every time.
+
+   Teaching thirty handlers to recognise every disguise would be thirty chances to miss one. The
+   disguise is undone here instead, once, before anything else sees it: when a line break is asked
+   for in a text field and no plain Enter came with it, that field is handed the keydown it was
+   written to expect. If its handler cancels that keydown, the line break is cancelled too -- so a
+   field that treats Enter as "done" does not also quietly gain an empty line.
+
+   One press, one answer: whatever combination of events a keyboard sends for a single Enter, only
+   the first of them is acted on. */
+let enterDeliveredAt = 0;
+let deliveringEnter = false;
+const ENTER_ONE_PRESS_MS = 400;
+function looksLikeEnterKey(e){
+  return e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.keyCode === 13 || e.which === 13;
+}
+function editableTarget(el){
+  if(!el || !el.tagName) return null;
+  if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return el;
+  return el.isContentEditable ? el : null;
+}
+function enterAlreadyAnswered(){ return Date.now() - enterDeliveredAt < ENTER_ONE_PRESS_MS; }
+function markEnterAnswered(){ enterDeliveredAt = Date.now(); }
+// a keydown that says Enter reached the handlers on its own -- nothing more to do for this press
+document.addEventListener('keydown', (e)=>{
+  if(!deliveringEnter && looksLikeEnterKey(e)) markEnterAnswered();
+}, true);
+function deliverEnter(el){
+  if(enterAlreadyAnswered()) return false;
+  markEnterAnswered();
+  deliveringEnter = true;
+  let prevented = false;
+  try{
+    prevented = !el.dispatchEvent(new KeyboardEvent('keydown', {
+      key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true, cancelable:true }));
+  } catch(err){ /* nothing to do: the press is simply lost, as it was before */ }
+  finally { deliveringEnter = false; }
+  return prevented;
+}
+// keyup usually tells the truth even when keydown did not
+document.addEventListener('keyup', (e)=>{
+  if(deliveringEnter || !looksLikeEnterKey(e)) return;
+  const el = editableTarget(e.target);
+  if(el) deliverEnter(el);
+}, true);
+// and in a textarea or a note, the line break itself announces the press
+document.addEventListener('beforeinput', (e)=>{
+  if(deliveringEnter) return;
+  if(e.inputType !== 'insertLineBreak' && e.inputType !== 'insertParagraph') return;
+  const el = editableTarget(e.target);
+  if(!el) return;
+  if(deliverEnter(el)) e.preventDefault();
+}, true);
+
 /* Every list this page mirrors redraws it, and every list the open window edits redraws that too.
    One place, instead of a call added to the tail of each of them (and forgotten in the next one). */
 /* The forms in those windows are the app's own, and their buttons end an edit by clearing the
