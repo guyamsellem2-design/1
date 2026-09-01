@@ -5508,8 +5508,47 @@ function renderTopicFocus(){
 }
 /* Everything on this page is a live view of the same lists the rest of the app draws, so it
    redraws whenever any of them do -- an edit made in a floating window lands here with no wiring
-   of its own. */
-function refreshTopicFocus(){ if(mainView==='focus') renderTopicFocus(); }
+   of its own.
+
+   Which is right, until it happens while you are in the middle of typing. The sync between devices
+   runs on its own every minute and the calendar pulls on its own too, and each of those redraws
+   every list -- so the page rebuilt itself under your hands, took the half-written line in an add
+   field with it, and looked like it was refreshing at random. It waits now: while the cursor is in
+   a field on this page nothing is redrawn, and whatever came in is drawn the moment you are done.
+   A burst of redraws in one go is also collapsed into a single one. */
+let topicFocusRedrawQueued = false;
+let topicFocusDirty = false;
+function typingInsideTopicFocus(){
+  const a = document.activeElement;
+  const host = document.getElementById('topicFocusBody');
+  if(!a || !host || !host.contains(a)) return false;
+  return a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable;
+}
+function refreshTopicFocus(){
+  if(mainView !== 'focus') return;
+  if(typingInsideTopicFocus()){ topicFocusDirty = true; return; }
+  if(topicFocusRedrawQueued) return;
+  topicFocusRedrawQueued = true;
+  requestAnimationFrame(()=>{
+    topicFocusRedrawQueued = false;
+    topicFocusDirty = false;
+    if(mainView === 'focus') renderTopicFocus();
+  });
+}
+/* and the same rule for the window itself: a background sync must not rebuild the form you are
+   writing in */
+function typingInsideFocusSheet(){
+  const a = document.activeElement;
+  const host = document.getElementById('focusSheetOverlay');
+  if(!a || !host || !host.contains(a)) return false;
+  return a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable;
+}
+// what arrived while you were typing is drawn as soon as the cursor leaves
+document.addEventListener('focusout', ()=>{
+  setTimeout(()=>{
+    if(topicFocusDirty && !typingInsideTopicFocus()){ topicFocusDirty = false; refreshTopicFocus(); }
+  }, 0);
+}, true);
 
 /* ---------- the windows over the page ----------
    These hold the app's OWN editors, not simplified copies of them: the same form, with the same
@@ -5579,7 +5618,10 @@ function renderFocusSheet(){
     return;
   }
 }
-function refreshFocusSheet(){ if(focusSheetRef) renderFocusSheet(); }
+function refreshFocusSheet(){
+  if(!focusSheetRef || typingInsideFocusSheet()) return;
+  renderFocusSheet();
+}
 
 function renderDomainEditor(){
   renderWorldSwitch();
@@ -8106,6 +8148,7 @@ function gcalEventKeys(ev, gid, date, time, endTime){
    The old sentence still exists in events written before this, so it is recognised on the way back
    in: the description it occupies is emptied, and if it names a topic, that becomes the topic. */
 const GCAL_PROP_TOPIC = 'wmTopic';
+const GCAL_PROP_MINE = 'wmApp';
 function gcalAppNoteTopic(text){
   const raw = (text||'').replace(/ /g,' ').trim();
   if(!raw) return null;
@@ -8130,7 +8173,11 @@ function gcalIncomingFields(ev){
   return { domain, description: note ? '' : ((ev && ev.description) || '') };
 }
 function gcalOutgoingProps(rec){
+  // The stamp that says "this app wrote this event" used to be the sentence in the description.
+  // Taking that sentence out took the stamp with it -- and the duplicate cleanup, which will only
+  // ever delete an event this app made, would have quietly stopped recognising anything.
   const props = {};
+  props[GCAL_PROP_MINE] = '1';
   if(rec && rec.domain) props[GCAL_PROP_TOPIC] = rec.domain;
   return { private: props };
 }
@@ -8463,9 +8510,20 @@ function cleanGcalDuplicates(){
    anyone else made in Google is counted, named, and left exactly where it is, even when it is
    plainly one of a pair -- deleting something out of a real calendar on a guess is not a thing to
    do on your behalf. Within a group of copies the human-made one is always the one kept. */
+/* Three ways to know an event as ours, because there are three vintages of them:
+     · the stamp in extendedProperties -- everything written from now on
+     · an id we chose ourselves, which no one else's event could have
+     · the old sentence in the description, for everything written before either of those
+   An event that matches none of them was made by a person, and this never touches those. */
 const GCAL_APP_SIGNATURE = 'המפה השבועית';
 function gcalMadeHere(ev){
-  return !!(ev && ev.description && ev.description.indexOf(GCAL_APP_SIGNATURE) !== -1);
+  if(!ev) return false;
+  const props = (ev.extendedProperties && ev.extendedProperties.private) || {};
+  if(props[GCAL_PROP_MINE]) return true;
+  if(gcalLocalIdFromEventId(ev.id, GCAL_ID_PREFIX_TASK)) return true;
+  if(gcalLocalIdFromEventId(ev.id, GCAL_ID_PREFIX_ANCHOR)) return true;
+  if(gcalLocalIdFromEventId(ev.id, GCAL_ID_PREFIX_SUBTASK)) return true;
+  return !!(ev.description && ev.description.indexOf(GCAL_APP_SIGNATURE) !== -1);
 }
 function gcalEventWhen(ev){
   const st = (ev.start && (ev.start.dateTime || ev.start.date)) || '';
@@ -13552,13 +13610,23 @@ document.addEventListener('pointerdown', (e)=>{
    already be closing things, or opening something else entirely -- has fully finished; the
    still-equals-snapshot guard skips closing anything that already moved on by then. */
 function clickIsOutsideEl(el, target){ return !el || !el.contains(target); }
+/* Where the edit form actually IS. On its own page it is a row in a list; opened from the topic
+   page it is in the window over it -- and then every click inside that window is outside the row,
+   so this rule was closing the window the moment you pressed anything in it. That is what made the
+   new windows look broken: the body check, the decision helper, every button in them. */
+function openEditContainer(listId, id){
+  if(focusSheetOwnsEdit && focusSheetRef && focusSheetRef.id === id){
+    return document.getElementById('focusSheetOverlay');
+  }
+  return document.querySelector(`#${listId} [data-drag-id="${id}"]`);
+}
 document.addEventListener('click', (e)=>{
   const target = e.target;
   const prevSomeday = editingSomedayId, prevSuggestion = editingSuggestionId;
   const prevDilemma = editingDilemmaId;
-  const outsideSomeday = prevSomeday !== null && clickIsOutsideEl(document.querySelector(`#somedayList [data-drag-id="${prevSomeday}"]`), target);
-  const outsideSuggestion = prevSuggestion !== null && clickIsOutsideEl(document.querySelector(`#suggestionList [data-drag-id="${prevSuggestion}"]`), target);
-  const outsideDilemma = prevDilemma !== null && clickIsOutsideEl(document.querySelector(`#dilemmaList [data-drag-id="${prevDilemma}"]`), target);
+  const outsideSomeday = prevSomeday !== null && clickIsOutsideEl(openEditContainer('somedayList', prevSomeday), target);
+  const outsideSuggestion = prevSuggestion !== null && clickIsOutsideEl(openEditContainer('suggestionList', prevSuggestion), target);
+  const outsideDilemma = prevDilemma !== null && clickIsOutsideEl(openEditContainer('dilemmaList', prevDilemma), target);
   if(!outsideSomeday && !outsideSuggestion && !outsideDilemma) return;
   setTimeout(()=>{
     if(outsideSomeday && editingSomedayId===prevSomeday) closeSomedayEdit();
