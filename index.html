@@ -3737,6 +3737,11 @@
   .task-row-main .tag{ flex:0 1 auto; min-width:0; max-width:40%; }
   .task-row-main .del-task{ flex-shrink:0; }
   .task-row-meta{ flex-wrap:wrap; gap:7px; }
+  /* a step's row now carries a button or two of its own, so it is allowed a second line */
+  .subtask-row{ flex-wrap:wrap; }
+  .subtask-row .move-to-btn, .subtask-row .subtask-toggle-btn{
+    font-size:11px; padding:2px 6px; min-height:0; flex-shrink:0;
+  }
 
   .leave-ask-overlay{
     position:fixed; inset:0; z-index:5200; background:rgba(0,0,0,.45);
@@ -6168,6 +6173,7 @@ const MOVE_SOURCES = {
   habit:      { list: ()=>data.habits,           text:'text',  after: ()=>renderHabits() },
   todayIdea:  { list: ()=>data.todayIdeas,       text:'text',  after: ()=>renderTodayIdeas() },
   topicAction:{ list: ()=>topicActions(),         text:'text',  after: ()=>{ renderImportantTopicsStrip(); renderTopicActions(); } },
+  subtask:    { list: ()=>subtaskMoveList(),      text:'text',  after: ()=>{ renderTasks(); renderSomeday(); renderScheduleGrid(); } },
   weeklyAction:{list: ()=>topicWeeklyActions(),   text:'text',  after: ()=>renderTopicFocus() },
 };
 let moveMenuSource = null;
@@ -6211,6 +6217,16 @@ function moveToBtnHtml(sourceKind, id){
   return `<button type="button" class="subtask-toggle-btn move-to-btn"
     onclick="openMoveMenu(event,'${sourceKind}','${id}')" title="העברה למקום אחר באתר">העבר ל...</button>`;
 }
+/* A small step is not a list of its own -- it lives inside a task or an idea. For moving, the ones
+   scattered across all of them are gathered into one flat list, each carrying the topic of whatever
+   it belongs to, so a step moved out of a task arrives filed where the task was. These are copies:
+   nothing here writes back, and taking the step out of its parent is done by removeMoveSource. */
+function subtaskMoveList(){
+  const out = [];
+  (data.tasks||[]).forEach(t=>(t.subtasks||[]).forEach(x=>out.push({...x, domain: x.domain || t.domain || ''})));
+  (data.someday||[]).forEach(g=>(g.subtasks||[]).forEach(x=>out.push({...x, domain: x.domain || g.domain || ''})));
+  return out;
+}
 function topicActionById(id){ return topicActions().find(a=>a.id===id) || null; }
 function moveSourceRecord(src){
   const def = MOVE_SOURCES[src.kind];
@@ -6241,6 +6257,15 @@ function removeMoveSource(src){
   else if(src.kind==='dilemma') data.generalDilemmas = (data.generalDilemmas||[]).filter(x=>x.id!==src.id);
   else if(src.kind==='habit') data.habits = data.habits.filter(x=>x.id!==src.id);
   else if(src.kind==='todayIdea') data.todayIdeas = data.todayIdeas.filter(x=>x.id!==src.id);
+  else if(src.kind==='subtask'){
+    // it may have had its own hour in Google; deleted here means deleted there too
+    let gone = null;
+    (data.tasks||[]).forEach(t=>{ const hit = (t.subtasks||[]).find(x=>x.id===src.id); if(hit) gone = hit; });
+    (data.someday||[]).forEach(g=>{ const hit = (g.subtasks||[]).find(x=>x.id===src.id); if(hit) gone = hit; });
+    if(gone && gone.googleEventId) rememberDeletedGcalEvent(gone.googleEventId);
+    (data.tasks||[]).forEach(t=>{ if(Array.isArray(t.subtasks)) t.subtasks = t.subtasks.filter(x=>x.id!==src.id); });
+    (data.someday||[]).forEach(g=>{ if(Array.isArray(g.subtasks)) g.subtasks = g.subtasks.filter(x=>x.id!==src.id); });
+  }
   else if(src.kind==='weeklyAction') data.topicWeeklyActions = topicWeeklyActions().filter(x=>x.id!==src.id);
   else if(src.kind==='topicAction'){
     const gone = topicActionById(src.id);
@@ -9521,6 +9546,7 @@ function taskDetailHtml(t){
           : `<span class="subtask-text ${s.done?'done':''}" data-inline-key="subtask:${t.id}:${s.id}" onclick="inlineEditToggle('subtask:${t.id}:${s.id}', renderTasks)">${escapeHtml(s.text)}</span>`}
         ${s.date ? `<span class="task-date-badge">${formatDateHe(s.date)}${s.time?' · '+s.time:''}</span>` : ''}
         <span class="sched-link ${hasSchedule?'active':''}" onclick="toggleSubtaskDateOpen('${t.id}','${s.id}')" title="תזמון">🕐</span>
+        ${moveToBtnHtml('subtask', s.id)}
         <span class="del-task" onclick="deleteSubtask('${t.id}','${s.id}')" title="מחיקה">✕</span>
       </div>`;
       if(isOpen) html += subtaskScheduleFormHtml(t, s);
@@ -9537,7 +9563,8 @@ function taskDetailHtml(t){
     </div>
     ${subsHtml}
     <div class="subtask-add-row">
-      <input type="text" id="subtaskInput-${t.id}" placeholder="תת-משימה קטנה...">
+      <input type="text" id="subtaskInput-${t.id}" placeholder="תת-משימה קטנה..." enterkeyhint="done"
+        onkeydown="if(event.key==='Enter'){event.preventDefault(); addSubtask('${t.id}');}">
       <button onclick="addSubtask('${t.id}')">+ הוסף</button>
     </div>
   </li>`;
@@ -9567,8 +9594,20 @@ function toggleTaskExpand(id){
   renderTasks();
   if(opening) scrollElIntoView(document.querySelector(`.task-li[data-drag-id="${id}"]`));
 }
+/* The topic page draws the very same rows the boards draw, so while it is open a task can be on
+   screen twice -- and an id, which is meant to name one thing, names two. getElementById always
+   answers with the first, which is the copy on the page you are not looking at: you typed a step
+   on the topic page and nothing happened, because the empty field on the hidden board was read
+   instead. Anything read out of a task row goes through this, and the copy you can see wins. */
+function visibleElById(id){
+  const all = document.querySelectorAll(`[id="${id}"]`);
+  if(all.length <= 1) return all[0] || null;
+  for(const el of all){ if(el.getClientRects().length) return el; }
+  return all[0];
+}
 function addSubtask(taskId){
-  const input = document.getElementById(`subtaskInput-${taskId}`);
+  const input = visibleElById(`subtaskInput-${taskId}`);
+  if(!input) return;
   const text = input.value.trim();
   if(!text) return;
   const t = data.tasks.find(t=>t.id===taskId);
@@ -9578,6 +9617,8 @@ function addSubtask(taskId){
   input.value = '';
   saveData();
   renderTasks();
+  // small steps come in threes and fours, not one at a time: the field stays ready for the next
+  requestAnimationFrame(()=>{ const i = visibleElById(`subtaskInput-${taskId}`); if(i) i.focus(); });
 }
 function toggleSubtask(taskId, subId){
   const t = data.tasks.find(t=>t.id===taskId);
@@ -9634,10 +9675,13 @@ function saveSubtaskSchedule(taskId, subId){
   const s = t && (t.subtasks||[]).find(s=>s.id===subId);
   if(!s) return;
   const prevDate = s.date, prevTime = s.time, prevEnd = s.endTime, prevGcalSync = s.gcalSync;
-  s.date = document.getElementById(`subtaskDate-${taskId}-${subId}`).value || '';
-  s.time = document.getElementById(`subtaskTime-${taskId}-${subId}`).value || '';
-  s.endTime = document.getElementById(`subtaskEnd-${taskId}-${subId}`).value || '';
-  const gcalCheckbox = document.getElementById(`subtaskGcalSync-${taskId}-${subId}`);
+  const dEl = visibleElById(`subtaskDate-${taskId}-${subId}`);
+  const tEl = visibleElById(`subtaskTime-${taskId}-${subId}`);
+  const eEl = visibleElById(`subtaskEnd-${taskId}-${subId}`);
+  s.date = (dEl && dEl.value) || '';
+  s.time = (tEl && tEl.value) || '';
+  s.endTime = (eEl && eEl.value) || '';
+  const gcalCheckbox = visibleElById(`subtaskGcalSync-${taskId}-${subId}`);
   if(gcalCheckbox) s.gcalSync = gcalCheckbox.checked;
   subtaskDateOpenIds.delete(taskId+':'+subId);
   saveData();
@@ -10788,6 +10832,21 @@ function addSheetSubtask(){
   renderTasks();
   requestAnimationFrame(()=>{ const i = document.getElementById('timelineSheetSubInput'); if(i) i.focus(); });
 }
+/* A step that turns out to need its own hour gets its own window -- the same one everything else
+   is made in, opened on a task made from it, carrying the parent's topic. The step stays where it
+   is: giving it a place in the week is not the same as taking it out of what it belongs to. */
+function scheduleSheetSubtaskAsTask(subId){
+  const rec = commitSheetFieldsToRecord();
+  const sub = rec && (rec.subtasks||[]).find(x=>x.id===subId);
+  if(!sub || !(sub.text||'').trim()) return;
+  saveData();
+  const t = pushTask({id:uid(), text:sub.text.trim(), domain: rec.domain || '', done:false, energy:'',
+    date: sub.date || '', time: sub.time || '', endTime: sub.endTime || '',
+    description:'', subtasks:[], bodyCheck:{}, draft:true, createdAt:Date.now()});
+  saveData();
+  renderTasks(); renderScheduleGrid();
+  openTimelineSheet('task', t.id, true);
+}
 function toggleSheetSubtask(subId){
   const rec = commitSheetFieldsToRecord();
   const sub = rec && (rec.subtasks||[]).find(x=>x.id===subId);
@@ -10896,6 +10955,8 @@ function renderTimelineSheet(){
         ${subs.map(x=>`<div class="subtask-row">
             <div class="chk ${x.done?'done':''}" onclick="toggleSheetSubtask('${x.id}')"></div>
             <span class="task-text" style="flex:1">${escapeHtml(x.text)}</span>
+            <button type="button" class="subtask-toggle-btn" onclick="scheduleSheetSubtaskAsTask('${x.id}')"
+              title="פותח חלון משימה חדשה בשביל הצעד הזה">+ ליומן</button>
             <span class="del-task" onclick="deleteSheetSubtask('${x.id}')" title="מחיקה">✕</span>
           </div>`).join('')}
         <div class="subtask-add-row">
@@ -11518,7 +11579,8 @@ function somedayDescSubtasksInnerHtml(s, subsHtml){
     <span class="detail-label">צעדים קטנים — כדי לראות מתי זה מתקרב להיות ממשי</span>
     ${subsHtml}
     <div class="subtask-add-row">
-      <input type="text" id="somedaySubInput-${s.id}" placeholder="צעד קטן...">
+      <input type="text" id="somedaySubInput-${s.id}" placeholder="צעד קטן..." enterkeyhint="done"
+        onkeydown="if(event.key==='Enter'){event.preventDefault(); addSomedaySubtask('${s.id}');}">
       <button onclick="addSomedaySubtask('${s.id}')">+ הוסף</button>
     </div>`;
 }
@@ -11540,7 +11602,7 @@ function somedaySubtasksListHtml(s){
       ${inlineEditIds.has('somedaystep:'+s.id+':'+sub.id)
         ? `<input type="text" class="inline-text-edit" value="${escapeAttr(sub.text)}" data-inline-key="somedaystep:${s.id}:${sub.id}" onblur="this.dataset.cancelled ? cancelInlineEdit('somedaystep:${s.id}:${sub.id}', renderSomeday) : saveSomedaySubtaskTextEdit('${s.id}','${sub.id}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();} else if(event.key==='Escape'){this.dataset.cancelled='1'; this.blur();}">`
         : `<span class="subtask-text ${sub.done?'done':''}" data-inline-key="somedaystep:${s.id}:${sub.id}" onclick="inlineEditToggle('somedaystep:${s.id}:${sub.id}', renderSomeday)">${escapeHtml(sub.text)}</span>`}
-      <span class="promote" onclick="convertSomedaySubtaskToTask('${s.id}','${sub.id}')">→ משימה</span>
+      ${moveToBtnHtml('subtask', sub.id)}
       <span class="del-task" onclick="deleteSomedaySubtask('${s.id}','${sub.id}')" title="מחיקה">✕</span>
     </div>`);
   });
@@ -11607,6 +11669,7 @@ function addSomedaySubtask(id){
   input.value='';
   saveData();
   renderSomeday();
+  requestAnimationFrame(()=>{ const i = document.getElementById(`somedaySubInput-${id}`); if(i) i.focus(); });
 }
 function toggleSomedaySubtask(id, subId){
   const s = data.someday.find(s=>s.id===id);
