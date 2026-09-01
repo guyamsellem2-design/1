@@ -1837,6 +1837,19 @@
   .undo-redo-bar > .options-menu-wrap > .reset-btn .ico{ width:20px; height:20px; }
   .undo-redo-bar > .reset-btn:hover,
   .undo-redo-bar > .options-menu-wrap > .reset-btn:hover{ border-color:var(--gold); }
+  /* Sync was the one still wearing its name, which made the row a row of circles with a label
+     stuck on the end. Five circles read as one thing; four and a word read as two. */
+  .undo-redo-bar > .sync-menu > .sync-menu-btn{
+    font-size:0; width:44px; height:44px; min-height:0; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:50%; background:var(--surface); border:1px solid var(--border-strong);
+    box-shadow:var(--lift-2);
+  }
+  .undo-redo-bar > .sync-menu > .sync-menu-btn .ico{ width:20px; height:20px; }
+  .undo-redo-bar > .sync-menu > .sync-menu-btn:hover{ border-color:var(--gold); }
+  /* ☰ has no drawn icon of its own, and the row zeroes the font size to hide labels -- so it is
+     given its size back explicitly rather than disappearing */
+  .undo-redo-bar .dock-ico{ font-size:19px; line-height:1; font-weight:400; }
 
   /* ---------------------------------------------------------------------------
      21. STILLNESS — and the lag fix.
@@ -4191,6 +4204,9 @@
 </div>
 
 <div class="undo-redo-bar">
+  <!-- the side menu was only ever reachable from the ☰ at the top of a page; here it is where your
+       thumb already is, next to the other four -->
+  <button class="reset-btn" id="dockNavBtn" onclick="toggleNav()" title="ניווט"><span class="dock-ico">☰</span></button>
   <div class="options-menu-wrap">
     <button class="reset-btn" id="optionsMenuBtn" onclick="toggleOptionsMenu()" title="אפשרויות">⚙ אפשרויות</button>
     <div class="options-menu-panel" id="optionsMenuPanel" style="display:none;">
