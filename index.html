@@ -3624,7 +3624,10 @@
     border:1.5px solid var(--tint); box-shadow:0 0 22px -12px var(--tint);
   }
   .focus-hero-q{ font-size:14.5px; font-weight:700; color:var(--tint); margin-bottom:9px; line-height:1.4; }
+  .focus-hero .today-idea-row{ margin-bottom:6px; }
   .focus-hero .today-idea-input{ font-size:15px; }
+  .focus-hero .move-to-btn{ font-size:11px; padding:2px 6px; min-height:0; flex-shrink:0; }
+  .focus-hero-add{ margin-top:8px; }
 
   .focus-sec{
     background:var(--surface); border:1px solid var(--card-line); border-radius:16px;
@@ -3665,6 +3668,7 @@
   .focus-row .chk{ flex-shrink:0; }
   .focus-row .energy-dot{ flex-shrink:0; }
 
+  .subtask-toggle-btn.needs-when-btn{ border-style:solid; border-color:var(--gold); color:var(--gold); }
   .focus-add{ display:flex; gap:6px; align-items:center; margin-top:8px; }
   .focus-add input{
     flex:1; min-width:0; background:var(--surface2); border:1px dashed var(--border);
@@ -5200,28 +5204,33 @@ function openTopicFocus(id){
 }
 function focusDomain(){ return data.domains.find(d=>d.id===focusDomainId) || null; }
 
-/* ---------- the one action for the week ---------- */
+/* ---------- מה אני יכול לעשות השבוע למען התחום הזה? ----------
+   Not one line but as many as come to mind. This is the thinking end of the page -- what COULD be
+   done -- and thinking is not improved by a cap. Anything here that turns out to have a day and an
+   hour goes to the board with "העבר ל...", which is what the rest of the page is for. */
 function topicWeeklyActions(){ return data.topicWeeklyActions || (data.topicWeeklyActions = []); }
-function weeklyActionFor(domainId){ return topicWeeklyActions().find(a=>a.domain===domainId) || null; }
-function onWeeklyActionInput(domainId, el){
-  const val = el.value;
-  let a = weeklyActionFor(domainId);
-  if(!a){
-    if(!val.trim()) return;
-    a = {id:uid(), domain:domainId, text:val, done:false, createdAt:Date.now()};
-    topicWeeklyActions().push(a);
-  } else a.text = val;
-  saveData();
+function weeklyActionsFor(domainId){ return topicWeeklyActions().filter(a=>a.domain===domainId); }
+function onWeeklyActionInput(id, el){
+  const a = topicWeeklyActions().find(x=>x.id===id);
+  if(a){ a.text = el.value; saveData(); }
+  // added and removed by hand, not by redrawing, so the cursor stays where you are typing
+  const row = el.closest('.today-idea-row');
+  const btn = row.querySelector('.move-to-btn');
+  if(el.value.trim() && !btn){
+    const holder = document.createElement('div');
+    holder.innerHTML = moveToBtnHtml('weeklyAction', id);
+    row.insertBefore(holder.firstElementChild, row.querySelector('.today-idea-del'));
+  } else if(!el.value.trim() && btn) btn.remove();
 }
-function toggleWeeklyActionDone(domainId){
-  const a = weeklyActionFor(domainId);
+function toggleWeeklyActionDone(id){
+  const a = topicWeeklyActions().find(x=>x.id===id);
   if(!a) return;
   a.done = !a.done;
   saveData();
   renderTopicFocus();
 }
-function clearWeeklyAction(domainId){
-  data.topicWeeklyActions = topicWeeklyActions().filter(a=>a.domain!==domainId);
+function deleteWeeklyAction(id){
+  data.topicWeeklyActions = topicWeeklyActions().filter(a=>a.id!==id);
   saveData();
   renderTopicFocus();
 }
@@ -5256,13 +5265,29 @@ function focusAdd(kind){
   const text = el ? el.value.trim() : '';
   if(!text) return;
   const id = focusDomainId;
+  /* A task and an anchor are the two things that mean nothing without a day and an hour, so those
+     two open the window that asks for them -- already carrying the title, the topic and a sensible
+     when, so it is a confirmation rather than a form to fill in. Everything else on this page is
+     something you are still thinking about, and thinking does not need an hour. */
   if(kind==='task'){
-    data.tasks.push({id:uid(), text, domain:id, done:false, energy:'', date:'', time:'', endTime:'',
-      description:'', subtasks:[], bodyCheck:{}, createdAt:Date.now()});
-  } else if(kind==='anchor'){
-    data.anchors.push({id:uid(), day:new Date().getDay(), time:'09:00', endTime:'', label:text,
+    const t = pushTask({id:uid(), text, domain:id, done:false, energy:'', date:'', time:'', endTime:'',
+      description:'', subtasks:[], bodyCheck:{}, draft:true, createdAt:Date.now()});
+    if(el) el.value = '';
+    saveData();
+    renderTasks(); renderScheduleGrid(); renderTopicFocus();
+    openTimelineSheet('task', t.id, true);
+    return;
+  }
+  if(kind==='anchor'){
+    const a = pushAnchorRec({id:uid(), day:new Date().getDay(), time:'', endTime:'', label:text,
       domain:id, buffer:false, repeatType:'weekly', date:'', createdAt:Date.now()});
-  } else if(kind==='dream' || kind==='someday'){
+    if(el) el.value = '';
+    saveData();
+    renderAnchorsTab(); renderScheduleGrid(); renderTopicFocus();
+    openTimelineSheet('anchor', a.id, true);
+    return;
+  }
+  if(kind==='dream' || kind==='someday'){
     data.someday.push({id:uid(), dream: kind==='dream', text, domain:id, description:'',
       subtasks:[], bodyCheck:{}, createdAt:Date.now()});
   } else if(kind==='dilemma'){
@@ -5270,6 +5295,8 @@ function focusAdd(kind){
       decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()});
   } else if(kind==='note'){
     ensureDomainNotes(id).unshift({id:uid(), text, color:'', drawing:'', memos:[], pinned:false, headerId:''});
+  } else if(kind==='weekly'){
+    topicWeeklyActions().push({id:uid(), domain:id, text, done:false, createdAt:Date.now()});
   }
   saveData();
   renderTopicFocus();
@@ -5288,7 +5315,9 @@ function focusRowHtml(kind, it){
     return `<div class="focus-row ${it.done?'is-done':''}">
       <div class="chk ${it.done?'done':''}" onclick="toggleTask('${it.id}')"></div>
       <span class="focus-row-text" onclick="openTimelineSheet('task','${it.id}')" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>
-      ${it.date ? `<span class="task-date-badge">${focusWhen(it.date, it.time)}</span>` : ''}
+      ${taskNeedsAWhen(it)
+        ? `<button type="button" class="subtask-toggle-btn needs-when-btn" onclick="openTimelineSheet('task','${it.id}')">קבע מועד</button>`
+        : `<span class="task-date-badge">${focusWhen(it.date, it.time)}</span>`}
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}"
         onclick="cycleEnergy('${it.id}')" title="רמת אנרגיה"></div>
       ${move}
@@ -5372,19 +5401,26 @@ function renderTopicFocus(){
   }
   // the page is named after the topic, in the topic's own colour -- nothing else on it needs a name
   if(title){ title.textContent = d.name; title.style.color = d.color; }
-  const wk = weeklyActionFor(d.id);
+  const weekly = weeklyActionsFor(d.id);
   withFocusPreserved('topicFocusBody', ()=>{
     const hero = `
       <div class="focus-hero" style="--tint:${d.color}">
-        <div class="focus-hero-q">פעולה אחת שאוכל לעשות בשביל התחום הזה השבוע?</div>
-        <div class="today-idea-row">
-          <input type="checkbox" class="today-idea-check" ${(wk && wk.done)?'checked':''}
-            onchange="toggleWeeklyActionDone('${d.id}')" title="בוצע">
-          <input type="text" class="today-idea-input ${(wk && wk.done)?'done':''}" dir="rtl"
-            id="focusWeeklyAction" data-field-key="weeklyAction-${d.id}"
-            value="${escapeAttr(wk ? (wk.text||'') : '')}" placeholder="משהו אחד. קטן מספיק כדי שיקרה."
-            oninput="onWeeklyActionInput('${d.id}', this)">
-          ${wk ? `<span class="today-idea-del" onclick="clearWeeklyAction('${d.id}')" title="ניקוי">✕</span>` : ''}
+        <div class="focus-hero-q">מה אני יכול לעשות השבוע למען התחום הזה?</div>
+        ${weekly.map(a=>`
+          <div class="today-idea-row">
+            <input type="checkbox" class="today-idea-check" ${a.done?'checked':''}
+              onchange="toggleWeeklyActionDone('${a.id}')" title="בוצע">
+            <input type="text" class="today-idea-input ${a.done?'done':''}" dir="rtl"
+              data-field-key="weeklyAction-${a.id}" value="${escapeAttr(a.text||'')}"
+              placeholder="משהו שאפשר לעשות השבוע..."
+              oninput="onWeeklyActionInput('${a.id}', this)">
+            ${(a.text||'').trim() ? moveToBtnHtml('weeklyAction', a.id) : ''}
+            <span class="today-idea-del" onclick="deleteWeeklyAction('${a.id}')" title="מחיקה">✕</span>
+          </div>`).join('')}
+        <div class="focus-add focus-hero-add">
+          <input type="text" id="focusAdd-weekly" dir="rtl" placeholder="${weekly.length?'ועוד משהו...':'משהו שאפשר לעשות השבוע...'}"
+            onkeydown="onFocusAddKeydown(event,'weekly')">
+          <button type="button" onclick="focusAdd('weekly')">+</button>
         </div>
       </div>`;
     const sections = FOCUS_SECTIONS.map(sec=>{
@@ -6011,6 +6047,7 @@ const MOVE_SOURCES = {
   habit:      { list: ()=>data.habits,           text:'text',  after: ()=>renderHabits() },
   todayIdea:  { list: ()=>data.todayIdeas,       text:'text',  after: ()=>renderTodayIdeas() },
   topicAction:{ list: ()=>topicActions(),         text:'text',  after: ()=>{ renderImportantTopicsStrip(); renderTopicActions(); } },
+  weeklyAction:{list: ()=>topicWeeklyActions(),   text:'text',  after: ()=>renderTopicFocus() },
 };
 let moveMenuSource = null;
 function closeMoveMenu(){
@@ -6083,6 +6120,7 @@ function removeMoveSource(src){
   else if(src.kind==='dilemma') data.generalDilemmas = (data.generalDilemmas||[]).filter(x=>x.id!==src.id);
   else if(src.kind==='habit') data.habits = data.habits.filter(x=>x.id!==src.id);
   else if(src.kind==='todayIdea') data.todayIdeas = data.todayIdeas.filter(x=>x.id!==src.id);
+  else if(src.kind==='weeklyAction') data.topicWeeklyActions = topicWeeklyActions().filter(x=>x.id!==src.id);
   else if(src.kind==='topicAction'){
     const gone = topicActionById(src.id);
     if(gone) openTopicActionRows.delete(gone.domain);   // moved away, so the empty row goes too
@@ -6109,7 +6147,7 @@ function moveItemTo(destKind){
     const t = {id:uid(), text:p.text, domain: validDomain || (data.domains[0]&&data.domains[0].id) || '',
       done:false, energy:p.energy||'', date:p.date||'', time:p.time||'', endTime:p.endTime||'',
       description:p.description, subtasks:p.subtasks, bodyCheck:p.bodyCheck, draft:true, createdAt:Date.now()};
-    data.tasks.push(t);
+    pushTask(t);
     saveData(); renderTasks(); renderScheduleGrid();
     openTimelineSheet('task', t.id, true);   // the full editor, so a date can be given right away
     return;
@@ -9228,7 +9266,8 @@ function taskRowHtml(t){
     <div class="task-row-meta">
       <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
       ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
-      ${isOverdue ? `<button type="button" class="subtask-toggle-btn" onclick="openTimelineSheet('task','${t.id}')">שנה מועד</button>` : ''}
+      ${taskNeedsAWhen(t) ? `<button type="button" class="subtask-toggle-btn needs-when-btn" onclick="openTimelineSheet('task','${t.id}')">קבע מועד</button>`
+        : (isOverdue ? `<button type="button" class="subtask-toggle-btn" onclick="openTimelineSheet('task','${t.id}')">שנה מועד</button>` : '')}
       <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
     ${bodyCheckStatusBadgesHtml(t, {urgencyOptions:['objective','other','relief'], showEnergy:true})}
@@ -9488,6 +9527,45 @@ function deleteTask(id, opts){
     : confirm(`למחוק את "${removed.text||'האירוע'}" גם מיומן גוגל?`);
   if(alsoGoogle) deleteEventFromGcal(removed.googleEventId, ()=>{});
 }
+
+/* ---------- a task or an anchor always has a when ----------
+   A thing on the week's board with no day and no hour is not a plan, it is a wish with a checkbox
+   next to it: it never comes up, it never passes, it just sits. The place for something with no
+   when already exists -- "משימות ללא מועד" and "רעיונות וחלומות" -- and "העבר ל..." reaches it in
+   one tap. So the board and the timetable only hold things that are actually placed in a week.
+
+   Where you are already in the window that asks for a day and an hour, it keeps asking (saving
+   without a time has always been refused there). Everywhere else the nearest sensible when is
+   filled in rather than the creation being refused: today, at the next full hour, which is one tap
+   from being changed. Refusing to create the thing would only teach you not to write it down. */
+function defaultWhen(){
+  const d = new Date();
+  let h = d.getHours() + (d.getMinutes() > 50 ? 2 : 1);
+  if(h > 21){ d.setDate(d.getDate() + 1); return { date: ymd(d), time: '09:00' }; }
+  if(h < 8) return { date: ymd(d), time: '09:00' };
+  return { date: ymd(d), time: pad(h) + ':00' };
+}
+function pushTask(t){
+  if(!t.date || !t.time){
+    const w = defaultWhen();
+    if(!t.date) t.date = w.date;
+    if(!t.time) t.time = (t.date === w.date) ? w.time : '09:00';
+  }
+  data.tasks.push(t);
+  return t;
+}
+function pushAnchorRec(a){
+  const n = Number(a.day);
+  if(!(n >= 0 && n <= 6)) a.day = new Date().getDay();
+  if(!a.time) a.time = '09:00';
+  if(!a.repeatType) a.repeatType = 'weekly';
+  data.anchors.push(a);
+  return a;
+}
+/* The ones written before this rule existed are not moved onto today behind your back -- a day
+   quietly filling with things you never put there is worse than the problem. They are pointed at
+   instead: the row says it has no when, and one tap opens the window that gives it one. */
+function taskNeedsAWhen(t){ return !t.done && (!t.date || !t.time); }   // something finished needs no schedule
 
 /* ---------- weekly schedule (anchors + dated tasks together) ---------- */
 const WEEK_OFFSET_MIN = -1, WEEK_OFFSET_MAX = 2;
@@ -10486,9 +10564,9 @@ function duplicateFromSheet(){
   saveData();
   const copy = {...rec, id: uid(), createdAt: Date.now(),
     subtasks: (rec.subtasks||[]).map(x=>({...x, id: uid()})),
-    date: ymd(new Date()), time: '', endTime: rec.endTime || '',
+    date: ymd(new Date()), time: rec.time || '', endTime: rec.endTime || '',
     googleEventId: null, googleRecurringEventId: null, done: false, draft: true};
-  if(kind==='task') data.tasks.push(copy); else data.anchors.push(copy);
+  if(kind==='task') pushTask(copy); else pushAnchorRec(copy);
   saveData();
   renderTasks(); renderScheduleGrid();
   closeTimelineSheet();
@@ -10731,7 +10809,7 @@ function promoteTaskToAnchor(taskId, repeatType){
     description: f.description, createdAt: Date.now()
   };
   if(f.gcalSync !== undefined) a.gcalSync = f.gcalSync;
-  data.anchors.push(a);
+  pushAnchorRec(a);
   data.tasks = data.tasks.filter(x=>x.id!==taskId);
   saveData();
   try{ applyGcalSyncForAnchor(a, true); }catch(e){ console.error('gcal sync failed', e); }
@@ -10749,7 +10827,7 @@ function demoteAnchorToTask(anchorId){
     description: f.description, subtasks: [], draft: false, createdAt: Date.now()
   };
   if(f.gcalSync !== undefined) t.gcalSync = f.gcalSync;
-  data.tasks.push(t);
+  pushTask(t);
   data.anchors = data.anchors.filter(x=>x.id!==anchorId);
   saveData();
   try{ applyGcalSyncForTask(t, true); }catch(e){ console.error('gcal sync failed', e); }
@@ -11170,8 +11248,7 @@ function convertSomedayToTask(id){
   // the someday item is NOT removed here -- it stays in "דברים לעשות" until she explicitly chooses
   // to remove it from the sheet that opens next (מחק מ"דברים לעשות"), so a promotion to a task is
   // never also a silent deletion decided on her behalf
-  const newTask = {id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()};
-  data.tasks.push(newTask);
+  const newTask = pushTask({id:uid(), text:s.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:false, energy:'mid', date:'', time:'', endTime:'', description:s.description||'', subtasks:s.subtasks||[], createdAt:Date.now()});
   editingSomedayId = null;
   saveData();
   renderSomeday();
@@ -11311,8 +11388,7 @@ function convertSomedaySubtaskToTask(id, subId){
   const sub = (s.subtasks||[]).find(x=>x.id===subId);
   if(!sub) return;
   // same as convertSomedayToTask above -- the small step stays put until explicitly removed from the sheet
-  const newTask = {id:uid(), text:sub.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:sub.done||false, energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
-  data.tasks.push(newTask);
+  const newTask = pushTask({id:uid(), text:sub.text, domain:s.domain||((data.domains[0]&&data.domains[0].id)||''), done:sub.done||false, energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()});
   saveData();
   renderSomeday();
   renderTasks();
@@ -11595,8 +11671,7 @@ function syncSuggestionReplyToSchedule(s){
   const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
   let t = s.linkedTaskId ? data.tasks.find(x=>x.id===s.linkedTaskId) : null;
   if(!t){
-    t = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate, time:s.replyTime||'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
-    data.tasks.push(t);
+    t = pushTask({id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate, time:s.replyTime||'', endTime:'', description:'', subtasks:[], createdAt:Date.now()});
     s.linkedTaskId = t.id;
     applyGcalSyncForTask(t, true);
   } else {
@@ -11666,8 +11741,7 @@ function convertSuggestionToTask(id){
   let newTask = s.linkedTaskId ? data.tasks.find(t=>t.id===s.linkedTaskId) : null;
   if(!newTask){
     const text = s.who ? `להחזיר תשובה ל${s.who}: ${s.text}` : `להחזיר תשובה: ${s.text}`;
-    newTask = {id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:s.replyTime||'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
-    data.tasks.push(newTask);
+    newTask = pushTask({id:uid(), text, domain:'', done:false, energy:'', date:s.replyDate||'', time:s.replyTime||'', endTime:'', description:'', subtasks:[], createdAt:Date.now()});
   }
   data.suggestions = data.suggestions.filter(x=>x.id!==id);
   saveData();
@@ -12011,8 +12085,7 @@ function reorderGeneralDilemmas(fromId, toId){
 function convertDilemmaToTask(id){
   const d = (data.generalDilemmas||[]).find(d=>d.id===id);
   if(!d) return;
-  const newTask = {id:uid(), text: `להחליט: ${d.text}`, domain:d.domain||'', done:false, energy:'', date:d.decisionDate||'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()};
-  data.tasks.push(newTask);
+  const newTask = pushTask({id:uid(), text: `להחליט: ${d.text}`, domain:d.domain||'', done:false, energy:'', date:d.decisionDate||'', time:'', endTime:'', description:'', subtasks:[], createdAt:Date.now()});
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -13951,9 +14024,8 @@ function addHabitToCalendar(id, useSmallStart){
   if(!text) return;
   // whatever time the habit was carrying comes with it, so the sheet opens already filled in
   const date = (h.day === null || h.day === undefined) ? '' : ymd(viewedWeekDates()[h.day]);
-  const newTask = {id:uid(), text, domain:'', done:false, energy:'', date, time: h.time || '', endTime:'',
-                   description: h.description || '', subtasks:[], draft:true, createdAt:Date.now()};
-  data.tasks.push(newTask);
+  const newTask = pushTask({id:uid(), text, domain:'', done:false, energy:'', date, time: h.time || '', endTime:'',
+                   description: h.description || '', subtasks:[], draft:true, createdAt:Date.now()});
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -14271,8 +14343,7 @@ function reorderListSubitems(listId, itemId, fromId, toId){
   renderListsView();
 }
 function createTaskFromText(text){
-  const task = {id:uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false, createdAt:Date.now()};
-  data.tasks.push(task);
+  const task = pushTask({id:uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false, createdAt:Date.now()});
   saveData();
   renderTasks();
   renderScheduleGrid();
@@ -14912,14 +14983,12 @@ function convertBlankTo(destKind, dayIdx, dateStr){
 function finishConvert(destKind, text, domain, extra={}){
   text = (text||'').trim();
   if(destKind==='task'){
-    const newTask = {id:uid(), text, domain: domain||(data.domains[0]?data.domains[0].id:''), done:false, energy:'', date:extra.dateStr||'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
-    data.tasks.push(newTask);
+    const newTask = pushTask({id:uid(), text, domain: domain||(data.domains[0]?data.domains[0].id:''), done:false, energy:'', date:extra.dateStr||'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()});
     saveData(); renderTasks(); renderScheduleGrid();
     openTimelineSheet('task', newTask.id, true);
   } else if(destKind==='anchor'){
     if(data.domains.length===0){ alert('קודם צריך להוסיף נושא אחד לפחות (בסעיף "נושאים").'); return; }
-    const newAnchor = {id:uid(), day: extra.dayIdx!=null?extra.dayIdx:new Date().getDay(), time:'', endTime:'', label:text, domain: domain||data.domains[0].id, buffer:false, draft:true, repeatType:'weekly', date:'', createdAt:Date.now()};
-    data.anchors.push(newAnchor);
+    const newAnchor = pushAnchorRec({id:uid(), day: extra.dayIdx!=null?extra.dayIdx:new Date().getDay(), time:'', endTime:'', label:text, domain: domain||data.domains[0].id, buffer:false, draft:true, repeatType:'weekly', date:'', createdAt:Date.now()});
     saveData(); renderScheduleGrid();
     openTimelineSheet('anchor', newAnchor.id, true);
   } else if(!text){
@@ -14979,8 +15048,7 @@ function routeInboxItem(kind, id){
     saveData(); renderInbox(); renderHabits();
     flashStatus('הועבר ל"דברים שהייתי רוצה להתמיד בהם"');
   } else if(kind==='task'){
-    const newTask = {id:uid(), text:it.text, domain:'', done:false, energy:'', date:'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
-    data.tasks.push(newTask);
+    const newTask = pushTask({id:uid(), text:it.text, domain:'', done:false, energy:'', date:'', time:'', endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()});
     data.inbox = data.inbox.filter(x=>x.id!==id);
     saveData(); renderInbox(); renderTasks(); renderScheduleGrid();
     flashStatus('הועבר למשימות');
@@ -15244,8 +15312,7 @@ function promoteTodayIdeaToTask(id){
   const item = data.todayIdeas.find(x=>x.id===id);
   if(!item || !item.text.trim()) return;
   const text = item.text.trim();
-  const task = {id: uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false};
-  data.tasks.push(task);
+  const task = pushTask({id: uid(), text, domain: data.domains[0]?data.domains[0].id:'', energy:'mid', date:'', time:'', endTime:'', description:'', subtasks:[], done:false});
   saveData();
   renderTasks();
   renderScheduleGrid();
