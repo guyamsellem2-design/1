@@ -456,7 +456,7 @@
   ul.tasks{list-style:none; margin:0; padding:0;}
   ul.tasks li{display:flex; align-items:center; gap:9px; padding:10px 4px; border-bottom:1px solid var(--border);}
   ul.tasks li:last-child{border-bottom:none;}
-  .chk{width:19px; height:19px; border-radius:50%; border:2px solid var(--border-strong); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:transparent; transition:background .25s ease, border-color .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1);}
+  .chk{width:19px; height:19px; border-radius:5px; border:2px solid var(--border-strong); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:transparent; transition:background .25s ease, border-color .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1);}
   .chk.done{background:var(--gold); border-color:var(--gold);}
   .chk.chk-pop{animation:chkPop .4s cubic-bezier(.34,1.56,.64,1);}
   @keyframes chkPop{ 0%{transform:scale(1);} 45%{transform:scale(1.35);} 100%{transform:scale(1);} }
@@ -3675,11 +3675,14 @@
     border-radius:9px; padding:8px 11px; color:var(--text); font-family:inherit; font-size:14px;
   }
   .focus-add input:focus{ outline:none; border-style:solid; border-color:var(--tint); }
-  .focus-add button{
+  /* the small square + belongs to a field it sits beside; the sections with no field get the
+     board's own wide "+ הוסף", which must not be squeezed into that square */
+  .focus-add button:not(.focus-add-btn){
     flex:0 0 auto; width:38px; min-height:36px; border-radius:9px; cursor:pointer;
     background:transparent; border:1px dashed var(--tint); color:var(--tint);
     font-family:inherit; font-size:17px; line-height:1;
   }
+  .focus-add-btn{ flex:1 1 auto; width:auto; white-space:nowrap; }
 
   .focus-sheet-overlay{
     position:fixed; inset:0; z-index:5000; background:rgba(0,0,0,.5);
@@ -3703,17 +3706,40 @@
     .focus-hero{ column-span:all; }
   }
 
+  /* An anchor is a title, a topic and a when -- there is no second line to make room for, so it
+     stays the plain single row it always was, even though it shares .task-li with tasks. */
+  ul.tasks li.task-li.anchor-li{ flex-direction:row; align-items:center; gap:8px; }
+  ul.tasks li.task-li.anchor-li .task-text{ min-width:0; }
+  ul.tasks li.task-li.anchor-li .tag{ flex-shrink:0; }
+  ul.tasks li.task-li.anchor-li .task-date-badge{ flex-shrink:0; }
+
+  /* Line one says what the task is: the box, the words, the topic, and the way out of it.
+     Line two is everything you can do with it. The ✕ moved up because deleting belongs with the
+     thing, not with the things you do to it. */
+  /* Line one is one line: the words give up their room to the topic and the ✕, not the other way
+     round, and a long title wraps inside its own share rather than pushing them onto a line of
+     their own -- which is exactly the clumsy extra row this was meant to remove. */
+  .task-row-main{ flex-wrap:nowrap; gap:8px; }
+  .task-row-main .task-text{ flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+  .task-row-main .tag{ flex:0 1 auto; min-width:0; max-width:40%; }
+  .task-row-main .del-task{ flex-shrink:0; }
+  .task-row-meta{ flex-wrap:wrap; gap:7px; }
+
   .leave-ask-overlay{
     position:fixed; inset:0; z-index:5200; background:rgba(0,0,0,.45);
-    display:flex; align-items:center; justify-content:center; padding:24px;
+    display:flex; align-items:flex-start; justify-content:center;
+    padding:max(14vh, 90px) 24px 24px; overflow-y:auto;
+    /* dead to the touch until the tap that opened it is finished */
+    pointer-events:none;
   }
+  .leave-ask-overlay.armed{ pointer-events:auto; }
   .leave-ask-box{
     background:var(--surface); border:1.5px solid var(--card-line); border-radius:18px;
     padding:20px 22px; box-shadow:var(--lift-3); max-width:320px; width:100%;
   }
   .leave-ask-title{ font-size:17px; font-weight:700; color:var(--text); margin-bottom:16px; }
   .leave-ask-actions{ display:flex; gap:10px; }
-  .leave-ask-actions button{ flex:1; padding:11px 14px; border-radius:10px; font-family:inherit; font-size:15px; cursor:pointer; }
+  .leave-ask-actions button{ flex:1; padding:14px 14px; min-height:50px; border-radius:10px; font-family:inherit; font-size:16px; cursor:pointer; touch-action:manipulation; }
 
   .timeline-sheet-tools{ gap:6px; margin-top:2px; }
   .sheet-subtasks{ margin-bottom:10px; }
@@ -4106,7 +4132,7 @@
      several places it might have ended up in. -->
 <!-- Tapping the background is how a sheet gets closed by accident, and it was taking whatever
      you had typed with it. It asks now, in the app's own shape rather than the browser's. -->
-<div class="leave-ask-overlay" id="leaveAskOverlay" style="display:none;">
+<div class="leave-ask-overlay" id="leaveAskOverlay" style="display:none;" onclick="leaveAskBackdrop(event)">
   <div class="leave-ask-box">
     <div class="leave-ask-title" id="leaveAskTitle">לשמור את מה שכתבת?</div>
     <div class="leave-ask-actions">
@@ -5197,6 +5223,7 @@ function renderTopicActions(){
    ============================================================================ */
 let focusDomainId = null;
 function openTopicFocus(id){
+  if(focusDomainId && focusDomainId !== id){ pruneEmptyWeeklyActions(); saveData(); }
   focusDomainId = id;
   activeNoteDomain = id;          // so the notes here and the notebook stay the same place
   switchMainView('focus');
@@ -5229,6 +5256,32 @@ function toggleWeeklyActionDone(id){
   saveData();
   renderTopicFocus();
 }
+/* An empty box under the last one says "there is room for another" without a word of instruction,
+   and Enter walks down them the way it walks down "מה אעשה היום" -- on the last one it opens a new. */
+function addWeeklyActionSlot(){
+  topicWeeklyActions().push({id:uid(), domain:focusDomainId, text:'', done:false, createdAt:Date.now()});
+  saveData();
+  renderTopicFocus();
+  requestAnimationFrame(()=>{
+    const all = document.querySelectorAll('.focus-hero .today-idea-input');
+    const last = all[all.length-1];
+    if(last) last.focus();
+  });
+}
+function onWeeklyActionKeydown(e){
+  const isEnter = e.key === 'Enter' || e.keyCode === 13 || e.which === 13;
+  if(!isEnter || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  const inputs = [...document.querySelectorAll('.focus-hero .today-idea-input')];
+  const i = inputs.indexOf(e.target);
+  if(i > -1 && i < inputs.length - 1){
+    const next = inputs[i+1];
+    next.focus();
+    try{ next.setSelectionRange(next.value.length, next.value.length); }catch(err){}
+    return;
+  }
+  addWeeklyActionSlot();
+}
 function deleteWeeklyAction(id){
   data.topicWeeklyActions = topicWeeklyActions().filter(a=>a.id!==id);
   saveData();
@@ -5246,17 +5299,30 @@ function focusItems(kind, id){
   return [];
 }
 const FOCUS_SECTIONS = [
-  {kind:'task',    title:'משימות',            add:'משימה חדשה בנושא הזה...'},
-  {kind:'anchor',  title:'עוגנים',            add:'עוגן קבוע בנושא הזה...'},
+  {kind:'task',    title:'משימות',            add:''},
+  {kind:'anchor',  title:'עוגנים',            add:''},
   {kind:'dream',   title:'רעיונות וחלומות',   add:'רעיון או חלום בנושא הזה...'},
   {kind:'someday', title:'משימות ללא מועד',   add:'משהו שאין לו עדיין מועד...'},
   {kind:'dilemma', title:'התלבטויות',         add:'משהו שאני מתלבט/ת לגביו...'},
   {kind:'note',    title:'פתקים',             add:'פתק חדש בנושא הזה...'},
 ];
 
-/* ---------- adding: type, Enter, and the field is ready for the next one ---------- */
+/* A task and an anchor are made the way they are made everywhere else: the window that asks for a
+   day and an hour, already carrying this topic. There is nothing to type here first, and so nothing
+   for Enter to do -- the two of them are the only things on this page that need more than a line. */
+function focusAddScheduled(kind){
+  if(kind === 'task') finishConvert('task', '', focusDomainId, {dateStr: ymd(new Date())});
+  else                finishConvert('anchor', '', focusDomainId, {dayIdx: new Date().getDay()});
+}
+/* ---------- adding: type, Enter, and the field is ready for the next one ----------
+   The phone was the problem. Hebrew keyboards on Android go through an input method, and while it
+   is composing, keydown reports no key at all (keyCode 229, key "Unidentified") -- so "Enter" was
+   simply never seen, and the add worked on a computer and sometimes not on the phone. The field is
+   a form now: the keyboard's own go key submits it, which no input method can swallow. The keydown
+   is still here for the plain case, and both land in the same place. */
 function onFocusAddKeydown(e, kind){
-  if(e.key !== 'Enter' || e.shiftKey) return;
+  const isEnter = e.key === 'Enter' || e.keyCode === 13 || e.which === 13;
+  if(!isEnter || e.shiftKey || e.isComposing) return;
   e.preventDefault();
   focusAdd(kind);
 }
@@ -5308,31 +5374,13 @@ function focusAdd(kind){
 }
 
 /* ---------- one line per thing ---------- */
+/* A task and an anchor are drawn HERE by the very functions that draw them on the boards, not by
+   a second, similar-looking version of them. One shape, one set of controls, one place to change
+   it -- and everything a row can do on the board it can do here, because it is the same row. */
 function focusRowHtml(kind, it){
+  if(kind==='task')   return `<ul class="tasks focus-board-list">${taskRowHtml(it)}</ul>`;
+  if(kind==='anchor') return `<ul class="tasks focus-board-list">${anchorRowHtml(it)}</ul>`;
   const move = moveToBtnHtml(FOCUS_MOVE_KIND[kind] || 'task', it.id);
-  if(kind==='task'){
-    const energy = it.energy || '';
-    return `<div class="focus-row ${it.done?'is-done':''}">
-      <div class="chk ${it.done?'done':''}" onclick="toggleTask('${it.id}')"></div>
-      <span class="focus-row-text" onclick="openTimelineSheet('task','${it.id}')" title="לחיצה לעריכה">${escapeHtml(it.text)}</span>
-      ${taskNeedsAWhen(it)
-        ? `<button type="button" class="subtask-toggle-btn needs-when-btn" onclick="openTimelineSheet('task','${it.id}')">קבע מועד</button>`
-        : `<span class="task-date-badge">${focusWhen(it.date, it.time)}</span>`}
-      <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}"
-        onclick="cycleEnergy('${it.id}')" title="רמת אנרגיה"></div>
-      ${move}
-      <span class="del-task" onclick="deleteTask('${it.id}')" title="מחיקה">✕</span>
-    </div>`;
-  }
-  if(kind==='anchor'){
-    const repeat = {once:'חד-פעמי', daily:'כל יום', weekly:DAY_LETTERS[it.day], monthly:'כל חודש', yearly:'כל שנה'}[it.repeatType||'weekly'] || DAY_LETTERS[it.day];
-    return `<div class="focus-row">
-      <span class="task-date-badge">${escapeHtml(repeat)}${it.time?' · '+it.time:''}</span>
-      <span class="focus-row-text" onclick="openTimelineSheet('anchor','${it.id}')" title="לחיצה לעריכה">${escapeHtml(it.label||'')}</span>
-      ${move}
-      <span class="del-task" onclick="deleteAnchor('${it.id}')" title="מחיקה">✕</span>
-    </div>`;
-  }
   if(kind==='dream' || kind==='someday'){
     const subs = (it.subtasks||[]).length;
     return `<div class="focus-row">
@@ -5389,6 +5437,12 @@ function deleteFocusNote(noteId){
 }
 
 /* ---------- the page ---------- */
+function pruneEmptyWeeklyActions(){
+  const focused = document.activeElement;
+  const keepId = (focused && focused.closest && focused.closest('.focus-hero'))
+    ? (focused.getAttribute('data-field-key')||'').replace('weeklyAction-','') : '';
+  data.topicWeeklyActions = topicWeeklyActions().filter(a=>(a.text||'').trim() || a.id === keepId);
+}
 function renderTopicFocus(){
   const el = document.getElementById('topicFocusBody');
   if(!el) return;
@@ -5410,18 +5464,14 @@ function renderTopicFocus(){
           <div class="today-idea-row">
             <input type="checkbox" class="today-idea-check" ${a.done?'checked':''}
               onchange="toggleWeeklyActionDone('${a.id}')" title="בוצע">
-            <input type="text" class="today-idea-input ${a.done?'done':''}" dir="rtl"
+            <input type="text" class="today-idea-input ${a.done?'done':''}" dir="rtl" enterkeyhint="next"
               data-field-key="weeklyAction-${a.id}" value="${escapeAttr(a.text||'')}"
-              placeholder="משהו שאפשר לעשות השבוע..."
-              oninput="onWeeklyActionInput('${a.id}', this)">
+              placeholder="" oninput="onWeeklyActionInput('${a.id}', this)"
+              onkeydown="onWeeklyActionKeydown(event)">
             ${(a.text||'').trim() ? moveToBtnHtml('weeklyAction', a.id) : ''}
             <span class="today-idea-del" onclick="deleteWeeklyAction('${a.id}')" title="מחיקה">✕</span>
           </div>`).join('')}
-        <div class="focus-add focus-hero-add">
-          <input type="text" id="focusAdd-weekly" dir="rtl" placeholder="${weekly.length?'ועוד משהו...':'משהו שאפשר לעשות השבוע...'}"
-            onkeydown="onFocusAddKeydown(event,'weekly')">
-          <button type="button" onclick="focusAdd('weekly')">+</button>
-        </div>
+        <button type="button" class="feel-chip feel-chip-add focus-hero-add" onclick="addWeeklyActionSlot()">+ הוספה</button>
       </div>`;
     const sections = FOCUS_SECTIONS.map(sec=>{
       const items = focusItems(sec.kind, d.id);
@@ -5433,11 +5483,14 @@ function renderTopicFocus(){
         <div class="focus-sec-body">
           ${items.length ? items.map(it=>focusRowHtml(sec.kind, it)).join('') : '<div class="focus-empty">אין כאן כלום עדיין</div>'}
         </div>
-        <div class="focus-add">
-          <input type="text" id="focusAdd-${sec.kind}" dir="rtl" placeholder="${escapeAttr(sec.add)}"
-            onkeydown="onFocusAddKeydown(event,'${sec.kind}')">
-          <button type="button" onclick="focusAdd('${sec.kind}')">+</button>
-        </div>
+        ${(sec.kind==='task' || sec.kind==='anchor')
+          ? `<div class="focus-add"><button type="button" class="add-anchor-btn focus-add-btn"
+               onclick="focusAddScheduled('${sec.kind}')">+ הוסף</button></div>`
+          : `<form class="focus-add" onsubmit="focusAdd('${sec.kind}'); return false;">
+              <input type="text" id="focusAdd-${sec.kind}" dir="rtl" enterkeyhint="done"
+                placeholder="${escapeAttr(sec.add)}" onkeydown="onFocusAddKeydown(event,'${sec.kind}')">
+              <button type="submit">+</button>
+            </form>`}
       </section>`;
     }).join('');
     el.innerHTML = hero + sections;
@@ -9260,15 +9313,15 @@ function taskRowHtml(t){
       <div class="chk ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
       <span class="task-text ${t.done?'done':''} ${(!t.done && energy==='low')?'task-text-energizing':''}" onclick="openTimelineSheet('task','${t.id}')" title="לחיצה לעריכה">${escapeHtml(t.text)}</span>
       <select class="tag ${dom?'':'tag-empty'} ${t.done?'tag-dimmed':''}" style="${dom?`background:${dom.color}; color:${contrastTextColor(dom.color)};`:''}" onclick="event.stopPropagation()" onchange="quickChangeTaskDomain('${t.id}', this.value)" title="שינוי נושא">${domainOptionsWithEmpty(t.domain)}</select>
-      <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
-      ${moveToBtnHtml('task', t.id)}
+      <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
     <div class="task-row-meta">
-      <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
+      <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
+      ${moveToBtnHtml('task', t.id)}
       ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
       ${taskNeedsAWhen(t) ? `<button type="button" class="subtask-toggle-btn needs-when-btn" onclick="openTimelineSheet('task','${t.id}')">קבע מועד</button>`
         : (isOverdue ? `<button type="button" class="subtask-toggle-btn" onclick="openTimelineSheet('task','${t.id}')">שנה מועד</button>` : '')}
-      <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
+      <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
     </div>
     ${bodyCheckStatusBadgesHtml(t, {urgencyOptions:['objective','other','relief'], showEnergy:true})}
   </li>`;
@@ -10369,23 +10422,47 @@ function commitSheetFieldsToRecord(){
 
    The ✕ and the "סגירה" button are deliberate, so they just save and go. */
 let leaveAskAction = null;
+let leaveAskArmed = false;
+/* Three things were wrong with this on a phone, and none of them show up on a computer:
+
+   The keyboard. The field you were typing in still had focus, so the keyboard was up, the box was
+   centred in a viewport that no longer existed, and its buttons sat behind the keys. You tapped
+   where you saw them and nothing happened. The field is blurred first now, and the box sits near
+   the top rather than in the middle of a height that is only theoretical.
+
+   The same tap twice. A touch becomes a click a moment later, at the same point. Open a box under
+   that point and the tail of the tap that opened it presses a button in it. The box takes no
+   presses at all for a moment after it appears -- long enough for the tap that opened it to be
+   over, short enough that you would never wait for it.
+
+   And being asked about nothing: a sheet you opened and left without typing a word had nothing to
+   lose, and asking about it made the dialog feel like something that appears at random. */
 function askBeforeLeaving(kindLabel, onSave){
   leaveAskAction = onSave;
+  try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
   const title = document.getElementById('leaveAskTitle');
   if(title) title.textContent = kindLabel;
-  document.getElementById('leaveAskOverlay').style.display = '';
+  const el = document.getElementById('leaveAskOverlay');
+  leaveAskArmed = false;
+  el.classList.remove('armed');
+  el.style.display = '';
+  setTimeout(()=>{ leaveAskArmed = true; el.classList.add('armed'); }, 320);
 }
 function closeLeaveAsk(){
   leaveAskAction = null;
+  leaveAskArmed = false;
   const el = document.getElementById('leaveAskOverlay');
-  if(el) el.style.display = 'none';
+  if(el){ el.style.display = 'none'; el.classList.remove('armed'); }
 }
 function confirmLeaveSheet(){
+  if(!leaveAskArmed) return;
   const fn = leaveAskAction;
   closeLeaveAsk();
   if(fn) fn();
 }
-function cancelLeaveSheet(){ closeLeaveAsk(); }   // stay exactly where you were
+function cancelLeaveSheet(){ if(leaveAskArmed) closeLeaveAsk(); }   // stay exactly where you were
+// tapping beside the box means the same as "בטל": you did not mean to leave
+function leaveAskBackdrop(ev){ if(ev.target && ev.target.id === 'leaveAskOverlay') cancelLeaveSheet(); }
 
 /* the ✕, the swipe and "סגירה": keep what is there, then close */
 function dismissTimelineSheet(){
@@ -10395,6 +10472,9 @@ function dismissTimelineSheet(){
 }
 /* the background: ask first */
 function backgroundLeaveTimelineSheet(){
+  // nothing written on a brand-new one is nothing to lose, and nothing to ask about
+  const titleEl = document.getElementById('timelineSheetTitleInput');
+  if(timelineSheetIsNew && titleEl && !titleEl.value.trim()){ closeTimelineSheet(); return; }
   askBeforeLeaving('לשמור את המשימה?', dismissTimelineSheet);
 }
 function backgroundLeaveCapture(){
@@ -11073,9 +11153,9 @@ function anchorRowHtml(a){
   const dom = domainById(a.domain);
   const repeatLabel = {once:'חד-פעמי', daily:'מדי יום', weekly:'מדי שבוע', monthly:'מדי חודש', yearly:'מדי שנה'}[a.repeatType||'weekly'] || 'מדי שבוע';
   const dayLabel = (a.repeatType||'weekly')==='weekly' ? DAYS[a.day] : repeatLabel;
-  return `<li class="task-li ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" onclick="openTimelineSheet('anchor','${a.id}')">
-    <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>
+  return `<li class="task-li anchor-li ${a.draft?'chip-draft':''}" data-drag-id="${a.id}" onclick="openTimelineSheet('anchor','${a.id}')">
     <span class="task-text" style="flex:1">${escapeHtml(a.label)}${a.draft?' <span class="draft-badge">🌱 טיוטה</span>':''}</span>
+    <span class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};">${escapeHtml(dom.name)}</span>
     <span class="task-date-badge">${dayLabel}${a.time?' · '+a.time:''}</span>
   </li>`;
 }
