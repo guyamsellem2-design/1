@@ -3380,10 +3380,6 @@
      for a detail you may not even want -- look exactly as much like the action as "הוסף" does */
 
   .plan-head-actions{ display:flex; gap:8px; align-self:flex-end; }
-  /* in the רעיונות וחלומות lens the body-check has nothing to weigh: a dream is not somebody
-     asking you for something. the field stays on the record, only the prompt goes away. */
-  #planView.lens-dreams .dreams-hidden{ display:none; }
-
   /* nothing on screen but the list and what you can do with it */
   #planView.select-mode #planHost .add-row,
   #planView.select-mode #planHost .section-divider,
@@ -3655,6 +3651,10 @@
     font-size:11.5px; font-weight:700; color:var(--tint);
     border:1.2px solid var(--tint); border-radius:999px; padding:1px 8px; min-width:22px; text-align:center;
   }
+  .focus-mode-switch{ display:flex; gap:6px; margin-bottom:8px; }
+  .focus-mode-switch .timer-preset-btn{ flex:1; font-size:12.5px; padding:5px 8px; min-height:0; }
+  .focus-simple-row{ margin-bottom:6px; }
+  .focus-simple-row .move-to-btn{ font-size:11px; padding:2px 6px; min-height:0; flex-shrink:0; }
   .focus-sec-body{ display:flex; flex-direction:column; gap:2px; }
   .focus-empty{ font-size:13px; color:var(--muted2); padding:4px 2px 6px; }
 
@@ -4360,7 +4360,7 @@
           <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
           <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
         </div>
-        <div id="pendingBodyCheck-someday" class="dreams-hidden"></div>
+        <div id="pendingBodyCheck-someday"></div>
         <div id="pendingSomedayDescWrap"></div>
         <div id="pendingSomedaySubtasksWrap"></div>
         <button onclick="addSomeday()">הוסף</button>
@@ -5244,7 +5244,7 @@ function renderTopicActions(){
    ============================================================================ */
 let focusDomainId = null;
 function openTopicFocus(id){
-  if(focusDomainId && focusDomainId !== id){ pruneEmptyWeeklyActions(); saveData(); }
+  if(focusDomainId && focusDomainId !== id){ pruneEmptyWeeklyActions(); pruneEmptySomeday(); saveData(); }
   focusDomainId = id;
   activeNoteDomain = id;          // so the notes here and the notebook stay the same place
   switchMainView('focus');
@@ -5313,17 +5313,17 @@ function deleteWeeklyAction(id){
 function focusItems(kind, id){
   if(kind==='task')    return data.tasks.filter(t=>t.domain===id);
   if(kind==='anchor')  return (data.anchors||[]).filter(a=>a.domain===id);
-  if(kind==='dream')   return (data.someday||[]).filter(x=>x.domain===id && !!x.dream);
-  if(kind==='someday') return (data.someday||[]).filter(x=>x.domain===id && !x.dream);
+  if(kind==='someday') return (data.someday||[]).filter(x=>x.domain===id);
   if(kind==='dilemma') return (data.generalDilemmas||[]).filter(x=>x.domain===id);
   if(kind==='note')    return ensureDomainNotes(id);
   return [];
 }
+/* What comes first is what you can still choose. The week's question, then everything that has no
+   hour attached to it yet, and only then the things that are already placed. */
 const FOCUS_SECTIONS = [
+  {kind:'someday', title:'רעיונות ומשימות ללא מועד', add:'רעיון או משהו שאין לו עדיין מועד...'},
   {kind:'task',    title:'משימות',            add:''},
   {kind:'anchor',  title:'עוגנים',            add:''},
-  {kind:'dream',   title:'רעיונות וחלומות',   add:'רעיון או חלום בנושא הזה...'},
-  {kind:'someday', title:'משימות ללא מועד',   add:'משהו שאין לו עדיין מועד...'},
   {kind:'dilemma', title:'התלבטויות',         add:'משהו שאני מתלבט/ת לגביו...'},
   {kind:'note',    title:'פתקים',             add:'פתק חדש בנושא הזה...'},
 ];
@@ -5384,8 +5384,8 @@ function focusAdd(kind){
     openTimelineSheet('anchor', a.id, true);
     return;
   }
-  if(kind==='dream' || kind==='someday'){
-    data.someday.push({id:uid(), dream: kind==='dream', text, domain:id, description:'',
+  if(kind==='someday'){
+    data.someday.push({id:uid(), dream:false, text, domain:id, description:'',
       subtasks:[], bodyCheck:{}, createdAt:Date.now()});
   } else if(kind==='dilemma'){
     (data.generalDilemmas || (data.generalDilemmas = [])).push({id:uid(), text, domain:id,
@@ -5404,6 +5404,87 @@ function focusAdd(kind){
   });
 }
 
+/* ---------- two ways of writing the same list ----------
+   Advanced is what the rest of the app does: a row you tap, a window with every field in it. It is
+   the right shape for something you are actually working out.
+
+   Simple is what "מה אעשה היום" does: a box you type in, Enter for the next one, and that is the
+   whole of it. It is the right shape for emptying your head -- and on this page it costs nothing,
+   because the topic is already decided by the page you are standing on. Nothing is lost by writing
+   simply: the same item opens in the full window the moment you switch back. */
+let focusSomedayMode = 'advanced';
+function setFocusSomedayMode(mode){
+  focusSomedayMode = mode;
+  persistUiState();
+  renderTopicFocus();
+}
+function focusSimpleRowHtml(it){
+  return `<div class="today-idea-row focus-simple-row">
+    <input type="checkbox" class="today-idea-check" ${it.done?'checked':''}
+      onchange="toggleFocusSomedayDone('${it.id}')" title="בוצע">
+    <input type="text" class="today-idea-input ${it.done?'done':''}" dir="rtl" enterkeyhint="next"
+      data-focus-simple="${it.id}" data-field-key="focusSimple-${it.id}"
+      value="${escapeAttr(it.text||'')}" placeholder=""
+      oninput="onFocusSimpleInput('${it.id}', this)" onkeydown="onFocusSimpleKeydown(event)">
+    ${(it.text||'').trim() ? moveToBtnHtml('someday', it.id) : ''}
+    <span class="today-idea-del" onclick="deleteFocusSomeday('${it.id}')" title="מחיקה">✕</span>
+  </div>`;
+}
+function onFocusSimpleInput(id, el){
+  const it = (data.someday||[]).find(x=>x.id===id);
+  if(it){ it.text = el.value; saveData(); }
+  const row = el.closest('.today-idea-row');
+  const btn = row.querySelector('.move-to-btn');
+  if(el.value.trim() && !btn){
+    const holder = document.createElement('div');
+    holder.innerHTML = moveToBtnHtml('someday', id);
+    row.insertBefore(holder.firstElementChild, row.querySelector('.today-idea-del'));
+  } else if(!el.value.trim() && btn) btn.remove();
+}
+function onFocusSimpleKeydown(e){
+  const isEnter = e.key === 'Enter' || e.keyCode === 13 || e.which === 13;
+  if(!isEnter || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  const inputs = [...document.querySelectorAll('#topicFocusBody [data-focus-simple]')];
+  const i = inputs.indexOf(e.target);
+  if(i > -1 && i < inputs.length - 1){
+    const next = inputs[i+1];
+    next.focus();
+    try{ next.setSelectionRange(next.value.length, next.value.length); }catch(err){}
+    return;
+  }
+  addFocusSomedaySlot();
+}
+function addFocusSomedaySlot(){
+  data.someday.push({id:uid(), dream:false, text:'', domain:focusDomainId, description:'',
+    subtasks:[], bodyCheck:{}, createdAt:Date.now()});
+  saveData();
+  renderTopicFocus();
+  requestAnimationFrame(()=>{
+    const all = document.querySelectorAll('#topicFocusBody [data-focus-simple]');
+    const last = all[all.length-1];
+    if(last) last.focus();
+  });
+}
+function toggleFocusSomedayDone(id){
+  const it = (data.someday||[]).find(x=>x.id===id);
+  if(!it) return;
+  it.done = !it.done;
+  saveData();
+  renderTopicFocus();
+}
+function deleteFocusSomeday(id){
+  data.someday = (data.someday||[]).filter(x=>x.id!==id);
+  saveData();
+  renderTopicFocus();
+}
+/* An empty box is a waiting box, not a thought: it goes when you leave the topic. */
+function pruneEmptySomeday(){
+  const focused = document.activeElement;
+  const keepId = (focused && focused.getAttribute) ? (focused.getAttribute('data-focus-simple') || '') : '';
+  data.someday = (data.someday||[]).filter(x=>(x.text||'').trim() || x.id === keepId);
+}
+
 /* ---------- one line per thing ---------- */
 /* A task and an anchor are drawn HERE by the very functions that draw them on the boards, not by
    a second, similar-looking version of them. One shape, one set of controls, one place to change
@@ -5412,7 +5493,8 @@ function focusRowHtml(kind, it){
   if(kind==='task')   return `<ul class="tasks focus-board-list">${taskRowHtml(it)}</ul>`;
   if(kind==='anchor') return `<ul class="tasks focus-board-list">${anchorRowHtml(it)}</ul>`;
   const move = moveToBtnHtml(FOCUS_MOVE_KIND[kind] || 'task', it.id);
-  if(kind==='dream' || kind==='someday'){
+  if(kind==='someday'){
+    if(focusSomedayMode === 'simple') return focusSimpleRowHtml(it);
     const subs = (it.subtasks||[]).length;
     return `<div class="focus-row">
       <span class="fav-star ${it.favorite?'active':''}" onclick="toggleSomedayFavorite('${it.id}')" title="${it.favorite?'הסרה מהנבחרים':'סימון כנבחר'}">${it.favorite?'★':'☆'}</span>
@@ -5444,7 +5526,7 @@ function focusRowHtml(kind, it){
     <span class="del-task" onclick="deleteFocusNote('${it.id}')" title="מחיקה">✕</span>
   </div>`;
 }
-const FOCUS_MOVE_KIND = {task:'task', anchor:'anchor', dream:'someday', someday:'someday', dilemma:'dilemma'};
+const FOCUS_MOVE_KIND = {task:'task', anchor:'anchor', someday:'someday', dilemma:'dilemma'};
 function focusWhen(date, time){
   if(!date) return time || '';
   const d = new Date(date+'T00:00:00');
@@ -5506,17 +5588,27 @@ function renderTopicFocus(){
       </div>`;
     const sections = FOCUS_SECTIONS.map(sec=>{
       const items = focusItems(sec.kind, d.id);
+      const modeSwitch = sec.kind === 'someday' ? `
+        <div class="focus-mode-switch">
+          <button type="button" class="timer-preset-btn ${focusSomedayMode==='simple'?'active':''}"
+            onclick="setFocusSomedayMode('simple')">כתיבה פשוטה</button>
+          <button type="button" class="timer-preset-btn ${focusSomedayMode==='advanced'?'active':''}"
+            onclick="setFocusSomedayMode('advanced')">עריכה מתקדמת</button>
+        </div>` : '';
       return `<section class="focus-sec" style="--tint:${d.color}">
         <div class="focus-sec-head">
           <span class="focus-sec-title">${sec.title}</span>
           <span class="focus-sec-count">${items.length}</span>
         </div>
+        ${modeSwitch}
         <div class="focus-sec-body">
           ${items.length ? items.map(it=>focusRowHtml(sec.kind, it)).join('') : '<div class="focus-empty">אין כאן כלום עדיין</div>'}
         </div>
         ${(sec.kind==='task' || sec.kind==='anchor')
           ? `<div class="focus-add"><button type="button" class="add-anchor-btn focus-add-btn"
                onclick="focusAddScheduled('${sec.kind}')">+ הוסף</button></div>`
+          : (sec.kind==='someday' && focusSomedayMode==='simple')
+          ? `<button type="button" class="feel-chip feel-chip-add focus-hero-add" onclick="addFocusSomedaySlot()">+ הוספה</button>`
           : `<form class="focus-add" onsubmit="return focusAddFromSubmit(event,'${sec.kind}')">
               <input type="text" id="focusAdd-${sec.kind}" dir="rtl" enterkeyhint="done"
                 placeholder="${escapeAttr(sec.add)}" onkeydown="onFocusAddKeydown(event,'${sec.kind}')">
@@ -5610,10 +5702,7 @@ function renderFocusSheet(){
     const it = (data.someday||[]).find(x=>x.id===id);
     if(!it){ closeFocusSheet(); return; }
     head.textContent = it.dream ? 'רעיון או חלום' : 'משימה ללא מועד';
-    const wasKind = activePlanKind;
-    activePlanKind = it.dream ? 'dreams' : 'someday';
-    try{ body.innerHTML = `<ul class="tasks focus-sheet-list">${somedayEditFormHtml(it)}</ul>`; }
-    finally{ activePlanKind = wasKind; }
+    body.innerHTML = `<ul class="tasks focus-sheet-list">${somedayEditFormHtml(it)}</ul>`;
     return;
   }
   if(kind==='dilemma'){
@@ -5687,8 +5776,7 @@ function renderPlanStrip(){
   const el = document.getElementById('planTabStrip');
   if(!el) return;
   const countOf = key =>
-      key==='dreams'       ? (data.someday||[]).filter(x=>x.dream).length
-    : key==='somedayTasks' ? (data.someday||[]).filter(x=>!x.dream).length
+      key==='someday'      ? (data.someday||[]).length
     : key==='suggestions'  ? (data.suggestions||[]).length
     : (data.generalDilemmas||[]).length;
   el.innerHTML = PLAN_KINDS.map(k => {
@@ -6090,7 +6178,7 @@ function restoreViewState(){
     }
   }
   if(typeof v.timelineDay === 'number' && v.timelineDay >= 0 && v.timelineDay <= 6) timelineExpandedDay = v.timelineDay;
-  if(PLAN_KINDS.some(k=>k.key===v.planKind)) activePlanKind = v.planKind;
+  if(PLAN_KINDS.some(k=>k.key===normalizePlanKind(v.planKind))) activePlanKind = normalizePlanKind(v.planKind);
   // a topic can have been deleted since; falling back to the first one beats landing on nothing
   if(v.noteContainer && containerById(v.noteContainer)){
     activeNoteDomain = v.noteContainer;
@@ -6149,8 +6237,7 @@ let fabMenuOpen = false;
 const FAB_KINDS = [
   {kind:'task',         label:'+ ליומן'},
   {kind:'habit',        label:'+ הרגל'},
-  {kind:'dream',        label:'+ רעיון'},
-  {kind:'somedayTask',  label:'+ משימה ללא מועד'},
+  {kind:'someday',      label:'+ רעיון / ללא מועד'},
   {kind:'suggestion',   label:'+ הצעה/בקשה'},
   {kind:'dilemma',      label:'+ התלבטות'},
   {kind:'note',         label:'+ פתק'},
@@ -6275,7 +6362,7 @@ function removeMoveSource(src){
   if(def) def.after();
 }
 const MOVE_DEST_LABEL = {
-  task:'היומן', habit:'הרגלים', dream:'רעיונות וחלומות', somedayTask:'משימות ללא מועד',
+  task:'היומן', habit:'הרגלים', someday:'רעיונות ומשימות ללא מועד', dream:'רעיונות ומשימות ללא מועד', somedayTask:'רעיונות ומשימות ללא מועד',
   suggestion:'הצעות ובקשות', dilemma:'התלבטויות', note:'המחברת',
 };
 function moveItemTo(destKind){
@@ -6302,7 +6389,7 @@ function moveItemTo(destKind){
     data.habits.push({id:uid(), text:p.text, description:p.description, smallStarts:[],
       contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
     renderHabits();
-  } else if(destKind==='dream' || destKind==='somedayTask'){
+  } else if(destKind==='someday' || destKind==='dream' || destKind==='somedayTask'){
     data.someday.push({id:uid(), dream: destKind==='dream', text:p.text,
       domain: validDomain || (data.domains[0]&&data.domains[0].id) || '',
       description:p.description, subtasks:p.subtasks, favorite:p.favorite,
@@ -6466,6 +6553,7 @@ function persistUiState(){
     listExpandState: {...listExpandState},
     noteSizeLevel: [...noteSizeLevel.entries()],
     openTopicActionRows: [...openTopicActionRows],
+    focusSomedayMode,
   };
   saveData();
 }
@@ -6484,6 +6572,7 @@ function restoreUiState(){
     if(typeof v === 'number') noteSizeLevel.set(k, v);
   });
   if(Array.isArray(u.openTopicActionRows)) u.openTopicActionRows.forEach(k=>openTopicActionRows.add(k));
+  if(u.focusSomedayMode === 'simple' || u.focusSomedayMode === 'advanced') focusSomedayMode = u.focusSomedayMode;
 }
 const expandedMemoNoteIds = new Set();
 let openMemoId = null;
@@ -6557,13 +6646,18 @@ let noteWorld = 'domain'; // 'domain' | 'notebook'
 const PLAN_KINDS = [
   // the other three say what they are in their own name; only this list needs something said
   // about it, and it is the whole reason the list exists
-  {key:'dreams',      label:'רעיונות וחלומות', block:'someday',     hint:''},
-  {key:'somedayTasks',label:'משימות ללא מועד', block:'someday',     hint:''},
+  /* These were two lists for a long time, on the theory that "לתקן את האופניים" and "לנסוע ליפן"
+     are not the same kind of thing. True, and it did not matter: two lists meant two places to
+     remember, each half as full, and neither of them visited. One list you actually open beats two
+     that are tidier than they are used. */
+  {key:'someday',     label:'רעיונות ומשימות ללא מועד', block:'someday', hint:''},
   {key:'suggestions', label:'הצעות ובקשות',    block:'suggestions', sub:'others',
    hint:'הצעות ובקשות הן לרוב העדפה של מישהו אחר, לא צורך ולא הכרח. מותר להתחשב גם בעצמי, מותר לומר גם לא, ומותר לשאול — מה אני מעדיף שיקרה?'},
   {key:'dilemmas',    label:'התלבטויות',       block:'suggestions', hint:'', sub:'general'},
 ];
-let activePlanKind = 'dreams';
+let activePlanKind = 'someday';
+// the two old lenses both land on the one that replaced them
+function normalizePlanKind(key){ return (key==='dreams' || key==='somedayTasks') ? 'someday' : key; }
 function planBlockOf(key){ const k = PLAN_KINDS.find(x=>x.key===key); return k ? k.block : 'someday'; }
 let planBlocksMoved = false;
 function movePlanBlocksIntoPlanView(){
@@ -6583,6 +6677,7 @@ function movePlanBlocksIntoPlanView(){
   planBlocksMoved = true;
 }
 function setPlanKind(key){
+  key = normalizePlanKind(key);
   // a selection belongs to the list it was made in -- carrying it across would mean deleting rows
   // you can no longer see
   if(key !== activePlanKind){ planSelected.clear(); planMoveMenuOpen = false; planTopicMenuOpen = false; }
@@ -6606,7 +6701,6 @@ function setPlanKind(key){
   if(hint){ hint.textContent = kind.hint; hint.style.display = kind.hint ? '' : 'none'; }
   const view = document.getElementById('planView');
   if(view){
-    view.classList.toggle('lens-dreams', key === 'dreams');
     view.classList.toggle('select-mode', planSelectMode);
   }
   renderPlanPanes();
@@ -6632,8 +6726,7 @@ let planTopicMenuOpen = false;
 function planLensHasTopics(kind){ return kind !== 'suggestions'; }
 
 function planItemsOf(kind){
-  if(kind==='dreams')       return (data.someday||[]).filter(x=>!!x.dream);
-  if(kind==='somedayTasks') return (data.someday||[]).filter(x=>!x.dream);
+  if(kind==='someday' || kind==='dreams' || kind==='somedayTasks') return data.someday || (data.someday = []);
   if(kind==='suggestions')  return data.suggestions || (data.suggestions = []);
   return data.generalDilemmas || (data.generalDilemmas = []);
 }
@@ -6733,7 +6826,7 @@ function planSetTopicForPicked(domainId){
 }
 function planRemoveIds(kind, ids){
   const set = new Set(ids);
-  if(kind==='dreams' || kind==='somedayTasks') data.someday = (data.someday||[]).filter(x=>!set.has(x.id));
+  if(kind==='someday' || kind==='dreams' || kind==='somedayTasks') data.someday = (data.someday||[]).filter(x=>!set.has(x.id));
   else if(kind==='suggestions') data.suggestions = (data.suggestions||[]).filter(x=>!set.has(x.id));
   else data.generalDilemmas = (data.generalDilemmas||[]).filter(x=>!set.has(x.id));
 }
@@ -6741,7 +6834,7 @@ function planRemoveIds(kind, ids){
    or corrected, so nothing is quietly thrown away on the way across */
 function planAdaptItem(item, toKind){
   const it = {...item};
-  if(toKind==='dreams' || toKind==='somedayTasks'){
+  if(toKind==='someday' || toKind==='dreams' || toKind==='somedayTasks'){
     it.dream = (toKind==='dreams');
     // somedayRowHtml paints a colour from this, so it has to name a topic that still exists
     if(!data.domains.some(d=>d.id===it.domain)) it.domain = (data.domains[0] && data.domains[0].id) || '';
@@ -6771,7 +6864,7 @@ function planMovePicked(toKind){
   const picked = planItemsOf(from).filter(x=>planSelected.has(x.id));
   planRemoveIds(from, ids);
   const moved = picked.map(it=>planAdaptItem(it, toKind));
-  if(toKind==='dreams' || toKind==='somedayTasks') data.someday = (data.someday||[]).concat(moved);
+  if(toKind==='someday' || toKind==='dreams' || toKind==='somedayTasks') data.someday = (data.someday||[]).concat(moved);
   else if(toKind==='suggestions') data.suggestions = (data.suggestions||[]).concat(moved);
   else data.generalDilemmas = (data.generalDilemmas||[]).concat(moved);
   planSelected.clear();
@@ -11476,9 +11569,8 @@ function renderSomedayFilterSelect(){
 function renderSomeday(){
   const el = document.getElementById('somedayList');
   renderSomedayFilterSelect();
-  // רעיונות וחלומות and משימות ללא מועד are one list seen through two lenses
-  const wantDreams = activePlanKind === 'dreams';
-  let list = data.someday.filter(x => !!x.dream === wantDreams);
+  // one list now, not two lenses over one list
+  let list = (data.someday||[]).slice();
   if(somedayFilterDomain === '__important'){
     const important = importantTopicIds();
     list = list.filter(s=>important.indexOf(s.domain)!==-1);
@@ -11530,7 +11622,7 @@ function somedayRowHtml(s){
     <span class="task-text" style="flex:1" onclick="somedayTextClick('${s.id}')">${escapeHtml(s.text)}${hasContent?'<span class="has-detail-dot" title="יש כאן תיאור או צעדים"></span>':''}</span>
     <select class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};" onclick="event.stopPropagation()" onchange="quickChangeSomedayDomain('${s.id}', this.value)" title="שינוי נושא">${domainOptions(s.domain)}</select>
     <span class="del-task" onclick="deleteSomeday('${s.id}')" title="מחיקה">✕</span>
-    ${activePlanKind==='dreams' ? '' : bodyCheckStatusBadgesHtml(s, {})}
+    ${bodyCheckStatusBadgesHtml(s, {})}
   </li>`;
   if(isExpanded) html += somedayDetailHtml(s);
   return html;
@@ -11543,13 +11635,14 @@ function somedayEditFormHtml(s){
         <input type="text" id="somedayEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="הרעיון">
         <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
       </div>
-      ${activePlanKind==='dreams' ? '' : `<div class="edit-form-row">${bodyCheckToggleBtnHtml('someday', s.id)}</div>`}
-      ${activePlanKind!=='dreams' && bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {hideNote:true}) : ''}
+      <div class="edit-form-row">${bodyCheckToggleBtnHtml('someday', s.id)}</div>
+      ${bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {hideNote:true}) : ''}
       ${somedayDescSubtasksHtml(s)}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
         <button class="cancel-btn" onclick="closeSomedayEdit()">בטל</button>
         <button class="cancel-btn" onclick="convertSomedayToTask('${s.id}')">→ הוסף ליומן</button>
+        ${moveToBtnHtml('someday', s.id)}
       </div>
     </div>
   </li>`;
@@ -11784,7 +11877,7 @@ function addSomeday(){
   const domainSel = document.getElementById('somedayDomain');
   const domain = domainSel ? domainSel.value : data.domains[0].id;
   const bodyCheck = {...pendingBodyCheck.someday};
-  data.someday.push({id:uid(), dream: activePlanKind==='dreams', text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck});
+  data.someday.push({id:uid(), dream:false, text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck});
   input.value='';
   resetPendingBodyCheck('someday');
   resetPendingSomedayDesc();
@@ -14926,7 +15019,7 @@ function toggleInboxBlock(){ inboxBlockOpen = !inboxBlockOpen; renderInbox(); up
 // when set, committing this capture creates that kind directly instead of landing in the inbox
 let quickCaptureTarget = null;
 const CAPTURE_TITLES = {
-  habit:'הרגל חדש', dream:'רעיון או חלום', somedayTask:'משימה ללא מועד',
+  habit:'הרגל חדש', someday:'רעיון או משימה ללא מועד', dream:'רעיון או משימה ללא מועד', somedayTask:'רעיון או משימה ללא מועד',
   suggestion:'הצעה או בקשה', note:'פתק חדש', dilemma:'התלבטות',
   todayIdea:'משהו שבא לי היום'
 };
@@ -15331,11 +15424,11 @@ function finishConvert(destKind, text, domain, extra={}){
     data.habits.push({id:uid(), text, smallStarts:[], contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
     saveData(); renderHabits();
     flashStatus('נוסף להרגלים');
-  } else if(destKind==='dream' || destKind==='somedayTask'){
+  } else if(destKind==='someday' || destKind==='dream' || destKind==='somedayTask'){
     data.someday.push({id:uid(), dream: destKind==='dream', text, domain: domain||'', description:'',
       subtasks:[], draft:true, createdAt:Date.now()});
     saveData(); renderSomeday();
-    flashStatus(destKind==='dream' ? 'נוסף לרעיונות וחלומות' : 'נוסף למשימות ללא מועד');
+    flashStatus('נוסף לרעיונות ומשימות ללא מועד');
   } else if(destKind==='todayIdea'){
     data.todayIdeas.push({id:uid(), text, done:false, favorite:false});
     saveData(); renderTodayIdeas();
