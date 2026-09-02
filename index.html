@@ -3736,7 +3736,15 @@
   .task-row-main .task-text{ flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
   .task-row-main .tag{ flex:0 1 auto; min-width:0; max-width:40%; }
   .task-row-main .del-task{ flex-shrink:0; }
-  .task-row-meta{ flex-wrap:wrap; gap:7px; }
+  /* The energy dot leads the line rather than trailing it: it is the one thing here that is a
+     single small circle, so at the end it was the first thing pushed onto a line of its own and
+     read as a stray mark. Nothing else moves, and when the line does have to wrap it is the date
+     -- the last of them -- that goes over, which is the right one to lose from the first glance. */
+  .task-row-meta{ flex-wrap:wrap; gap:6px; padding-right:20px; }
+  .task-row-meta .energy-dot{ flex-shrink:0; }
+  .task-row-meta .task-date-badge{ font-size:11px; padding:2px 6px; }
+  /* trimmed just enough that the whole line still fits once the subtask button grows a count */
+  .task-row-meta .subtask-toggle-btn{ font-size:11.5px; padding:3px 7px; min-height:0; }
   /* a step's row now carries a button or two of its own, so it is allowed a second line */
   .subtask-row{ flex-wrap:wrap; }
   .subtask-row .move-to-btn, .subtask-row .subtask-toggle-btn{
@@ -5490,7 +5498,7 @@ function pruneEmptySomeday(){
    a second, similar-looking version of them. One shape, one set of controls, one place to change
    it -- and everything a row can do on the board it can do here, because it is the same row. */
 function focusRowHtml(kind, it){
-  if(kind==='task')   return `<ul class="tasks focus-board-list">${taskRowHtml(it)}</ul>`;
+  if(kind==='task')   return `<ul class="tasks focus-board-list">${taskRowHtml(it, {hideChangeDate:true})}</ul>`;
   if(kind==='anchor') return `<ul class="tasks focus-board-list">${anchorRowHtml(it)}</ul>`;
   const move = moveToBtnHtml(FOCUS_MOVE_KIND[kind] || 'task', it.id);
   if(kind==='someday'){
@@ -9562,7 +9570,11 @@ function renderTasks(){
   el.innerHTML = html;
   applyListCap('task', regular.length);
 }
-function taskRowHtml(t){
+/* opts.hideChangeDate: on the topic page the row already opens the full window on a tap, so a
+   button that opens the same window is a second door to one room. "קבע מועד" stays -- that one is
+   not a shortcut, it is the row saying it has no day and no hour yet. */
+function taskRowHtml(t, opts){
+  opts = opts || {};
   const dom = t.domain ? domainById(t.domain) : null;
   const energy = t.energy||'';
   const subCount = (t.subtasks||[]).length;
@@ -9582,12 +9594,12 @@ function taskRowHtml(t){
       <span class="del-task" onclick="deleteTask('${t.id}')" title="מחיקת משימה">✕</span>
     </div>
     <div class="task-row-meta">
+      <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
       <button type="button" class="subtask-toggle-btn ${hasIncompleteSubtasks?'has-content':''}" onclick="toggleTaskExpand('${t.id}')">${subBtnLabel}</button>
       ${moveToBtnHtml('task', t.id)}
-      ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
       ${taskNeedsAWhen(t) ? `<button type="button" class="subtask-toggle-btn needs-when-btn" onclick="openTimelineSheet('task','${t.id}')">קבע מועד</button>`
-        : (isOverdue ? `<button type="button" class="subtask-toggle-btn" onclick="openTimelineSheet('task','${t.id}')">שנה מועד</button>` : '')}
-      <div class="energy-dot ${energy?'':'energy-dot-empty'}" style="${energy?`background:${ENERGY_COLORS[energy]}`:''}" onclick="cycleEnergy('${t.id}')" title="${energy?ENERGY_LABELS[energy]+' — לחיצה משנה':'רמת אנרגיה לא הוגדרה — לחיצה קובעת'}"></div>
+        : ((isOverdue && !opts.hideChangeDate) ? `<button type="button" class="subtask-toggle-btn" onclick="openTimelineSheet('task','${t.id}')">שנה מועד</button>` : '')}
+      ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
     </div>
     ${bodyCheckStatusBadgesHtml(t, {urgencyOptions:['objective','other','relief'], showEnergy:true})}
   </li>`;
