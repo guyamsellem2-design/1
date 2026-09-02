@@ -5769,6 +5769,7 @@ function renderDomainEditor(){
       <input type="text" style="color:inherit;" value="${escapeAttr(d.name)}"
         onchange="renameDomainCommit('${d.id}', this.value)"
         oninput="updateDomainNameLive('${d.id}', this.value); sizeChipInput(this)">
+      <span class="rm" style="color:${activeChipFg};" onclick="event.stopPropagation(); mergeDomainInto('${d.id}')" title="מיזוג נושא אחר לתוך זה">⇤</span>
       <span class="rm" style="color:${activeChipFg};" onclick="event.stopPropagation(); deleteDomain('${d.id}')" title="מחיקת נושא">✕</span>
     </div>`;
   }).join('')
@@ -5995,6 +5996,83 @@ function addDomain(){
   saveData();
   render();
 }
+/* ---------- everything a topic is attached to ----------
+   A topic's id is written on tasks, anchors, ideas, dilemmas, its notes and their headings, the
+   two kinds of one-action, the "important right now" marks, and whichever filters happen to be
+   pointing at it. Moving a topic's belongings used to be spelled out inside deleteDomain, and had
+   quietly fallen behind: someday items, dilemmas, the important marks and both one-action lists
+   were all added later and none of them were being carried across. So it is one function now, and
+   deleting and merging both go through it -- which means neither can forget half of it. */
+function reassignDomain(fromId, toId){
+  let moved = 0;
+  const swap = (arr)=> (arr||[]).forEach(x=>{ if(x.domain === fromId){ x.domain = toId; moved++; } });
+  swap(data.tasks); swap(data.anchors); swap(data.someday); swap(data.generalDilemmas);
+  swap(data.topicActions); swap(data.topicWeeklyActions); swap(data.inbox);
+  // the old free-text note, from before topics had a notebook of their own
+  if(data.notes && data.notes[fromId]){
+    const fb = ensureNotes(toId);
+    if(data.notes[fromId].text) fb.text += (fb.text?'\n\n':'') + data.notes[fromId].text;
+    fb.sparks = (fb.sparks||[]).concat(data.notes[fromId].sparks || []);
+    delete data.notes[fromId];
+  }
+  /* Headings belong to the topic, not to the note -- so on a merge they come across as headings of
+     their own (a heading called "שירים" from one copy should not silently become "ללא כותרת"), and
+     only a heading whose name is already there is folded into the one that exists. */
+  const fromNotes = (data.domainNotes && data.domainNotes[fromId]) ? data.domainNotes[fromId] : [];
+  if(fromNotes.length || (data.domainNoteHeaders && (data.domainNoteHeaders[fromId]||[]).length)){
+    const toHeaders = ensureDomainNoteHeaders(toId);
+    const headerMap = {};
+    (data.domainNoteHeaders[fromId] || []).forEach(h=>{
+      const same = toHeaders.find(x=>gcalTextKey(x.label) === gcalTextKey(h.label));
+      if(same){ headerMap[h.id] = same.id; }
+      else { const nh = {id: uid(), label: h.label}; toHeaders.push(nh); headerMap[h.id] = nh.id; }
+    });
+    const toNotes = ensureDomainNotes(toId);
+    fromNotes.forEach(n=>{ toNotes.push({...n, headerId: headerMap[n.headerId] || ''}); moved++; });
+  }
+  delete data.domainNotes[fromId];
+  delete data.domainNoteHeaders[fromId];
+  // the marks and the places that might be pointing at the topic that is going away
+  if(Array.isArray(data.importantTopics)){
+    data.importantTopics = data.importantTopics.map(x=>x===fromId ? toId : x)
+      .filter((x,i,arr)=>arr.indexOf(x)===i);
+  }
+  if(activeNoteDomain === fromId) activeNoteDomain = toId;
+  if(focusDomainId === fromId) focusDomainId = toId;
+  if(typeof taskFilterDomain !== 'undefined' && taskFilterDomain === fromId) taskFilterDomain = toId;
+  if(typeof somedayFilterDomain !== 'undefined' && somedayFilterDomain === fromId) somedayFilterDomain = toId;
+  if(typeof anchorFilterDomain !== 'undefined' && anchorFilterDomain === fromId) anchorFilterDomain = toId;
+  return moved;
+}
+/* Two topics that are the same topic -- the same name typed twice, most often -- become one. The
+   one you keep is the one you press this on; the other empties into it and goes. Nothing is
+   deleted: every task, idea, note and heading it held arrives here. */
+function mergeDomainInto(keepId){
+  const keep = domainById(keepId);
+  const others = data.domains.filter(d=>d.id !== keepId);
+  if(!others.length){ alert('יש רק נושא אחד.'); return; }
+  const sameName = others.filter(d=>gcalTextKey(d.name) === gcalTextKey(keep.name));
+  const list = others.map((d,i)=>`${i+1}. ${d.name}`).join('\n');
+  const suggested = sameName.length === 1 ? (others.indexOf(sameName[0]) + 1) : '';
+  const answer = prompt(`מיזוג לתוך "${keep.name}".\n\nאיזה נושא למזג פנימה? (מספר)\n\n${list}`, String(suggested));
+  if(answer === null) return;
+  const idx = parseInt(String(answer).trim(), 10) - 1;
+  const from = others[idx];
+  if(!from){ flashStatus('לא נבחר נושא'); return; }
+  const count = domainItemCount(from.id);
+  if(!confirm(`למזג את "${from.name}" לתוך "${keep.name}"?\n\n${count} פריטים יעברו, ו"${from.name}" ייעלם.\nשום דבר לא נמחק, ואפשר לבטל אחר כך עם ↶.`)) return;
+  const moved = reassignDomain(from.id, keepId);
+  data.domains = data.domains.filter(d=>d.id !== from.id);
+  saveData();
+  render();
+  flashStatus(`מוזגו ${moved} פריטים לתוך "${keep.name}"`);
+}
+function domainItemCount(id){
+  const n = (arr)=>(arr||[]).filter(x=>x.domain===id).length;
+  return n(data.tasks) + n(data.anchors) + n(data.someday) + n(data.generalDilemmas)
+       + n(data.topicActions) + n(data.topicWeeklyActions)
+       + ((data.domainNotes && data.domainNotes[id]) ? data.domainNotes[id].length : 0);
+}
 function deleteDomain(id){
   if(data.domains.length<=1){ alert('צריך שיישאר לפחות נושא אחד.'); return; }
   const d = domainById(id);
@@ -6004,24 +6082,10 @@ function deleteDomain(id){
     : `למחוק את "${d.name}"? פריטים ששייכים אליו יעברו לנושא אחר.`;
   if(!confirm(warning)) return;
   const fallback = data.domains.find(x=>x.id!==id).id;
-  data.anchors.forEach(a=>{ if(a.domain===id) a.domain=fallback; });
-  data.tasks.forEach(t=>{ if(t.domain===id) t.domain=fallback; });
-  if(data.notes[id]){
-    const fb = ensureNotes(fallback);
-    if(data.notes[id].text) fb.text += (fb.text?'\n\n':'') + data.notes[id].text;
-    fb.sparks = fb.sparks.concat(data.notes[id].sparks || []);
-    delete data.notes[id];
-  }
-  if(noteCount>0){
-    const fbNotes = ensureDomainNotes(fallback);
-    // headers belong to this domain, not to the note itself -- moved notes fall back to "ללא
-    // כותרת" in the new domain rather than dragging along headerIds that won't match anything there
-    fbNotes.push(...data.domainNotes[id].map(n=>({...n, headerId:''})));
-    delete data.domainNotes[id];
-  }
-  delete data.domainNoteHeaders[id];
+  reassignDomain(id, fallback);
   data.domains = data.domains.filter(d=>d.id!==id);
   if(activeNoteDomain===id) activeNoteDomain = data.domains[0].id;
+  if(focusDomainId===id) focusDomainId = data.domains[0].id;
   saveData();
   render();
 }
