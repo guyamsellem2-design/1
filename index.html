@@ -3765,6 +3765,11 @@
   }
   .leave-ask-title{ font-size:17px; font-weight:700; color:var(--text); margin-bottom:16px; }
   .leave-ask-actions{ display:flex; gap:10px; }
+  .note-move-box{ max-width:360px; }
+  .note-move-box .schedule-tabs{ margin-bottom:12px; }
+  .note-move-row{ display:flex; flex-direction:column; gap:10px; }
+  .note-move-row .field-label{ display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--muted); }
+  .note-move-row select{ width:100%; }
   .leave-ask-actions button{ flex:1; padding:14px 14px; min-height:50px; border-radius:10px; font-family:inherit; font-size:16px; cursor:pointer; touch-action:manipulation; }
 
   .timeline-sheet-tools{ gap:6px; margin-top:2px; }
@@ -4158,6 +4163,22 @@
      several places it might have ended up in. -->
 <!-- Tapping the background is how a sheet gets closed by accident, and it was taking whatever
      you had typed with it. It asks now, in the app's own shape rather than the browser's. -->
+<!-- Moving a note is not the same act as moving a task. A task goes to a different KIND of place
+     -- the week, the habits, an idea. A note only ever goes to another shelf: another life area or
+     another notebook, and a heading inside it. So it gets its own small window that asks exactly
+     that, instead of the seven-destination menu that would have nothing to offer it. -->
+<div class="leave-ask-overlay" id="noteMoveOverlay" style="display:none;" onclick="if(event.target===this) closeNoteMove()">
+  <div class="leave-ask-box note-move-box">
+    <div class="leave-ask-title">העברת הפתק</div>
+    <div class="schedule-tabs" id="noteMoveWorldSwitch"></div>
+    <div id="noteMoveRow"></div>
+    <div class="leave-ask-actions" style="margin-top:14px;">
+      <button type="button" class="save-btn" onclick="commitNoteMove()">העבר</button>
+      <button type="button" class="cancel-btn" onclick="closeNoteMove()">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div class="leave-ask-overlay" id="leaveAskOverlay" style="display:none;" onclick="leaveAskBackdrop(event)">
   <div class="leave-ask-box">
     <div class="leave-ask-title" id="leaveAskTitle">לשמור את מה שכתבת?</div>
@@ -7037,6 +7058,95 @@ function noteHeaderSelectHtml(domainId, n){
     ${headers.map(h=>`<option value="${h.id}" ${n.headerId===h.id?'selected':''}>${escapeHtml(h.label)}</option>`).join('')}
   </select>`;
 }
+/* ---------- העברת פתק ---------- */
+let noteMoveRef = null;          // {fromId, noteId}
+let noteMoveWorld = 'domain';
+let noteMoveContainer = null;
+let noteMoveHeader = '';
+function openNoteMove(fromId, noteId){
+  noteMoveRef = {fromId, noteId};
+  noteMoveWorld = worldOfContainer(fromId) || 'domain';
+  noteMoveContainer = fromId;
+  const n = ensureDomainNotes(fromId).find(x=>x.id===noteId);
+  noteMoveHeader = (n && n.headerId) || '';
+  document.getElementById('noteMoveOverlay').style.display = '';
+  renderNoteMove();
+  syncOverlayGuard();
+}
+function closeNoteMove(){
+  noteMoveRef = null;
+  const el = document.getElementById('noteMoveOverlay');
+  if(el) el.style.display = 'none';
+  syncOverlayGuard();
+}
+function setNoteMoveWorld(world){
+  if(noteMoveWorld === world) return;
+  noteMoveWorld = world;
+  noteMoveContainer = firstContainerOf(world);
+  noteMoveHeader = '';
+  renderNoteMove();
+}
+function setNoteMoveContainer(id){
+  noteMoveContainer = id;
+  noteMoveHeader = '';          // a heading belongs to one shelf; it does not travel to another
+  renderNoteMove();
+}
+function setNoteMoveHeader(id){ noteMoveHeader = id; }
+function renderNoteMove(){
+  if(!noteMoveRef) return;
+  const worlds = [
+    {key:'domain',   label:'🌱 תחומי חיים', list:(data.domains || [])},
+    {key:'notebook', label:'📓 מחברות',     list:notebookList()},
+  ];
+  document.getElementById('noteMoveWorldSwitch').innerHTML = worlds.map(w=>`
+    <button type="button" class="schedule-tab-btn ${noteMoveWorld===w.key?'active':''}"
+      onclick="setNoteMoveWorld('${w.key}')">${w.label}${w.list.length?` (${w.list.length})`:''}</button>`).join('');
+  const containers = containersOfWorld(noteMoveWorld);
+  if(noteMoveContainer && !containers.some(c=>c.id===noteMoveContainer)){
+    noteMoveContainer = containers.length ? containers[0].id : null;
+  }
+  const headers = noteMoveContainer ? ensureDomainNoteHeaders(noteMoveContainer) : [];
+  document.getElementById('noteMoveRow').innerHTML = containers.length ? `
+    <div class="note-move-row">
+      <label class="field-label">לאן
+        <select id="noteMoveContainerSel" onchange="setNoteMoveContainer(this.value)">
+          ${containers.map(c=>`<option value="${c.id}" ${noteMoveContainer===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field-label">כותרת
+        <select id="noteMoveHeaderSel" onchange="setNoteMoveHeader(this.value)">
+          <option value="">(ללא כותרת)</option>
+          ${headers.map(h=>`<option value="${h.id}" ${noteMoveHeader===h.id?'selected':''}>${escapeHtml(h.label)}</option>`).join('')}
+        </select>
+      </label>
+    </div>
+    ${headers.length ? '' : '<div class="hint" style="margin:8px 2px 0;">אין עדיין כותרות שם — הפתק ינחת תחת "ללא כותרת".</div>'}`
+    : '<div class="empty">אין כאן עדיין לאן להעביר</div>';
+}
+function commitNoteMove(){
+  if(!noteMoveRef) return;
+  const {fromId, noteId} = noteMoveRef;
+  const toId = noteMoveContainer;
+  if(!toId){ closeNoteMove(); return; }
+  const n = ensureDomainNotes(fromId).find(x=>x.id===noteId);
+  if(!n){ closeNoteMove(); return; }
+  if(toId === fromId){
+    n.headerId = noteMoveHeader || '';
+    saveData();
+    closeNoteMove();
+    renderKeepGrid(fromId);
+    flashStatus('הכותרת עודכנה');
+    return;
+  }
+  data.domainNotes[fromId] = ensureDomainNotes(fromId).filter(x=>x.id!==noteId);
+  ensureDomainNotes(toId).unshift({...n, headerId: noteMoveHeader || ''});
+  saveData();
+  closeNoteMove();
+  renderKeepGrid(fromId);
+  renderKeepGrid(toId);
+  renderDomainEditor();
+  flashStatus(`הפתק עבר ל"${containerName(toId)}"`);
+}
 function setNoteHeader(domainId, noteId, headerId){
   const n = ensureDomainNotes(domainId).find(x=>x.id===noteId);
   if(n){ n.headerId = headerId; saveData(); }
@@ -7293,6 +7403,7 @@ function keepNoteHtml(id, n){
       <div class="keep-note-topbar" onclick="onNoteTopbarClick(event,'${id}','${n.id}')" title="לחיצה על השורה ממזערת">
         <span class="note-pin-btn ${n.pinned?'active':''}" onclick="toggleNotePin('${id}','${n.id}')" title="${n.pinned?'בטל נעיצה':'נעיצה — נשאר פתוח תמיד'}">📌</span>
         ${noteHeaderSelectHtml(id, n)}
+        <span class="note-size-btn" onclick="openNoteMove('${id}','${n.id}')" title="העברה לתחום חיים או למחברת אחרת">⇥ העבר</span>
         ${isMedium
           ? `<span class="note-size-btn" onclick="expandNoteStep('${id}','${n.id}')" title="הרחבה">🗖 הרחב</span><span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מיזעור נוסף">🗕 מזער עוד</span>`
           : `<span class="note-size-btn" onclick="minimizeNoteStep('${id}','${n.id}')" title="מזער פתק">⌄ מזער</span>`}
@@ -16803,6 +16914,7 @@ window.addEventListener('touchcancel', gestureCancel, {passive:true});
    result of a tap or a key, so re-checking right after those two events catches every case. */
 const OVERLAY_LAYERS = [
   { open: ()=> isDisplayed('leaveAskOverlay'),           close: ()=> cancelLeaveSheet() },
+  { open: ()=> isDisplayed('noteMoveOverlay'),           close: ()=> closeNoteMove() },
   { open: ()=> partyMode,                                close: ()=> endPartyMode(true) },
   { open: ()=> isDisplayed('timelineSheet'),             close: ()=> closeTimelineSheet() },
   { open: ()=> isDisplayed('focusSheetOverlay'),         close: ()=> closeFocusSheet() },
