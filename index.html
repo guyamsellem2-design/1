@@ -3755,10 +3755,13 @@
     position:fixed; inset:0; z-index:5200; background:rgba(0,0,0,.45);
     display:flex; align-items:flex-start; justify-content:center;
     padding:max(14vh, 90px) 24px 24px; overflow-y:auto;
-    /* dead to the touch until the tap that opened it is finished */
-    pointer-events:none;
   }
-  .leave-ask-overlay.armed{ pointer-events:auto; }
+  /* Only the save/cancel question ignores touches for a moment after it opens -- that is there so
+     the tap that OPENED it cannot also press a button inside it. It was written against the shared
+     class, and the other two windows that borrow this shape inherited it: they were dead to the
+     touch from the moment they appeared, forever, because nothing ever armed them. */
+  #leaveAskOverlay{ pointer-events:none; }
+  #leaveAskOverlay.armed{ pointer-events:auto; }
   .leave-ask-box{
     background:var(--surface); border:1.5px solid var(--card-line); border-radius:18px;
     padding:20px 22px; box-shadow:var(--lift-3); max-width:320px; width:100%;
@@ -3772,6 +3775,7 @@
     display:flex; align-items:center; gap:9px; padding:7px 6px; border-radius:9px; cursor:pointer;
   }
   .consolidate-row:hover{ background:var(--surface2); }
+  .consolidate-row.is-picked{ background:color-mix(in srgb, var(--gold) 16%, transparent); }
   .consolidate-row input{ width:17px; height:17px; accent-color:var(--gold); flex-shrink:0; cursor:pointer; }
   .consolidate-name{ flex:1; min-width:0; font-size:14px; color:var(--text); }
   .consolidate-count{ font-size:11.5px; color:var(--muted2); flex-shrink:0; }
@@ -6096,25 +6100,18 @@ function reassignDomain(fromId, toId){
 /* Two topics that are the same topic -- the same name typed twice, most often -- become one. The
    one you keep is the one you press this on; the other empties into it and goes. Nothing is
    deleted: every task, idea, note and heading it held arrives here. */
+/* This used to ask for a number typed into a prompt, listing the topics in the message. That was a
+   worse version of the window that already exists for exactly this -- so it opens that instead,
+   with this topic already chosen as the one that stays. If a topic with the same name exists, it
+   is already ticked, because typing the same name twice is why you are here. */
 function mergeDomainInto(keepId){
+  if(data.domains.length < 2){ alert('יש רק נושא אחד.'); return; }
+  openTopicConsolidate(keepId);
   const keep = domainById(keepId);
-  const others = data.domains.filter(d=>d.id !== keepId);
-  if(!others.length){ alert('יש רק נושא אחד.'); return; }
-  const sameName = others.filter(d=>gcalTextKey(d.name) === gcalTextKey(keep.name));
-  const list = others.map((d,i)=>`${i+1}. ${d.name}`).join('\n');
-  const suggested = sameName.length === 1 ? (others.indexOf(sameName[0]) + 1) : '';
-  const answer = prompt(`מיזוג לתוך "${keep.name}".\n\nאיזה נושא למזג פנימה? (מספר)\n\n${list}`, String(suggested));
-  if(answer === null) return;
-  const idx = parseInt(String(answer).trim(), 10) - 1;
-  const from = others[idx];
-  if(!from){ flashStatus('לא נבחר נושא'); return; }
-  const count = domainItemCount(from.id);
-  if(!confirm(`למזג את "${from.name}" לתוך "${keep.name}"?\n\n${count} פריטים יעברו, ו"${from.name}" ייעלם.\nשום דבר לא נמחק, ואפשר לבטל אחר כך עם ↶.`)) return;
-  const moved = reassignDomain(from.id, keepId);
-  data.domains = data.domains.filter(d=>d.id !== from.id);
-  saveData();
-  render();
-  flashStatus(`מוזגו ${moved} פריטים לתוך "${keep.name}"`);
+  data.domains.forEach(d=>{
+    if(d.id !== keepId && gcalTextKey(d.name) === gcalTextKey(keep.name)) consolidateFolding.add(d.id);
+  });
+  renderTopicConsolidate();
 }
 /* ---------- איחוד תחומי חיים ---------- */
 let consolidateKeepId = null;
@@ -6137,9 +6134,29 @@ function setConsolidateKeep(id){
   consolidateFolding.delete(id);   // a topic cannot be folded into itself
   renderTopicConsolidate();
 }
+/* Only the summary and the button change when a box is ticked. Redrawing the whole list would
+   replace the very checkbox being pressed, mid-tap, which is its own way of not working. */
 function toggleConsolidateFold(id){
   if(consolidateFolding.has(id)) consolidateFolding.delete(id); else consolidateFolding.add(id);
-  renderTopicConsolidate();
+  updateConsolidateSummary();
+}
+function updateConsolidateSummary(){
+  const keep = domainById(consolidateKeepId);
+  const moving = [...consolidateFolding].reduce((n,id)=>n + domainItemCount(id), 0);
+  const hint = document.querySelector('#topicConsolidateBody .consolidate-hint');
+  if(hint){
+    hint.innerHTML = consolidateFolding.size
+      ? `${moving} פריטים יעברו אל "${escapeHtml(keep ? keep.name : '')}", ו-${consolidateFolding.size} תחומים ייעלמו. שום דבר לא נמחק, ואפשר לבטל עם ↶.`
+      : 'שום דבר לא ישתנה עד שתסמן/י תחומים.';
+  }
+  const go = document.getElementById('topicConsolidateGo');
+  if(go){
+    go.disabled = !consolidateFolding.size;
+    go.textContent = consolidateFolding.size ? `אחד ${consolidateFolding.size} תחומים` : 'אחד';
+  }
+  document.querySelectorAll('.consolidate-row').forEach(row=>{
+    row.classList.toggle('is-picked', consolidateFolding.has(row.dataset.domainId));
+  });
 }
 function renderTopicConsolidate(){
   const body = document.getElementById('topicConsolidateBody');
@@ -6157,23 +6174,15 @@ function renderTopicConsolidate(){
     <div class="consolidate-label">מה מתאחד לתוכו</div>
     <div class="consolidate-list">
       ${others.length ? others.map(d=>`
-        <label class="consolidate-row">
+        <label class="consolidate-row ${consolidateFolding.has(d.id)?'is-picked':''}" data-domain-id="${d.id}">
           <input type="checkbox" ${consolidateFolding.has(d.id)?'checked':''} onchange="toggleConsolidateFold('${d.id}')">
           <span class="chip-dot" style="background:${d.color}"></span>
           <span class="consolidate-name">${escapeHtml(d.name)}</span>
           <span class="consolidate-count">${domainItemCount(d.id)}</span>
         </label>`).join('') : '<div class="empty">יש רק תחום אחד</div>'}
     </div>
-    <div class="hint" style="margin:10px 2px 0; line-height:1.5;">
-      ${consolidateFolding.size
-        ? `${moving} פריטים יעברו אל "${escapeHtml(keep ? keep.name : '')}", ו-${consolidateFolding.size} תחומים ייעלמו. שום דבר לא נמחק, ואפשר לבטל עם ↶.`
-        : 'שום דבר לא ישתנה עד שתסמן/י תחומים.'}
-    </div>`;
-  const go = document.getElementById('topicConsolidateGo');
-  if(go){
-    go.disabled = !consolidateFolding.size;
-    go.textContent = consolidateFolding.size ? `אחד ${consolidateFolding.size} תחומים` : 'אחד';
-  }
+    <div class="hint consolidate-hint" style="margin:10px 2px 0; line-height:1.5;"></div>`;
+  updateConsolidateSummary();
 }
 function commitTopicConsolidate(){
   if(!consolidateFolding.size) return;
