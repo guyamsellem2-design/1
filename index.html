@@ -3765,6 +3765,18 @@
   }
   .leave-ask-title{ font-size:17px; font-weight:700; color:var(--text); margin-bottom:16px; }
   .leave-ask-actions{ display:flex; gap:10px; }
+  .topic-consolidate-box{ max-width:380px; }
+  .consolidate-label{ font-size:12.5px; color:var(--muted); margin:14px 2px 6px; }
+  .consolidate-list{ max-height:44vh; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+  .consolidate-row{
+    display:flex; align-items:center; gap:9px; padding:7px 6px; border-radius:9px; cursor:pointer;
+  }
+  .consolidate-row:hover{ background:var(--surface2); }
+  .consolidate-row input{ width:17px; height:17px; accent-color:var(--gold); flex-shrink:0; cursor:pointer; }
+  .consolidate-name{ flex:1; min-width:0; font-size:14px; color:var(--text); }
+  .consolidate-count{ font-size:11.5px; color:var(--muted2); flex-shrink:0; }
+  .leave-ask-actions button:disabled{ opacity:.45; cursor:default; }
+
   .note-move-box{ max-width:360px; }
   .note-move-box .schedule-tabs{ margin-bottom:12px; }
   .note-move-row{ display:flex; flex-direction:column; gap:10px; }
@@ -4167,6 +4179,21 @@
      -- the week, the habits, an idea. A note only ever goes to another shelf: another life area or
      another notebook, and a heading inside it. So it gets its own small window that asks exactly
      that, instead of the seven-destination menu that would have nothing to offer it. -->
+<!-- Too many life areas is its own kind of clutter: every one of them is a place to check, and
+     past a handful you stop checking any of them. Folding several into one, one at a time through a
+     prompt, is enough work that it does not get done -- so it is one pass here: pick what stays,
+     tick what folds in, see what each of them is holding, once. -->
+<div class="leave-ask-overlay" id="topicConsolidateOverlay" style="display:none;" onclick="if(event.target===this) closeTopicConsolidate()">
+  <div class="leave-ask-box topic-consolidate-box">
+    <div class="leave-ask-title">איחוד תחומי חיים</div>
+    <div id="topicConsolidateBody"></div>
+    <div class="leave-ask-actions" style="margin-top:14px;">
+      <button type="button" class="save-btn" id="topicConsolidateGo" onclick="commitTopicConsolidate()">אחד</button>
+      <button type="button" class="cancel-btn" onclick="closeTopicConsolidate()">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div class="leave-ask-overlay" id="noteMoveOverlay" style="display:none;" onclick="if(event.target===this) closeNoteMove()">
   <div class="leave-ask-box note-move-box">
     <div class="leave-ask-title">העברת הפתק</div>
@@ -5795,6 +5822,7 @@ function renderDomainEditor(){
     </div>`;
   }).join('')
     + `<button class="add-domain-btn" onclick="addDomain()">+ נושא</button>`
+    + `<button class="add-domain-btn" onclick="openTopicConsolidate(activeNoteDomain)">🔀 איחוד תחומים</button>`
     + `<button class="add-domain-btn important-topics-btn ${importantTopicsMode?'active':''}" onclick="toggleImportantTopicsMode()">${importantTopicsMode?'✓ סיום':'⭐ נושאים חשובים בתקופה זו'}</button>`
     + (colorPickerForId ? renderColorPanel(colorPickerForId) : '');
   el.querySelectorAll('input[type="text"]').forEach(sizeChipInput);
@@ -6087,6 +6115,80 @@ function mergeDomainInto(keepId){
   saveData();
   render();
   flashStatus(`מוזגו ${moved} פריטים לתוך "${keep.name}"`);
+}
+/* ---------- איחוד תחומי חיים ---------- */
+let consolidateKeepId = null;
+const consolidateFolding = new Set();
+function openTopicConsolidate(keepId){
+  consolidateKeepId = keepId || (data.domains[0] && data.domains[0].id) || null;
+  consolidateFolding.clear();
+  document.getElementById('topicConsolidateOverlay').style.display = '';
+  renderTopicConsolidate();
+  syncOverlayGuard();
+}
+function closeTopicConsolidate(){
+  consolidateFolding.clear();
+  const el = document.getElementById('topicConsolidateOverlay');
+  if(el) el.style.display = 'none';
+  syncOverlayGuard();
+}
+function setConsolidateKeep(id){
+  consolidateKeepId = id;
+  consolidateFolding.delete(id);   // a topic cannot be folded into itself
+  renderTopicConsolidate();
+}
+function toggleConsolidateFold(id){
+  if(consolidateFolding.has(id)) consolidateFolding.delete(id); else consolidateFolding.add(id);
+  renderTopicConsolidate();
+}
+function renderTopicConsolidate(){
+  const body = document.getElementById('topicConsolidateBody');
+  if(!body) return;
+  if(!data.domains.some(d=>d.id===consolidateKeepId)) consolidateKeepId = data.domains[0] ? data.domains[0].id : null;
+  const keep = domainById(consolidateKeepId);
+  const others = data.domains.filter(d=>d.id !== consolidateKeepId);
+  const moving = [...consolidateFolding].reduce((n,id)=>n + domainItemCount(id), 0);
+  body.innerHTML = `
+    <label class="field-label" style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--muted);">איזה תחום נשאר
+      <select onchange="setConsolidateKeep(this.value)">
+        ${data.domains.map(d=>`<option value="${d.id}" ${d.id===consolidateKeepId?'selected':''}>${escapeHtml(d.name)} (${domainItemCount(d.id)})</option>`).join('')}
+      </select>
+    </label>
+    <div class="consolidate-label">מה מתאחד לתוכו</div>
+    <div class="consolidate-list">
+      ${others.length ? others.map(d=>`
+        <label class="consolidate-row">
+          <input type="checkbox" ${consolidateFolding.has(d.id)?'checked':''} onchange="toggleConsolidateFold('${d.id}')">
+          <span class="chip-dot" style="background:${d.color}"></span>
+          <span class="consolidate-name">${escapeHtml(d.name)}</span>
+          <span class="consolidate-count">${domainItemCount(d.id)}</span>
+        </label>`).join('') : '<div class="empty">יש רק תחום אחד</div>'}
+    </div>
+    <div class="hint" style="margin:10px 2px 0; line-height:1.5;">
+      ${consolidateFolding.size
+        ? `${moving} פריטים יעברו אל "${escapeHtml(keep ? keep.name : '')}", ו-${consolidateFolding.size} תחומים ייעלמו. שום דבר לא נמחק, ואפשר לבטל עם ↶.`
+        : 'שום דבר לא ישתנה עד שתסמן/י תחומים.'}
+    </div>`;
+  const go = document.getElementById('topicConsolidateGo');
+  if(go){
+    go.disabled = !consolidateFolding.size;
+    go.textContent = consolidateFolding.size ? `אחד ${consolidateFolding.size} תחומים` : 'אחד';
+  }
+}
+function commitTopicConsolidate(){
+  if(!consolidateFolding.size) return;
+  const keep = domainById(consolidateKeepId);
+  const ids = [...consolidateFolding].filter(id=>id !== consolidateKeepId);
+  const names = ids.map(id=>(domainById(id)||{}).name).filter(Boolean);
+  const moving = ids.reduce((n,id)=>n + domainItemCount(id), 0);
+  if(!confirm(`לאחד ${ids.length} תחומים לתוך "${keep.name}"?\n\n${names.map(n=>'· '+n).join('\n')}\n\n${moving} פריטים יעברו. שום דבר לא נמחק, ואפשר לבטל עם ↶.`)) return;
+  let moved = 0;
+  ids.forEach(id=>{ moved += reassignDomain(id, consolidateKeepId); });
+  data.domains = data.domains.filter(d=>ids.indexOf(d.id) === -1);
+  closeTopicConsolidate();
+  saveData();
+  render();
+  flashStatus(`אוחדו ${ids.length} תחומים · ${moved} פריטים עברו ל"${keep.name}"`);
 }
 function domainItemCount(id){
   const n = (arr)=>(arr||[]).filter(x=>x.domain===id).length;
@@ -8847,32 +8949,58 @@ function gcalEventWhen(ev){
   const en = (ev.end && (ev.end.dateTime || ev.end.date)) || '';
   return st + '|' + en;
 }
+/* Two copies of one event have the same name and start at the same moment. The END is left out of
+   this on purpose: editing one copy's length is exactly the kind of thing that happens, and it must
+   not stop the pair from being recognised as a pair. Nothing is deleted on the strength of this
+   alone -- it only decides what gets LOOKED at; whether a copy may go is gcalMadeHere's decision. */
 function gcalEventGroupKey(ev){
   const t = gcalTextKey(ev.summary || '');
-  const when = gcalEventWhen(ev);
-  return (t && when !== '|') ? (t + '|' + when) : '';
+  const st = (ev.start && (ev.start.dateTime || ev.start.date)) || '';
+  return (t && st) ? (t + '|' + st) : '';
+}
+/* One calendar page is 2500 events at most, and a year of a busy calendar is more than that. Asking
+   for one page and stopping is how a scan reports "nothing" while sitting on top of the answer. */
+function gcalFetchAllEvents(calId, params, onPage){
+  const go = (pageToken)=>{
+    const q = new URLSearchParams(params);
+    if(pageToken) q.set('pageToken', pageToken);
+    return fetch(gcalEventsUrl(calId)+'?'+q.toString(), { headers:{ Authorization: 'Bearer '+gcalAccessToken } })
+      .then(r=>{ if(!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(json=>{
+        onPage(json.items || []);
+        return json.nextPageToken ? go(json.nextPageToken) : null;
+      });
+  };
+  return go('');
 }
 let gcalDupScanRunning = false;
+let gcalDupReport = null;
 function cleanGoogleCalendarDuplicates(){
   if(gcalDupScanRunning) return;
   if(!data.gcalConnected){ flashStatus('צריך קודם להתחבר ליומן'); return; }
   gcalDupScanRunning = true;
   renderGcalStatus();
   ensureGcalWriteToken(()=>{
-    const startDates = weekDatesForOffset(WEEK_OFFSET_MIN);
-    const endDates = weekDatesForOffset(WEEK_OFFSET_MAX);
-    const timeMin = new Date(startDates[0].getFullYear(), startDates[0].getMonth(), startDates[0].getDate(), 0,0,0).toISOString();
-    const timeMax = new Date(endDates[6].getFullYear(), endDates[6].getMonth(), endDates[6].getDate(), 23,59,59).toISOString();
-    // singleEvents=false on purpose: a repeating event is ONE event here, and expanding it into its
-    // instances would read a weekly anchor as fifty copies of itself
-    const params = new URLSearchParams({ timeMin, timeMax, singleEvents:'false', maxResults:'2500' });
+    /* The sync only ever looks at the four weeks around now, and this used to borrow that window --
+       so a calendar full of duplicates from six months ago answered "nothing found", which is worse
+       than useless: it says the problem is not there when it is only out of frame. A year back and
+       a year forward, in pages, however many that takes. */
+    const now = new Date();
+    const from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    const to   = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+    const params = { timeMin: from.toISOString(), timeMax: to.toISOString(),
+                     // singleEvents=false on purpose: a repeating event is ONE event here, and
+                     // expanding it into its instances would read a weekly anchor as fifty copies
+                     singleEvents:'false', maxResults:'2500' };
     const calIds = gcalSelectedCalendarIds();
+    const collected = [];
+    const failures = [];
     Promise.all(calIds.map(calId=>
-      fetch(gcalEventsUrl(calId)+'?'+params.toString(), { headers:{ Authorization: 'Bearer '+gcalAccessToken } })
-        .then(r=>{ if(!r.ok) throw new Error(String(r.status)); return r.json(); })
-        .then(json=>(json.items||[]).filter(ev=>ev.id && ev.status!=='cancelled').map(ev=>({ev, calId})))
-        .catch(()=>[])
-    )).then(per=>{
+      gcalFetchAllEvents(calId, params, items=>{
+        items.forEach(ev=>{ if(ev.id && ev.status!=='cancelled') collected.push({ev, calId}); });
+      }).catch(err=>{ failures.push(calId + ' (' + (err && err.message ? err.message : '?') + ')'); })
+    )).then(()=>{
+      const per = [collected];
       const groups = new Map();
       per.flat().forEach(({ev, calId})=>{
         const k = gcalEventGroupKey(ev);
@@ -8900,11 +9028,23 @@ function cleanGoogleCalendarDuplicates(){
         });
       });
       gcalDupScanRunning = false;
+      // What the scan actually saw, always -- so "nothing found" is an answer you can act on
+      // instead of a shrug. Which calendars, how many events, how many pairs, and how many of
+      // those this app is allowed to touch.
+      gcalDupReport = {
+        calendars: calIds.length, failed: failures.slice(),
+        scanned: collected.length,
+        pairs: [...groups.values()].filter(g=>g.length > 1).length,
+        deletable: doomed.length, untouchable,
+        from: ymd(from), to: ymd(to),
+      };
       renderGcalStatus();
       if(!doomed.length){
-        flashStatus(untouchable
-          ? `נמצאו ${untouchable} כפילויות שלא נוצרו כאן — אותן צריך למחוק ביומן גוגל עצמו`
-          : 'לא נמצאו כפילויות ביומן גוגל 🌱');
+        const bits = [`נסרקו ${collected.length} אירועים ב-${calIds.length} יומנים`];
+        if(untouchable) bits.push(`${untouchable} כפילויות לא נוצרו כאן ולכן לא ייגעו בהן`);
+        else bits.push('לא נמצאו כפילויות');
+        if(failures.length) bits.push(`${failures.length} יומנים לא נקראו`);
+        flashStatus(bits.join(' · '));
         return;
       }
       const names = [...new Set(doomed.map(x=>x.ev.summary||'(ללא כותרת)'))].slice(0,6);
@@ -9069,7 +9209,12 @@ function renderGcalStatus(){
       ${escapeHtml(bits.join(' · '))}${which}${failed}</div>`;
   }
   const dupCount = gcalDuplicateCount() + duplicateAnchorIds().size;
-  const dupHtml = `<div class="gcal-status gcal-dup-note">🧹 ${dupCount ? dupCount+' עותקים כפולים כאן על הלוח · ' : ''}"כפילויות ביומן גוגל" סורק את היומנים עצמם ומוחק שם עותקים שהאפליקציה יצרה פעמיים. אירוע שלא נוצר כאן לא ייגע.</div>`;
+  const dupHtml = `<div class="gcal-status gcal-dup-note">🧹 ${dupCount ? dupCount+' עותקים כפולים כאן על הלוח · ' : ''}"כפילויות ביומן גוגל" סורק שנה אחורה ושנה קדימה בכל היומנים המחוברים, ומוחק שם רק עותקים שהאפליקציה עצמה יצרה. אירוע שנוצר ביד נספר ונשאר.</div>`
+    + (gcalDupReport ? `<div class="gcal-status" style="font-size:12.5px; line-height:1.5; margin-top:4px;">
+        הסריקה האחרונה: ${gcalDupReport.scanned} אירועים ב-${gcalDupReport.calendars} יומנים (${gcalDupReport.from} — ${gcalDupReport.to})<br>
+        ${gcalDupReport.pairs} קבוצות של עותקים · ${gcalDupReport.deletable} ניתנים למחיקה מכאן · ${gcalDupReport.untouchable} נוצרו ביד ולא ייגעו בהם
+        ${gcalDupReport.failed.length ? '<br>יומנים שלא נקראו: ' + escapeHtml(gcalDupReport.failed.join(', ')) : ''}
+      </div>` : '');
   const syncErrorHtml = (!currentSyncUser && lastSyncSignInError)
     ? `<div class="gcal-status" style="color:#e06060; margin-top:4px;">⚠️ סנכרון בין מכשירים נכשל: ${escapeHtml(lastSyncSignInError)}</div>`
     : '';
@@ -16915,6 +17060,7 @@ window.addEventListener('touchcancel', gestureCancel, {passive:true});
 const OVERLAY_LAYERS = [
   { open: ()=> isDisplayed('leaveAskOverlay'),           close: ()=> cancelLeaveSheet() },
   { open: ()=> isDisplayed('noteMoveOverlay'),           close: ()=> closeNoteMove() },
+  { open: ()=> isDisplayed('topicConsolidateOverlay'),   close: ()=> closeTopicConsolidate() },
   { open: ()=> partyMode,                                close: ()=> endPartyMode(true) },
   { open: ()=> isDisplayed('timelineSheet'),             close: ()=> closeTimelineSheet() },
   { open: ()=> isDisplayed('focusSheetOverlay'),         close: ()=> closeFocusSheet() },
