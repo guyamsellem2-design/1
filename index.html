@@ -3614,6 +3614,11 @@
   /* only when there is actually something to clean -- otherwise it is one more grey button */
   .reset-btn.gcal-dup-btn{ border-color:var(--gold); color:var(--gold); font-weight:600; }
   .gcal-dup-note{ margin-top:6px; font-size:12.5px; line-height:1.5; color:var(--gold); }
+  .gcal-wrong-write{
+    margin-top:8px; font-size:12.5px; line-height:1.6; color:var(--text);
+    background:color-mix(in srgb, var(--gold) 14%, transparent);
+    border:1px solid var(--gold); border-radius:12px; padding:10px 12px;
+  }
 
   /* a marked topic whose row is open reads as pressed, so the strip says which one you are in */
   .important-topic-chip.topic-chip-open{ background:var(--tint); color:#1a1206; }
@@ -8217,6 +8222,9 @@ function resolvePrimaryCalendarId(){
       if(cal && cal.id && cal.id!=='primary'){
         data.gcalCalendarIds = gcalSelectedCalendarIds().map(id=>id==='primary'?cal.id:id);
         data.gcalAccountEmail = cal.id; // personal calendar id is the account's email — used as a hint so future connects skip the account chooser
+        // and it is the calendar written to, recorded now rather than worked out later from list
+        // order -- which is how writing wandered off to a secondary calendar in the first place
+        if(!data.gcalWriteCalendarId || data.gcalWriteCalendarId === 'primary') data.gcalWriteCalendarId = cal.id;
         saveData();
         renderGcalStatus();
       }
@@ -8244,10 +8252,44 @@ function ensureGcalWriteToken(onReady){
    to be "whichever is first in the list", so connecting another calendar could silently move where
    new events land — possibly onto a calendar that is only shared for reading. It is now an explicit
    choice that survives the list changing order. */
+/* One calendar is written to. Every other connected calendar is read-only, and that is not a
+   preference -- it is the rule the whole design rests on.
+
+   This function used to end in "...or whichever calendar happens to be first in the list", and that
+   one clause undid it. The list is rebuilt in Google's own order by "חבר את כל היומנים שלי", and
+   the chosen calendar starts out unset -- so connecting more calendars silently moved where new
+   events land. On an account whose work calendar sorts first, the app quietly began writing there.
+   With the same task list open under the other account, every task then became two events, one in
+   each calendar. There is no fallback to "the first one" any more: the account's own calendar, the
+   one explicitly chosen, or nothing at all. */
+function gcalOwnCalendarId(){
+  const ids = gcalSelectedCalendarIds();
+  const own = data.gcalAccountEmail;
+  if(own && ids.includes(own)) return own;
+  if(ids.includes('primary')) return 'primary';
+  return '';
+}
 function gcalWriteCalendarId(){
   const ids = gcalSelectedCalendarIds();
   const chosen = data.gcalWriteCalendarId;
-  return (chosen && ids.includes(chosen)) ? chosen : (ids[0] || 'primary');
+  if(chosen && ids.includes(chosen)) return chosen;
+  const own = gcalOwnCalendarId();
+  if(own) return own;
+  return ids.length === 1 ? ids[0] : '';
+}
+// writing to a secondary calendar is the bug itself, so it is named where it can be seen and fixed
+function gcalWritingToASecondary(){
+  const own = gcalOwnCalendarId();
+  const write = gcalWriteCalendarId();
+  return !!(own && write && write !== own);
+}
+function restoreGcalWriteToOwn(){
+  const own = gcalOwnCalendarId();
+  if(!own) return;
+  data.gcalWriteCalendarId = own;
+  saveData();
+  renderGcalStatus();
+  flashStatus('האפליקציה כותבת שוב ליומן הראשי בלבד');
 }
 function setGcalWriteCalendar(calId){
   data.gcalWriteCalendarId = calId;
@@ -8318,8 +8360,12 @@ function gcalEventsUrl(calId){
   return `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
 }
 function pushEventToGcal(eventBody, existingEventId, onSuccess, wantedId, homeCalId){
-  const tgt = gcalTargetFor(existingEventId, homeCalId);
   const writeCal = gcalWriteCalendarId();
+  if(!writeCal){
+    flashStatus('לא נקבע יומן ראשי — בחר/י אחד ברשימת היומנים, והאפליקציה תכתוב רק אליו');
+    return;
+  }
+  const tgt = gcalTargetFor(existingEventId, homeCalId);
   // the calendar we are aiming at is not one we own: whatever happens, we do not create here
   const aimingElsewhere = tgt.calId !== writeCal;
   const headers = { Authorization: 'Bearer '+gcalAccessToken, 'Content-Type':'application/json' };
@@ -9007,6 +9053,65 @@ function gcalFetchAllEvents(calId, params, onPage){
 }
 let gcalDupScanRunning = false;
 let gcalDupReport = null;
+/* ---------- taking back what was written to the wrong calendar ----------
+   Pairwise de-duplication is the wrong shape for what actually happened. The app wrote a full copy
+   of everything into a calendar it should only have been reading from, so the fix is not "find
+   pairs" -- it is "take back everything this app put in THAT calendar". It is also far safer to
+   reason about: one named calendar, and only events carrying this app's own mark, which is never
+   anything a person wrote there themselves. */
+function purgeAppEventsFromCalendar(calId){
+  if(gcalDupScanRunning) return;
+  if(!data.gcalConnected){ flashStatus('צריך קודם להתחבר ליומן'); return; }
+  gcalDupScanRunning = true;
+  renderGcalStatus();
+  ensureGcalWriteToken(()=>{
+    const now = new Date();
+    const from = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
+    const to   = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
+    const params = { timeMin: from.toISOString(), timeMax: to.toISOString(),
+                     singleEvents:'false', maxResults:'2500' };
+    const mine = [];
+    let others = 0;
+    gcalFetchAllEvents(calId, params, items=>{
+      items.forEach(ev=>{
+        if(!ev.id || ev.status==='cancelled') return;
+        if(gcalMadeHere(ev)) mine.push(ev); else others++;
+      });
+    }).then(()=>{
+      gcalDupScanRunning = false;
+      renderGcalStatus();
+      if(!mine.length){
+        flashStatus(`ב"${gcalCalendarLabel(calId)}" לא נמצאו אירועים שהאפליקציה יצרה (${others} אירועים אחרים, ולא ייגעו בהם)`);
+        return;
+      }
+      const names = [...new Set(mine.map(x=>x.summary||'(ללא כותרת)'))].slice(0, 8);
+      if(!confirm(`למחוק מ"${gcalCalendarLabel(calId)}" את ${mine.length} האירועים שהאפליקציה יצרה שם?\n\n${names.map(n=>'· '+n).join('\n')}${mine.length>names.length?'\n· ...':''}\n\n${others} אירועים אחרים ביומן הזה לא ייגעו בהם כלל.\nהעותקים ביומן הראשי נשארים.`)) return;
+      let ok = 0, failed = 0;
+      const headers = { Authorization: 'Bearer '+gcalAccessToken };
+      const step = (i)=>{
+        if(i >= mine.length){
+          saveData();
+          renderGcalStatus();
+          flashStatus(failed
+            ? `נמחקו ${ok} · ${failed} לא ניתנים למחיקה מהחשבון הזה`
+            : `נמחקו ${ok} אירועים מ"${gcalCalendarLabel(calId)}"`);
+          return;
+        }
+        const ev = mine[i];
+        fetch(gcalEventsUrl(calId)+'/'+encodeURIComponent(ev.id), { method:'DELETE', headers })
+          .then(r=>{ if(r.ok || r.status===410){ ok++; rememberDeletedGcalEvent(calId+':'+ev.id); } else failed++; })
+          .catch(()=>{ failed++; })
+          .then(()=>step(i+1));
+      };
+      flashStatus(`מוחק ${mine.length} אירועים...`);
+      step(0);
+    }).catch(()=>{
+      gcalDupScanRunning = false;
+      renderGcalStatus();
+      flashStatus('הקריאה מהיומן נכשלה');
+    });
+  });
+}
 function cleanGoogleCalendarDuplicates(){
   if(gcalDupScanRunning) return;
   if(!data.gcalConnected){ flashStatus('צריך קודם להתחבר ליומן'); return; }
@@ -9141,8 +9246,12 @@ function addAllGcalCalendars(){
       const ids = (json.items||[]).map(c=>c.id).filter(Boolean);
       if(!ids.length){ flashStatus('לא נמצאו יומנים בחשבון'); return; }
       const before = gcalSelectedCalendarIds();
+      // pin where writing goes BEFORE the list changes shape: adding calendars to read from must
+      // never change the one calendar written to
+      const keepWriting = gcalWriteCalendarId();
       const merged = Array.from(new Set(before.filter(x=>x!=='primary').concat(ids)));
       data.gcalCalendarIds = merged;
+      if(keepWriting && merged.includes(keepWriting)) data.gcalWriteCalendarId = keepWriting;
       saveData();
       renderGcalStatus();
       flashStatus(`חוברו ${merged.length} יומנים — מסנכרן`);
@@ -9171,11 +9280,12 @@ function renderGcalStatus(){
             <span style="display:block; font-size:11.5px; opacity:.75;">${isWrite ? 'ראשי · האפליקציה כותבת אליו וקוראת ממנו' : 'משני · קריאה בלבד'}</span>
           </span>
           ${isWrite ? '' : `<span class="del-task" style="white-space:nowrap;" onclick="setGcalWriteCalendar('${escapeAttr(calId)}')" title="הפיכה ליומן הראשי">★ ראשי</span>`}
+          ${isWrite ? '' : `<span class="del-task" style="white-space:nowrap;" onclick="purgeAppEventsFromCalendar('${escapeAttr(calId)}')" title="מחיקת כל האירועים שהאפליקציה יצרה ביומן הזה — אירועים שנוצרו ביד לא ייגעו">🧹 נקה מכאן</span>`}
           <span class="del-task" onclick="removeGcalCalendar('${escapeAttr(calId)}')" title="מחיקה">✕ נתק</span>
         </div>`;
       }).join('') : '<div class="empty">לא נבחרו יומנים</div>'}
       <div class="hint" style="margin-top:6px; font-size:12px; line-height:1.5;">
-        האפליקציה כותבת רק ליומן הראשי. משאר היומנים היא רק קוראת.<br>
+        האפליקציה כותבת רק ליומן הראשי, ולעולם לא לאף יומן אחר. משאר היומנים היא רק קוראת.<br>
         אותו אירוע שמופיע בשני יומנים מיובא פעם אחת בלבד.
       </div>
       <div class="add-row" style="margin:8px 0 0;">
@@ -9241,6 +9351,10 @@ function renderGcalStatus(){
       ${escapeHtml(bits.join(' · '))}${which}${failed}</div>`;
   }
   const dupCount = gcalDuplicateCount() + duplicateAnchorIds().size;
+  const wrongWriteHtml = gcalWritingToASecondary()
+    ? `<div class="gcal-status gcal-wrong-write">⚠️ האפליקציה כותבת כרגע ליומן משני (${escapeHtml(gcalCalendarLabel(gcalWriteCalendarId()))}) ולא ליומן הראשי של ${escapeHtml(data.gcalAccountEmail||'החשבון')}. זה מה שיוצר אירוע בכל אחד מהיומנים.
+        <button type="button" class="reset-btn" style="margin-top:6px;" onclick="restoreGcalWriteToOwn()">החזר את הכתיבה ליומן הראשי</button></div>`
+    : '';
   const dupHtml = `<div class="gcal-status gcal-dup-note">🧹 ${dupCount ? dupCount+' עותקים כפולים כאן על הלוח · ' : ''}"כפילויות ביומן גוגל" סורק שנה אחורה ושנה קדימה בכל היומנים המחוברים, ומוחק שם רק עותקים שהאפליקציה עצמה יצרה. אירוע שנוצר ביד נספר ונשאר.</div>`
     + (gcalDupReport ? `<div class="gcal-status" style="font-size:12.5px; line-height:1.5; margin-top:4px;">
         הסריקה האחרונה: ${gcalDupReport.scanned} אירועים ב-${gcalDupReport.calendars} יומנים (${gcalDupReport.from} — ${gcalDupReport.to})<br>
@@ -9260,7 +9374,7 @@ function renderGcalStatus(){
       <button class="reset-btn gcal-dup-btn" onclick="cleanGoogleCalendarDuplicates()" ${gcalDupScanRunning?'disabled':''}>${gcalDupScanRunning?'🔍 בודק...':'🧹 כפילויות ביומן גוגל'}</button>
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
-    ${dupHtml}${syncErrorHtml}${diagHtml}
+    ${wrongWriteHtml}${dupHtml}${syncErrorHtml}${diagHtml}
     ${pickerHtml}
   `;
 }
