@@ -9052,7 +9052,6 @@ function gcalFetchAllEvents(calId, params, onPage){
   return go('');
 }
 let gcalDupScanRunning = false;
-let gcalDupReport = null;
 /* ---------- taking back what was written to the wrong calendar ----------
    Pairwise de-duplication is the wrong shape for what actually happened. The app wrote a full copy
    of everything into a calendar it should only have been reading from, so the fix is not "find
@@ -9109,112 +9108,6 @@ function purgeAppEventsFromCalendar(calId){
       gcalDupScanRunning = false;
       renderGcalStatus();
       flashStatus('הקריאה מהיומן נכשלה');
-    });
-  });
-}
-function cleanGoogleCalendarDuplicates(){
-  if(gcalDupScanRunning) return;
-  if(!data.gcalConnected){ flashStatus('צריך קודם להתחבר ליומן'); return; }
-  gcalDupScanRunning = true;
-  renderGcalStatus();
-  ensureGcalWriteToken(()=>{
-    /* The sync only ever looks at the four weeks around now, and this used to borrow that window --
-       so a calendar full of duplicates from six months ago answered "nothing found", which is worse
-       than useless: it says the problem is not there when it is only out of frame. A year back and
-       a year forward, in pages, however many that takes. */
-    const now = new Date();
-    const from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-    const to   = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-    const params = { timeMin: from.toISOString(), timeMax: to.toISOString(),
-                     // singleEvents=false on purpose: a repeating event is ONE event here, and
-                     // expanding it into its instances would read a weekly anchor as fifty copies
-                     singleEvents:'false', maxResults:'2500' };
-    const calIds = gcalSelectedCalendarIds();
-    const collected = [];
-    const failures = [];
-    Promise.all(calIds.map(calId=>
-      gcalFetchAllEvents(calId, params, items=>{
-        items.forEach(ev=>{ if(ev.id && ev.status!=='cancelled') collected.push({ev, calId}); });
-      }).catch(err=>{ failures.push(calId + ' (' + (err && err.message ? err.message : '?') + ')'); })
-    )).then(()=>{
-      const per = [collected];
-      const groups = new Map();
-      per.flat().forEach(({ev, calId})=>{
-        const k = gcalEventGroupKey(ev);
-        if(!k) return;
-        if(!groups.has(k)) groups.set(k, []);
-        groups.get(k).push({ev, calId});
-      });
-      const doomed = [];
-      let untouchable = 0;
-      groups.forEach(list=>{
-        if(list.length < 2) return;
-        // what stays: something a person made, over anything the app made; then the copy carrying
-        // the id the app will keep using from now on; then simply the oldest
-        const ranked = list.slice().sort((a,b)=>{
-          const human = (gcalMadeHere(a.ev)?1:0) - (gcalMadeHere(b.ev)?1:0);
-          if(human) return human;
-          const ours = (gcalLocalIdFromEventId(b.ev.id, GCAL_ID_PREFIX_TASK) || gcalLocalIdFromEventId(b.ev.id, GCAL_ID_PREFIX_ANCHOR) ? 1 : 0)
-                     - (gcalLocalIdFromEventId(a.ev.id, GCAL_ID_PREFIX_TASK) || gcalLocalIdFromEventId(a.ev.id, GCAL_ID_PREFIX_ANCHOR) ? 1 : 0);
-          if(ours) return ours;
-          return String(a.ev.created||'').localeCompare(String(b.ev.created||''));
-        });
-        ranked.slice(1).forEach(x=>{
-          if(gcalMadeHere(x.ev)) doomed.push(x);
-          else untouchable++;
-        });
-      });
-      gcalDupScanRunning = false;
-      // What the scan actually saw, always -- so "nothing found" is an answer you can act on
-      // instead of a shrug. Which calendars, how many events, how many pairs, and how many of
-      // those this app is allowed to touch.
-      gcalDupReport = {
-        calendars: calIds.length, failed: failures.slice(),
-        scanned: collected.length,
-        pairs: [...groups.values()].filter(g=>g.length > 1).length,
-        deletable: doomed.length, untouchable,
-        from: ymd(from), to: ymd(to),
-      };
-      renderGcalStatus();
-      if(!doomed.length){
-        const bits = [`נסרקו ${collected.length} אירועים ב-${calIds.length} יומנים`];
-        if(untouchable) bits.push(`${untouchable} כפילויות לא נוצרו כאן ולכן לא ייגעו בהן`);
-        else bits.push('לא נמצאו כפילויות');
-        if(failures.length) bits.push(`${failures.length} יומנים לא נקראו`);
-        flashStatus(bits.join(' · '));
-        return;
-      }
-      const names = [...new Set(doomed.map(x=>x.ev.summary||'(ללא כותרת)'))].slice(0,6);
-      const extra = untouchable ? `\n\nעוד ${untouchable} כפילויות לא נוצרו על ידי האפליקציה, ולכן לא ייגעו בהן — אותן צריך למחוק ביומן גוגל עצמו.` : '';
-      if(!confirm(`נמצאו ${doomed.length} אירועים כפולים ביומן גוגל שהאפליקציה יצרה.\n\n${names.map(n=>'· '+n).join('\n')}${doomed.length>names.length?'\n· ...':''}\n\nלמחוק אותם מיומן גוגל? מכל קבוצה יישאר עותק אחד.${extra}`)) return;
-      let failed = 0;
-      const gone = [];
-      const step = (i)=>{
-        if(i >= doomed.length){
-          const ok = gone.length;
-          // only what actually left Google is written off, so a copy that could not be deleted is
-          // still allowed to come back here rather than quietly vanishing from both sides
-          gone.forEach(x=>rememberDeletedGcalEvent(x.calId+':'+x.ev.id));
-          saveData();
-          flashStatus(failed
-            ? `נמחקו ${ok} כפילויות מיומן גוגל · ${failed} לא ניתנות למחיקה מהחשבון הזה`
-            : `נמחקו ${ok} כפילויות מיומן גוגל`);
-          renderGcalStatus();
-          return;
-        }
-        const x = doomed[i];
-        fetch(gcalEventsUrl(x.calId)+'/'+encodeURIComponent(x.ev.id), {
-          method:'DELETE', headers:{ Authorization: 'Bearer '+gcalAccessToken }
-        }).then(r=>{ if(r.ok || r.status===410) gone.push(x); else failed++; })
-          .catch(()=>{ failed++; })
-          .then(()=>step(i+1));
-      };
-      flashStatus('מוחק כפילויות מיומן גוגל...');
-      step(0);
-    }).catch(()=>{
-      gcalDupScanRunning = false;
-      renderGcalStatus();
-      flashStatus('בדיקת הכפילויות ביומן נכשלה');
     });
   });
 }
@@ -9355,12 +9248,10 @@ function renderGcalStatus(){
     ? `<div class="gcal-status gcal-wrong-write">⚠️ האפליקציה כותבת כרגע ליומן משני (${escapeHtml(gcalCalendarLabel(gcalWriteCalendarId()))}) ולא ליומן הראשי של ${escapeHtml(data.gcalAccountEmail||'החשבון')}. זה מה שיוצר אירוע בכל אחד מהיומנים.
         <button type="button" class="reset-btn" style="margin-top:6px;" onclick="restoreGcalWriteToOwn()">החזר את הכתיבה ליומן הראשי</button></div>`
     : '';
-  const dupHtml = `<div class="gcal-status gcal-dup-note">🧹 ${dupCount ? dupCount+' עותקים כפולים כאן על הלוח · ' : ''}"כפילויות ביומן גוגל" סורק שנה אחורה ושנה קדימה בכל היומנים המחוברים, ומוחק שם רק עותקים שהאפליקציה עצמה יצרה. אירוע שנוצר ביד נספר ונשאר.</div>`
-    + (gcalDupReport ? `<div class="gcal-status" style="font-size:12.5px; line-height:1.5; margin-top:4px;">
-        הסריקה האחרונה: ${gcalDupReport.scanned} אירועים ב-${gcalDupReport.calendars} יומנים (${gcalDupReport.from} — ${gcalDupReport.to})<br>
-        ${gcalDupReport.pairs} קבוצות של עותקים · ${gcalDupReport.deletable} ניתנים למחיקה מכאן · ${gcalDupReport.untouchable} נוצרו ביד ולא ייגעו בהם
-        ${gcalDupReport.failed.length ? '<br>יומנים שלא נקראו: ' + escapeHtml(gcalDupReport.failed.join(', ')) : ''}
-      </div>` : '');
+  // said only when there is something to say
+  const dupHtml = dupCount
+    ? `<div class="gcal-status gcal-dup-note">🧹 ${dupCount} עותקים כפולים על הלוח כאן.</div>`
+    : '';
   const syncErrorHtml = (!currentSyncUser && lastSyncSignInError)
     ? `<div class="gcal-status" style="color:#e06060; margin-top:4px;">⚠️ סנכרון בין מכשירים נכשל: ${escapeHtml(lastSyncSignInError)}</div>`
     : '';
@@ -9370,8 +9261,7 @@ function renderGcalStatus(){
       <span class="gcal-status">${gcalSyncing?'🔄 מסנכרן...':'✅ מחובר ליומן גוגל'}${(lastSyncStr && !gcalSyncing) ? (' · סונכרן לאחרונה '+lastSyncStr) : ''}</span>
       <button class="reset-btn" onclick="syncGoogleCalendar()" ${gcalSyncing?'disabled':''}>🔄 סנכרן עכשיו</button>
       <button class="reset-btn" onclick="toggleGcalPicker()">📋 יומנים (${selectedIds.length})</button>
-      <button class="reset-btn ${dupCount?'gcal-dup-btn':''}" onclick="cleanGcalDuplicates()">🧹 כפילויות כאן${dupCount?' ('+dupCount+')':''}</button>
-      <button class="reset-btn gcal-dup-btn" onclick="cleanGoogleCalendarDuplicates()" ${gcalDupScanRunning?'disabled':''}>${gcalDupScanRunning?'🔍 בודק...':'🧹 כפילויות ביומן גוגל'}</button>
+      ${dupCount ? `<button class="reset-btn gcal-dup-btn" onclick="cleanGcalDuplicates()">🧹 כפילויות כאן (${dupCount})</button>` : ''}
       <button class="reset-btn" onclick="disconnectGoogleCalendar()">✕ נתק</button>
     </div>
     ${wrongWriteHtml}${dupHtml}${syncErrorHtml}${diagHtml}
