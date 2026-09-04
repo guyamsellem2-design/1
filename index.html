@@ -8297,16 +8297,31 @@ function gcalLocalIdFromEventId(evId, prefix){
 /* An event imported from a calendar carries that calendar's name in front of its id, and it has to
    be updated THERE. Sending it to the write calendar -- which is what happened until now -- asks
    for an id that calendar has never heard of, and has been failing silently every time. */
-function gcalTargetFor(existingEventId){
+/* ---------- an event lives in ONE calendar, and it is remembered ----------
+   The app writes to "the main calendar", and which one that is belongs to the device: connect the
+   personal account on the phone and the work account on the computer, and the two of them are
+   writing to two different calendars. The task list is shared between them, so the same task got
+   pushed twice -- once into each account. The chosen event id stopped a second copy inside ONE
+   calendar; it could do nothing about one copy in each of two.
+
+   So the calendar an event landed in is written down on the record, travels with it between
+   devices, and every later push goes THERE. And when a push cannot reach that calendar -- another
+   account, no permission -- it does not fall back to making a local copy, which is exactly the
+   duplicate we are trying to stop. It says so instead, and leaves the one real event alone. */
+function gcalTargetFor(existingEventId, homeCalId){
   const at = existingEventId ? existingEventId.indexOf(':') : -1;
   if(at !== -1) return { calId: existingEventId.slice(0, at), evId: existingEventId.slice(at+1) };
-  return { calId: gcalWriteCalendarId(), evId: existingEventId || '' };
+  return { calId: homeCalId || gcalWriteCalendarId(), evId: existingEventId || '' };
 }
+function gcalHomeCalendarOf(rec){ return (rec && rec.googleCalendarId) || ''; }
 function gcalEventsUrl(calId){
   return `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
 }
-function pushEventToGcal(eventBody, existingEventId, onSuccess, wantedId){
-  const tgt = gcalTargetFor(existingEventId);
+function pushEventToGcal(eventBody, existingEventId, onSuccess, wantedId, homeCalId){
+  const tgt = gcalTargetFor(existingEventId, homeCalId);
+  const writeCal = gcalWriteCalendarId();
+  // the calendar we are aiming at is not one we own: whatever happens, we do not create here
+  const aimingElsewhere = tgt.calId !== writeCal;
   const headers = { Authorization: 'Bearer '+gcalAccessToken, 'Content-Type':'application/json' };
   // no confirm() here on purpose (same reasoning as everywhere else in the app) -- just say what
   // happened and let the user reconnect via the button whenever they're ready, instead of a
@@ -8316,22 +8331,22 @@ function pushEventToGcal(eventBody, existingEventId, onSuccess, wantedId){
     clearPersistedGcalToken();
     flashStatus('ההרשאה ליומן גוגל פגה — לחיצה על "חיבור ליומן גוגל" תחדש אותה');
   };
-  const done = (ev)=>{ if(ev){ onSuccess(ev); flashStatus('עודכן ביומן גוגל'); } };
+  const done = (calId)=>(ev)=>{ if(ev){ onSuccess(ev, calId); flashStatus('עודכן ביומן גוגל'); } };
   const fail = ()=>{ flashStatus('העדכון ביומן גוגל נכשל'); };
 
   // update the one that is already there, under the id we asked for
   const adopt = ()=>{
-    fetch(gcalEventsUrl(gcalWriteCalendarId())+'/'+encodeURIComponent(wantedId), {
+    fetch(gcalEventsUrl(writeCal)+'/'+encodeURIComponent(wantedId), {
       method:'PATCH', headers, body: JSON.stringify({...eventBody, status:'confirmed'})
     }).then(r=>{
       if(r.status===401){ authGone(); return null; }
       if(!r.ok) throw new Error('http_'+r.status);
       return r.json();
-    }).then(done).catch(fail);
+    }).then(done(writeCal)).catch(fail);
   };
   const insert = ()=>{
     const body = wantedId ? {...eventBody, id: wantedId} : eventBody;
-    fetch(gcalEventsUrl(gcalWriteCalendarId()), { method:'POST', headers, body: JSON.stringify(body) })
+    fetch(gcalEventsUrl(writeCal), { method:'POST', headers, body: JSON.stringify(body) })
       .then(r=>{
         if(r.status===401 || r.status===403){ authGone(); return null; }
         // 409: this id is taken, which is exactly the answer we want -- the event exists already,
@@ -8339,7 +8354,7 @@ function pushEventToGcal(eventBody, existingEventId, onSuccess, wantedId){
         if(r.status===409 && wantedId){ adopt(); return null; }
         if(!r.ok) throw new Error('http_'+r.status);
         return r.json();
-      }).then(done).catch(fail);
+      }).then(done(writeCal)).catch(fail);
   };
 
   if(!tgt.evId){ insert(); return; }
@@ -8347,12 +8362,20 @@ function pushEventToGcal(eventBody, existingEventId, onSuccess, wantedId){
     method:'PATCH', headers, body: JSON.stringify(eventBody)
   }).then(r=>{
     if(r.status===401){ authGone(); return null; }
-    // gone from Google, or an id belonging to a calendar we cannot write to: make it again -- and
-    // making it again is safe now, because it can only ever land on the one id we chose
-    if(r.status===403 || r.status===404 || r.status===410){ insert(); return null; }
+    if(r.status===403 || r.status===404 || r.status===410){
+      /* The event's own calendar will not take the change. If that calendar is somebody else's --
+         the other account this task list is shared with -- then the event IS there and is simply
+         out of our reach, and making a local one would be the second copy, not a repair. */
+      if(aimingElsewhere){
+        flashStatus('האירוע נמצא ביומן של חשבון אחר — העדכון שם לא בוצע, ולא נוצר עותק כאן');
+        return null;
+      }
+      insert();     // our own calendar, and it really is gone from it
+      return null;
+    }
     if(!r.ok) throw new Error('http_'+r.status);
     return r.json();
-  }).then(done).catch(fail);
+  }).then(done(tgt.calId)).catch(fail);
 }
 function pushTaskToGcal(t){
   if(!t.date) return;
@@ -8374,12 +8397,12 @@ function pushTaskToGcal(t){
     // the cross-device merge can replace the whole task list while this request is in the air, and
     // writing the new event id onto an object nothing points at any more is how a task ends up with
     // no link at all -- which is how it got created in Google a second time
-    pushEventToGcal(body, t.googleEventId, ev=>{
+    pushEventToGcal(body, t.googleEventId, (ev, calId)=>{
       const live = data.tasks.find(x=>x.id===t.id);
-      if(live) live.googleEventId = ev.id;
-      t.googleEventId = ev.id;
+      if(live){ live.googleEventId = ev.id; live.googleCalendarId = calId; }
+      t.googleEventId = ev.id; t.googleCalendarId = calId;
       saveData();
-    }, gcalDeterministicId(GCAL_ID_PREFIX_TASK, t.id));
+    }, gcalDeterministicId(GCAL_ID_PREFIX_TASK, t.id), gcalHomeCalendarOf(t));
   });
 }
 function anchorRecurrenceRule(a){
@@ -8424,19 +8447,19 @@ function pushAnchorToGcal(a){
       end: { dateTime: end.toISOString() }
     };
     if(recur) body.recurrence = [recur];
-    pushEventToGcal(body, a.googleRecurringEventId, ev=>{
+    pushEventToGcal(body, a.googleRecurringEventId, (ev, calId)=>{
       const live = data.anchors.find(x=>x.id===a.id);
-      if(live) live.googleRecurringEventId = ev.id;
-      a.googleRecurringEventId = ev.id;
+      if(live){ live.googleRecurringEventId = ev.id; live.googleCalendarId = calId; }
+      a.googleRecurringEventId = ev.id; a.googleCalendarId = calId;
       saveData();
-    }, gcalDeterministicId(GCAL_ID_PREFIX_ANCHOR, a.id));
+    }, gcalDeterministicId(GCAL_ID_PREFIX_ANCHOR, a.id), gcalHomeCalendarOf(a));
   });
 }
-function deleteEventFromGcal(eventId, onDone){
+function deleteEventFromGcal(eventId, onDone, homeCalId){
   ensureGcalWriteToken(()=>{
-    // an imported event names its own calendar; anything else was written by us, to the write
-    // calendar. "the first calendar in the list" was neither, and quietly deleted nothing.
-    const tgt = gcalTargetFor(eventId);
+    // an imported event names its own calendar; anything else names the calendar it was written
+    // to. "the first calendar in the list" was neither, and quietly deleted nothing.
+    const tgt = gcalTargetFor(eventId, homeCalId);
     fetch(gcalEventsUrl(tgt.calId)+'/'+encodeURIComponent(tgt.evId), {
       method:'DELETE', headers:{ Authorization: 'Bearer '+gcalAccessToken }
     }).then(()=>{ onDone(); flashStatus('הוסר מיומן גוגל'); }).catch(()=>{ onDone(); });
@@ -8447,7 +8470,7 @@ function deleteEventFromGcal(eventId, onDone){
 function applyGcalSyncForTask(t, timingOrSyncChanged){
   if(!data.gcalConnected || !timingOrSyncChanged) return;
   if(t.gcalSync===false){
-    if(t.googleEventId){ const evId = t.googleEventId; t.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+    if(t.googleEventId){ const evId = t.googleEventId, home = gcalHomeCalendarOf(t); t.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData(), home); }
     return;
   }
   if(!t.date) return;
@@ -8456,7 +8479,7 @@ function applyGcalSyncForTask(t, timingOrSyncChanged){
 function applyGcalSyncForAnchor(a, timingOrSyncChanged){
   if(!data.gcalConnected || !timingOrSyncChanged) return;
   if(a.gcalSync===false){
-    if(a.googleRecurringEventId){ const evId = a.googleRecurringEventId; a.googleRecurringEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+    if(a.googleRecurringEventId){ const evId = a.googleRecurringEventId, home = gcalHomeCalendarOf(a); a.googleRecurringEventId = null; deleteEventFromGcal(evId, ()=>saveData(), home); }
     return;
   }
   pushAnchorToGcal(a);
@@ -8771,7 +8794,7 @@ function runGcalSync(quiet){
         const fields = gcalIncomingFields(ev);
         data.tasks.push({id:uid(), text:ev.summary||'(ללא כותרת)', domain:fields.domain, done:false, energy:'',
           date, time, endTime, description:fields.description, subtasks:[], googleEventId:gid,
-          googleICalUID: ev.iCalUID||'', createdAt:Date.now()});
+          googleCalendarId: calId, googleICalUID: ev.iCalUID||'', createdAt:Date.now()});
         addedTasks++;
       });
 
@@ -9667,7 +9690,7 @@ function deleteAnchor(id){
   data.anchors = data.anchors.filter(a=>a.id!==id);
   saveData();
   renderScheduleGrid();
-  if(data.gcalConnected && removed && removed.googleRecurringEventId) deleteEventFromGcal(removed.googleRecurringEventId, ()=>{});
+  if(data.gcalConnected && removed && removed.googleRecurringEventId) deleteEventFromGcal(removed.googleRecurringEventId, ()=>{}, gcalHomeCalendarOf(removed));
 }
 function deleteAnchorOccurrence(id, dateStr){
   const a = data.anchors.find(a=>a.id===id);
@@ -9713,7 +9736,7 @@ function unscheduleTaskFromWeek(id){
   if(t){
     t.date=''; t.time=''; t.endTime='';
     saveData();
-    if(data.gcalConnected && t.googleEventId){ const evId = t.googleEventId; t.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+    if(data.gcalConnected && t.googleEventId){ const evId = t.googleEventId, home = gcalHomeCalendarOf(t); t.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData(), home); }
   }
   longPressedTaskId = null;
   renderScheduleGrid();
@@ -10086,19 +10109,19 @@ function pushSubtaskToGcal(taskId, s){
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() }
     };
-    pushEventToGcal(body, s.googleEventId, ev=>{
+    pushEventToGcal(body, s.googleEventId, (ev, calId)=>{
       const liveTask = data.tasks.find(x=>x.id===taskId);
       const live = liveTask && (liveTask.subtasks||[]).find(x=>x.id===s.id);
-      if(live) live.googleEventId = ev.id;
-      s.googleEventId = ev.id;
+      if(live){ live.googleEventId = ev.id; live.googleCalendarId = calId; }
+      s.googleEventId = ev.id; s.googleCalendarId = calId;
       saveData();
-    }, gcalDeterministicId(GCAL_ID_PREFIX_SUBTASK, s.id));
+    }, gcalDeterministicId(GCAL_ID_PREFIX_SUBTASK, s.id), gcalHomeCalendarOf(s));
   });
 }
 function applyGcalSyncForSubtask(taskId, s, timingOrSyncChanged){
   if(!data.gcalConnected || !timingOrSyncChanged) return;
   if(s.gcalSync===false){
-    if(s.googleEventId){ const evId = s.googleEventId; s.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+    if(s.googleEventId){ const evId = s.googleEventId, home = gcalHomeCalendarOf(s); s.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData(), home); }
     return;
   }
   if(!s.date) return;
@@ -10132,7 +10155,7 @@ function cancelSubtaskScheduleForm(taskId, subId){
   subtaskDateOpenIds.delete(taskId+':'+subId);
   saveData();
   renderTasks();
-  if(s.googleEventId){ const evId = s.googleEventId; s.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData()); }
+  if(s.googleEventId){ const evId = s.googleEventId, home = gcalHomeCalendarOf(s); s.googleEventId = null; deleteEventFromGcal(evId, ()=>saveData(), home); }
 }
 function deleteSubtask(taskId, subId){
   const t = data.tasks.find(t=>t.id===taskId);
@@ -10142,7 +10165,7 @@ function deleteSubtask(taskId, subId){
   subtaskDateOpenIds.delete(taskId+':'+subId);
   saveData();
   renderTasks();
-  if(data.gcalConnected && removed && removed.googleEventId) deleteEventFromGcal(removed.googleEventId, ()=>{});
+  if(data.gcalConnected && removed && removed.googleEventId) deleteEventFromGcal(removed.googleEventId, ()=>{}, gcalHomeCalendarOf(removed));
 }
 function toggleSubtaskFavorite(taskId, subId){
   const t = data.tasks.find(t=>t.id===taskId);
@@ -10205,7 +10228,7 @@ function deleteTask(id, opts){
   const alsoGoogle = (opts && typeof opts.alsoGoogle === 'boolean')
     ? opts.alsoGoogle
     : confirm(`למחוק את "${removed.text||'האירוע'}" גם מיומן גוגל?`);
-  if(alsoGoogle) deleteEventFromGcal(removed.googleEventId, ()=>{});
+  if(alsoGoogle) deleteEventFromGcal(removed.googleEventId, ()=>{}, gcalHomeCalendarOf(removed));
 }
 
 /* ---------- a task or an anchor always has a when ----------
@@ -12410,7 +12433,7 @@ function syncSuggestionReplyToSchedule(s){
       const t = data.tasks.find(t=>t.id===s.linkedTaskId);
       if(t){
         data.tasks = data.tasks.filter(x=>x.id!==t.id);
-        if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData());
+        if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData(), gcalHomeCalendarOf(t));
       }
       s.linkedTaskId = null;
     }
@@ -12504,7 +12527,7 @@ function deleteSuggestion(id){
     const t = data.tasks.find(t=>t.id===s.linkedTaskId);
     if(t){
       data.tasks = data.tasks.filter(x=>x.id!==t.id);
-      if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData());
+      if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData(), gcalHomeCalendarOf(t));
       renderTasks();
       renderScheduleGrid();
     }
@@ -13769,7 +13792,7 @@ function clearTasks(which){
   doomed.forEach(t=>{
     if(!t.googleEventId) return;
     rememberDeletedGcalEvent(t.googleEventId);
-    if(alsoGoogle && !taskDateHasPassed(t)) deleteEventFromGcal(t.googleEventId, ()=>{});
+    if(alsoGoogle && !taskDateHasPassed(t)) deleteEventFromGcal(t.googleEventId, ()=>{}, gcalHomeCalendarOf(t));
   });
   const gone = new Set(doomed.map(t=>t.id));
   data.tasks = data.tasks.filter(t=>!gone.has(t.id));
@@ -13791,7 +13814,7 @@ function clearDilemmasSection(){
   (data.suggestions||[]).forEach(s=>{
     if(!s.linkedTaskId) return;
     const t = data.tasks.find(t=>t.id===s.linkedTaskId);
-    if(t){ data.tasks = data.tasks.filter(x=>x.id!==t.id); if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData()); }
+    if(t){ data.tasks = data.tasks.filter(x=>x.id!==t.id); if(data.gcalConnected && t.googleEventId) deleteEventFromGcal(t.googleEventId, ()=>saveData(), gcalHomeCalendarOf(t)); }
   });
   data.suggestions = [];
   data.generalDilemmas = [];
