@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>מחברת אחת</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#F1F2EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14170F" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="מחברת אחת">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --paper:#F1F2EC;
+    --paper-2:#E9EBE1;
+    --paper-3:#DFE2D6;
+    --ink:#202720;
+    --ink-soft:#5E6A5E;
+    --ink-faint:#8A9488;
+    --rule:#D6D9CE;
+    --rule-strong:#C3C8B8;
+    --time:#2C4E8A;
+    --time-soft:#DFE6F2;
+    --done:#9AA394;
+    --shadow:0 10px 30px -22px rgba(32,39,32,.55);
+    --focus:#2C4E8A;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#14170F;
+      --paper-2:#1C2017;
+      --paper-3:#262B20;
+      --ink:#E7EAE0;
+      --ink-soft:#9BA495;
+      --ink-faint:#6C7568;
+      --rule:#2B3126;
+      --rule-strong:#3A4134;
+      --time:#9DBBF0;
+      --time-soft:#1B2435;
+      --done:#616B5D;
+      --shadow:0 10px 30px -20px rgba(0,0,0,.8);
+      --focus:#9DBBF0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14170F;
+    --paper-2:#1C2017;
+    --paper-3:#262B20;
+    --ink:#E7EAE0;
+    --ink-soft:#9BA495;
+    --ink-faint:#6C7568;
+    --rule:#2B3126;
+    --rule-strong:#3A4134;
+    --time:#9DBBF0;
+    --time-soft:#1B2435;
+    --done:#616B5D;
+    --shadow:0 10px 30px -20px rgba(0,0,0,.8);
+    --focus:#9DBBF0;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  img{max-width:100%;}
+  [hidden]{display:none !important;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Assistant","Segoe UI",system-ui,sans-serif;
+    font-size:16px;
+    line-height:1.55;
+    -webkit-text-size-adjust:100%;
+  }
+  button{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--focus); outline-offset:2px; border-radius:4px;}
+
+  .app{
+    max-width:600px;
+    margin:0 auto;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    padding-inline:18px;
+    background:var(--paper);
+  }
+
+  /* ---------- top ---------- */
+  .topbar{
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+    padding-block:18px 12px;
+    border-bottom:1px solid var(--rule);
+  }
+  .brand{
+    font-family:"Frank Ruhl Libre",Georgia,serif;
+    font-weight:700; font-size:21px; letter-spacing:.01em;
+  }
+  .thesis{
+    font-size:12.5px; color:var(--ink-faint); letter-spacing:.06em;
+    flex:1; min-width:120px;
+  }
+  .top-actions{display:flex; gap:4px;}
+  .icon-btn{
+    background:none; border:1px solid transparent; color:var(--ink-soft);
+    font-size:15px; padding:6px 9px; border-radius:var(--radius); cursor:pointer;
+  }
+  .icon-btn:hover{background:var(--paper-2); color:var(--ink);}
+
+  /* ---------- page head ---------- */
+  main{flex:1; padding-block:16px 8px;}
+  .page-head{display:flex; align-items:flex-end; gap:10px; margin-bottom:4px;}
+  .page-title{
+    font-family:"Frank Ruhl Libre",Georgia,serif;
+    font-weight:500; font-size:27px; line-height:1.2; text-wrap:balance; margin:0;
+  }
+  .page-sub{font-size:13px; color:var(--ink-faint); margin:2px 0 0;}
+  .daynav{display:flex; gap:2px; margin-inline-start:auto;}
+  .daynav button{
+    background:none; border:1px solid var(--rule); color:var(--ink-soft);
+    width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:13px;
+  }
+  .daynav button:hover{border-color:var(--rule-strong); color:var(--ink);}
+
+  /* ---------- the scheduled strip ---------- */
+  .strip{
+    margin:18px 0 22px; padding:12px 14px;
+    background:var(--time-soft); border-radius:var(--radius);
+  }
+  .strip-label{
+    font-size:11.5px; letter-spacing:.09em; color:var(--time);
+    font-weight:600; margin-bottom:8px; display:flex; gap:8px; align-items:baseline;
+  }
+  .strip-label span{color:var(--ink-faint); font-weight:400; letter-spacing:0;}
+  .strip-row{
+    display:flex; gap:10px; align-items:baseline; padding-block:4px;
+    cursor:pointer; border:none; background:none; width:100%; text-align:start;
+    color:var(--ink); font-size:15px;
+  }
+  .strip-row .t{
+    font-variant-numeric:tabular-nums; color:var(--time); font-weight:600;
+    font-size:13.5px; min-width:42px;
+  }
+  .strip-row .s{flex:1;}
+  .strip-empty{font-size:14px; color:var(--ink-faint);}
+
+  /* ---------- lines: the notebook ---------- */
+  .lines{
+    border-inline-start:1px solid var(--rule);
+    padding-inline-start:0;
+    margin:0 0 4px;
+    list-style:none;
+  }
+  .line{
+    display:flex; gap:11px; align-items:flex-start;
+    padding:9px 2px 9px 12px;
+    border-bottom:1px solid var(--rule);
+  }
+  .line:last-of-type{border-bottom:1px solid var(--rule);}
+  .bullet{
+    flex:none; margin-top:7px;
+    width:9px; height:9px; padding:0;
+    border:1.5px solid var(--rule-strong); border-radius:50%;
+    background:none; cursor:pointer;
+  }
+  .bullet:hover{border-color:var(--ink-soft);}
+  .line.done .bullet{background:var(--done); border-color:var(--done);}
+  .line-main{flex:1; min-width:0;}
+  .line-text{
+    outline:none; word-break:break-word; white-space:pre-wrap;
+    cursor:text; font-weight:300; font-size:16.5px;
+  }
+  .line.done .line-text{color:var(--done); text-decoration:line-through;}
+  .line-meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:5px;}
+  .chip{
+    font-size:11.5px; padding:2px 8px; border-radius:999px;
+    border:1px solid transparent; cursor:pointer; background:none;
+    font-family:inherit; line-height:1.6;
+  }
+  .chip.time{
+    color:var(--time); border-color:var(--time); font-variant-numeric:tabular-nums;
+    font-weight:600;
+  }
+  .chip.topic{color:var(--c); border-color:var(--c);}
+  .chip.where{color:var(--ink-faint); border-color:var(--rule);}
+  .line-toggle{
+    flex:none; background:none; border:none; color:var(--ink-faint);
+    cursor:pointer; font-size:15px; padding:2px 5px; margin-top:2px; border-radius:6px;
+  }
+  .line-toggle:hover{background:var(--paper-2); color:var(--ink);}
+
+  /* a heading the user writes -- this is how "lists" and "sections" exist */
+  .line.heading{border-bottom:none; padding-bottom:2px; padding-top:22px;}
+  .line.heading .bullet{display:none;}
+  .line.heading .line-text{
+    font-family:"Frank Ruhl Libre",Georgia,serif;
+    font-weight:500; font-size:19px; color:var(--ink);
+  }
+
+  /* ---------- inline actions ---------- */
+  .acts{
+    padding:10px 12px 14px; border-bottom:1px solid var(--rule);
+    background:var(--paper-2);
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .acts-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .act{
+    background:var(--paper); border:1px solid var(--rule-strong); color:var(--ink-soft);
+    border-radius:999px; padding:5px 12px; font-size:13px; cursor:pointer;
+  }
+  .act:hover{color:var(--ink); border-color:var(--ink-faint);}
+  .act.on{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .act.danger:hover{color:#B4472F; border-color:#B4472F;}
+  .act.dot::before{
+    content:""; display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:var(--c); margin-inline-end:6px; vertical-align:-1px;
+  }
+  .acts label{
+    font-size:11.5px; letter-spacing:.07em; color:var(--ink-faint);
+    display:block; margin-bottom:5px;
+  }
+  .acts input[type="date"], .acts input[type="time"], .acts select{
+    font-family:inherit; font-size:14px; padding:6px 9px;
+    background:var(--paper); color:var(--ink);
+    border:1px solid var(--rule-strong); border-radius:8px;
+  }
+
+  /* ---------- composer ---------- */
+  .composer{
+    position:sticky; bottom:0; background:var(--paper);
+    padding-block:10px 12px;
+    border-top:1px solid var(--rule);
+    display:flex; gap:8px; align-items:center;
+  }
+  .composer input{
+    flex:1; min-width:0; font-family:inherit; font-size:16.5px; font-weight:300;
+    background:var(--paper-2); color:var(--ink);
+    border:1px solid var(--rule); border-radius:var(--radius);
+    padding:11px 13px;
+  }
+  .composer input::placeholder{color:var(--ink-faint);}
+  .composer button{
+    flex:none; background:var(--ink); color:var(--paper); border:none;
+    border-radius:var(--radius); padding:11px 17px; font-size:15px; cursor:pointer;
+  }
+  .composer-hint{
+    font-size:11.5px; color:var(--ink-faint); padding-bottom:8px; margin-top:-2px;
+  }
+
+  /* ---------- tabs ---------- */
+  .tabs{
+    position:sticky; bottom:0; display:flex; gap:4px;
+    padding-block:8px 16px; background:var(--paper);
+    border-top:1px solid var(--rule);
+  }
+  .tab{
+    flex:1; background:none; border:none; cursor:pointer;
+    color:var(--ink-faint); font-size:14px; padding:9px 4px;
+    border-radius:var(--radius); border:1px solid transparent;
+  }
+  .tab.on{color:var(--ink); background:var(--paper-2); border-color:var(--rule);}
+
+  /* ---------- pages list ---------- */
+  .page-list{list-style:none; margin:14px 0 0; padding:0;}
+  .page-row{
+    display:flex; align-items:baseline; gap:10px; width:100%;
+    background:none; border:none; border-bottom:1px solid var(--rule);
+    padding:13px 2px; cursor:pointer; color:var(--ink); text-align:start;
+    font-family:"Frank Ruhl Libre",Georgia,serif; font-size:19px;
+  }
+  .page-row .count{
+    font-family:"Assistant",sans-serif; font-size:13px; color:var(--ink-faint);
+    margin-inline-start:auto; font-variant-numeric:tabular-nums;
+  }
+  .new-page{
+    display:flex; gap:8px; margin-top:16px;
+  }
+  .new-page input{
+    flex:1; min-width:0; font-family:inherit; font-size:15px;
+    background:var(--paper-2); color:var(--ink);
+    border:1px solid var(--rule); border-radius:var(--radius); padding:9px 12px;
+  }
+  .new-page button{
+    background:none; border:1px solid var(--rule-strong); color:var(--ink-soft);
+    border-radius:var(--radius); padding:9px 14px; font-size:14px; cursor:pointer;
+  }
+
+  /* ---------- week ---------- */
+  .week-day{border-bottom:1px solid var(--rule); padding-block:12px;}
+  .week-day h3{
+    margin:0 0 6px; font-family:"Frank Ruhl Libre",Georgia,serif;
+    font-size:16px; font-weight:500; display:flex; gap:9px; align-items:baseline;
+  }
+  .week-day h3 em{font-style:normal; font-size:12.5px; color:var(--ink-faint);}
+  .week-day.today h3{color:var(--time);}
+  .week-empty{font-size:13.5px; color:var(--ink-faint);}
+
+  /* ---------- topic lens ---------- */
+  .lens-head{
+    display:flex; align-items:center; gap:10px; margin-bottom:4px;
+  }
+  .lens-dot{width:12px; height:12px; border-radius:50%; background:var(--c); flex:none;}
+  .group-label{
+    font-size:11.5px; letter-spacing:.08em; color:var(--ink-faint);
+    margin:22px 0 2px;
+  }
+
+  /* ---------- sheets ---------- */
+  .sheet{
+    position:fixed; inset:0; background:rgba(20,23,15,.42);
+    display:none; align-items:flex-start; justify-content:center;
+    padding:22px 16px; z-index:40; backdrop-filter:blur(2px);
+  }
+  .sheet.open{display:flex;}
+  .sheet-box{
+    background:var(--paper); border:1px solid var(--rule-strong);
+    border-radius:14px; box-shadow:var(--shadow);
+    width:100%; max-width:560px; padding:16px; max-height:88dvh; overflow:auto;
+  }
+  .sheet-box input[type="search"]{
+    width:100%; font-family:inherit; font-size:16px; padding:11px 13px;
+    background:var(--paper-2); color:var(--ink);
+    border:1px solid var(--rule); border-radius:var(--radius);
+  }
+  .result{
+    display:block; width:100%; text-align:start; background:none;
+    border:none; border-bottom:1px solid var(--rule); padding:11px 2px;
+    cursor:pointer; color:var(--ink); font-size:15px; font-weight:300;
+  }
+  .result em{font-style:normal; font-size:11.5px; color:var(--ink-faint); display:block;}
+
+  /* ---------- breath ---------- */
+  .breath-box{text-align:center; padding:26px 16px;}
+  .orb{
+    width:120px; height:120px; border-radius:50%; margin:14px auto 18px;
+    background:var(--time-soft); border:1.5px solid var(--time);
+    animation:breathe 12s ease-in-out infinite;
+  }
+  @keyframes breathe{
+    0%,100%{transform:scale(.62);} 25%{transform:scale(1);} 50%{transform:scale(1);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .orb{animation:none; transform:scale(.85);}
+  }
+  .breath-word{
+    font-family:"Frank Ruhl Libre",Georgia,serif; font-size:20px; color:var(--ink-soft);
+  }
+
+  .seed-note{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    font-size:12.5px; color:var(--ink-faint);
+    border:1px dashed var(--rule-strong); border-radius:var(--radius);
+    padding:9px 12px; margin-bottom:18px;
+  }
+  .seed-note button{
+    background:none; border:1px solid var(--rule-strong); color:var(--ink-soft);
+    border-radius:999px; padding:3px 11px; font-size:12px; cursor:pointer;
+    margin-inline-start:auto;
+  }
+  .empty-note{font-size:14px; color:var(--ink-faint); padding:18px 2px;}
+  .sync-note{font-size:11px; color:var(--ink-faint); text-align:center; padding-bottom:6px;}
+  .tabs{padding-bottom:calc(16px + env(safe-area-inset-bottom));}
+</style>
+</head>
+<body>
+
+<div class="app" dir="rtl">
+  <header class="topbar">
+    <div class="brand">מחברת אחת</div>
+    <div class="thesis">כותבים לפי זמן · קוראים לפי נושא</div>
+    <div class="top-actions">
+      <button class="icon-btn" id="searchBtn" title="חיפוש">⌕ חיפוש</button>
+      <button class="icon-btn" id="breathBtn" title="רגע עצירה">◯ נשימה</button>
+    </div>
+  </header>
+
+  <main id="main"></main>
+
+  <div class="composer">
+    <input id="composer" type="text" autocomplete="off" placeholder="לכתוב...">
+    <button id="composerBtn">הוסף</button>
+  </div>
+  <div class="composer-hint" id="composerHint"></div>
+
+  <nav class="tabs">
+    <button class="tab" id="tabDay" data-view="day">היום</button>
+    <button class="tab" id="tabPages" data-view="pages">מחברות</button>
+    <button class="tab" id="tabWeek" data-view="week">השבוע</button>
+  </nav>
+  <div class="sync-note" id="syncNote"></div>
+</div>
+
+<div class="sheet" id="searchSheet">
+  <div class="sheet-box">
+    <input type="search" id="searchInput" placeholder="לחפש בכל מה שכתבת...">
+    <div id="searchResults"></div>
+  </div>
+</div>
+
+<div class="sheet" id="breathSheet">
+  <div class="sheet-box breath-box">
+    <div class="orb"></div>
+    <div class="breath-word" id="breathWord">שאיפה</div>
+    <p style="font-size:13px;color:var(--ink-faint);margin:18px 0 0;">לחיצה בכל מקום סוגרת</p>
+  </div>
+</div>
+
+<script>
+document.documentElement.dir = 'rtl';
+document.documentElement.lang = 'he';
+
+/* ============================================================
+   THE WHOLE MODEL
+   A line. That is the only kind of thing here.
+     text · done · heading · where it lives (a day, or a page) ·
+     an optional topic · an optional date+time.
+   The calendar is not a drawer -- it is the view of every line that
+   has a time, wherever that line happens to live.
+   ============================================================ */
+
+const DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parseYmd = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const uid = () => Math.random().toString(36).slice(2,10);
+const todayStr = () => ymd(new Date());
+
+function dayTitle(s){
+  const d = parseYmd(s), t = todayStr();
+  if(s === t) return 'היום';
+  const yest = ymd(new Date(Date.now()-864e5)), tom = ymd(new Date(Date.now()+864e5));
+  if(s === yest) return 'אתמול';
+  if(s === tom) return 'מחר';
+  return 'יום ' + DAYS[d.getDay()];
+}
+function daySub(s){
+  const d = parseYmd(s);
+  return DAYS[d.getDay()] + ', ' + d.getDate() + ' ב' + MONTHS[d.getMonth()];
+}
+function whenLabel(line){
+  if(!line.date) return '';
+  const d = parseYmd(line.date), t = todayStr();
+  let day = line.date === t ? 'היום'
+          : line.date === ymd(new Date(Date.now()+864e5)) ? 'מחר'
+          : DAYS[d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth()+1);
+  return line.time ? day + ' ' + line.time : day;
+}
+
+const TOPIC_COLORS = ['#7D8C5C','#A2624A','#4F7E82','#8A6A9E','#B08A3E','#5C7A9E'];
+
+let state = { lines: [], pages: [], topics: [], seeded: false };
+let view = 'day';
+let viewDay = todayStr();
+let viewPage = null;
+let viewTopic = null;
+let openLine = null;
+let db = null, dbDoc = null, saveTimer = null;
+
+/* A blank notebook. No example rows, no ready-made notebooks, no ready-made
+   topics -- the whole point is that the shape comes from what you write. */
+function blank(){
+  return { lines: [], pages: [], topics: [], seeded:false };
+}
+
+/* ---------- storage: db when the viewer grants it, localStorage otherwise ---------- */
+const LS_KEY = 'machberet-achat-v1';
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return null;
+}
+function save(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+  if(!dbDoc) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    dbDoc.set({ payload: JSON.stringify(state), at: Date.now() }).catch(()=>{});
+  }, 400);
+}
+
+async function connectDb(){
+  try{
+    db = await window.claude?.use?.('db');
+    if(!db) return note('נשמר במכשיר הזה');
+    dbDoc = db.doc('state/main');
+    const snap = await dbDoc.get();
+    if(snap.exists && snap.data() && snap.data().payload){
+      const remote = JSON.parse(snap.data().payload);
+      // the stored copy wins on load, so the same notebook opens on every device
+      if(remote && remote.lines){ state = remote; render(); }
+    } else {
+      dbDoc.set({ payload: JSON.stringify(state), at: Date.now() }).catch(()=>{});
+    }
+    note('נשמר ומסתנכרן');
+  }catch(e){ note('נשמר במכשיר הזה'); }
+}
+function note(t){ document.getElementById('syncNote').textContent = t; }
+
+/* ---------- small helpers over the model ---------- */
+const topicById = id => state.topics.find(t=>t.id===id) || null;
+const pageById  = id => state.pages.find(p=>p.id===id) || null;
+const linesOfDay  = d => state.lines.filter(l=>l.day===d).sort((a,b)=>a.createdAt-b.createdAt);
+const linesOfPage = p => state.lines.filter(l=>l.page===p).sort((a,b)=>a.createdAt-b.createdAt);
+const scheduledOn = d => state.lines.filter(l=>l.date===d && !l.done)
+                                    .sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
+function whereLabel(l){
+  if(l.page) return (pageById(l.page)||{}).name || '';
+  if(l.day)  return dayTitle(l.day) === 'היום' ? 'היום' : daySub(l.day);
+  return '';
+}
+
+/* ---------- escaping ---------- */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  document.querySelectorAll('.tab').forEach(b=>{
+    const v = b.dataset.view;
+    b.classList.toggle('on', v===view || (v==='pages' && view==='page') || (v==='day' && view==='topic'));
+  });
+  const main = document.getElementById('main');
+  if(view==='day')        main.innerHTML = renderDay();
+  else if(view==='pages') main.innerHTML = renderPages();
+  else if(view==='page')  main.innerHTML = renderPage();
+  else if(view==='week')  main.innerHTML = renderWeek();
+  else if(view==='topic') main.innerHTML = renderTopic();
+  setComposer();
+}
+
+function seedNoteHtml(){ return ''; }
+
+function lineHtml(l, opts){
+  opts = opts || {};
+  const tp = topicById(l.topic);
+  const meta = [];
+  if(l.date) meta.push(`<button class="chip time" data-act="open" data-id="${l.id}">${esc(whenLabel(l))}</button>`);
+  if(tp) meta.push(`<button class="chip topic" style="--c:${tp.color}" data-act="lens" data-topic="${tp.id}">${esc(tp.name)}</button>`);
+  if(opts.showWhere && whereLabel(l)) meta.push(`<span class="chip where">${esc(whereLabel(l))}</span>`);
+  return `
+  <li class="line ${l.done?'done':''} ${l.heading?'heading':''}" data-id="${l.id}">
+    <button class="bullet" data-act="done" data-id="${l.id}" aria-label="סימון כבוצע"></button>
+    <div class="line-main">
+      <div class="line-text" contenteditable="true" data-act="edit" data-id="${l.id}" role="textbox">${esc(l.text)}</div>
+      ${meta.length?`<div class="line-meta">${meta.join('')}</div>`:''}
+    </div>
+    <button class="line-toggle" data-act="open" data-id="${l.id}" aria-label="אפשרויות">···</button>
+  </li>
+  ${openLine===l.id ? actsHtml(l) : ''}`;
+}
+
+function actsHtml(l){
+  const topics = state.topics.map(t=>
+    `<button class="act dot ${l.topic===t.id?'on':''}" style="--c:${t.color}" data-act="settopic" data-id="${l.id}" data-topic="${t.id}">${esc(t.name)}</button>`).join('');
+  const pages = state.pages.map(p=>
+    `<button class="act ${l.page===p.id?'on':''}" data-act="moveto" data-id="${l.id}" data-page="${p.id}">${esc(p.name)}</button>`).join('');
+  const t = todayStr(), tom = ymd(new Date(Date.now()+864e5));
+  return `<div class="acts">
+    <div>
+      <label>מועד — רק מה שיש לו שעה מופיע בשבוע</label>
+      <div class="acts-row">
+        <button class="act ${l.date===t?'on':''}" data-act="when" data-id="${l.id}" data-day="${t}">היום</button>
+        <button class="act ${l.date===tom?'on':''}" data-act="when" data-id="${l.id}" data-day="${tom}">מחר</button>
+        <input type="date" data-act="whendate" data-id="${l.id}" value="${l.date||''}">
+        <input type="time" data-act="whentime" data-id="${l.id}" value="${l.time||''}">
+        ${l.date?`<button class="act" data-act="clearwhen" data-id="${l.id}">בלי מועד</button>`:''}
+      </div>
+    </div>
+    <div>
+      <label>נושא</label>
+      <div class="acts-row">${topics}
+        <button class="act ${!l.topic?'on':''}" data-act="settopic" data-id="${l.id}" data-topic="">ללא</button>
+        <button class="act" data-act="newtopic" data-id="${l.id}">+ נושא</button>
+      </div>
+    </div>
+    <div>
+      <label>לאיזה עמוד</label>
+      <div class="acts-row">${pages}
+        <button class="act ${l.day?'on':''}" data-act="moveto" data-id="${l.id}" data-page="">היום</button>
+        <button class="act" data-act="newpageFor" data-id="${l.id}">+ מחברת</button>
+      </div>
+    </div>
+    <div class="acts-row">
+      <button class="act" data-act="head" data-id="${l.id}">${l.heading?'לשורה רגילה':'להפוך לכותרת'}</button>
+      <button class="act danger" data-act="del" data-id="${l.id}">מחיקה</button>
+      <button class="act" data-act="open" data-id="${l.id}">סגירה</button>
+    </div>
+  </div>`;
+}
+
+function renderDay(){
+  const sched = scheduledOn(viewDay);
+  const lines = linesOfDay(viewDay);
+  const prev = ymd(new Date(parseYmd(viewDay).getTime()-864e5));
+  const next = ymd(new Date(parseYmd(viewDay).getTime()+864e5));
+  return `
+  ${seedNoteHtml()}
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">${esc(dayTitle(viewDay))}</h1>
+      <p class="page-sub">${esc(daySub(viewDay))}</p>
+    </div>
+    <div class="daynav">
+      <button data-act="day" data-day="${prev}" aria-label="יום קודם">›</button>
+      <button data-act="day" data-day="${next}" aria-label="יום הבא">‹</button>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="strip-label">עם שעה <span>מכל המחברות, לא רק מכאן</span></div>
+    ${sched.length ? sched.map(l=>`
+      <button class="strip-row" data-act="open" data-id="${l.id}">
+        <span class="t">${esc(l.time||'—')}</span>
+        <span class="s">${esc(l.text)}</span>
+      </button>`).join('')
+    : '<div class="strip-empty">שום דבר לא קבוע לשעה. זה בסדר גמור.</div>'}
+  </div>
+
+  <ul class="lines">
+    ${lines.length ? lines.map(l=>lineHtml(l)).join('')
+      : `<div class="empty-note">הדף ריק.<br>כל מה שתכתוב היום ינחת כאן — בלי להחליט קודם מה זה.<br>
+         מחשבה, משימה, שורה משיר, רשימה. אותו דבר בדיוק.</div>`}
+  </ul>`;
+}
+
+function renderPages(){
+  return `
+  ${seedNoteHtml()}
+  <div class="page-head"><div>
+    <h1 class="page-title">מחברות</h1>
+    <p class="page-sub">מחברת לכל דבר — כמו לקנות מחברת פיזית, רק שאפשר לערוך</p>
+  </div></div>
+  ${state.pages.length ? `<ul class="page-list">
+    ${state.pages.map(p=>`
+      <li><button class="page-row" data-act="page" data-page="${p.id}">
+        ${esc(p.name)}<span class="count">${linesOfPage(p.id).length}</span>
+      </button></li>`).join('')}
+  </ul>` : '<div class="empty-note">עוד אין מחברות. כל שם שתכתוב כאן נפתח כמחברת.</div>'}
+  <div class="new-page">
+    <input id="newPageInput" type="text" placeholder="מחברת חדשה — תובנות, יומן, האלבום...">
+    <button data-act="newpage">הוספה</button>
+  </div>
+  <p class="group-label">נושאים — לחיצה מראה כל מה ששייך להם</p>
+  ${state.topics.length ? `<div class="acts-row">
+    ${state.topics.map(t=>`<button class="act dot" style="--c:${t.color}" data-act="lens" data-topic="${t.id}">${esc(t.name)}</button>`).join('')}
+  </div>` : '<div class="empty-note">נושא נולד מתוך שורה: ··· ליד שורה ← + נושא.</div>'}`;
+}
+
+function renderPage(){
+  const p = pageById(viewPage);
+  if(!p){ view='pages'; return renderPages(); }
+  const lines = linesOfPage(p.id);
+  return `
+  <div class="page-head"><div>
+    <h1 class="page-title">${esc(p.name)}</h1>
+    <p class="page-sub">${lines.length} שורות · כותרת נכתבת עם # בתחילת השורה</p>
+  </div>
+  <div class="daynav"><button data-act="delpage" data-page="${p.id}" aria-label="מחיקת מחברת">✕</button></div>
+  </div>
+  <ul class="lines">
+    ${lines.length ? lines.map(l=>lineHtml(l)).join('')
+      : '<div class="empty-note">עמוד ריק ומחכה.</div>'}
+  </ul>`;
+}
+
+function renderWeek(){
+  const start = new Date();
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(start.getTime()+i*864e5);
+    days.push(ymd(d));
+  }
+  return `
+  <div class="page-head"><div>
+    <h1 class="page-title">השבוע</h1>
+    <p class="page-sub">רק מה שיש לו שעה. זו תצוגה, לא מגירה — השורות עצמן חיות במחברות</p>
+  </div></div>
+  ${days.map(d=>{
+    const items = scheduledOn(d);
+    return `<div class="week-day ${d===todayStr()?'today':''}">
+      <h3>${esc(dayTitle(d))} <em>${esc(daySub(d))}</em></h3>
+      ${items.length ? items.map(l=>`
+        <button class="strip-row" data-act="open" data-id="${l.id}">
+          <span class="t">${esc(l.time||'—')}</span>
+          <span class="s">${esc(l.text)}</span>
+        </button>`).join('')
+      : '<div class="week-empty">פנוי</div>'}
+    </div>`;
+  }).join('')}`;
+}
+
+function renderTopic(){
+  const t = topicById(viewTopic);
+  if(!t){ view='day'; return renderDay(); }
+  const all = state.lines.filter(l=>l.topic===t.id);
+  const timed = all.filter(l=>l.date).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  const written = all.filter(l=>!l.date).sort((a,b)=>b.createdAt-a.createdAt);
+  return `
+  <div class="page-head"><div>
+    <div class="lens-head"><span class="lens-dot" style="--c:${t.color}"></span>
+      <h1 class="page-title">${esc(t.name)}</h1></div>
+    <p class="page-sub">כל מה ששייך לנושא הזה — מכל יום ומכל מחברת. זה מה שלמחברת נייר אין.</p>
+  </div></div>
+  <p class="group-label">עם מועד</p>
+  <ul class="lines">${timed.length ? timed.map(l=>lineHtml(l,{showWhere:true})).join('')
+    : '<div class="empty-note">כלום לא קבוע לשעה.</div>'}</ul>
+  <p class="group-label">כתוב</p>
+  <ul class="lines">${written.length ? written.map(l=>lineHtml(l,{showWhere:true})).join('')
+    : '<div class="empty-note">עוד לא נכתב כלום.</div>'}</ul>`;
+}
+
+/* ---------- the composer knows where you are ---------- */
+function setComposer(){
+  const inp = document.getElementById('composer');
+  const hint = document.getElementById('composerHint');
+  if(view==='page'){
+    const p = pageById(viewPage);
+    inp.placeholder = 'לכתוב ב' + (p?p.name:'עמוד') + '...';
+    hint.textContent = 'כותרת בתוך עמוד — להתחיל את השורה ב־#';
+  } else if(view==='topic'){
+    const t = topicById(viewTopic);
+    inp.placeholder = 'לכתוב על ' + (t?t.name:'') + '...';
+    hint.textContent = 'נוחת בדף של היום, עם הנושא הזה כבר עליו';
+  } else if(view==='week'){
+    inp.placeholder = 'לכתוב...';
+    hint.textContent = 'נוחת בדף של היום — מועד נותנים אחר כך';
+  } else {
+    inp.placeholder = 'לכתוב...';
+    hint.textContent = 'שורה נכתבת עכשיו · מועד ונושא נותנים אחר כך';
+  }
+}
+
+function addLine(text){
+  text = text.trim();
+  if(!text) return;
+  let heading = false;
+  if(text.startsWith('# ')){ heading = true; text = text.slice(2).trim(); }
+  const l = {
+    id: uid(), text, done:false, heading,
+    day: view==='page' ? null : (view==='day' ? viewDay : todayStr()),
+    page: view==='page' ? viewPage : null,
+    topic: view==='topic' ? viewTopic : null,
+    date: null, time: null, createdAt: Date.now()
+  };
+  state.lines.push(l);
+  save(); render();
+}
+
+/* ============================================================
+   EVENTS — one delegated handler
+   ============================================================ */
+document.addEventListener('click', (e)=>{
+  const el = e.target.closest('[data-act]');
+  if(!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  const line = id ? state.lines.find(l=>l.id===id) : null;
+
+  if(act==='done' && line){ line.done = !line.done; save(); render(); }
+  else if(act==='open'){ openLine = (openLine===id) ? null : id; render(); }
+  else if(act==='when' && line){ line.date = el.dataset.day; if(!line.time) line.time='09:00'; save(); render(); }
+  else if(act==='clearwhen' && line){ line.date=null; line.time=null; save(); render(); }
+  else if(act==='settopic' && line){ line.topic = el.dataset.topic || null; save(); render(); }
+  else if(act==='newtopic' && line){
+    const name = prompt('שם הנושא החדש:');
+    if(name && name.trim()){
+      const t = {id:uid(), name:name.trim(), color:TOPIC_COLORS[state.topics.length % TOPIC_COLORS.length]};
+      state.topics.push(t); line.topic = t.id; save(); render();
+    }
+  }
+  else if(act==='moveto' && line){
+    const p = el.dataset.page;
+    if(p){ line.page = p; line.day = null; } else { line.page = null; line.day = todayStr(); }
+    openLine = null; save(); render();
+  }
+  else if(act==='head' && line){ line.heading = !line.heading; save(); render(); }
+  else if(act==='del' && line){
+    state.lines = state.lines.filter(l=>l.id!==id); openLine=null; save(); render();
+  }
+  else if(act==='day'){ viewDay = el.dataset.day; view='day'; openLine=null; render(); }
+  else if(act==='page'){ viewPage = el.dataset.page; view='page'; openLine=null; render(); window.scrollTo(0,0); }
+  else if(act==='lens'){ viewTopic = el.dataset.topic; view='topic'; openLine=null; render(); window.scrollTo(0,0); }
+  else if(act==='newpage'){
+    const inp = document.getElementById('newPageInput');
+    if(inp && inp.value.trim()){
+      state.pages.push({id:uid(), name:inp.value.trim()});
+      inp.value=''; save(); render();
+    }
+  }
+  else if(act==='delpage'){
+    const p = pageById(el.dataset.page);
+    if(p && confirm('למחוק את "'+p.name+'"? השורות שבו יעברו לדף של היום.')){
+      state.lines.forEach(l=>{ if(l.page===p.id){ l.page=null; l.day=todayStr(); } });
+      state.pages = state.pages.filter(x=>x.id!==p.id);
+      view='pages'; save(); render();
+    }
+  }
+  else if(act==='newpageFor' && line){
+    const name = prompt('שם המחברת החדשה:');
+    if(name && name.trim()){
+      const p = {id:uid(), name:name.trim()};
+      state.pages.push(p);
+      line.page = p.id; line.day = null;
+      openLine = null; save(); render();
+    }
+  }
+});
+
+document.addEventListener('change', (e)=>{
+  const el = e.target.closest('[data-act]');
+  if(!el) return;
+  const line = state.lines.find(l=>l.id===el.dataset.id);
+  if(!line) return;
+  if(el.dataset.act==='whendate'){ line.date = el.value || null; if(line.date && !line.time) line.time='09:00'; save(); render(); }
+  if(el.dataset.act==='whentime'){ line.time = el.value || null; if(line.time && !line.date) line.date=todayStr(); save(); render(); }
+});
+
+/* editing a line in place — the one thing a paper notebook cannot do */
+document.addEventListener('blur', (e)=>{
+  const el = e.target.closest ? e.target.closest('[data-act="edit"]') : null;
+  if(!el) return;
+  const line = state.lines.find(l=>l.id===el.dataset.id);
+  if(!line) return;
+  const val = el.textContent.trim();
+  if(!val){ state.lines = state.lines.filter(l=>l.id!==line.id); save(); render(); return; }
+  if(val !== line.text){ line.text = val; save(); }
+}, true);
+
+document.addEventListener('keydown', (e)=>{
+  const el = e.target.closest ? e.target.closest('[data-act="edit"]') : null;
+  if(el && e.key==='Enter'){ e.preventDefault(); el.blur(); }
+});
+
+document.getElementById('composerBtn').addEventListener('click', ()=>{
+  const inp = document.getElementById('composer');
+  addLine(inp.value); inp.value=''; inp.focus();
+});
+document.getElementById('composer').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); const inp=e.target; addLine(inp.value); inp.value=''; }
+});
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    view = b.dataset.view;
+    if(view==='day') viewDay = todayStr();
+    openLine = null; render(); window.scrollTo(0,0);
+  });
+});
+
+/* ---------- search ---------- */
+const searchSheet = document.getElementById('searchSheet');
+document.getElementById('searchBtn').addEventListener('click', ()=>{
+  searchSheet.classList.add('open');
+  document.getElementById('searchInput').focus();
+  runSearch();
+});
+searchSheet.addEventListener('click', (e)=>{ if(e.target===searchSheet) searchSheet.classList.remove('open'); });
+document.getElementById('searchInput').addEventListener('input', runSearch);
+function runSearch(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const box = document.getElementById('searchResults');
+  if(!q){ box.innerHTML = '<p class="empty-note">הכל נמצא במקום אחד, אז החיפוש מוצא הכל.</p>'; return; }
+  const hits = state.lines.filter(l=>l.text.toLowerCase().includes(q)).slice(0,40);
+  box.innerHTML = hits.length ? hits.map(l=>`
+    <button class="result" data-act="goto" data-id="${l.id}">
+      ${esc(l.text)}<em>${esc([whereLabel(l), whenLabel(l), (topicById(l.topic)||{}).name].filter(Boolean).join(' · '))}</em>
+    </button>`).join('') : '<p class="empty-note">לא נמצא כלום.</p>';
+}
+document.getElementById('searchResults').addEventListener('click', (e)=>{
+  const el = e.target.closest('[data-act="goto"]');
+  if(!el) return;
+  const l = state.lines.find(x=>x.id===el.dataset.id);
+  if(!l) return;
+  searchSheet.classList.remove('open');
+  if(l.page){ viewPage = l.page; view='page'; } else { viewDay = l.day || todayStr(); view='day'; }
+  openLine = l.id; render();
+});
+
+/* ---------- one quiet button instead of a whole tools tab ---------- */
+const breathSheet = document.getElementById('breathSheet');
+let breathTimer = null;
+document.getElementById('breathBtn').addEventListener('click', ()=>{
+  breathSheet.classList.add('open');
+  const words = ['שאיפה','החזקה','נשיפה','נשיפה'];
+  let i = 0;
+  const w = document.getElementById('breathWord');
+  w.textContent = words[0];
+  clearInterval(breathTimer);
+  breathTimer = setInterval(()=>{ i=(i+1)%4; w.textContent = words[i]; }, 3000);
+});
+breathSheet.addEventListener('click', ()=>{
+  breathSheet.classList.remove('open');
+  clearInterval(breathTimer);
+});
+
+/* ---------- boot ---------- */
+const local = loadLocal();
+state = local && local.lines ? local : blank();
+render();
+connectDb();
+
+/* installable, and it opens with no signal */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
