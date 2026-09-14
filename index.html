@@ -4431,7 +4431,6 @@
           <input type="text" id="somedayInput" placeholder="רעיון, פרויקט, חלום... לכתוב ולשחרר">
           <select id="somedayDomain" onchange="onSomedayDomainChange(this.value)"></select>
         </div>
-        <div id="pendingBodyCheck-someday"></div>
         <div id="pendingSomedayDescWrap"></div>
         <div id="pendingSomedaySubtasksWrap"></div>
         <button onclick="addSomeday()">הוסף</button>
@@ -5029,7 +5028,7 @@ function collapseAllOnCurrentView(){
     expandedSomeday.clear();
     bodyCheckOpenIds.clear(); decisionHelperOpenIds.clear(); answerDraftOpenIds.clear();
     pendingSomedayDescOpen = false; pendingSomedaySubtasksOpen = false;
-    ['someday','suggestion','dilemma'].forEach(k=>{ pendingBodyCheckOpen[k] = false; renderPendingBodyCheck(k); });
+    ['suggestion','dilemma'].forEach(k=>{ pendingBodyCheckOpen[k] = false; renderPendingBodyCheck(k); });
     ['suggDetailsFields','dilemmaDetailsFields'].forEach(id=>{ const el = document.getElementById(id); if(el) el.style.display = 'none'; });
     renderPendingSomedayDesc();
     renderPendingSomedaySubtasks();
@@ -5741,6 +5740,17 @@ document.addEventListener('focusout', ()=>{
    wrong one -- which is what focusSheetOwnsEdit prevents. */
 let focusSheetRef = null;        // {kind, id}
 let focusSheetOwnsEdit = false;
+/* The window an idea opens in is the same one the topic page uses -- the app's own form, floating.
+   This is the way in from everywhere else: the move menu, the pencil, wherever a new idea is made
+   somewhere you cannot see the list it landed in. */
+function openSomedaySheet(id){
+  if(!(data.someday||[]).some(x=>x.id===id)) return;
+  openFocusSheet('someday', id);
+  requestAnimationFrame(()=>{
+    const el = document.getElementById('somedayEditText-'+id);
+    if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(e){} }
+  });
+}
 function openFocusSheet(kind, id){
   focusSheetRef = {kind, id};
   focusSheetOwnsEdit = true;
@@ -6605,11 +6615,18 @@ function moveItemTo(destKind){
       contextAnchor:'', lastDoneDate:'', createdAt:Date.now()});
     renderHabits();
   } else if(destKind==='someday' || destKind==='dream' || destKind==='somedayTask'){
-    data.someday.push({id:uid(), dream: destKind==='dream', text:p.text,
-      domain: validDomain || (data.domains[0]&&data.domains[0].id) || '',
+    /* Moving to the week opens the window that asks when. Moving to the ideas should open its own
+       window for the same reason: the thing has just changed what it is, and the one moment you
+       are thinking about it is now -- not later, when you next scroll past it. */
+    const it = {id:uid(), dream:false, text:p.text,
+      domain: validDomain,
       description:p.description, subtasks:p.subtasks, favorite:p.favorite,
-      bodyCheck:p.bodyCheck, draft:true, createdAt:Date.now()});
+      bodyCheck:{}, draft:true, createdAt:Date.now()};
+    data.someday.push(it);
+    saveData();
     renderSomeday();
+    openSomedaySheet(it.id);
+    return;
   } else if(destKind==='suggestion'){
     data.suggestions.push({id:uid(), who:p.who, text:p.text, answered:false, done:false,
       replyDate:p.date||'', replyTime:p.time||'', description:p.description,
@@ -9971,7 +9988,6 @@ function taskRowHtml(t, opts){
         : ((isOverdue && !opts.hideChangeDate) ? `<button type="button" class="subtask-toggle-btn" onclick="openTimelineSheet('task','${t.id}')">שנה מועד</button>` : '')}
       ${t.date ? `<span class="task-date-badge">${formatDateHe(t.date)}${t.time?' · '+t.time:''}${t.endTime?'–'+t.endTime:''}</span>` : ''}
     </div>
-    ${bodyCheckStatusBadgesHtml(t, {urgencyOptions:['objective','other','relief'], showEnergy:true})}
   </li>`;
   if(isSubtasksOpen) html += taskDetailHtml(t);
   return html;
@@ -12004,7 +12020,7 @@ function somedayRowHtml(s){
     <span class="task-text" style="flex:1" onclick="somedayTextClick('${s.id}')">${escapeHtml(s.text)}${hasContent?'<span class="has-detail-dot" title="יש כאן תיאור או צעדים"></span>':''}</span>
     <select class="tag" style="background:${dom.color}; color:${contrastTextColor(dom.color)};" onclick="event.stopPropagation()" onchange="quickChangeSomedayDomain('${s.id}', this.value)" title="שינוי נושא">${domainOptions(s.domain)}</select>
     <span class="del-task" onclick="deleteSomeday('${s.id}')" title="מחיקה">✕</span>
-    ${bodyCheckStatusBadgesHtml(s, {})}
+
   </li>`;
   if(isExpanded) html += somedayDetailHtml(s);
   return html;
@@ -12017,8 +12033,6 @@ function somedayEditFormHtml(s){
         <input type="text" id="somedayEditText-${s.id}" value="${escapeAttr(s.text)}" placeholder="הרעיון">
         <select id="somedayEditDomain-${s.id}">${domainOptions(s.domain)}</select>
       </div>
-      <div class="edit-form-row">${bodyCheckToggleBtnHtml('someday', s.id)}</div>
-      ${bodyCheckOpenIds.has('someday:'+s.id) ? bodyCheckPanelHtml('someday', s.id, {hideNote:true}) : ''}
       ${somedayDescSubtasksHtml(s)}
       <div class="anchor-form-actions">
         <button class="save-btn" onclick="saveSomedayEdit('${s.id}')">שמור</button>
@@ -12258,10 +12272,8 @@ function addSomeday(){
   if(!text) return;
   const domainSel = document.getElementById('somedayDomain');
   const domain = domainSel ? domainSel.value : data.domains[0].id;
-  const bodyCheck = {...pendingBodyCheck.someday};
-  data.someday.push({id:uid(), dream:false, text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck});
+  data.someday.push({id:uid(), dream:false, text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck:{}});
   input.value='';
-  resetPendingBodyCheck('someday');
   resetPendingSomedayDesc();
   resetPendingSomedaySubtasks();
   saveData();
@@ -15807,10 +15819,11 @@ function finishConvert(destKind, text, domain, extra={}){
     saveData(); renderHabits();
     flashStatus('נוסף להרגלים');
   } else if(destKind==='someday' || destKind==='dream' || destKind==='somedayTask'){
-    data.someday.push({id:uid(), dream: destKind==='dream', text, domain: domain||'', description:'',
-      subtasks:[], draft:true, createdAt:Date.now()});
+    const it = {id:uid(), dream:false, text, domain: domain||'', description:'',
+      subtasks:[], bodyCheck:{}, draft:true, createdAt:Date.now()};
+    data.someday.push(it);
     saveData(); renderSomeday();
-    flashStatus('נוסף לרעיונות ומשימות ללא מועד');
+    openSomedaySheet(it.id);
   } else if(destKind==='todayIdea'){
     data.todayIdeas.push({id:uid(), text, done:false, favorite:false});
     saveData(); renderTodayIdeas();
@@ -16692,7 +16705,6 @@ function render(){
   renderSomedayDomainSelect();
   renderSomeday();
   renderDilemmasSection();
-  renderPendingBodyCheck('someday');
   renderPendingSomedayDesc();
   renderPendingSomedaySubtasks();
   renderReflection();
