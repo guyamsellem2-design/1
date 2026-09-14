@@ -4805,8 +4805,8 @@ function migrateInboxAway(){
   const items = data.inbox || [];
   if(!items.length) return;
   items.forEach(it => {
-    data.someday.push({id:uid(), dream:true, text:it.text, domain:'', description:'',
-      subtasks:[], draft:true, createdAt: it.createdAt || Date.now()});
+    data.someday.push(justAdded({id:uid(), dream:true, text:it.text, domain:'', description:'',
+      subtasks:[], draft:true, createdAt: it.createdAt || Date.now()}));
   });
   data.inbox = [];
 }
@@ -5455,8 +5455,8 @@ function focusAdd(kind){
     return;
   }
   if(kind==='someday'){
-    data.someday.push({id:uid(), dream:false, text, domain:id, description:'',
-      subtasks:[], bodyCheck:{}, createdAt:Date.now()});
+    data.someday.push(justAdded({id:uid(), dream:false, text, domain:id, description:'',
+      subtasks:[], bodyCheck:{}, createdAt:Date.now()}));
   } else if(kind==='dilemma'){
     (data.generalDilemmas || (data.generalDilemmas = [])).push({id:uid(), text, domain:id,
       decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()});
@@ -5526,8 +5526,8 @@ function onFocusSimpleKeydown(e){
   addFocusSomedaySlot();
 }
 function addFocusSomedaySlot(){
-  data.someday.push({id:uid(), dream:false, text:'', domain:focusDomainId, description:'',
-    subtasks:[], bodyCheck:{}, createdAt:Date.now()});
+  data.someday.push(justAdded({id:uid(), dream:false, text:'', domain:focusDomainId, description:'',
+    subtasks:[], bodyCheck:{}, createdAt:Date.now()}));
   saveData();
   renderTopicFocus();
   requestAnimationFrame(()=>{
@@ -6622,20 +6622,20 @@ function moveItemTo(destKind){
       domain: validDomain,
       description:p.description, subtasks:p.subtasks, favorite:p.favorite,
       bodyCheck:{}, draft:true, createdAt:Date.now()};
-    data.someday.push(it);
+    data.someday.push(justAdded(it));
     saveData();
     renderSomeday();
     openSomedaySheet(it.id);
     return;
   } else if(destKind==='suggestion'){
-    data.suggestions.push({id:uid(), who:p.who, text:p.text, answered:false, done:false,
+    data.suggestions.push(justAdded({id:uid(), who:p.who, text:p.text, answered:false, done:false,
       replyDate:p.date||'', replyTime:p.time||'', description:p.description,
-      subtasks:p.subtasks, domain:validDomain, bodyCheck:p.bodyCheck});
+      subtasks:p.subtasks, domain:validDomain, bodyCheck:p.bodyCheck}));
     renderSuggestions();
   } else if(destKind==='dilemma'){
     if(!data.generalDilemmas) data.generalDilemmas = [];
-    data.generalDilemmas.push({id:uid(), text:p.text, domain:validDomain, decisionDate:p.date||'',
-      done:false, description:p.description, subtasks:p.subtasks, bodyCheck:p.bodyCheck, createdAt:Date.now()});
+    data.generalDilemmas.push(justAdded({id:uid(), text:p.text, domain:validDomain, decisionDate:p.date||'',
+      done:false, description:p.description, subtasks:p.subtasks, bodyCheck:p.bodyCheck, createdAt:Date.now()}));
     renderGeneralDilemmaList();
   } else if(destKind==='note'){
     const container = (validDomain && containerById(validDomain)) ? validDomain
@@ -9853,6 +9853,19 @@ let overdueSectionOpen = false;
 function toggleOverdueSection(){ overdueSectionOpen = !overdueSectionOpen; persistUiState(); renderTasks(); }
 const LIST_CAP_THRESHOLD = 5;
 const listExpandState = { task:false, someday:false, suggestion:false, dilemma:false };
+/* Something just typed in must never be hidden. A list past the threshold shows only its first few
+   rows, and a new item lands at the bottom -- so adding one to a list that already had six looked
+   exactly like the app swallowing it: it was in the data, its row was built, and then the cap took
+   it off the screen. That is the "נעלם לי ישר אחרי שהזנתי" -- nothing was ever deleted.
+
+   Anything added since the app was opened is exempt from the cap, so it stays on screen under the
+   rows that were there before it. A reload puts the list back to its short form. */
+const justAddedIds = new Set();
+function justAdded(itemOrId){
+  const id = itemOrId && typeof itemOrId === 'object' ? itemOrId.id : itemOrId;
+  if(id) justAddedIds.add(String(id));
+  return itemOrId;
+}
 function toggleListExpand(key){
   setTimeout(persistUiState, 0);
   listExpandState[key] = !listExpandState[key];
@@ -9891,6 +9904,8 @@ function applyRowCap(listEl, capped){
     if(!capped) continue;
     // notices and the "empty" placeholder aren't rows and never count against the cap
     if(el.tagName !== 'LI' || el.classList.contains('empty')) continue;
+    // a row you just added stays, however long the list is -- see justAddedIds
+    if(justAddedIds.has(el.dataset.dragId || '')) continue;
     if(past){ el.classList.add('capped-hidden'); continue; }
     // a divider is scenery: it rides along with the rows above it but doesn't use one up
     if(el.classList.contains('fav-divider')) continue;
@@ -10288,7 +10303,7 @@ function pushTask(t){
     if(!t.date) t.date = w.date;
     if(!t.time) t.time = (t.date === w.date) ? w.time : '09:00';
   }
-  data.tasks.push(t);
+  data.tasks.push(justAdded(t));
   return t;
 }
 function pushAnchorRec(a){
@@ -10759,7 +10774,7 @@ function commitTimelineAdd(dayIdx, slot, dateStr){
   timelineAddCell = null;
   if(!text){ renderTimelineGrid(); return; }
   const newTask = {id:uid(), text, domain:'', done:false, energy:'', date:dateStr, time:slot, endTime:'', description:'', subtasks:[], draft:true, createdAt:Date.now()};
-  data.tasks.push(newTask);
+  data.tasks.push(justAdded(newTask));
   saveData();
   renderScheduleGrid();
   renderTasks();
@@ -11704,7 +11719,7 @@ function saveTimelineSheet(){
     try{ applyGcalSyncForTask(t, isNew || t.date!==prevDate || t.time!==prevTime || t.endTime!==prevEnd); }catch(e){ console.error('gcal sync failed', e); }
     extraDays.forEach(di=>{
       const newTask = {...t, id:uid(), date:dateForDay(di), subtasks:(t.subtasks||[]).map(s=>({...s})), createdAt:Date.now()};
-      data.tasks.push(newTask);
+      data.tasks.push(justAdded(newTask));
       try{ applyGcalSyncForTask(newTask, true); }catch(e){ console.error('gcal sync failed', e); }
     });
     saveData();
@@ -12272,7 +12287,7 @@ function addSomeday(){
   if(!text) return;
   const domainSel = document.getElementById('somedayDomain');
   const domain = domainSel ? domainSel.value : data.domains[0].id;
-  data.someday.push({id:uid(), dream:false, text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck:{}});
+  data.someday.push(justAdded({id:uid(), dream:false, text, domain, description:pendingSomedayDesc, subtasks:pendingSomedaySubtasks, createdAt:Date.now(), bodyCheck:{}}));
   input.value='';
   resetPendingSomedayDesc();
   resetPendingSomedaySubtasks();
@@ -12518,7 +12533,7 @@ function addSuggestion(){
   if(!text) return;
   const bodyCheck = {...pendingBodyCheck.suggestion};
   const newSuggestion = {id:uid(), who:whoInput.value.trim(), text, answered:false, done:false, replyDate: dateInput ? dateInput.value : '', replyTime: timeInput ? timeInput.value : '', bodyCheck};
-  data.suggestions.push(newSuggestion);
+  data.suggestions.push(justAdded(newSuggestion));
   whoInput.value=''; textInput.value=''; if(dateInput) dateInput.value='';
   if(timeInput) setTimePickerValue('suggReplyTime', '');
   resetPendingBodyCheck('suggestion');
@@ -12609,7 +12624,7 @@ function addGeneralDilemma(){
   if(!text) return;
   const bodyCheck = {...pendingBodyCheck.dilemma};
   if(!data.generalDilemmas) data.generalDilemmas = [];
-  data.generalDilemmas.push({id:uid(), text, domain: domainSel ? domainSel.value : '', decisionDate: dateInput ? dateInput.value : '', done:false, bodyCheck, createdAt:Date.now()});
+  data.generalDilemmas.push(justAdded({id:uid(), text, domain: domainSel ? domainSel.value : '', decisionDate: dateInput ? dateInput.value : '', done:false, bodyCheck, createdAt:Date.now()}));
   textInput.value=''; if(dateInput) dateInput.value='';
   resetPendingBodyCheck('dilemma');
   saveData();
@@ -15682,25 +15697,25 @@ function commitInboxCapture(){
   const spec = CAPTURE_FIELDS[target] || {};
   const topic = (spec.topic && data.domains.some(d=>d.id===f.topic)) ? f.topic : '';
   if(target === 'dream' || target === 'somedayTask'){
-    data.someday.push({id:uid(), dream: target==='dream', text,
+    data.someday.push(justAdded({id:uid(), dream: target==='dream', text,
       domain: topic || (data.domains[0] && data.domains[0].id) || '',
       description:f.description, subtasks:f.steps, favorite:false,
-      bodyCheck: spec.body ? bc : {}, draft:true, createdAt:Date.now()});
+      bodyCheck: spec.body ? bc : {}, draft:true, createdAt:Date.now()}));
     saveData(); renderSomeday(); renderPlanStrip();
     flashStatus(target==='dream' ? 'נוסף לרעיונות וחלומות' : 'נוסף למשימות ללא מועד');
     return;
   }
   if(target === 'suggestion'){
-    data.suggestions.push({id:uid(), who:f.who, text, answered:false, done:false,
-      replyDate:f.date, replyTime:f.time, bodyCheck:bc});
+    data.suggestions.push(justAdded({id:uid(), who:f.who, text, answered:false, done:false,
+      replyDate:f.date, replyTime:f.time, bodyCheck:bc}));
     saveData(); renderSuggestions(); renderPlanStrip();
     flashStatus('נוסף ל"הצעות ובקשות"');
     return;
   }
   if(target === 'dilemma'){
     if(!data.generalDilemmas) data.generalDilemmas = [];
-    data.generalDilemmas.push({id:uid(), text, domain:topic, decisionDate:f.date,
-      done:false, bodyCheck:bc, createdAt:Date.now()});
+    data.generalDilemmas.push(justAdded({id:uid(), text, domain:topic, decisionDate:f.date,
+      done:false, bodyCheck:bc, createdAt:Date.now()}));
     saveData(); renderGeneralDilemmaList(); renderPlanStrip();
     flashStatus('נוסף להתלבטויות');
     return;
@@ -15806,12 +15821,12 @@ function finishConvert(destKind, text, domain, extra={}){
   } else if(!text){
     return; // the other four kinds always need real text, typed in the capture sheet before this runs
   } else if(destKind==='suggestion'){
-    data.suggestions.push({id:uid(), who:'', text, answered:false, done:false, replyDate:'', replyTime:'', bodyCheck:{}});
+    data.suggestions.push(justAdded({id:uid(), who:'', text, answered:false, done:false, replyDate:'', replyTime:'', bodyCheck:{}}));
     saveData(); renderSuggestions();
     flashStatus('נוסף ל"הצעות ובקשות"');
   } else if(destKind==='dilemma'){
     if(!data.generalDilemmas) data.generalDilemmas = [];
-    data.generalDilemmas.push({id:uid(), text, domain: domain||'', decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()});
+    data.generalDilemmas.push(justAdded({id:uid(), text, domain: domain||'', decisionDate:'', done:false, bodyCheck:{}, createdAt:Date.now()}));
     saveData(); renderGeneralDilemmaList();
     flashStatus('נוסף ל"התלבטויות כלליות"');
   } else if(destKind==='habit'){
@@ -15821,7 +15836,7 @@ function finishConvert(destKind, text, domain, extra={}){
   } else if(destKind==='someday' || destKind==='dream' || destKind==='somedayTask'){
     const it = {id:uid(), dream:false, text, domain: domain||'', description:'',
       subtasks:[], bodyCheck:{}, draft:true, createdAt:Date.now()};
-    data.someday.push(it);
+    data.someday.push(justAdded(it));
     saveData(); renderSomeday();
     openSomedaySheet(it.id);
   } else if(destKind==='todayIdea'){
@@ -15846,7 +15861,7 @@ function routeInboxItem(kind, id){
   const it = data.inbox.find(x=>x.id===id);
   if(!it) return;
   if(kind==='someday'){
-    data.someday.push({id:uid(), text:it.text, domain:'', description:'', subtasks:[], draft:true, createdAt:Date.now()});
+    data.someday.push(justAdded({id:uid(), text:it.text, domain:'', description:'', subtasks:[], draft:true, createdAt:Date.now()}));
     data.inbox = data.inbox.filter(x=>x.id!==id);
     saveData(); renderInbox(); renderSomeday();
     flashStatus('הועבר ל"דברים לעשות"');
