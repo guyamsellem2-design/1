@@ -1,9 +1,9 @@
 // Report a whole day in one sheet: one tap per lesson for attendance, a line for what we did.
 // Opened from the table (tap a date) and the calendar (tap a day). Nothing is saved before "שמור".
 
-import { escapeHtml as e, fmtDay, endTime, telHref, clone } from './util.js';
+import { escapeHtml as e, fmtDay, endTime, clone } from './util.js';
 import * as M from './model.js';
-import { el, openSheet, editLesson, pickStudent, toast } from './ui.js';
+import { el, openSheet, editLesson, pickStudent, toast, callLinks } from './ui.js';
 
 export function reportDay(app, date, { onSaved, extraAction } = {}) {
   const s = app.state;
@@ -27,13 +27,12 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
     list.innerHTML = lessons.length ? '' : `<p class="muted">${day.holiday ? 'יום חופש, אין שיעורים במערכת.' : 'אין שיעורים ביום הזה.'}</p>`;
     lessons.sort(M.byTime).forEach((l, i) => {
       const st = l.studentId && M.studentById(s, l.studentId);
-      const tel = st && telHref(st.phone);
       const card = el(`<div class="report-card" data-i="${i}">
         <div class="report-head">
           <span class="t" dir="ltr">${e(l.time)}–${e(endTime(l.time, l.len))}</span>
           <button type="button" class="link-btn" data-edit><b>${e(M.lessonName(s, l))}</b>${st?.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}</button>
           <span class="grow"></span>
-          ${tel ? `<a class="icon-btn" href="${e(tel)}" aria-label="להתקשר">📞</a>` : ''}
+          ${callLinks(st, { short: true })}
         </div>
         <div class="seg report-status">${s.statuses.map((x) => `<button type="button" data-status="${e(x.id)}" aria-pressed="${l.status === x.id}" style="${l.status === x.id ? `background:${e(x.bg)};color:${e(x.fg)};border-color:${e(x.bg)}` : ''}">${e(x.name)}</button>`).join('')}</div>
         <input class="input" data-summary value="${e(l.summary || '')}" placeholder="מה עשינו (לא חובה)" style="margin-top:8px;min-height:40px">

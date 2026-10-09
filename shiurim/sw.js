@@ -2,7 +2,7 @@
    Files are served cache-first and refreshed in the background, so an update lands on the next open.
    Text shared from another app arrives here as a POST to ./share; it is parked in IndexedDB
    and the app picks it up on ./?shared=1. Nothing the teacher writes ever passes through this file. */
-const CACHE = 'shiurim-v2';
+const CACHE = 'shiurim-v3';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './js/app.js', './js/util.js', './js/parser.js', './js/model.js', './js/store.js', './js/ui.js',

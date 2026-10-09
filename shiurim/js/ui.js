@@ -78,6 +78,17 @@ export function chipButton(state, statusId, label, attrs = '') {
   return `<button type="button" class="chip" style="${style}" ${attrs}>${e(label || (st && st.name) || '')}</button>`;
 }
 
+// Dial buttons for a student and their parents (only the numbers that exist).
+export function callLinks(st, { cls = 'btn small call', short = false } = {}) {
+  if (!st) return '';
+  const out = [];
+  const me = telHref(st.phone);
+  const parents = telHref(st.parentPhone);
+  if (me) out.push(`<a class="${cls}" href="${e(me)}" aria-label="להתקשר ל${e(st.name)}" title="${e(st.phone)}">📞${short ? '' : ' להתקשר'}</a>`);
+  if (parents) out.push(`<a class="${cls}" href="${e(parents)}" aria-label="להתקשר להורים של ${e(st.name)}" title="${e(st.parentPhone)}">📞 הורים</a>`);
+  return out.join('');
+}
+
 export const timeRange = (l) => `${l.time}–${endTime(l.time, l.len)}`;
 
 export function lenLabel(n) {
@@ -103,8 +114,7 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
   const body = el(`<div>
     <p class="muted" style="margin:-6px 0 12px;display:flex;align-items:center;gap:8px">${e(fmtDay(date))}${(() => {
       const st = l.studentId && studentById(state, l.studentId);
-      const tel = st && telHref(st.phone);
-      return tel ? `<a class="btn small call" href="${e(tel)}">📞 להתקשר</a>` : '';
+      return callLinks(st);
     })()}</p>
     ${allowStudentChange ? `<label class="field"><span>תלמיד</span>
       <select class="input" name="student"><option value="">— שם חופשי —</option>${opts}</select></label>

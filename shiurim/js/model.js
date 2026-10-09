@@ -86,7 +86,7 @@ export function activeStudents(state, date = todayISO()) {
   return state.students.filter((s) => !(s.deleted && (!s.deletedFrom || s.deletedFrom <= date)));
 }
 
-export function addStudent(state, { name, aliases = [], frame = 'yeshiva', day, time, len = 30, notes = '', phone = '', grade = '', from }) {
+export function addStudent(state, { name, aliases = [], frame = 'yeshiva', day, time, len = 30, notes = '', phone = '', parentPhone = '', grade = '', from }) {
   const st = {
     id: uid(),
     name: name.trim(),
@@ -94,6 +94,7 @@ export function addStudent(state, { name, aliases = [], frame = 'yeshiva', day, 
     frame,
     notes,
     phone,
+    parentPhone,
     grade,
     startDate: null,
     schedule: day != null && time ? [{ from: from || '2000-01-01', day: Number(day), time, len: Number(len) }] : [],

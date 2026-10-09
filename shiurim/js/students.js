@@ -2,7 +2,7 @@
 
 import { escapeHtml as e, DAY_NAMES, todayISO, fmtDate, fmtDay, norm, toMin, telHref } from './util.js';
 import * as M from './model.js';
-import { el, toast, openSheet, confirmDialog, chip, lenLabel } from './ui.js';
+import { el, toast, openSheet, confirmDialog, chip, lenLabel, callLinks } from './ui.js';
 
 export function renderStudents(app, root) {
   const s = app.state;
@@ -27,10 +27,9 @@ export function renderStudents(app, root) {
     const ul = box.querySelector('ul');
     for (const st of items) {
       const v = M.currentSlot(st, today);
-      const tel = telHref(st.phone);
       const li = el(`<li class="tap"><span class="grow"><b>${e(st.name)}</b>${st.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}${st.aliases?.length ? ` <span class="hint">(${e(st.aliases.join(', '))})</span>` : ''}</span>
         <span class="muted" style="font-size:14px">${v ? `${e(DAY_NAMES[v.day])} ${e(v.time)} · ${e(lenLabel(v.len))}` : 'בלי שעה קבועה'}</span>
-        ${tel ? `<a class="icon-btn call" href="${e(tel)}" aria-label="להתקשר ל${e(st.name)}" title="${e(st.phone)}">📞</a>` : ''}<span>‹</span></li>`);
+        <span class="calls">${callLinks(st, { short: true })}</span><span>‹</span></li>`);
       li.addEventListener('click', (ev) => { if (!ev.target.closest('a.call')) editStudent(app, st); });
       ul.appendChild(li);
     }
@@ -39,6 +38,13 @@ export function renderStudents(app, root) {
   wrap.querySelector('[data-add]').addEventListener('click', () => editStudent(app, null));
   wrap.querySelector('[data-bulk]').addEventListener('click', () => bulkAdd(app));
   if (app.params.bulk) { app.params.bulk = false; setTimeout(() => bulkAdd(app), 30); }
+}
+
+function phoneField(name, label, value) {
+  const href = telHref(value);
+  return `<label class="field"><span>${e(label)}</span><span style="display:flex;gap:6px;align-items:center;margin:0">
+    <input class="input" type="tel" inputmode="tel" name="${name}" value="${e(value)}" placeholder="050-0000000" dir="ltr" autocomplete="off" style="min-width:0">
+    <a class="btn call" data-call="${name}" href="${e(href || '#')}" ${href ? '' : 'hidden'} aria-label="${e(label)}: חיוג" style="padding:9px 12px">📞</a></span></label>`;
 }
 
 const sortBySlot = (date) => (a, b) => {
@@ -71,6 +77,7 @@ export function editStudent(app, student, opts = {}) {
     len: v ? Number(v.len) : Number(opts.len) || 30,
     notes: student?.notes || '',
     phone: student?.phone || '',
+    parentPhone: student?.parentPhone || '',
     grade: student?.grade || '',
     noSlot: student ? !v : !!opts.oneTimeOption,
   };
@@ -79,11 +86,10 @@ export function editStudent(app, student, opts = {}) {
   const body = el(`<div>
     <label class="field"><span>שם</span><input class="input" name="name" value="${e(f.name)}" autocomplete="off"></label>
     <div class="two">
-      <label class="field"><span>טלפון</span><span style="display:flex;gap:6px;align-items:center;margin:0">
-        <input class="input" type="tel" inputmode="tel" name="phone" value="${e(f.phone)}" placeholder="050-0000000" dir="ltr" autocomplete="off">
-        <a class="btn call" data-call href="${e(telHref(f.phone) || '#')}" ${telHref(f.phone) ? '' : 'hidden'} aria-label="להתקשר">📞</a></span></label>
-      <label class="field"><span>כיתה</span><input class="input" name="grade" value="${e(f.grade)}" placeholder="למשל: י׳2" autocomplete="off"></label>
+      ${phoneField('phone', 'טלפון התלמיד', f.phone)}
+      ${phoneField('parentPhone', 'טלפון הורים', f.parentPhone)}
     </div>
+    <label class="field"><span>כיתה</span><input class="input" name="grade" value="${e(f.grade)}" placeholder="למשל: י׳2" autocomplete="off"></label>
     <label class="field"><span>כינויים (איך שאני כותב אותו לפעמים, מופרד בפסיקים)</span><input class="input" name="aliases" value="${e(f.aliases)}" placeholder="למשל: בני, בנימין כ."></label>
     <div class="field"><span>מסגרת</span><div class="seg" data-frame>${s.frames.map((fr) => `<button type="button" data-v="${e(fr.id)}" aria-pressed="${f.frame === fr.id}">${e(fr.name)}</button>`).join('')}</div></div>
     <div class="field"><span>יום קבוע</span><div class="seg" data-day>${days.map((d) => `<button type="button" data-v="${d}" aria-pressed="${!f.noSlot && Number(f.day) === d}">${e(DAY_NAMES[d])}</button>`).join('')}
@@ -99,12 +105,12 @@ export function editStudent(app, student, opts = {}) {
     ${!isNew ? '<div data-history></div>' : ''}
   </div>`);
   const $ = (q) => body.querySelector(q);
-  $('[name=phone]').addEventListener('input', (ev) => {
-    const href = telHref(ev.target.value);
-    const a = $('[data-call]');
+  body.querySelectorAll('input[type=tel]').forEach((inp) => inp.addEventListener('input', () => {
+    const href = telHref(inp.value);
+    const a = $(`[data-call="${inp.name}"]`);
     a.hidden = !href;
     if (href) a.href = href;
-  });
+  }));
   const press = (group, val) => body.querySelectorAll(`[data-${group}] button`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v) === String(val)));
   const slotChanged = () => !isNew && v && (Number(f.day) !== Number(v.day) || f.time !== v.time || Number(f.len) !== Number(v.len));
   const check = () => {
@@ -146,14 +152,15 @@ export function editStudent(app, student, opts = {}) {
       const aliases = $('[name=aliases]').value.split(',').map((x) => x.trim()).filter(Boolean);
       const notes = $('[name=notes]').value.trim();
       const phone = $('[name=phone]').value.trim();
+      const parentPhone = $('[name=parentPhone]').value.trim();
       const grade = $('[name=grade]').value.trim();
       const dupe = s.students.find((x) => x !== student && !x.deleted && norm(x.name) === norm(name));
       if (dupe && isNew && !confirm(`כבר יש תלמיד בשם ${dupe.name}. להוסיף עוד אחד?`)) return;
       let st = student;
       if (isNew) {
-        st = M.addStudent(s, { name, aliases, frame: f.frame, notes, phone, grade, day: f.noSlot ? null : f.day, time: f.time, len: f.len, from: opts.from && opts.from < defaultFrom(s) ? opts.from : defaultFrom(s) });
+        st = M.addStudent(s, { name, aliases, frame: f.frame, notes, phone, parentPhone, grade, day: f.noSlot ? null : f.day, time: f.time, len: f.len, from: opts.from && opts.from < defaultFrom(s) ? opts.from : defaultFrom(s) });
       } else {
-        Object.assign(st, { name, aliases, frame: f.frame, notes, phone, grade });
+        Object.assign(st, { name, aliases, frame: f.frame, notes, phone, parentPhone, grade });
         if (slotChanged() || (!v && !f.noSlot)) M.setSlot(st, { day: f.day, time: f.time, len: f.len }, $('[name=from]')?.value || today);
       }
       app.save();
@@ -202,9 +209,16 @@ export function parseBulk(text, s) {
     let line = raw.trim().replace(/^[-•*\d.)\s]+(?=[א-ת])/, '');
     if (!line) continue;
     // Phone and class first, so their digits are not taken for a time.
-    const pm = line.match(/(?:\+972[-\s]?|0)[2-9]\d?[-\s]?\d{3}[-\s]?\d{4}/);
-    const phone = pm ? pm[0].trim() : '';
-    if (pm) line = line.replace(pm[0], ' ');
+    // First number is the student's, a second one (or one after "הורים"/"אבא"/"אמא") is the parents'.
+    const PHONE = /(?:\+972[-\s]?|0)[2-9]\d?[-\s]?\d{3}[-\s]?\d{4}/g;
+    let phone = '';
+    let parentPhone = '';
+    for (const m of [...line.matchAll(PHONE)]) {
+      const before = line.slice(0, m.index);
+      if (/(?:הורים|אבא|אמא|הורה)\s*:?\s*$/.test(before) || phone) parentPhone = parentPhone || m[0].trim();
+      else phone = m[0].trim();
+    }
+    line = line.replace(PHONE, ' ').replace(/(?:טלפון\s+)?(?:הורים|אבא|אמא|הורה)\s*:?(?=\s|$)/g, ' ').replace(/טלפון\s*:?/g, ' ');
     const gm = line.match(/(?:^|\s)כיתה\s+(\S+)/) || line.match(/(?:^|\s)(י["״][אב]\d?|(?:ט|י|יא|יב)['׳]\d?|(?:ט|י|יא|יב)\d)(?=\s|$|,)/);
     const grade = gm ? gm[1].replace(/,$/, '') : '';
     if (gm) line = line.replace(gm[0], ' ');
@@ -227,7 +241,7 @@ export function parseBulk(text, s) {
     }
     let len = lm ? Number(lm[1]) : 30;
     if (tm && lm && lm.index === tm.index) len = 30;
-    out.push({ name, day: dm ? DAY_NAMES.indexOf(dm[1]) : null, time, len, frame: frame || 'yeshiva', phone, grade });
+    out.push({ name, day: dm ? DAY_NAMES.indexOf(dm[1]) : null, time, len, frame: frame || 'yeshiva', phone, parentPhone, grade });
   }
   return out;
 }
@@ -235,11 +249,11 @@ export function parseBulk(text, s) {
 function bulkAdd(app) {
   const s = app.state;
   const body = el(`<div>
-    <p class="muted" style="margin-top:0">שורה לכל תלמיד: שם, יום, שעה, ואם רוצים גם אורך, כיתה, טלפון ו"פרטי". אפשר להדביק מהפתקים או מהאקסל.</p>
+    <p class="muted" style="margin-top:0">שורה לכל תלמיד: שם, יום, שעה, ואם רוצים גם אורך, כיתה, טלפון, טלפון הורים ו"פרטי". אפשר להדביק מהפתקים או מהאקסל.</p>
     <textarea class="input" rows="7" data-t placeholder="שלמה שלישי 14:00 30
 בנימין שלישי 14:30 45
 יוסף שלישי 15:15 כיתה י׳2
-דוד שלישי 15:45 60 פרטי 050-1234567"></textarea>
+דוד שלישי 15:45 60 פרטי 050-1234567 הורים 052-7654321"></textarea>
     <div data-prev style="margin-top:10px"></div>
   </div>`);
   const ta = body.querySelector('[data-t]');
@@ -247,7 +261,7 @@ function bulkAdd(app) {
   let rows = [];
   const update = () => {
     rows = parseBulk(ta.value, s);
-    prev.innerHTML = rows.length ? `<ul class="list card">${rows.map((r) => `<li><b class="grow">${e(r.name)}</b><span class="muted" style="font-size:14px">${r.day != null ? e(DAY_NAMES[r.day]) : '<span style="color:var(--danger)">בלי יום</span>'} ${e(r.time || '')} · ${r.len} דק׳${r.frame === 'private' ? ' · פרטי' : ''}${r.grade ? ` · ${e(r.grade)}` : ''}${r.phone ? ` · <span dir="ltr">${e(r.phone)}</span>` : ''}</span></li>`).join('')}</ul>` : '';
+    prev.innerHTML = rows.length ? `<ul class="list card">${rows.map((r) => `<li><b class="grow">${e(r.name)}</b><span class="muted" style="font-size:14px">${r.day != null ? e(DAY_NAMES[r.day]) : '<span style="color:var(--danger)">בלי יום</span>'} ${e(r.time || '')} · ${r.len} דק׳${r.frame === 'private' ? ' · פרטי' : ''}${r.grade ? ` · ${e(r.grade)}` : ''}${r.phone ? ` · <span dir="ltr">${e(r.phone)}</span>` : ''}${r.parentPhone ? ` · הורים <span dir="ltr">${e(r.parentPhone)}</span>` : ''}</span></li>`).join('')}</ul>` : '';
   };
   ta.addEventListener('input', update);
   openSheet({
@@ -258,7 +272,7 @@ function bulkAdd(app) {
         label: 'הוסף את כולם', cls: 'primary', grow: true, onClick: (close) => {
           if (!rows.length) { toast('לא זיהיתי שמות'); return; }
           const from = defaultFrom(s);
-          for (const r of rows) M.addStudent(s, { name: r.name, frame: r.frame, phone: r.phone, grade: r.grade, day: r.day, time: r.time || (r.day != null ? s.settings.dayStart : null), len: r.len, from });
+          for (const r of rows) M.addStudent(s, { name: r.name, frame: r.frame, phone: r.phone, parentPhone: r.parentPhone, grade: r.grade, day: r.day, time: r.time || (r.day != null ? s.settings.dayStart : null), len: r.len, from });
           const days = new Set(rows.map((r) => r.day).filter((d) => d != null));
           for (const d of days) if (!s.settings.workDays.includes(d)) s.settings.workDays.push(d);
           s.settings.workDays.sort();
