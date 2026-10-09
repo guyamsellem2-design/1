@@ -1,6 +1,6 @@
 // Shared UI pieces: bottom sheets, toasts, status chips and the lesson editor.
 
-import { escapeHtml as e, toMin, endTime, fmtDay } from './util.js';
+import { escapeHtml as e, toMin, endTime, fmtDay, telHref } from './util.js';
 import { statusById, activeStudents, lessonName, studentById } from './model.js';
 
 export function el(html) {
@@ -101,7 +101,11 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
   const lens = [30, 45, 60];
   const isCustomLen = !lens.includes(Number(l.len));
   const body = el(`<div>
-    <p class="muted" style="margin:-6px 0 12px">${e(fmtDay(date))}</p>
+    <p class="muted" style="margin:-6px 0 12px;display:flex;align-items:center;gap:8px">${e(fmtDay(date))}${(() => {
+      const st = l.studentId && studentById(state, l.studentId);
+      const tel = st && telHref(st.phone);
+      return tel ? `<a class="btn small call" href="${e(tel)}">📞 להתקשר</a>` : '';
+    })()}</p>
     ${allowStudentChange ? `<label class="field"><span>תלמיד</span>
       <select class="input" name="student"><option value="">— שם חופשי —</option>${opts}</select></label>
       <label class="field" data-free ${l.studentId ? 'hidden' : ''}><span>שם</span><input class="input" name="name" value="${e(l.name || '')}" placeholder="שם התלמיד"></label>` : ''}

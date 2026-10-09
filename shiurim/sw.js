@@ -1,13 +1,12 @@
 /* Offline shell + the phone's "Share" menu.
    Files are served cache-first and refreshed in the background, so an update lands on the next open.
-   Text or a photo shared from another app arrives here as a POST to ./share; it is parked in IndexedDB
+   Text shared from another app arrives here as a POST to ./share; it is parked in IndexedDB
    and the app picks it up on ./?shared=1. Nothing the teacher writes ever passes through this file. */
-const CACHE = 'shiurim-v1';
+const CACHE = 'shiurim-v2';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './js/app.js', './js/util.js', './js/parser.js', './js/model.js', './js/store.js', './js/ui.js',
-  './js/students.js', './js/settings.js', './js/table.js', './js/calendar.js', './js/export.js', './js/ocr.js',
-  './vendor/anthropic-sdk.mjs',
+  './js/students.js', './js/settings.js', './js/table.js', './js/calendar.js', './js/export.js', './js/report.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];
 
@@ -44,12 +43,10 @@ function inboxPut(value) {
 async function receiveShare(request) {
   try {
     const form = await request.formData();
-    const file = form.get('image');
     await inboxPut({
       title: form.get('title') || '',
       text: form.get('text') || '',
       url: form.get('url') || '',
-      file: file && typeof file !== 'string' && file.size ? file : null,
     });
   } catch (err) {
     // Fall through: the app still opens.

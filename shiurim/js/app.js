@@ -3,13 +3,12 @@
 import { todayISO, addDays, weekday, fmtDay, fmtDate, relDay, escapeHtml as e, DAY_NAMES, uid, toMin } from './util.js';
 import * as M from './model.js';
 import { parseReport } from './parser.js';
-import { loadState, saveState, getDraft, setDraft, askPersistence, putPhoto, getPhoto, takeInbox, getPref, setPref, backupBlob } from './store.js';
+import { loadState, saveState, getDraft, setDraft, askPersistence, takeInbox, getPref, setPref, backupBlob } from './store.js';
 import { el, toast, openSheet, confirmDialog, chip, chipButton, editLesson, pickStudent, timeRange } from './ui.js';
 import { renderStudents, editStudent } from './students.js';
 import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
 import { renderCalendar } from './calendar.js';
-import { transcribePhoto, hasApiKey, compressImage } from './ocr.js';
 
 const app = {
   state: loadState(),
@@ -74,7 +73,6 @@ function renderHome(app, root) {
       <textarea class="write" id="write" placeholder="${e(PLACEHOLDER)}" aria-label="מה היה היום"></textarea>
       <div class="row-actions">
         <button class="btn primary" id="btnParse">סדר לי את זה ←</button>
-        <button class="btn" id="btnPhoto" title="צילום דף מהמחברת">📷 צילום</button>
         <button class="btn ghost" id="btnPaste" title="הדבקה">📋 הדבקה</button>
       </div>
     </section>
@@ -88,7 +86,6 @@ function renderHome(app, root) {
   syncBtn();
   ta.addEventListener('input', () => { setDraft(ta.value); syncBtn(); });
   btn.addEventListener('click', () => startReview(ta.value));
-  page.querySelector('#btnPhoto').addEventListener('click', () => document.getElementById('photoInput').click());
   page.querySelector('#btnPaste').addEventListener('click', async () => {
     try {
       const t = await navigator.clipboard.readText();
@@ -208,10 +205,8 @@ function parseCtx(s) {
   };
 }
 
-function startReview(text, photoIds = []) {
+function startReview(text) {
   const s = app.state;
-  if (!photoIds.length && app.photoForNext) photoIds = [app.photoForNext];
-  app.photoForNext = null;
   const parsed = parseReport(text, parseCtx(s));
   if (!parsed.days.length) {
     toast('לא מצאתי פה שיעורים. אפשר לנסות לכתוב שם של תלמיד בתחילת שורה.');
@@ -219,7 +214,6 @@ function startReview(text, photoIds = []) {
   }
   app.pending = {
     text,
-    photoIds,
     days: parsed.days.map((pd) => ({ parsed: pd, review: M.buildReview(s, pd) })),
   };
   app.go('review');
@@ -246,7 +240,6 @@ function renderReview(app, root) {
       <ul class="lines"></ul>
       <div class="row-actions" data-bulk></div>
       <label class="field" style="margin-top:10px"><span>הארות ושינויים ליום</span><input class="input" data-remark value="${e(rv.remark || '')}" placeholder="למשל: שיעור קצר בגלל אסיפה"></label>
-      <div data-photos style="display:flex;gap:8px;flex-wrap:wrap"></div>
     </section>`);
     const ul = page.querySelector('ul');
 
@@ -363,17 +356,6 @@ function renderReview(app, root) {
       pd.review = M.buildReview(s, pd.parsed);
       render();
     });
-    if (di === 0 && p.photoIds.length) {
-      const box = page.querySelector('[data-photos]');
-      for (const id of p.photoIds) {
-        getPhoto(id).then((blob) => {
-          if (!blob) return;
-          const img = el(`<img class="photo-thumb" alt="צילום מצורף">`);
-          img.src = URL.createObjectURL(blob);
-          box.appendChild(img);
-        });
-      }
-    }
     wrap.appendChild(page);
   });
 
@@ -386,10 +368,6 @@ function renderReview(app, root) {
   foot.querySelector('[data-save]').addEventListener('click', () => {
     for (const pd of p.days) {
       M.applyReview(s, pd.review);
-    }
-    if (p.photoIds.length) {
-      const rec = M.materialize(s, p.days[0].review.date);
-      rec.photos = [...new Set([...(rec.photos || []), ...p.photoIds])];
     }
     app.save();
     setDraft('');
@@ -438,7 +416,6 @@ function renderDay(app, root) {
     <ul class="list card arr"></ul>
     <p class="hint" style="margin:10px 4px">גוררים ב-☰ כדי לשנות סדר (השעות מסתדרות לפי האורך של כל אחד). כל שינוי כאן הוא ליום הזה בלבד. אפשר גם לכתוב במחברת: <span class="kbd">היום: בנימין 14:00, צביקה 14:45</span></p>
     <label class="field"><span>הארות ושינויים</span><textarea class="input" data-remark rows="2" placeholder="יופיע בעמודה האחרונה בטבלה">${e(day.remark)}</textarea></label>
-    <div data-photos style="display:flex;gap:8px;flex-wrap:wrap"></div>
   </div>`);
   root.appendChild(wrap);
   const ul = wrap.querySelector('ul');
@@ -549,17 +526,6 @@ function renderDay(app, root) {
       }
     });
   });
-
-  const photos = wrap.querySelector('[data-photos]');
-  for (const id of day.photos) {
-    getPhoto(id).then((blob) => {
-      if (!blob) return;
-      const img = el(`<img class="photo-thumb" alt="צילום מהמחברת">`);
-      img.src = URL.createObjectURL(blob);
-      img.addEventListener('click', () => window.open(img.src, '_blank'));
-      photos.appendChild(img);
-    });
-  }
 }
 
 // Pointer-based drag on the ☰ handle; works with touch and mouse.
@@ -600,51 +566,6 @@ function enableDrag(ul, onDrop) {
 }
 
 // ============================================================
-// Photo of a notebook page → text → the same review
-// ============================================================
-
-async function handlePhoto(file) {
-  if (!file) return;
-  const s = app.state;
-  const photoId = 'p' + uid();
-  let blob = file;
-  try { blob = await compressImage(file, 1600, 0.82); } catch { /* keep original */ }
-  await putPhoto(photoId, blob).catch(() => {});
-  if (!hasApiKey()) {
-    openSheet({
-      title: 'קריאת כתב יד',
-      body: `<p>כדי שהאתר יקרא כתב יד מתמונה צריך לחבר פעם אחת מפתח של Claude (בערך 10 אגורות לתמונה).</p>
-        <p class="muted">בינתיים התמונה נשמרה, והיא תצורף ליום כשתשמרו. אפשר גם להקליד או להדביק את הטקסט.</p>`,
-      actions: [
-        { label: 'לחיבור בהגדרות', cls: 'primary', onClick: (c) => { c(); app.go('settings', { focus: 'ai' }); } },
-        { label: 'אקליד בעצמי', cls: 'ghost', onClick: (c) => { c(); app.pending = null; app.photoForNext = photoId; } },
-      ],
-    });
-    return;
-  }
-  const t = el(`<div class="toast" role="status"><span class="spinner"></span> קורא את הדף…</div>`);
-  document.body.appendChild(t);
-  try {
-    const text = await transcribePhoto(blob, s);
-    t.remove();
-    if (!text.trim()) { toast('לא הצלחתי לקרוא טקסט מהתמונה'); return; }
-    const prev = getDraft();
-    setDraft(prev ? prev + '\n' + text : text);
-    startReview(prev ? prev + '\n' + text : text, [photoId]);
-  } catch (err) {
-    t.remove();
-    console.error(err);
-    openSheet({ title: 'הקריאה לא הצליחה', body: `<p>${e(err.message || String(err))}</p><p class="muted">התמונה נשמרה. אפשר לנסות שוב או להקליד.</p>`, actions: [{ label: 'סגור', cls: 'ghost' }] });
-  }
-}
-
-document.getElementById('photoInput').addEventListener('change', (ev) => {
-  const f = ev.target.files[0];
-  ev.target.value = '';
-  handlePhoto(f);
-});
-
-// ============================================================
 // Boot
 // ============================================================
 
@@ -657,16 +578,11 @@ document.getElementById('btnSettings').addEventListener('click', () => app.go('s
 async function receiveShared() {
   const params = new URLSearchParams(location.search);
   let text = [params.get('title'), params.get('text'), params.get('url')].filter(Boolean).join('\n');
-  let file = null;
   if (params.has('shared')) {
     const inbox = await takeInbox();
-    if (inbox) {
-      text = [inbox.title, inbox.text, inbox.url].filter(Boolean).join('\n');
-      file = inbox.file || null;
-    }
+    if (inbox) text = [inbox.title, inbox.text, inbox.url].filter(Boolean).join('\n');
   }
   if (params.toString()) { try { history.replaceState(null, '', location.pathname); } catch { /* ignore */ } }
-  if (file) { app.go('home'); await handlePhoto(file); return true; }
   if (text.trim()) {
     const prev = getDraft();
     setDraft(prev ? prev + '\n' + text : text);

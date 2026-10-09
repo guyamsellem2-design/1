@@ -86,13 +86,15 @@ export function activeStudents(state, date = todayISO()) {
   return state.students.filter((s) => !(s.deleted && (!s.deletedFrom || s.deletedFrom <= date)));
 }
 
-export function addStudent(state, { name, aliases = [], frame = 'yeshiva', day, time, len = 30, notes = '', from }) {
+export function addStudent(state, { name, aliases = [], frame = 'yeshiva', day, time, len = 30, notes = '', phone = '', grade = '', from }) {
   const st = {
     id: uid(),
     name: name.trim(),
     aliases,
     frame,
     notes,
+    phone,
+    grade,
     startDate: null,
     schedule: day != null && time ? [{ from: from || '2000-01-01', day: Number(day), time, len: Number(len) }] : [],
   };
@@ -153,7 +155,6 @@ export function getDay(state, date) {
     custom: !!(rec && rec.lessons),
     remark: rec?.remark || '',
     holiday: holidayOn(state, date),
-    photos: rec?.photos || [],
   };
 }
 

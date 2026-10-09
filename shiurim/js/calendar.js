@@ -3,7 +3,8 @@
 
 import { escapeHtml as e, toMin, fromMin, todayISO, addDays, weekday, fmtDate, fromISO, toISO, DAY_NAMES } from './util.js';
 import * as M from './model.js';
-import { el, editLesson, toast } from './ui.js';
+import { el, editLesson, toast, pickStudent } from './ui.js';
+import { reportDay } from './report.js';
 import { getPref, setPref } from './store.js';
 
 const PPM = 1.15; // pixels per minute
@@ -57,8 +58,26 @@ function renderWeek(app, root, anchor, titleEl) {
   const grid = el(`<div class="week" style="grid-template-columns:repeat(${dates.length || 1}, minmax(0,1fr))"></div>`);
   for (const d of dates) {
     const day = M.getDay(s, d);
-    const col = el(`<div class="col"><h4 class="${d === today ? 'today' : ''}">${e(DAY_NAMES[weekday(d)])} ${e(fmtDate(d))}</h4><div class="lane" style="height:${height}px"></div></div>`);
+    const col = el(`<div class="col"><h4 class="${d === today ? 'today' : ''}" role="button" title="דיווח על כל היום">${e(DAY_NAMES[weekday(d)])} ${e(fmtDate(d))}<span class="pen">✎</span></h4><div class="lane" style="height:${height}px"></div></div>`);
     const lane = col.querySelector('.lane');
+    col.querySelector('h4').addEventListener('click', () => reportDay(app, d, { onSaved: () => app.render() }));
+    // Tap an empty spot: a lesson at that time, this day only.
+    lane.addEventListener('click', (ev) => {
+      if (ev.target.closest('.blk')) return;
+      const y = ev.clientY - lane.getBoundingClientRect().top;
+      const t = fromMin(start + Math.floor(y / PPM / 15) * 15);
+      pickStudent(s, {
+        date: d, title: `שיעור ב-${t}`, exclude: day.lessons.map((l) => l.studentId).filter(Boolean),
+        onPick: ({ studentId, newName }) => {
+          const st = studentId && M.studentById(s, studentId);
+          const slot = st && (M.slotOn(st, d) || M.currentSlot(st, d));
+          const l = M.addLesson(s, d, { studentId: studentId || null, name: newName || '', time: t, len: slot ? Number(slot.len) : 30 });
+          app.save();
+          app.render();
+          editLesson(s, { date: d, lesson: l, title: 'שיעור נוסף ליום הזה', onSave: (nl) => { M.updateLesson(s, d, l.id, nl); app.save(); app.render(); }, onDelete: () => { M.removeLessons(s, d, [l.id]); app.save(); app.render(); } });
+        },
+      });
+    });
     for (let t = start; t < end; t += 30) lane.insertAdjacentHTML('beforeend', `<div class="hr" style="top:${(t - start) * PPM}px">${t % 60 === 0 ? fromMin(t) : ''}</div>`);
     if (day.holiday && !day.lessons.length) lane.insertAdjacentHTML('beforeend', `<div class="hol">${e(day.holiday)}</div>`);
     for (const l of day.lessons) {
@@ -84,7 +103,7 @@ function renderWeek(app, root, anchor, titleEl) {
   }
   if (!dates.length) grid.appendChild(el('<p class="muted">אין ימי עבודה בשבוע הזה.</p>'));
   root.appendChild(grid);
-  root.appendChild(el(`<p class="hint" style="margin:10px 4px">לחיצה על שיעור פותחת אותו. גרירה למעלה/למטה משנה את השעה ליום הזה בלבד.</p>`));
+  root.appendChild(el(`<p class="hint" style="margin:10px 4px">לדיווח: לוחצים על <b>שם היום</b> כדי לסמן את כל היום, או על <b>שיעור</b> כדי לפתוח אותו. מקום ריק = הוספת שיעור. גרירה למעלה/למטה משנה שעה ליום הזה בלבד.</p>`));
 }
 
 function enableBlockDrag(blk, { onTap, onDrop, snap }) {
@@ -140,10 +159,14 @@ function renderMonth(app, root, anchor, titleEl) {
       <div class="num">${fromISO(d).getDate()}</div>
       ${day.holiday ? `<div class="hl">${e(day.holiday)}</div>` : ''}
       <div class="dots">${dots}</div></div>`);
-    cell.addEventListener('click', () => app.go('calendar', { mode: 'week', date: d }));
+    cell.addEventListener('click', () => reportDay(app, d, {
+      onSaved: () => app.render(),
+      extraAction: { label: 'לתצוגת שבוע', onClick: () => app.go('calendar', { mode: 'week', date: d }) },
+    }));
     grid.appendChild(cell);
   }
   root.appendChild(grid);
   const legend = s.statuses.map((x) => `<span class="chip" style="background:${e(x.bg)};color:${e(x.fg)}">${e(x.name)}</span>`).join(' ');
   root.appendChild(el(`<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${legend}<span class="chip empty">לא דווח</span></div>`));
+  root.appendChild(el(`<p class="hint" style="margin:10px 4px">לחיצה על יום פותחת דיווח על כל השיעורים שלו.</p>`));
 }

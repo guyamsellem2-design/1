@@ -7,6 +7,7 @@ import * as M from './model.js';
 import { detectStatus, stripStatusWords, cleanup } from './parser.js';
 import { el, toast, editLesson } from './ui.js';
 import { openExport } from './export.js';
+import { reportDay } from './report.js';
 import { getPref, setPref } from './store.js';
 
 const DAY_LETTER = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
@@ -67,6 +68,7 @@ export function renderTable(app, root) {
       <button class="btn small ghost" data-zoom="fit">התאם לרוחב</button>
       <button class="btn small ghost" data-zoom="1" aria-label="הגדלה">+</button>
     </div>
+    <p class="hint" style="margin:0 16px 8px">לדיווח: לוחצים על <b>תאריך</b> כדי לסמן את כל היום, או על <b>תא</b> כדי להקליד או לבחור סטטוס לשיעור אחד. תא ריק = הוספת שיעור.</p>
     <div class="grid-wrap"><table class="grid"><thead></thead><tbody></tbody></table></div>
   </div>`);
   root.appendChild(wrap);
@@ -100,7 +102,7 @@ export function renderTable(app, root) {
     if (weekStart) tr.classList.add('week-start');
     const lessons = day.lessons.filter((l) => frameOk(s, l, frame));
     const { placed, outside } = layoutRow(s, lessons, cols);
-    let html = `<td class="c-date">${DAY_LETTER[weekday(d)]} ${fmtDate(d)}</td><td class="c-hol" tabindex="0" data-kind="hol" data-col="-1">${e(day.holiday)}</td>`;
+    let html = `<td class="c-date tap-date" title="דיווח על כל היום">${DAY_LETTER[weekday(d)]} ${fmtDate(d)}</td><td class="c-hol" tabindex="0" data-kind="hol" data-col="-1">${e(day.holiday)}</td>`;
     let c = 0;
     for (const p of placed) {
       for (; c < p.col; c++) html += `<td class="slot${cols[c] % 30 === 0 ? ' half' : ''}" tabindex="0" data-kind="slot" data-col="${c}"></td>`;
@@ -312,6 +314,13 @@ export function renderTable(app, root) {
   gridWrap.addEventListener('scroll', closeEditor, { passive: true });
 
   body.addEventListener('click', (ev) => {
+    const dc = ev.target.closest('td.c-date');
+    if (dc) {
+      const d = dc.closest('tr').dataset.date;
+      closeEditor();
+      reportDay(app, d, { onSaved: () => refreshRow(d) });
+      return;
+    }
     const td = ev.target.closest('td[data-kind]');
     if (td) { td.focus(); openEditor(td); }
   });

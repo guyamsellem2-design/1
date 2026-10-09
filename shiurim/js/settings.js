@@ -1,10 +1,9 @@
-// Settings: teacher, work days and hours, statuses, holidays, frames, photo reading, sharing, backup.
+// Settings: teacher, work days and hours, statuses, holidays, frames, sharing, backup.
 
 import { escapeHtml as e, DAY_NAMES, uid, fmtDateFull, todayISO } from './util.js';
 import * as M from './model.js';
 import { el, toast, openSheet, confirmDialog } from './ui.js';
 import { backupBlob, readBackup, getPref, setPref } from './store.js';
-import { getApiKey, setApiKey, testApiKey } from './ocr.js';
 import { openExport } from './export.js';
 
 export function renderSettings(app, root) {
@@ -59,19 +58,11 @@ export function renderSettings(app, root) {
       <div class="row-actions"><button class="btn" data-export>הורד לאקסל…</button></div>
     </div>
 
-    <div class="section-title" id="ai">צילום מחברת (קריאת כתב יד)</div>
-    <div class="card" style="padding:14px">
-      <p style="margin-top:0">טקסט שכותבים או מדביקים מפוענח <b>במכשיר עצמו</b>, בחינם ובלי לשלוח שמות לשום מקום. רק תמונה של כתב יד צריכה בינה מלאכותית (Claude) כדי להפוך לטקסט.</p>
-      <p class="muted" style="font-size:14px">עלות: בערך 2-3 סנט לתמונה, כלומר בערך שקל וחצי בחודש אם מצלמים שלוש פעמים בשבוע. המפתח נשמר רק בדפדפן הזה. מקבלים מפתח ב-<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> ‏(צריך להטעין שם 5$, שיספיקו ליותר משנה).</p>
-      <label class="field"><span>מפתח Claude API</span><input class="input" type="password" data-apikey value="${e(getApiKey())}" placeholder="sk-ant-..." dir="ltr" autocomplete="off"></label>
-      <div class="row-actions"><button class="btn" data-savekey>שמור מפתח</button><button class="btn ghost" data-testkey>בדיקה</button></div>
-    </div>
-
     <div class="section-title">שליחה ישר מהפתקים בטלפון</div>
     <div class="card" style="padding:14px">
       <details class="help" style="margin:0 0 8px" open><summary>אנדרואיד</summary>
         <ol><li>פותחים את האתר בכרום ← תפריט ⋮ ← "הוספה למסך הבית" / "התקנת אפליקציה".</li>
-        <li>מעכשיו, בפתק: "שיתוף" ← "שיעורים". הטקסט (או התמונה) נכנס ישר לתיבה.</li></ol></details>
+        <li>מעכשיו, בפתק: "שיתוף" ← "שיעורים". הטקסט נכנס ישר לתיבה.</li></ol></details>
       <details class="help" style="margin:0"><summary>אייפון</summary>
         <p class="muted" style="font-size:14px">באייפון אתרים לא יכולים להופיע ברשימת השיתוף, אז עושים קיצור דרך פעם אחת (דקה):</p>
         <ol>
@@ -216,14 +207,6 @@ export function renderSettings(app, root) {
   $('[data-exportnames]').addEventListener('change', (ev) => { st.exportNames = ev.target.checked; app.save(); });
   $('[data-export]').addEventListener('click', () => openExport(app));
 
-  // AI key
-  $('[data-savekey]').addEventListener('click', () => { setApiKey($('[data-apikey]').value.trim()); toast('נשמר ✓'); });
-  $('[data-testkey]').addEventListener('click', async () => {
-    setApiKey($('[data-apikey]').value.trim());
-    toast('בודק…');
-    try { await testApiKey(); toast('המפתח עובד ✓'); } catch (err) { toast('לא עבד: ' + (err.message || err), 5000); }
-  });
-
   // iPhone shortcut URL
   const url = new URL('./?text=', location.href).href;
   $('[data-shortcut-url]').textContent = url;
@@ -264,5 +247,4 @@ export function renderSettings(app, root) {
     app.go('home');
   });
 
-  if (app.params.focus === 'ai') setTimeout(() => $('#ai').scrollIntoView({ behavior: 'smooth' }), 50);
 }

@@ -207,7 +207,7 @@ textarea.input { min-height: 70px; resize: vertical; }
 .table-tools { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; overflow-x: auto; padding: 0 16px 10px; }
 .table-tools > * { flex: none; }
 .grid-wrap {
-  overflow: auto; height: calc(100dvh - 190px - env(safe-area-inset-bottom)); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  overflow: auto; height: calc(100dvh - 236px - env(safe-area-inset-bottom)); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
   background: var(--card); -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
 }
 table.grid { border-collapse: separate; border-spacing: 0; font-size: 12px; transform-origin: top right; }
@@ -263,12 +263,23 @@ table.grid tr.week-start td { border-top: 2px solid #D1D5DB; }
 .month .d .dots { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
 .month .d .dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(0,0,0,.1); }
 
+/* ---------- day report sheet ---------- */
+.report-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.report-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.report-head .t { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 14px; }
+.link-btn { border: 0; background: none; padding: 4px 2px; font-size: 16px; text-align: start; }
+.report-status button { font-size: 13.5px; padding: 5px 10px; min-height: 36px; }
+.c-date.tap-date { cursor: pointer; }
+.c-date.tap-date:hover { background: var(--accent-soft) !important; color: var(--accent); }
+.week .col h4 { cursor: pointer; }
+.week .col h4 .pen { opacity: .55; font-size: 11px; margin-inline-start: 3px; }
+a.call { text-decoration: none; }
+
 /* ---------- misc ---------- */
 .empty-state { text-align: center; padding: 30px 16px; color: var(--ink-2); }
 .empty-state .big { font-size: 40px; }
 .pill-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .kbd { background: var(--paper-2); padding: 0 4px; border-radius: 4px; white-space: nowrap; }
-.photo-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
 details.help { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-top: 10px; }
 details.help summary { cursor: pointer; font-weight: 500; }
 details.help ol { padding-inline-start: 20px; margin: 8px 0; }
@@ -281,7 +292,7 @@ details.help ol { padding-inline-start: 20px; margin: 8px 0; }
   nav.tabs button { flex-direction: row; font-size: 15px; gap: 6px; }
   main { padding-bottom: 40px; }
   .toast { bottom: 24px; }
-  .grid-wrap { height: calc(100dvh - 210px); }
+  .grid-wrap { height: calc(100dvh - 250px); }
 }
 @media print { nav.tabs, .topbar, .table-tools { display: none; } }
 </style>
@@ -299,7 +310,6 @@ details.help ol { padding-inline-start: 20px; margin: 8px 0; }
   <button data-view="students"><span class="ic">👥</span>תלמידים</button>
 </nav>
 <main id="view"></main>
-<input type="file" id="photoInput" accept="image/*" hidden>
 <input type="file" id="backupInput" accept="application/json,.json" hidden>
 <noscript>האתר צריך JavaScript כדי לעבוד.</noscript>
 <script type="module" src="js/app.js"></script>

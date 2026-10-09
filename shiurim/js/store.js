@@ -1,5 +1,5 @@
-// Persistence: the whole state in localStorage (small, synchronous, survives offline),
-// photos in IndexedDB (too big for localStorage). Everything stays on this device unless cloud sync is on.
+// Persistence: the whole state in localStorage (small, synchronous, survives offline).
+// IndexedDB only holds text shared in from the phone's share menu until the app picks it up.
 
 import { migrate } from './model.js';
 
@@ -50,7 +50,7 @@ export async function askPersistence() {
   } catch { /* not supported */ }
 }
 
-// ---------- photos (IndexedDB) ----------
+// ---------- share inbox (IndexedDB, written by sw.js) ----------
 
 function db() {
   return new Promise((resolve, reject) => {
@@ -75,10 +75,6 @@ async function tx(store, mode, fn) {
     t.onerror = () => reject(t.error);
   });
 }
-
-export const putPhoto = (id, blob) => tx('photos', 'readwrite', (s) => s.put(blob, id));
-export const getPhoto = (id) => tx('photos', 'readonly', (s) => s.get(id));
-export const delPhoto = (id) => tx('photos', 'readwrite', (s) => s.delete(id));
 
 // Things shared into the app from the phone's share menu land here (written by sw.js).
 export const takeInbox = async () => {

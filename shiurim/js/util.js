@@ -101,3 +101,9 @@ export function escapeHtml(s) {
 }
 
 export const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// "050-123 4567" → "tel:0501234567" (for the phone's dialer).
+export function telHref(phone) {
+  const d = String(phone || '').replace(/[^\d+]/g, '');
+  return d.length >= 7 ? `tel:${d}` : '';
+}
