@@ -5,6 +5,8 @@ import * as M from './model.js';
 import { parseReport } from './parser.js';
 import { loadState, saveState, getDraft, setDraft, askPersistence, takeInbox, getPref, setPref, backupBlob } from './store.js';
 import { el, toast, openSheet, confirmDialog, chip, chipButton, editLesson, pickStudent, timeRange } from './ui.js';
+import { initSync, isSignedIn, onSyncStatus, syncStatus } from './sync.js';
+import { openSignIn } from './account.js';
 import { renderStudents, editStudent } from './students.js';
 import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
@@ -26,6 +28,7 @@ const app = {
     window.scrollTo(0, 0);
   },
   render: () => render(),
+  toast: (m, ms) => toast(m, ms),
 };
 window.__app = app; // handy for debugging and tests
 
@@ -153,8 +156,9 @@ function renderHome(app, root) {
   // Everything lives on this device until cloud sync is connected: nudge a backup every two weeks.
   const reportedDays = Object.keys(s.days).length;
   const lastBackup = getPref('lastBackup');
-  if (reportedDays >= 3 && (!lastBackup || addDays(lastBackup, 14) <= today)) {
-    const box = el(`<div class="banner" style="margin-top:16px"><span class="grow">💾 הדיווחים שמורים רק במכשיר הזה. כדאי להוריד גיבוי.</span><button class="btn small" data-bk>גיבוי</button></div>`);
+  if (!isSignedIn() && reportedDays >= 3 && (!lastBackup || addDays(lastBackup, 14) <= today)) {
+    const box = el(`<div class="banner" style="margin-top:16px;flex-wrap:wrap"><span class="grow">💾 הדיווחים שמורים רק במכשיר הזה. כדי שיישמרו גם בענן ויופיעו גם במחשב, אפשר להתחבר עם מייל.</span><button class="btn small primary" data-login>התחברות</button><button class="btn small" data-bk>גיבוי לקובץ</button></div>`);
+    box.querySelector('[data-login]').addEventListener('click', () => openSignIn(app));
     box.querySelector('[data-bk]').addEventListener('click', () => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(backupBlob(s));
@@ -574,6 +578,25 @@ document.getElementById('tabs').addEventListener('click', (ev) => {
   if (b) app.go(b.dataset.view);
 });
 document.getElementById('btnSettings').addEventListener('click', () => app.go('settings'));
+document.getElementById('btnSync').addEventListener('click', () => (isSignedIn() ? app.go('settings', { focus: 'sync' }) : openSignIn(app)));
+
+// The cloud icon in the top bar: synced, syncing, or no connection.
+function paintSync({ status }) {
+  const b = document.getElementById('btnSync');
+  const map = {
+    off: ['☁︎', 'התחברות עם מייל, כדי שהנתונים יהיו גם בטלפון וגם במחשב', 'off'],
+    ok: ['☁︎', 'שמור בענן', 'ok'],
+    busy: ['⟳', 'שומר בענן…', 'busy'],
+    offline: ['☁︎', 'אין אינטרנט כרגע. מה שתכתוב יישמר בענן כשהחיבור יחזור', 'warn'],
+    error: ['☁︎', 'השמירה בענן לא הצליחה, ננסה שוב', 'warn'],
+  };
+  const [icon, title, cls] = map[status] || map.off;
+  b.textContent = icon;
+  b.title = title;
+  b.setAttribute('aria-label', title);
+  b.dataset.state = cls;
+}
+onSyncStatus(paintSync);
 
 async function receiveShared() {
   const params = new URLSearchParams(location.search);
@@ -598,6 +621,8 @@ async function receiveShared() {
   const shared = await receiveShared();
   if (!shared) app.go(['day', 'table', 'calendar', 'students', 'settings'].includes(hashView) ? hashView : 'home');
   askPersistence();
+  paintSync(syncStatus());
+  initSync(app);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
@@ -613,8 +638,9 @@ function welcome() {
     <p>כותבים בסוף היום כמו במחברת, והאתר מסדר לבד: טבלת נוכחות לבוס, היסטוריה לכל תלמיד וקובץ אקסל במבנה של הישיבה.</p>
     <label class="field"><span>השם שלך</span><input class="input" name="n" placeholder="למשל: גיא אמסלם"></label>
     <label class="field"><span>מה את/ה מלמד/ת</span><input class="input" name="sub" value="${e(s.teacher.subject)}"></label>
+    <p class="hint" style="margin:0">כבר התחלת לעבוד בטלפון או במחשב אחר? <a href="#" data-login>התחברות עם מייל</a> והכל יגיע לכאן.</p>
   </div>`);
-  openSheet({
+  const sh = openSheet({
     title: 'שלום! 👋',
     body,
     actions: [{
@@ -627,6 +653,11 @@ function welcome() {
         if (!s.students.length) app.go('students', { bulk: true });
       },
     }],
+  });
+  body.querySelector('[data-login]').addEventListener('click', (ev) => {
+    ev.preventDefault();
+    sh.close();
+    openSignIn(app);
   });
 }
 

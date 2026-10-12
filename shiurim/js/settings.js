@@ -5,12 +5,17 @@ import * as M from './model.js';
 import { el, toast, openSheet, confirmDialog } from './ui.js';
 import { backupBlob, readBackup, getPref, setPref } from './store.js';
 import { openExport } from './export.js';
+import { isSignedIn, syncStatus, signOut, pushNow, pullNow, onSyncStatus } from './sync.js';
+import { openSignIn } from './account.js';
 
 export function renderSettings(app, root) {
   const s = app.state;
   const st = s.settings;
   const lastBackup = getPref('lastBackup');
   const wrap = el(`<div>
+    <div class="section-title" id="sync">חשבון וענן (אותם נתונים בטלפון ובמחשב)</div>
+    <div class="card" style="padding:14px" data-syncbox></div>
+
     <div class="section-title">פרטים (מופיעים בקישור לבוס ובקובץ האקסל)</div>
     <div class="card" style="padding:14px">
       <div class="two">
@@ -79,15 +84,11 @@ export function renderSettings(app, root) {
 
     <div class="section-title">גיבוי</div>
     <div class="card" style="padding:14px">
-      <p style="margin-top:0">כרגע הכל שמור <b>במכשיר הזה</b>. כדי שלא יאבד ושיהיה גם במחשב, כדאי להוריד גיבוי מדי פעם (או לחבר ענן, בהמשך).</p>
+      <p style="margin-top:0">${isSignedIn() ? 'הכל נשמר בענן. אפשר בנוסף להוריד קובץ גיבוי, ליתר ביטחון.' : 'כרגע הכל שמור <b>במכשיר הזה</b>. כדי שלא יאבד, כדאי להתחבר עם מייל (למעלה) או להוריד גיבוי מדי פעם.'}</p>
       <p class="hint">גיבוי אחרון: ${lastBackup ? e(fmtDateFull(lastBackup)) : 'עוד לא'}</p>
       <div class="row-actions"><button class="btn" data-backup>הורד גיבוי</button><button class="btn ghost" data-restore>שחזור מקובץ</button></div>
     </div>
 
-    <div class="section-title">ענן (מהטלפון ומהמחשב יחד)</div>
-    <div class="card" style="padding:14px">
-      <p style="margin-top:0" class="muted">עוד לא מחובר. הפרויקט ב-Supabase שלך מושהה, וכדי להפעיל אותו צריך אישור שלך. ברגע שתאשר, החיבור ייכנס כאן, וההתחברות תהיה עם המייל.</p>
-    </div>
 
     <div class="section-title">איפוס</div>
     <div class="card" style="padding:14px"><button class="btn danger" data-wipe>מחק את כל הנתונים במכשיר הזה</button></div>
@@ -241,10 +242,41 @@ export function renderSettings(app, root) {
     inp.click();
   });
   $('[data-wipe]').addEventListener('click', async () => {
-    if (!await confirmDialog('למחוק את כל התלמידים והדיווחים מהמכשיר הזה? אי אפשר לבטל. כדאי להוריד גיבוי קודם.', 'מחק הכל', true)) return;
+    const signed = isSignedIn();
+    if (!await confirmDialog(signed
+      ? 'למחוק את הנתונים מהמכשיר הזה? החיבור לענן ינותק במכשיר הזה, והנתונים בענן יישארו (אפשר להתחבר שוב ולקבל אותם).'
+      : 'למחוק את כל התלמידים והדיווחים מהמכשיר הזה? אי אפשר לבטל. כדאי להוריד גיבוי קודם.', 'מחק', true)) return;
+    if (signed) await signOut();
     app.state = M.defaultState();
     app.save();
     app.go('home');
   });
 
+
+  // account & cloud
+  const box = $('[data-syncbox]');
+  const paint = () => {
+    const st = syncStatus();
+    if (!isSignedIn()) {
+      box.innerHTML = `<p style="margin-top:0">מתחברים עם מייל וסיסמה, ואז כל מה שמדווחים נשמר בענן ומופיע גם בטלפון וגם במחשב. בלי חיבור לאינטרנט הכל ממשיך לעבוד, ונשמר בענן כשהחיבור חוזר.</p>
+        <button class="btn primary" data-signin>התחברות / יצירת חשבון</button>`;
+      box.querySelector('[data-signin]').addEventListener('click', () => openSignIn(app, { onDone: () => app.render() }));
+      return;
+    }
+    const when = st.lastSync ? new Date(st.lastSync).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '';
+    const label = { ok: `נשמר בענן${when ? ` (${when})` : ''}`, busy: 'שומר…', offline: 'אין אינטרנט כרגע. יישמר כשהחיבור יחזור', error: 'השמירה האחרונה לא הצליחה, ננסה שוב' }[st.status] || '';
+    box.innerHTML = `<p style="margin-top:0">מחובר עם <b dir="ltr">${e(st.email)}</b></p>
+      <p class="hint">${e(label)}</p>
+      <p class="hint">במחשב או בטלפון השני: נכנסים לאתר, לוחצים על ☁︎ למעלה ומתחברים עם אותו מייל וסיסמה.</p>
+      <div class="row-actions"><button class="btn" data-syncnow>סנכרן עכשיו</button><button class="btn ghost" data-signout>התנתקות</button></div>`;
+    box.querySelector('[data-syncnow]').addEventListener('click', async () => { await pushNow(); await pullNow(); paint(); toast('מעודכן ✓'); });
+    box.querySelector('[data-signout]').addEventListener('click', async () => {
+      if (!await confirmDialog('להתנתק במכשיר הזה? הנתונים נשארים גם כאן וגם בענן, פשוט לא יתעדכנו יותר בין המכשירים.', 'התנתק')) return;
+      await signOut();
+      app.render();
+    });
+  };
+  paint();
+  onSyncStatus(() => { if (document.body.contains(box)) paint(); });
+  if (app.params.focus === 'sync') setTimeout(() => $('#sync').scrollIntoView({ behavior: 'smooth' }), 50);
 }

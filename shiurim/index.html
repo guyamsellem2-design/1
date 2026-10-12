@@ -274,6 +274,12 @@ table.grid tr.week-start td { border-top: 2px solid #D1D5DB; }
 .week .col h4 { cursor: pointer; }
 .week .col h4 .pen { opacity: .55; font-size: 11px; margin-inline-start: 3px; }
 a.call { text-decoration: none; }
+.sync-btn { font-size: 22px; }
+.section-title[id] { scroll-margin-top: 130px; }
+.sync-btn[data-state="off"] { color: var(--ink-3); }
+.sync-btn[data-state="ok"] { color: #1E7B4D; }
+.sync-btn[data-state="busy"] { color: var(--accent); animation: spin 1.2s linear infinite; }
+.sync-btn[data-state="warn"] { color: #B7791F; }
 .calls { display: flex; gap: 4px; }
 .calls a.call { padding: 3px 9px; min-height: 32px; font-size: 13px; }
 
@@ -302,6 +308,7 @@ details.help ol { padding-inline-start: 20px; margin: 8px 0; }
 <body>
 <header class="topbar">
   <div class="who" id="who"></div>
+  <button class="icon-btn sync-btn" id="btnSync" data-state="off" aria-label="ענן">☁︎</button>
   <button class="icon-btn" id="btnSettings" aria-label="הגדרות" title="הגדרות">⚙︎</button>
 </header>
 <nav class="tabs" id="tabs">

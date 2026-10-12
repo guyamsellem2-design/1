@@ -2,30 +2,48 @@
 // IndexedDB only holds text shared in from the phone's share menu until the app picks it up.
 
 import { migrate } from './model.js';
+import { stampChanges } from './syncmerge.js';
+import { clone } from './util.js';
 
 const KEY = 'shiurim.v1';
 const DRAFT_KEY = 'shiurim.draft';
 const listeners = new Set();
+let lastSaved = null; // what is on disk now, to see what each save changed
 
 export function loadState() {
+  let state;
   try {
     const raw = localStorage.getItem(KEY);
-    return migrate(raw ? JSON.parse(raw) : null);
+    state = migrate(raw ? JSON.parse(raw) : null);
   } catch (e) {
     console.error(e);
-    return migrate(null);
+    state = migrate(null);
   }
+  lastSaved = clone(state);
+  return state;
 }
 
-export function saveState(state, { silent = false, touch = true } = {}) {
-  if (touch) state.updatedAt = Date.now();
+function write(state) {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch (e) {
     console.error(e);
     alert('לא הצלחתי לשמור במכשיר (אולי הזיכרון מלא). כדאי להוריד גיבוי מההגדרות.');
   }
-  if (!silent) listeners.forEach((fn) => fn(state));
+}
+
+export function saveState(state, { touch = true } = {}) {
+  if (touch) state.updatedAt = Date.now();
+  stampChanges(lastSaved, state);
+  write(state);
+  lastSaved = clone(state);
+  listeners.forEach((fn) => fn(state));
+}
+
+// Data that arrived from the other device: stored as is, without counting as a local edit.
+export function replaceState(state) {
+  write(state);
+  lastSaved = clone(state);
 }
 
 export const onSave = (fn) => listeners.add(fn);
