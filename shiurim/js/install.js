@@ -21,7 +21,7 @@ export function initInstall() {
   window.addEventListener('appinstalled', () => {
     deferred = null;
     notify();
-    toast('האפליקציה הותקנה ✓ אפשר לפתוח אותה ממסך הבית');
+    toast('ההתקנה התחילה. בעוד כמה שניות "שיעורים" יופיע במסך הבית או ברשימת האפליקציות', 5000);
   });
 }
 
@@ -58,6 +58,16 @@ const STEPS = {
     <li>או: <b>⋮</b> ← <b>"העברה, שמירה ושיתוף"</b> ← <b>"התקנת הדף כאפליקציה"</b>.</li></ol>`,
 };
 
+// Chrome says "already installed" but there is no icon, or "Open app" fails.
+const TROUBLE = `<details class="help" style="margin-top:14px"><summary>כרום אומר שזה כבר מותקן, אבל אין אייקון או שזה לא נפתח?</summary>
+  <p class="hint" style="margin:8px 0">לפני הכל: אם עוד לא התחברת עם מייל (☁︎ למעלה), כדאי להתחבר קודם, כדי שהנתונים יהיו שמורים גם בענן.</p>
+  <ol>
+    <li><b>לחפש ברשימת כל האפליקציות</b> (מחליקים למעלה במסך הבית) את "שיעורים". לפעמים האייקון נכנס לשם ולא למסך הבית.</li>
+    <li><b>שיאומי, רדמי, פוקו, אופו, ריאלמי, וואווי:</b> הגדרות הטלפון ← אפליקציות ← Chrome ← הרשאות ← להפעיל <b>"קיצורי דרך במסך הבית"</b> (או "הרשאות נוספות"). אחר כך להתקין שוב.</li>
+    <li><b>אם "שיעורים" מופיע בהגדרות הטלפון ← אפליקציות</b> אבל לא נפתח: להסיר אותו משם, לסגור את כרום לגמרי, לפתוח את הקישור שוב וללחוץ "התקנה".</li>
+    <li><b>דרך שעובדת תמיד:</b> בכרום ⋮ ← "הוספה למסך הבית" ← לבחור <b>"יצירת קיצור דרך"</b> (ולא "התקנה"). מתקבל אייקון במסך הבית שפותח את האתר ישר.</li>
+  </ol></details>`;
+
 export async function installApp() {
   if (isInstalled()) { toast('האפליקציה כבר מותקנת ופתוחה כאפליקציה ✓'); return; }
   if (deferred) {
@@ -68,10 +78,16 @@ export async function installApp() {
     try { await ev.userChoice; } catch { /* ignore */ }
     return;
   }
+  installHelp();
+}
+
+// The instructions for this phone, plus what to do when Chrome says it's installed but it isn't there.
+export function installHelp() {
   const p = platform();
+  const android = p === 'android-chrome' || p === 'samsung';
   openSheet({
     title: 'התקנה כאפליקציה',
-    body: el(`<div>${STEPS[p]}</div>`),
+    body: el(`<div>${STEPS[p]}${android ? TROUBLE : ''}</div>`),
     actions: [{ label: 'הבנתי', cls: 'primary', grow: true }],
   });
 }
