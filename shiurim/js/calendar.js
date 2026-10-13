@@ -71,7 +71,7 @@ function renderWeek(app, root, anchor, titleEl) {
         onPick: ({ studentId, newName }) => {
           const st = studentId && M.studentById(s, studentId);
           const slot = st && (M.slotOn(st, d) || M.currentSlot(st, d));
-          const l = M.addLesson(s, d, { studentId: studentId || null, name: newName || '', time: t, len: slot ? Number(slot.len) : 30 });
+          const l = M.addLesson(s, d, { studentId: studentId || null, name: newName || '', time: t, timeSet: true, len: slot ? Number(slot.len) : 30 });
           app.save();
           app.render();
           editLesson(s, { date: d, lesson: l, title: 'שיעור נוסף ליום הזה', onSave: (nl) => { M.updateLesson(s, d, l.id, nl); app.save(); app.render(); }, onDelete: () => { M.removeLessons(s, d, [l.id]); app.save(); app.render(); } });
@@ -98,7 +98,7 @@ function renderWeek(app, root, anchor, titleEl) {
           const delta = Math.round(dyPx / PPM / 15) * 15;
           if (!delta) { app.render(); return; }
           const nt = fromMin(Math.max(0, toMin(l.time) + delta));
-          M.updateLesson(s, d, l.id, { time: nt });
+          M.updateLesson(s, d, l.id, { time: nt, timeSet: true });
           app.save();
           toast(`${M.lessonName(s, l)}: ${nt} (רק ביום הזה)`);
           app.render();

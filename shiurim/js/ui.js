@@ -207,6 +207,9 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
   const actions = [
     {
       label: 'שמור', cls: 'primary', grow: true, onClick: (close) => {
+        // A time or length changed here is a choice for this day: it no longer follows the students list.
+        if (l.time !== lesson.time) l.timeSet = true;
+        if (Number(l.len) !== Number(lesson.len)) l.lenSet = true;
         l.summary = $('[name=summary]').value.trim();
         l.note = $('[name=note]').value.trim();
         if ($('[name=name]')) l.name = $('[name=name]').value.trim();

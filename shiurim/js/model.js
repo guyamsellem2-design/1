@@ -169,9 +169,26 @@ function missingPlanned(state, date, rec) {
   });
 }
 
+// A student's lesson sits at the time and length set for him in the students list, unless that time
+// (or length) was changed by hand for this day (timeSet / lenSet).
+function regularSlot(state, l, date) {
+  const st = l.studentId && studentById(state, l.studentId);
+  return st ? slotOn(st, date) || currentSlot(st, date) : null;
+}
+
+export function followSchedule(state, date, l) {
+  const slot = regularSlot(state, l, date);
+  if (!slot) return l;
+  const time = l.timeSet ? l.time : slot.time;
+  const len = l.lenSet ? Number(l.len) : Number(slot.len);
+  return time === l.time && len === Number(l.len) ? l : { ...l, time, len };
+}
+
 export function getDay(state, date) {
   const rec = state.days[date];
-  const lessons = rec && rec.lessons ? [...rec.lessons, ...missingPlanned(state, date, rec)] : plannedLessons(state, date);
+  const lessons = rec && rec.lessons
+    ? [...rec.lessons, ...missingPlanned(state, date, rec)].map((l) => followSchedule(state, date, l))
+    : plannedLessons(state, date);
   return {
     date,
     lessons: lessons.slice().sort(byTime),
@@ -191,6 +208,7 @@ export function materialize(state, date) {
   const rec = state.days[date];
   if (!rec.lessons) rec.lessons = clone(plannedLessons(state, date));
   else rec.lessons.push(...clone(missingPlanned(state, date, rec)));
+  rec.lessons = rec.lessons.map((l) => followSchedule(state, date, l));
   return rec;
 }
 
@@ -239,23 +257,44 @@ export function nextFreeTime(state, date, lessons) {
 
 // Several students added at once: one after the other from the first free time (or `startTime`),
 // each with their usual length, and no status yet.
+// Several students added at once. Each goes to his own regular time from the students list; a student
+// without a regular time goes after the last lesson. With `startTime` (a spot tapped in the calendar)
+// they are placed one after the other from there, as a choice made by hand.
 export function newLessonsFor(state, date, studentIds, existing, startTime) {
-  let t = toMin(startTime || nextFreeTime(state, date, existing));
-  return studentIds.map((sid) => {
+  const slotOf = (sid) => {
     const st = studentById(state, sid);
-    const slot = st && (slotOn(st, date) || currentSlot(st, date));
+    return st && (slotOn(st, date) || currentSlot(st, date));
+  };
+  const out = new Map();
+  // Students with a regular time go there first...
+  if (!startTime) {
+    for (const sid of studentIds) {
+      const slot = slotOf(sid);
+      if (slot) out.set(sid, { id: uid(), studentId: sid, name: '', time: slot.time, len: Number(slot.len), status: null, summary: '', note: '', tasks: [] });
+    }
+  }
+  // ...the rest go one after the other, after everything else on the day.
+  let t = toMin(startTime || nextFreeTime(state, date, [...(existing || []), ...out.values()]));
+  for (const sid of studentIds) {
+    if (out.has(sid)) continue;
+    const slot = slotOf(sid);
     const len = slot ? Number(slot.len) : 30;
-    const l = { id: uid(), studentId: sid, name: '', time: fromMin(t), len, status: null, summary: '', note: '', tasks: [] };
+    out.set(sid, { id: uid(), studentId: sid, name: '', time: fromMin(t), len, timeSet: true, status: null, summary: '', note: '', tasks: [] });
     t += len;
-    return l;
-  });
+  }
+  return studentIds.map((sid) => out.get(sid));
+}
+
+// One student added to a day: his regular time, or after the last lesson if he has none.
+export function newLessonFor(state, date, studentId, existing) {
+  return newLessonsFor(state, date, [studentId], existing)[0];
 }
 
 // Drag-to-reorder: lessons follow each other from the day's first start time, each with its own length.
 export function repack(lessons, startTime) {
   let t = toMin(startTime ?? (lessons[0] && lessons[0].time) ?? '14:00');
   return lessons.map((l) => {
-    const out = { ...l, time: fromMin(t) };
+    const out = { ...l, time: fromMin(t), timeSet: true };
     t += Number(l.len);
     return out;
   });
@@ -298,6 +337,8 @@ export function buildReview(state, parsedDay) {
         name: it.studentId ? '' : it.name,
         time: it.time || (slot && slot.time) || state.settings.dayStart,
         len: it.len || (slot && Number(slot.len)) || 30,
+        ...(it.time ? { timeSet: true } : {}),
+        ...(it.len ? { lenSet: true } : {}),
         status: prev ? prev.status : null,
         summary: prev ? prev.summary : '',
         note: prev ? prev.note : '',
@@ -335,7 +376,8 @@ export function buildReview(state, parsedDay) {
       row.flags.timeChangedFrom = prevTime;
       row.time = it.time;
     }
-    if (it.len) row.len = it.len;
+    if (it.time) row.timeSet = true;
+    if (it.len) { row.len = it.len; row.lenSet = true; }
     row.status = it.status === 'absent' ? null : it.status || row.status;
     if (it.status === 'absent') row.flags.askNotified = true;
     if (it.summary) row.summary = row.summary && row.mentioned ? `${row.summary}, ${it.summary}` : it.summary;

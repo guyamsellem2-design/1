@@ -343,9 +343,8 @@ function renderReview(app, root) {
     add.addEventListener('click', () => pickStudent(s, {
       date: rv.date, exclude: rv.rows.map((r) => r.studentId).filter(Boolean),
       onPick: ({ studentId, newName }) => {
-        const st = studentId && M.studentById(s, studentId);
-        const slot = st && (M.slotOn(st, rv.date) || M.currentSlot(st, rv.date));
-        rv.rows.push({ id: uid(), studentId: studentId || null, name: newName || '', time: M.nextFreeTime(s, rv.date, rv.rows), len: slot ? Number(slot.len) : 30, status: 'came', summary: '', note: '', tasks: [], mentioned: true, flags: { isNew: !studentId } });
+        const base = studentId ? M.newLessonFor(s, rv.date, studentId, rv.rows) : { id: uid(), studentId: null, name: newName || '', time: M.nextFreeTime(s, rv.date, rv.rows), len: 30, summary: '', note: '', tasks: [] };
+        rv.rows.push({ ...base, status: 'came', mentioned: true, flags: { isNew: !studentId } });
         rv.rows.sort(M.byTime);
         render();
       },
@@ -485,9 +484,8 @@ function renderDay(app, root) {
     date, exclude: day.lessons.map((l) => l.studentId).filter(Boolean),
     onPick: ({ studentId, newName }) => {
       const add = (sid, name) => {
-        const st = sid && M.studentById(s, sid);
-        const slot = st && (M.slotOn(st, date) || M.currentSlot(st, date));
-        const l = M.addLesson(s, date, { studentId: sid || null, name: name || '', time: M.nextFreeTime(s, date), len: slot ? Number(slot.len) : 30 });
+        const { id, ...fresh } = sid ? M.newLessonFor(s, date, sid, M.getDay(s, date).lessons) : { name: name || '', time: M.nextFreeTime(s, date), len: 30 };
+        const l = M.addLesson(s, date, fresh);
         app.save();
         render();
         editLesson(s, { date, lesson: l, title: 'שיעור נוסף ליום הזה', onSave: (nl) => { M.updateLesson(s, date, l.id, nl); app.save(); render(); } });

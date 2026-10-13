@@ -70,9 +70,8 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
   body.querySelector('[data-add]').addEventListener('click', () => pickStudent(s, {
     date, exclude: lessons.map((l) => l.studentId).filter(Boolean), allowNew: true,
     onPick: ({ studentId, newName }) => {
-      const st = studentId && M.studentById(s, studentId);
-      const slot = st && (M.slotOn(st, date) || M.currentSlot(st, date));
-      lessons.push({ id: 'n' + Date.now().toString(36), studentId: studentId || null, name: newName || '', time: M.nextFreeTime(s, date, lessons), len: slot ? Number(slot.len) : 30, status: 'came', summary: '', note: '', tasks: [] });
+      const base = studentId ? M.newLessonFor(s, date, studentId, lessons) : { id: 'n' + Date.now().toString(36), studentId: null, name: newName || '', time: M.nextFreeTime(s, date, lessons), len: 30, summary: '', note: '', tasks: [] };
+      lessons.push({ ...base, status: 'came' });
       render();
     },
     onPickMany: (ids) => {

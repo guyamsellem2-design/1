@@ -261,7 +261,7 @@ export function renderTable(app, root) {
       if (o.type === 'student') {
         const st = M.studentById(s, o.id);
         const slot = st && (M.slotOn(st, d) || M.currentSlot(st, d));
-        M.addLesson(s, d, { studentId: o.id, time: slotTime, len: slot ? Number(slot.len) : 30 });
+        M.addLesson(s, d, { studentId: o.id, time: slotTime, timeSet: true, len: slot ? Number(slot.len) : 30 });
       }
       done(true);
     };

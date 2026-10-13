@@ -131,3 +131,20 @@ test('a student added later shows up on days already opened, unless taken off th
   assert.ok(!M.getDay(s, '2026-10-06').lessons.some((l) => l.studentId === y.id));
   assert.ok(M.getDay(s, '2026-10-20').lessons.some((l) => l.studentId === y.id));
 });
+
+test('lessons sit at each student\'s regular time unless changed by hand for that day', () => {
+  const { s, ids } = setup();
+  // Added together: each at his own time, not one after the other.
+  const extra = M.newLessonsFor(s, '2026-10-14', [ids.david, ids.shlomo], []);
+  assert.deepEqual(extra.map((l) => [l.time, l.len]), [['15:45', 60], ['14:00', 30]]);
+  // Old data placed one after the other is shown at the regular times.
+  s.days['2026-10-14'] = { lessons: [{ id: 'a', studentId: ids.david, time: '14:00', len: 60, status: null }, { id: 'b', studentId: ids.shlomo, time: '15:00', len: 30, status: null }] };
+  assert.deepEqual(M.getDay(s, '2026-10-14').lessons.map((l) => l.time), ['14:00', '15:45']);
+  // A time changed by hand stays.
+  M.updateLesson(s, '2026-10-14', 'b', { time: '17:00', timeSet: true });
+  assert.equal(M.getDay(s, '2026-10-14').lessons.find((l) => l.id === 'b').time, '17:00');
+  // A change in the students list moves the lessons that were not moved by hand.
+  M.setSlot(M.studentById(s, ids.david), { day: 2, time: '16:00', len: 45 }, '2026-10-01');
+  const d = M.getDay(s, '2026-10-14').lessons.find((l) => l.id === 'a');
+  assert.deepEqual([d.time, d.len], ['16:00', 45]);
+});
