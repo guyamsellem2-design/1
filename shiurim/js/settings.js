@@ -7,12 +7,19 @@ import { backupBlob, readBackup, getPref, setPref } from './store.js';
 import { openExport } from './export.js';
 import { isSignedIn, syncStatus, signOut, pushNow, pullNow, onSyncStatus } from './sync.js';
 import { openSignIn } from './account.js';
+import { installApp, isInstalled } from './install.js';
 
 export function renderSettings(app, root) {
   const s = app.state;
   const st = s.settings;
   const lastBackup = getPref('lastBackup');
   const wrap = el(`<div>
+    ${isInstalled() ? '' : `<div class="section-title" id="install">התקנה כאפליקציה בטלפון</div>
+    <div class="card" style="padding:14px">
+      <p style="margin-top:0">כך האתר נפתח מאייקון במסך הבית כמו אפליקציה, עובד גם בלי אינטרנט, ומופיע בתפריט "שיתוף" של הטלפון.</p>
+      <button class="btn primary" data-install>⤓ התקנה</button>
+    </div>`}
+
     <div class="section-title" id="sync">חשבון וענן (אותם נתונים בטלפון ובמחשב)</div>
     <div class="card" style="padding:14px" data-syncbox></div>
 
@@ -252,6 +259,8 @@ export function renderSettings(app, root) {
     app.go('home');
   });
 
+
+  $('[data-install]')?.addEventListener('click', installApp);
 
   // account & cloud
   const box = $('[data-syncbox]');

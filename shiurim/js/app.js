@@ -7,6 +7,7 @@ import { loadState, saveState, getDraft, setDraft, askPersistence, takeInbox, ge
 import { el, toast, openSheet, confirmDialog, chip, chipButton, editLesson, pickStudent, timeRange } from './ui.js';
 import { initSync, isSignedIn, onSyncStatus, syncStatus } from './sync.js';
 import { openSignIn } from './account.js';
+import { initInstall, installApp, isInstalled, onInstallChange } from './install.js';
 import { renderStudents, editStudent } from './students.js';
 import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
@@ -588,6 +589,14 @@ document.getElementById('tabs').addEventListener('click', (ev) => {
   if (b) app.go(b.dataset.view);
 });
 document.getElementById('btnSettings').addEventListener('click', () => app.go('settings'));
+// "התקנה" stays in the top bar until the site runs as an installed app.
+initInstall();
+const btnInstall = document.getElementById('btnInstall');
+const paintInstall = () => { btnInstall.hidden = isInstalled(); };
+btnInstall.addEventListener('click', installApp);
+onInstallChange(paintInstall);
+paintInstall();
+
 document.getElementById('btnSync').addEventListener('click', () => (isSignedIn() ? app.go('settings', { focus: 'sync' }) : openSignIn(app)));
 
 // The cloud icon in the top bar: synced, syncing, or no connection.
