@@ -1,7 +1,7 @@
 // The notebook: a page per student with everything written about him (notes, lesson plans, summaries,
 // and what was written in the lesson reports), plus a page of general notes.
 
-import { escapeHtml as e, todayISO, fmtDay, fmtDate, norm } from './util.js';
+import { escapeHtml as e, todayISO, fmtDay, fmtDate, norm, normalizeUrl, linkSite, linkify } from './util.js';
 import * as M from './model.js';
 import { el, openSheet, toast, confirmDialog, chip, editLesson, callLinks } from './ui.js';
 import { getPref, setPref } from './store.js';
@@ -14,6 +14,58 @@ const KIND_STYLE = {
   summary: 'background:#E7F3EC;color:#1E6B45',
 };
 const kindChip = (k) => `<span class="chip" style="${KIND_STYLE[k] || KIND_STYLE.note}">${e(kindName(k))}</span>`;
+
+// Links to songs attached to a note: shown as tappable cards that open the song.
+function linksHtml(links) {
+  if (!links || !links.length) return '';
+  return `<div class="song-links">${links.map((l) => `<a class="song-link" href="${e(l.url)}" target="_blank" rel="noopener">
+    <span class="song-ic">🎵</span><span class="grow"><b>${e(l.title || linkSite(l.url))}</b>${l.title ? `<small>${e(linkSite(l.url))}</small>` : ''}</span><span aria-hidden="true">↗</span></a>`).join('')}</div>`;
+}
+
+// A small editor for a note's links: the list, and a line to add one (address + optional song name).
+function linksEditor(initial = [], onChange = () => {}) {
+  const links = initial.map((l) => ({ ...l }));
+  const box = el(`<div class="links-editor">
+    <div data-items></div>
+    <div data-form hidden class="link-form">
+      <input class="input" type="url" inputmode="url" dir="ltr" data-url placeholder="https://youtube.com/…" autocomplete="off">
+      <input class="input" data-title placeholder="שם השיר (לא חובה)" autocomplete="off">
+      <div class="row-actions" style="margin-top:6px"><button type="button" class="btn small primary" data-addlink>הוסף קישור</button><button type="button" class="btn small ghost" data-cancel>ביטול</button></div>
+      <div class="hint" data-err></div>
+    </div>
+    <button type="button" class="btn small" data-open>🎵 + קישור לשיר</button>
+  </div>`);
+  const items = box.querySelector('[data-items]');
+  const form = box.querySelector('[data-form]');
+  const paint = () => {
+    items.innerHTML = links.map((l, i) => `<div class="link-row"><span class="song-ic">🎵</span><span class="grow"><b>${e(l.title || linkSite(l.url))}</b><small dir="ltr">${e(l.url)}</small></span><button type="button" class="icon-btn" data-del="${i}" aria-label="הסר קישור">✕</button></div>`).join('');
+  };
+  paint();
+  const open = (on) => { form.hidden = !on; box.querySelector('[data-open]').hidden = on; if (on) form.querySelector('[data-url]').focus(); };
+  box.querySelector('[data-open]').addEventListener('click', () => open(true));
+  box.querySelector('[data-cancel]').addEventListener('click', () => open(false));
+  const add = () => {
+    const url = normalizeUrl(form.querySelector('[data-url]').value);
+    if (!url) { form.querySelector('[data-err]').textContent = 'צריך להדביק כתובת של אתר (למשל מיוטיוב)'; return; }
+    links.push({ url, title: form.querySelector('[data-title]').value.trim() });
+    form.querySelector('[data-url]').value = '';
+    form.querySelector('[data-title]').value = '';
+    form.querySelector('[data-err]').textContent = '';
+    open(false);
+    paint();
+    onChange(links);
+  };
+  box.querySelector('[data-addlink]').addEventListener('click', add);
+  form.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); add(); } });
+  items.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-del]');
+    if (!b) return;
+    links.splice(Number(b.dataset.del), 1);
+    paint();
+    onChange(links);
+  });
+  return { el: box, get: () => links.map((l) => ({ ...l })) };
+}
 
 function preview(text, n = 70) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
@@ -54,7 +106,7 @@ function renderIndex(app, root) {
     const general = M.notesFor(s, null);
     const g = el(`<ul class="list card"><li class="tap" data-who="${GENERAL}">
       <span style="font-size:22px">📌</span>
-      <span class="grow"><b>פתקים כלליים</b><br><span class="hint">${general.length ? `${general.length} · ${e(preview(general[0].text, 50))}` : 'רעיונות, שירים, דברים לזכור, שלא קשורים לתלמיד אחד'}</span></span><span>‹</span></li></ul>`);
+      <span class="grow"><b>פתקים כלליים</b><br><span class="hint">${general.length ? `${general.length} · ${e(preview(general[0].text || '🎵 ' + ((general[0].links || [])[0]?.title || linkSite((general[0].links || [])[0]?.url || '')), 50))}` : 'רעיונות, שירים, דברים לזכור, שלא קשורים לתלמיד אחד'}</span></span><span>‹</span></li></ul>`);
     body.appendChild(g);
 
     const students = M.activeStudents(s).slice().sort((a, b) => a.name.localeCompare(b.name, 'he'));
@@ -67,7 +119,7 @@ function renderIndex(app, root) {
     for (const st of students) {
       const notes = M.notesFor(s, st.id);
       const lessons = lessonEntries(s, st.id);
-      const latest = [...notes.map((n) => ({ d: n.date, t: n.text })), ...lessons.map((l) => ({ d: l.date, t: l.summary || l.note || (l.tasks[0] && l.tasks[0].text) }))]
+      const latest = [...notes.map((n) => ({ d: n.date, t: n.text || (n.links || []).map((l) => '🎵 ' + (l.title || linkSite(l.url))).join(' ') })), ...lessons.map((l) => ({ d: l.date, t: l.summary || l.note || (l.tasks[0] && l.tasks[0].text) }))]
         .sort((a, b) => (a.d < b.d ? 1 : -1))[0];
       const count = notes.length + lessons.length;
       ul.appendChild(el(`<li class="tap" data-who="${e(st.id)}">
@@ -91,7 +143,8 @@ function paintSearch(app, body, term) {
   const s = app.state;
   const hits = [];
   for (const n of s.notes || []) {
-    if (norm(n.text).includes(term)) hits.push({ who: n.studentId || GENERAL, date: n.date, html: `${kindChip(n.kind)} ${e(preview(n.text, 90))}` });
+    const linkText = (n.links || []).map((l) => `${l.title || ''} ${l.url}`).join(' ');
+    if (norm(n.text).includes(term) || norm(linkText).includes(term)) hits.push({ who: n.studentId || GENERAL, date: n.date, html: `${kindChip(n.kind)} ${e(preview(n.text || (n.links || []).map((l) => '🎵 ' + (l.title || linkSite(l.url))).join(' '), 90))}` });
   }
   for (const st of s.students) {
     if (norm(st.name).includes(term)) hits.push({ who: st.id, date: '9999', html: `<b>${e(st.name)}</b> · הדף של התלמיד` });
@@ -131,6 +184,7 @@ function renderPage(app, root, who) {
     <section class="page" style="margin-bottom:14px">
       <div class="seg" data-kind style="margin-bottom:6px">${M.NOTE_KINDS.map((k) => `<button type="button" data-k="${k.id}" aria-pressed="${kind === k.id}">${e(k.name)}</button>`).join('')}</div>
       <textarea class="write" data-text style="min-height:calc(var(--row) * 4)" placeholder="${st ? `מה כדאי לזכור על ${e(st.name)}? מה עשינו, מה מתכננים לשיעור הבא…` : 'רעיון, שיר ללמד, משהו לזכור…'}"></textarea>
+      <div data-links></div>
       <div class="row-actions">
         <button class="btn primary" data-save>שמור פתק</button>
         <label class="hint">תאריך <input type="date" data-date value="${todayISO()}" style="font-size:14px;border:1px solid var(--border);border-radius:8px;padding:2px 6px"></label>
@@ -148,6 +202,9 @@ function renderPage(app, root, who) {
   const ta = $('[data-text]');
   ta.value = getPref(draftKey, '') || '';
   ta.addEventListener('input', () => setPref(draftKey, ta.value));
+  const linksDraftKey = `noteLinksDraft.${who}`;
+  const composerLinks = linksEditor(getPref(linksDraftKey, []) || [], (links) => setPref(linksDraftKey, links));
+  $('[data-links]').appendChild(composerLinks.el);
 
   $('[data-back]').addEventListener('click', () => app.go('notebook'));
   $('[data-kind]').addEventListener('click', (ev) => {
@@ -159,10 +216,12 @@ function renderPage(app, root, who) {
   });
   $('[data-save]').addEventListener('click', () => {
     const text = ta.value.trim();
-    if (!text) { ta.focus(); return; }
-    M.addNote(s, { studentId, kind, text, date: $('[data-date]').value || todayISO() });
+    const links = composerLinks.get();
+    if (!text && !links.length) { ta.focus(); return; }
+    M.addNote(s, { studentId, kind, text, links, date: $('[data-date]').value || todayISO() });
     app.save();
     setPref(draftKey, '');
+    setPref(linksDraftKey, []);
     toast('נשמר ✓');
     app.render();
   });
@@ -194,7 +253,7 @@ function renderPage(app, root, who) {
       const n = x.n;
       return el(`<div class="report-card note-card tap" data-note="${e(n.id)}">
         <div class="report-head">${kindChip(n.kind)}<span class="hint">${e(fmtDay(n.date))}</span></div>
-        <div class="note-text">${e(n.text)}</div></div>`);
+        ${n.text ? `<div class="note-text">${linkify(n.text)}</div>` : ''}${linksHtml(n.links)}</div>`);
     }
     const l = x.l;
     return el(`<div class="report-card note-card tap from-lesson" data-lesson="${e(l.id)}" data-date="${e(l.date)}">
@@ -211,6 +270,7 @@ function renderPage(app, root, who) {
   rest.forEach((x) => list.appendChild(card(x)));
 
   list.addEventListener('click', (ev) => {
+    if (ev.target.closest('a')) return; // a link opens the song, not the note
     const nc = ev.target.closest('[data-note]');
     if (nc) {
       const n = (s.notes || []).find((x) => x.id === nc.dataset.note);
@@ -238,7 +298,10 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
     <div class="field"><span>סוג</span><div class="seg" data-kind>${M.NOTE_KINDS.map((k) => `<button type="button" data-k="${k.id}" aria-pressed="${f.kind === k.id}">${e(k.name)}</button>`).join('')}</div></div>
     <label class="field"><span>תאריך</span><input class="input" type="date" name="date" value="${e(f.date)}"></label>
     <label class="field"><span>טקסט</span><textarea class="input" name="text" rows="7">${e(f.text)}</textarea></label>
+    <div class="field"><span>קישורים לשירים</span><div data-links></div></div>
   </div>`);
+  const linksEd = linksEditor(note?.links || []);
+  body.querySelector('[data-links]').appendChild(linksEd.el);
   body.querySelector('[data-kind]').addEventListener('click', (ev) => {
     const b = ev.target.closest('[data-k]');
     if (!b) return;
@@ -248,8 +311,9 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
   const actions = [{
     label: 'שמור', cls: 'primary', grow: true, onClick: (close) => {
       const text = body.querySelector('[name=text]').value.trim();
-      if (!text) { toast('הפתק ריק'); return; }
-      const patch = { kind: f.kind, studentId: body.querySelector('[name=who]').value || null, date: body.querySelector('[name=date]').value || todayISO(), text };
+      const links = linksEd.get();
+      if (!text && !links.length) { toast('הפתק ריק'); return; }
+      const patch = { kind: f.kind, studentId: body.querySelector('[name=who]').value || null, date: body.querySelector('[name=date]').value || todayISO(), text, links };
       if (isNew) M.addNote(s, patch); else M.updateNote(s, note.id, patch);
       app.save();
       close();

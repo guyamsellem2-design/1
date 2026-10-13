@@ -81,9 +81,10 @@ export const NOTE_KINDS = [
   { id: 'summary', name: 'סיכום' },
 ];
 
-export function addNote(state, { studentId = null, kind = 'note', text, date = todayISO() }) {
+export function addNote(state, { studentId = null, kind = 'note', text, date = todayISO(), links = [] }) {
   const now = Date.now();
   const n = { id: uid(), studentId: studentId || null, kind, text: String(text || '').trim(), date, createdAt: now, updatedAt: now };
+  if (links.length) n.links = links;
   state.notes = state.notes || [];
   state.notes.push(n);
   return n;

@@ -102,6 +102,41 @@ export function escapeHtml(s) {
 
 export const clone = (o) => JSON.parse(JSON.stringify(o));
 
+// Links to songs: "youtube.com/watch?v=..." → a full https URL, and a short readable label.
+export function normalizeUrl(u) {
+  const t = String(u || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(t)) return 'https://' + t;
+  return '';
+}
+
+const SITES = [
+  [/(^|\.)youtube\.com$|(^|\.)youtu\.be$/, 'YouTube'],
+  [/(^|\.)spotify\.com$/, 'Spotify'],
+  [/(^|\.)tab4u\.com$/, 'Tab4U'],
+  [/(^|\.)ultimate-guitar\.com$/, 'Ultimate Guitar'],
+  [/(^|\.)songsterr\.com$/, 'Songsterr'],
+  [/(^|\.)nagnu\.co\.il$/, 'נגנו'],
+  [/(^|\.)drive\.google\.com$|(^|\.)docs\.google\.com$/, 'Google Drive'],
+  [/(^|\.)music\.apple\.com$/, 'Apple Music'],
+];
+export function linkSite(url) {
+  try {
+    const h = new URL(url).hostname.replace(/^www\./, '');
+    for (const [rx, name] of SITES) if (rx.test(h)) return name;
+    return h;
+  } catch { return ''; }
+}
+
+// Escape text, then make the web addresses in it clickable.
+export function linkify(text) {
+  return escapeHtml(text).replace(/\b((?:https?:\/\/|www\.)[^\s<]+[^\s<.,;:!?)\]'"״׳])/g, (m) => {
+    const href = m.startsWith('http') ? m : 'https://' + m;
+    return `<a href="${href}" target="_blank" rel="noopener">${m}</a>`;
+  });
+}
+
 // "050-123 4567" → "tel:0501234567" (for the phone's dialer).
 export function telHref(phone) {
   const d = String(phone || '').replace(/[^\d+]/g, '');
