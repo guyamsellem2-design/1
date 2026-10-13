@@ -71,3 +71,15 @@ test('the same student typed on both devices before syncing becomes one', () => 
   assert.equal(m.days['2026-10-13'].lessons[0].studentId, b.id);
   assert.notEqual(a.id, b.id);
 });
+
+test('notebook notes from both devices are kept, deleted ones stay deleted', () => {
+  const cloud = base();
+  edit(cloud, (s) => { M.addNote(s, { text: 'פתק משותף' }); }, 1500);
+  const phone = clone(cloud);
+  const pc = clone(cloud);
+  edit(phone, (s) => { M.addNote(s, { studentId: s.students[0].id, kind: 'plan', text: 'להביא תווים' }); }, 2000);
+  edit(pc, (s) => { M.deleteNote(s, s.notes[0].id); M.addNote(s, { text: 'רעיון לשיר' }); }, 2500);
+  const m = mergeStates(phone, pc);
+  assert.deepEqual(m.notes.map((n) => n.text).sort(), ['להביא תווים', 'רעיון לשיר'].sort());
+  assert.deepEqual(mergeStates(pc, phone).notes.map((n) => n.text).sort(), ['להביא תווים', 'רעיון לשיר'].sort());
+});

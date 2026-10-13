@@ -9,6 +9,7 @@ import { initSync, isSignedIn, onSyncStatus, syncStatus } from './sync.js';
 import { openSignIn } from './account.js';
 import { initInstall, installApp, isInstalled, onInstallChange } from './install.js';
 import { renderStudents, editStudent } from './students.js';
+import { renderNotebook } from './notebook.js';
 import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
 import { renderCalendar } from './calendar.js';
@@ -47,7 +48,7 @@ function render() {
   });
   viewEl.className = app.view === 'table' ? 'wide' : '';
   viewEl.innerHTML = '';
-  const views = { home: renderHome, review: renderReview, day: renderDay, table: renderTable, calendar: renderCalendar, students: renderStudents, settings: renderSettings };
+  const views = { home: renderHome, review: renderReview, day: renderDay, table: renderTable, calendar: renderCalendar, students: renderStudents, settings: renderSettings, notebook: renderNotebook };
   (views[app.view] || renderHome)(app, viewEl);
 }
 
@@ -638,7 +639,7 @@ async function receiveShared() {
 (async function boot() {
   const hashView = location.hash.replace('#', '');
   const shared = await receiveShared();
-  if (!shared) app.go(['day', 'table', 'calendar', 'students', 'settings'].includes(hashView) ? hashView : 'home');
+  if (!shared) app.go(['day', 'table', 'calendar', 'students', 'settings', 'notebook'].includes(hashView) ? hashView : 'home');
   askPersistence();
   paintSync(syncStatus());
   initSync(app);

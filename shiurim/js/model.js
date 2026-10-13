@@ -44,6 +44,7 @@ export function defaultState() {
     days: {},
     holidays: HOLIDAYS_5787.map((h) => ({ id: uid(), ...h })),
     holidayOverride: {},
+    notes: [],
     updatedAt: 0,
   };
 }
@@ -68,7 +69,41 @@ export function migrate(s) {
   }
   out.holidays = s.holidays || d.holidays;
   out.holidayOverride = s.holidayOverride || {};
+  out.notes = Array.isArray(s.notes) ? s.notes : [];
   return out;
+}
+
+// ---------- notebook: notes per student, and general notes ----------
+
+export const NOTE_KINDS = [
+  { id: 'note', name: 'הערה' },
+  { id: 'plan', name: 'תכנון' },
+  { id: 'summary', name: 'סיכום' },
+];
+
+export function addNote(state, { studentId = null, kind = 'note', text, date = todayISO() }) {
+  const now = Date.now();
+  const n = { id: uid(), studentId: studentId || null, kind, text: String(text || '').trim(), date, createdAt: now, updatedAt: now };
+  state.notes = state.notes || [];
+  state.notes.push(n);
+  return n;
+}
+
+export function updateNote(state, id, patch) {
+  const n = (state.notes || []).find((x) => x.id === id);
+  if (n) Object.assign(n, patch, { updatedAt: Date.now() });
+  return n;
+}
+
+export function deleteNote(state, id) {
+  state.notes = (state.notes || []).filter((x) => x.id !== id);
+}
+
+// Notes of one student (or the general ones, with null), newest first.
+export function notesFor(state, studentId) {
+  return (state.notes || [])
+    .filter((n) => (n.studentId || null) === (studentId || null))
+    .sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1));
 }
 
 // ---------- students & regular schedule ----------

@@ -13,6 +13,8 @@ export function ensureMeta(state) {
   m.days = m.days || {};
   m.students = m.students || {};
   m.tomb = m.tomb || {};
+  m.notes = m.notes || {};
+  m.noteTomb = m.noteTomb || {};
   m.globalAt = m.globalAt || 0;
   return m;
 }
@@ -35,6 +37,13 @@ export function stampChanges(prev, next, now = Date.now()) {
   for (const st of next.students || []) {
     if (ps.get(st.id) !== JSON.stringify(st)) m.students[st.id] = now;
   }
+  const pn = new Map((prev.notes || []).map((x) => [x.id, JSON.stringify(x)]));
+  const nn = new Set();
+  for (const n of next.notes || []) {
+    nn.add(n.id);
+    if (pn.get(n.id) !== JSON.stringify(n)) { m.notes[n.id] = now; delete m.noteTomb[n.id]; }
+  }
+  for (const id of pn.keys()) if (!nn.has(id)) { m.noteTomb[id] = now; delete m.notes[id]; }
   if (globalOf(prev) !== globalOf(next)) m.globalAt = now;
   return next;
 }
@@ -44,6 +53,7 @@ export function stampAll(state, now = Date.now()) {
   const m = ensureMeta(state);
   for (const d of Object.keys(state.days || {})) m.days[d] = m.days[d] || now;
   for (const st of state.students || []) m.students[st.id] = m.students[st.id] || now;
+  for (const n of state.notes || []) m.notes[n.id] = m.notes[n.id] || now;
   m.globalAt = m.globalAt || now;
   return state;
 }
@@ -111,6 +121,21 @@ export function mergeStates(localIn, remoteIn) {
       om.days[d] = rm.days[d] || 0;
     }
   }
+  // Notes: by id, newest wins; a deleted note stays deleted.
+  const notes = new Map((out.notes || []).map((x) => [x.id, x]));
+  const noteIds = new Set([...notes.keys(), ...(remote.notes || []).map((x) => x.id), ...Object.keys(lm.noteTomb), ...Object.keys(rm.noteTomb)]);
+  const remoteNotes = new Map((remote.notes || []).map((x) => [x.id, x]));
+  for (const id of noteIds) {
+    const lt = Math.max(lm.notes[id] || 0, lm.noteTomb[id] || 0);
+    const rt = Math.max(rm.notes[id] || 0, rm.noteTomb[id] || 0);
+    if (rt > lt) {
+      if (remoteNotes.has(id)) { notes.set(id, remoteNotes.get(id)); om.notes[id] = rm.notes[id]; delete om.noteTomb[id]; } else { notes.delete(id); om.noteTomb[id] = rm.noteTomb[id]; delete om.notes[id]; }
+    } else if (!notes.has(id) && remoteNotes.has(id) && !lm.noteTomb[id]) {
+      notes.set(id, remoteNotes.get(id));
+      om.notes[id] = rm.notes[id] || 0;
+    }
+  }
+  out.notes = [...notes.values()];
   out.updatedAt = Math.max(local.updatedAt || 0, remote.updatedAt || 0);
   return out;
 }

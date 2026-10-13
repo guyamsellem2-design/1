@@ -183,7 +183,12 @@ export function editStudent(app, student, opts = {}) {
     });
   }
   actions.push({ label: 'ביטול', cls: 'ghost' });
-  openSheet({ title: isNew ? 'תלמיד חדש' : student.name, body, actions });
+  const sheet = openSheet({ title: isNew ? 'תלמיד חדש' : student.name, body, actions });
+  if (!isNew) {
+    const nb = el(`<button type="button" class="btn" style="margin-bottom:12px">📓 המחברת של ${e(student.name)}</button>`);
+    nb.addEventListener('click', () => { sheet.close(); app.go('notebook', { who: student.id }); });
+    body.insertBefore(nb, body.firstChild);
+  }
   if (isNew && !f.name) setTimeout(() => $('[name=name]').focus(), 50);
 }
 
