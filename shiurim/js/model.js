@@ -58,6 +58,14 @@ export function migrate(s) {
   out.statuses = s.statuses?.length ? s.statuses : d.statuses;
   out.students = s.students || [];
   out.days = s.days || {};
+  // Once: a student's regular slot starts with the school year, so every day that should have him shows him.
+  if (!out.slotsFromYearStart) {
+    for (const st of out.students) {
+      const first = (st.schedule || []).slice().sort((a, b) => (a.from < b.from ? -1 : 1))[0];
+      if (first && first.from > out.settings.yearStart) first.from = out.settings.yearStart;
+    }
+    out.slotsFromYearStart = true;
+  }
   out.holidays = s.holidays || d.holidays;
   out.holidayOverride = s.holidayOverride || {};
   return out;
@@ -96,6 +104,7 @@ export function addStudent(state, { name, aliases = [], frame = 'yeshiva', day, 
     phone,
     parentPhone,
     grade,
+    createdOn: todayISO(),
     startDate: null,
     schedule: day != null && time ? [{ from: from || '2000-01-01', day: Number(day), time, len: Number(len) }] : [],
   };
@@ -147,9 +156,22 @@ function plannedLessons(state, date) {
 
 export const byTime = (a, b) => toMin(a.time) - toMin(b.time);
 
+// Students who belong to this day by the regular schedule but are not on a day that was already edited:
+// added to the list later, so they show up without having to add them one by one.
+// Someone taken off this specific day stays off; a day already reported is not changed after the fact.
+function missingPlanned(state, date, rec) {
+  const have = new Set(rec.lessons.map((l) => l.studentId).filter(Boolean));
+  const removed = new Set(rec.removed || []);
+  return plannedLessons(state, date).filter((p) => {
+    if (have.has(p.studentId) || removed.has(p.studentId)) return false;
+    const st = studentById(state, p.studentId);
+    return !st?.createdOn || st.createdOn <= date;
+  });
+}
+
 export function getDay(state, date) {
   const rec = state.days[date];
-  const lessons = rec && rec.lessons ? rec.lessons : plannedLessons(state, date);
+  const lessons = rec && rec.lessons ? [...rec.lessons, ...missingPlanned(state, date, rec)] : plannedLessons(state, date);
   return {
     date,
     lessons: lessons.slice().sort(byTime),
@@ -168,12 +190,22 @@ export function materialize(state, date) {
   if (!state.days[date]) state.days[date] = {};
   const rec = state.days[date];
   if (!rec.lessons) rec.lessons = clone(plannedLessons(state, date));
+  else rec.lessons.push(...clone(missingPlanned(state, date, rec)));
   return rec;
+}
+
+// Remember who was taken off this day on purpose, so the regular schedule doesn't put them back.
+function markRemoved(state, date, rec, keptLessons) {
+  const kept = new Set(keptLessons.map((l) => l.studentId).filter(Boolean));
+  const planned = plannedLessons(state, date).map((p) => p.studentId).filter((id) => !kept.has(id));
+  const removed = new Set([...(rec.removed || []).filter((id) => !kept.has(id)), ...planned]);
+  if (removed.size) rec.removed = [...removed]; else delete rec.removed;
 }
 
 export function setDayLessons(state, date, lessons) {
   const rec = materialize(state, date);
   rec.lessons = lessons.map((l) => ({ ...l })).sort(byTime);
+  markRemoved(state, date, rec, rec.lessons);
 }
 
 export function updateLesson(state, date, id, patch) {
@@ -188,6 +220,7 @@ export function updateLesson(state, date, id, patch) {
 export function removeLessons(state, date, ids) {
   const rec = materialize(state, date);
   rec.lessons = rec.lessons.filter((l) => !ids.includes(l.id));
+  markRemoved(state, date, rec, rec.lessons);
 }
 
 export function addLesson(state, date, lesson) {
@@ -202,6 +235,20 @@ export function nextFreeTime(state, date, lessons) {
   const ls = lessons || getDay(state, date).lessons;
   if (!ls.length) return state.settings.dayStart;
   return fromMin(Math.max(...ls.map((l) => toMin(l.time) + Number(l.len))));
+}
+
+// Several students added at once: one after the other from the first free time (or `startTime`),
+// each with their usual length, and no status yet.
+export function newLessonsFor(state, date, studentIds, existing, startTime) {
+  let t = toMin(startTime || nextFreeTime(state, date, existing));
+  return studentIds.map((sid) => {
+    const st = studentById(state, sid);
+    const slot = st && (slotOn(st, date) || currentSlot(st, date));
+    const len = slot ? Number(slot.len) : 30;
+    const l = { id: uid(), studentId: sid, name: '', time: fromMin(t), len, status: null, summary: '', note: '', tasks: [] };
+    t += len;
+    return l;
+  });
 }
 
 // Drag-to-reorder: lessons follow each other from the day's first start time, each with its own length.
@@ -322,9 +369,8 @@ export function applyReview(state, review) {
     const { mentioned, flags, ...l } = r;
     return { ...l, len: Number(l.len) };
   });
-  const rec = materialize(state, review.date);
-  rec.lessons = lessons.sort(byTime);
-  if (review.remark != null) rec.remark = review.remark;
+  setDayLessons(state, review.date, lessons);
+  if (review.remark != null) state.days[review.date].remark = review.remark;
 }
 
 // ---------- tasks ----------

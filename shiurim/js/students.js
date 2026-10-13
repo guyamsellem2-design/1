@@ -55,8 +55,8 @@ const sortBySlot = (date) => (a, b) => {
 };
 
 function defaultFrom(s) {
-  // Before anything was reported, a new student belongs to the whole school year.
-  return Object.keys(s.days).length ? todayISO() : s.settings.yearStart;
+  // A student belongs to the whole school year; days already reported are not changed after the fact.
+  return s.settings.yearStart;
 }
 
 /**

@@ -223,34 +223,107 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
   return openSheet({ title: title || name || 'שיעור', body, actions });
 }
 
-export function pickStudent(state, { date, title = 'הוספת תלמיד ליום', exclude = [], onPick, allowNew = true }) {
+/**
+ * Pick a student to add. With onPickMany, a long press on a name starts choosing several at once.
+ */
+export function pickStudent(state, { date, title = 'הוספת תלמיד ליום', exclude = [], onPick, onPickMany, allowNew = true }) {
   const body = el(`<div>
     <input class="input" type="search" placeholder="חיפוש לפי שם" autocomplete="off" data-q>
-    <ul class="list card" data-list style="margin-top:10px;max-height:50vh;overflow:auto"></ul>
+    ${onPickMany ? '<p class="hint" data-tip style="margin:8px 2px 0">לחיצה ארוכה על שם = בחירה של כמה תלמידים בבת אחת</p>' : ''}
+    <ul class="list card pick-list" data-list style="margin-top:10px;max-height:50vh;overflow:auto"></ul>
+    <div data-multibar hidden style="position:sticky;bottom:0;background:var(--paper);padding:10px 0 2px;display:flex;gap:8px">
+      <button type="button" class="btn primary grow" data-addmany style="justify-content:center"></button>
+      <button type="button" class="btn ghost" data-cancelmany>ביטול בחירה</button>
+    </div>
   </div>`);
   const q = body.querySelector('[data-q]');
   const list = body.querySelector('[data-list]');
+  const bar = body.querySelector('[data-multibar]');
+  const selected = new Set();
+  let multi = false;
   let sheet;
-  const render = () => {
+  const visible = () => {
     const term = q.value.trim();
-    const items = activeStudents(state, date)
+    return activeStudents(state, date)
       .filter((s) => !exclude.includes(s.id))
       .filter((s) => !term || s.name.includes(term) || (s.aliases || []).some((a) => a.includes(term)))
       .sort((a, b) => a.name.localeCompare(b.name, 'he'));
-    list.innerHTML = items.map((s) => `<li class="tap" data-id="${e(s.id)}"><span class="grow">${e(s.name)}</span></li>`).join('')
-      + (allowNew && term ? `<li class="tap" data-new="${e(term)}"><b>+ תלמיד חדש: ${e(term)}</b></li>` : '')
+  };
+  const render = () => {
+    const term = q.value.trim();
+    const items = visible();
+    list.innerHTML = items.map((s) => `<li class="tap${selected.has(s.id) ? ' picked' : ''}" data-id="${e(s.id)}">
+        ${multi ? `<span class="pick-box" aria-hidden="true">${selected.has(s.id) ? '✓' : ''}</span>` : ''}<span class="grow">${e(s.name)}</span></li>`).join('')
+      + (allowNew && term && !multi ? `<li class="tap" data-new="${e(term)}"><b>+ תלמיד חדש: ${e(term)}</b></li>` : '')
       + (!items.length && !term ? '<li class="muted">אין תלמידים ברשימה עדיין. כתבו שם כדי להוסיף.</li>' : '');
+    bar.hidden = !multi;
+    const tip = body.querySelector('[data-tip]');
+    if (tip) tip.innerHTML = multi ? `בוחרים בלחיצה. <a href="#" data-all>סמן את כולם</a>` : 'לחיצה ארוכה על שם = בחירה של כמה תלמידים בבת אחת';
+    body.querySelector('[data-addmany]').textContent = selected.size ? `הוסף ${selected.size} (בלי סטטוס)` : 'בוחרים תלמידים…';
+    body.querySelector('[data-addmany]').disabled = !selected.size;
+  };
+  const startMulti = (id) => {
+    multi = true;
+    if (id) selected.add(id);
+    render();
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch { /* ignore */ }
   };
   q.addEventListener('input', render);
+
+  // Long press (touch or mouse) on a name starts multi-select.
+  let pressTimer = null;
+  let pressStart = null;
+  // The click that ends a long press must not toggle that same name back off.
+  let longId = null;
+  let longAt = 0;
+  list.addEventListener('pointerdown', (ev) => {
+    if (!onPickMany || multi) return;
+    const li = ev.target.closest('li[data-id]');
+    if (!li) return;
+    pressStart = { x: ev.clientX, y: ev.clientY };
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => { longId = li.dataset.id; longAt = Date.now(); startMulti(li.dataset.id); }, 450);
+  });
+  const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+  list.addEventListener('pointermove', (ev) => {
+    if (pressStart && Math.hypot(ev.clientX - pressStart.x, ev.clientY - pressStart.y) > 10) cancelPress();
+  });
+  list.addEventListener('pointerup', () => { cancelPress(); if (longId) longAt = Date.now(); });
+  list.addEventListener('pointercancel', cancelPress);
+  list.addEventListener('contextmenu', (ev) => {
+    if (!onPickMany) return;
+    const li = ev.target.closest('li[data-id]');
+    if (!li) return;
+    ev.preventDefault();
+    if (!multi) { cancelPress(); longId = li.dataset.id; longAt = Date.now(); startMulti(li.dataset.id); }
+  });
+
   list.addEventListener('click', (ev) => {
     const li = ev.target.closest('li');
     if (!li) return;
+    if (longId && li.dataset.id === longId && Date.now() - longAt < 800) { longId = null; return; }
+    longId = null;
+    if (multi && li.dataset.id) {
+      selected.has(li.dataset.id) ? selected.delete(li.dataset.id) : selected.add(li.dataset.id);
+      render();
+      return;
+    }
     if (li.dataset.id) { sheet.close(); onPick({ studentId: li.dataset.id }); }
     if (li.dataset.new) { sheet.close(); onPick({ newName: li.dataset.new }); }
   });
+  body.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-all]')) { ev.preventDefault(); visible().forEach((s) => selected.add(s.id)); render(); }
+  });
+  body.querySelector('[data-addmany]').addEventListener('click', () => {
+    if (!selected.size) return;
+    const ids = activeStudents(state, date).filter((s) => selected.has(s.id)).map((s) => s.id);
+    sheet.close();
+    onPickMany(ids);
+  });
+  body.querySelector('[data-cancelmany]').addEventListener('click', () => { multi = false; selected.clear(); render(); });
   render();
   sheet = openSheet({ title, body, actions: [{ label: 'סגור', cls: 'ghost' }] });
-  setTimeout(() => q.focus(), 50);
+  if (matchMedia('(pointer: fine)').matches) setTimeout(() => q.focus(), 50);
   return sheet;
 }
 

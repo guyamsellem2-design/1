@@ -114,3 +114,20 @@ test('schedule change applies from a date onwards only', () => {
   assert.ok(!M.getDay(s, '2026-11-03').lessons.some((l) => l.studentId === ids.shlomo));
   assert.equal(M.getDay(s, '2026-11-04').lessons.find((l) => l.studentId === ids.shlomo).len, 45);
 });
+
+test('a student added later shows up on days already opened, unless taken off that day', () => {
+  const { s, ids } = setup();
+  M.updateLesson(s, TUE, 'p-' + ids.shlomo, { status: 'came' }); // the day is now its own record
+  const z = M.addStudent(s, { name: 'צביקה', day: 2, time: '16:45', len: 30, from: '2026-09-01' });
+  z.createdOn = TUE;
+  assert.ok(M.getDay(s, TUE).lessons.some((l) => l.studentId === z.id));
+  assert.ok(M.updateLesson(s, TUE, 'p-' + z.id, { status: 'notified' }));
+  M.removeLessons(s, TUE, [M.getDay(s, TUE).lessons.find((l) => l.studentId === ids.david).id]);
+  assert.ok(!M.getDay(s, TUE).lessons.some((l) => l.studentId === ids.david));
+  // a day reported before the student existed is not changed after the fact
+  M.updateLesson(s, '2026-10-06', 'p-' + ids.shlomo, { status: 'came' });
+  const y = M.addStudent(s, { name: 'אליה', day: 2, time: '17:15', len: 30, from: '2026-09-01' });
+  y.createdOn = TUE;
+  assert.ok(!M.getDay(s, '2026-10-06').lessons.some((l) => l.studentId === y.id));
+  assert.ok(M.getDay(s, '2026-10-20').lessons.some((l) => l.studentId === y.id));
+});

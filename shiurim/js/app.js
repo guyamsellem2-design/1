@@ -349,6 +349,11 @@ function renderReview(app, root) {
         rv.rows.sort(M.byTime);
         render();
       },
+      onPickMany: (ids) => {
+        for (const l of M.newLessonsFor(s, rv.date, ids, rv.rows)) rv.rows.push({ ...l, mentioned: true, flags: {} });
+        rv.rows.sort(M.byTime);
+        render();
+      },
     }));
     bulk.appendChild(add);
 
@@ -490,6 +495,13 @@ function renderDay(app, root) {
       if (newName) {
         editStudent(app, null, { name: newName, day: weekday(date), time: M.nextFreeTime(s, date), from: date, oneTimeOption: true, onSaved: (st) => add(st.id) });
       } else add(studentId);
+    },
+    onPickMany: (ids) => {
+      const current = M.getDay(s, date).lessons;
+      M.setDayLessons(s, date, [...current, ...M.newLessonsFor(s, date, ids, current)]);
+      app.save();
+      render();
+      toast(`${ids.length} נוספו ליום הזה`);
     },
   }));
   q('[data-select]')?.addEventListener('click', () => setParams({ selecting: true, selected: [] }));

@@ -76,6 +76,13 @@ function renderWeek(app, root, anchor, titleEl) {
           app.render();
           editLesson(s, { date: d, lesson: l, title: 'שיעור נוסף ליום הזה', onSave: (nl) => { M.updateLesson(s, d, l.id, nl); app.save(); app.render(); }, onDelete: () => { M.removeLessons(s, d, [l.id]); app.save(); app.render(); } });
         },
+        onPickMany: (ids) => {
+          const current = M.getDay(s, d).lessons;
+          M.setDayLessons(s, d, [...current, ...M.newLessonsFor(s, d, ids, current, t)]);
+          app.save();
+          app.render();
+          toast(`${ids.length} נוספו מ-${t}`);
+        },
       });
     });
     for (let t = start; t < end; t += 30) lane.insertAdjacentHTML('beforeend', `<div class="hr" style="top:${(t - start) * PPM}px">${t % 60 === 0 ? fromMin(t) : ''}</div>`);

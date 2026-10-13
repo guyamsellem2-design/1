@@ -75,6 +75,10 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
       lessons.push({ id: 'n' + Date.now().toString(36), studentId: studentId || null, name: newName || '', time: M.nextFreeTime(s, date, lessons), len: slot ? Number(slot.len) : 30, status: 'came', summary: '', note: '', tasks: [] });
       render();
     },
+    onPickMany: (ids) => {
+      lessons.push(...M.newLessonsFor(s, date, ids, lessons));
+      render();
+    },
   }));
 
   const actions = [{
