@@ -13,7 +13,7 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
   const before = JSON.stringify({ lessons, remark });
 
   const body = el(`<div>
-    ${day.holiday ? `<div class="banner holiday">🎉 ${e(day.holiday)}</div>` : ''}
+    ${day.holiday ? `<div class="banner holiday" style="flex-wrap:wrap"><span class="grow">🎉 ${e(day.holiday)}</span><button type="button" class="btn small" data-anyway>היה שיעור בכל זאת</button></div>` : ''}
     <div data-list></div>
     <div class="row-actions" style="margin-top:4px">
       <button type="button" class="btn small" data-rest>כל השאר הגיעו</button>
@@ -63,6 +63,13 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
     if (card && ev.target.dataset.summary != null) lessons[Number(card.dataset.i)].summary = ev.target.value;
   });
   body.querySelector('[data-remark]').addEventListener('input', (ev) => { remark = ev.target.value; });
+  // A holiday, but some lessons happened anyway (often the private ones): pick who, all regulars pre-marked.
+  body.querySelector('[data-anyway]')?.addEventListener('click', () => pickStudent(s, {
+    date, title: 'מי היה בכל זאת?', exclude: lessons.map((l) => l.studentId).filter(Boolean), allowNew: false,
+    preselect: M.regularOn(s, date).filter((id) => !lessons.some((l) => l.studentId === id)),
+    onPick: ({ studentId }) => { lessons.push({ ...M.newLessonFor(s, date, studentId, lessons), status: 'came' }); render(); },
+    onPickMany: (ids) => { lessons.push(...M.newLessonsFor(s, date, ids, lessons)); render(); },
+  }));
   body.querySelector('[data-rest]').addEventListener('click', () => {
     lessons.forEach((l) => { if (!l.status) l.status = 'came'; });
     render();

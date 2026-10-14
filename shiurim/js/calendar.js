@@ -176,4 +176,31 @@ function renderMonth(app, root, anchor, titleEl) {
   const legend = s.statuses.map((x) => `<span class="chip" style="background:${e(x.bg)};color:${e(x.fg)}">${e(x.name)}</span>`).join(' ');
   root.appendChild(el(`<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${legend}<span class="chip empty">לא דווח</span></div>`));
   root.appendChild(el(`<p class="hint" style="margin:10px 4px">לחיצה על יום פותחת דיווח על כל השיעורים שלו.</p>`));
+
+  // The month in numbers, per frame.
+  const last = addDays(toISO(new Date(a.getFullYear(), a.getMonth() + 1, 1)), -1);
+  const hrs = (m) => {
+    const h = m / 60;
+    return (Math.round(h * 100) / 100).toString();
+  };
+  const rows = M.frameSummary(s, first, last).filter((r) => r.total);
+  const cameSt = M.statusById(s, 'came');
+  const box = el(`<div class="month-summary"><div class="section-title" style="margin:6px 4px 0">סיכום ${e(MONTHS[a.getMonth()])}</div></div>`);
+  if (!rows.length) box.appendChild(el('<p class="muted" style="margin:4px">אין שיעורים בחודש הזה.</p>'));
+  const line = (label, n, min, extra = '') => `<div class="ms-row ${extra}"><span class="lbl">${label}</span><b>${hrs(min)} שעות</b><span class="hint">(${n === 1 ? 'שיעור אחד' : `${n} שיעורים`})</span></div>`;
+  for (const r of rows) {
+    box.appendChild(el(`<div class="ms-card">
+      <h4>${e(r.frame.name)}</h4>
+      ${line(`<span class="dot-c" style="background:${e(cameSt?.bg || '#11734B')}"></span> הגיעו`, r.came, r.cameMin)}
+      ${line('<span class="dot-c" style="background:#B10202"></span> לא הגיעו', r.absent, r.absentMin)}
+      ${r.open ? line('<span class="dot-c" style="border:1px dashed var(--ink-3)"></span> עוד לא דווחו', r.open, r.openMin) : ''}
+      ${line('<b style="color:var(--ink)">סה״כ</b>', r.total, r.totalMin, 'ms-total')}
+    </div>`));
+  }
+  if (rows.length > 1) {
+    const sum = rows.reduce((acc, r) => ({ came: acc.came + r.came, cameMin: acc.cameMin + r.cameMin, total: acc.total + r.total, totalMin: acc.totalMin + r.totalMin }), { came: 0, cameMin: 0, total: 0, totalMin: 0 });
+    box.appendChild(el(`<div class="ms-card"><h4>כל המסגרות</h4>${line('הגיעו', sum.came, sum.cameMin)}${line('<b style="color:var(--ink)">סה״כ</b>', sum.total, sum.totalMin, 'ms-total')}</div>`));
+  }
+  box.appendChild(el('<p class="hint" style="margin:0 4px">הסה״כ לא כולל שיעורים שסומנו "טיול ישיבתי / אילוצי מערכת" ולא ימי חג. שיעור שדווח ביום חג כן נספר.</p>'));
+  root.appendChild(box);
 }

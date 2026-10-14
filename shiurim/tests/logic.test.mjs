@@ -148,3 +148,27 @@ test('lessons sit at each student\'s regular time unless changed by hand for tha
   const d = M.getDay(s, '2026-10-14').lessons.find((l) => l.id === 'a');
   assert.deepEqual([d.time, d.len], ['16:00', 45]);
 });
+
+test('month summary per frame, holidays and lessons that happened anyway, cancelling a day', () => {
+  const { s, ids } = setup();
+  const p = M.addStudent(s, { name: 'אריאל', frame: 'private', day: 2, time: '17:00', len: 60, from: '2026-09-01' });
+  M.updateLesson(s, TUE, 'p-' + ids.shlomo, { status: 'came' });
+  M.updateLesson(s, TUE, 'p-' + ids.binyamin, { status: 'noshow' });
+  M.updateLesson(s, TUE, 'p-' + ids.yosef, { status: 'trip' });
+  M.updateLesson(s, TUE, 'p-' + p.id, { status: 'came' });
+  // Hanukkah Tuesday: nothing planned, but the private lesson happened anyway.
+  const HOL = '2026-12-08';
+  assert.equal(M.getDay(s, HOL).lessons.length, 0);
+  assert.deepEqual(M.regularOn(s, HOL), [ids.shlomo, ids.binyamin, ids.yosef, ids.david, p.id]);
+  M.setDayLessons(s, HOL, [{ ...M.newLessonFor(s, HOL, p.id, []), status: 'came' }]);
+  const oct = M.frameSummary(s, '2026-10-01', '2026-10-31');
+  const yes = oct.find((r) => r.frame.id === 'yeshiva');
+  assert.deepEqual([yes.came, yes.cameMin, yes.absent, yes.absentMin], [1, 30, 1, 45]);
+  assert.equal(yes.total, yes.came + yes.absent + yes.open); // the trip is left out
+  const dec = M.frameSummary(s, '2026-12-01', '2026-12-31').find((r) => r.frame.id === 'private');
+  assert.ok(dec.came >= 1 && dec.cameMin >= 60);
+  // Cancelling a day: no lessons, marked in the holidays column.
+  M.cancelDay(s, '2026-10-20');
+  assert.equal(M.getDay(s, '2026-10-20').lessons.length, 0);
+  assert.equal(M.getDay(s, '2026-10-20').holiday, 'בוטל');
+});

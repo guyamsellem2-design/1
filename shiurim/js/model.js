@@ -192,6 +192,41 @@ function plannedLessons(state, date) {
 
 export const byTime = (a, b) => toMin(a.time) - toMin(b.time);
 
+// The students whose regular day this is, even on a holiday (to report lessons that happened anyway).
+export function regularOn(state, date) {
+  const wd = weekday(date);
+  return state.students
+    .filter((st) => { const v = slotOn(st, date); return v && Number(v.day) === wd; })
+    .sort((a, b) => toMin(slotOn(a, date).time) - toMin(slotOn(b, date).time))
+    .map((st) => st.id);
+}
+
+// "Cancel this day": no lessons, and the day shows as "בוטל" in the holidays/absences column.
+export function cancelDay(state, date, label = 'בוטל') {
+  setDayLessons(state, date, []);
+  state.holidayOverride = state.holidayOverride || {};
+  state.holidayOverride[date] = label;
+}
+
+// Hours per frame for a range: who came, who didn't, and the total. Lessons marked as a school
+// constraint (trip, exam…) and holidays are left out of the total; a lesson reported on a holiday counts.
+export function frameSummary(state, from, to) {
+  const out = new Map(state.frames.map((f) => [f.id, { frame: f, came: 0, cameMin: 0, absent: 0, absentMin: 0, open: 0, openMin: 0 }]));
+  const other = { frame: { id: '', name: 'בלי מסגרת' }, came: 0, cameMin: 0, absent: 0, absentMin: 0, open: 0, openMin: 0 };
+  for (const d of yearDates(state, from, to)) {
+    for (const l of getDay(state, d).lessons) {
+      const st = l.studentId && studentById(state, l.studentId);
+      const bucket = (st && out.get(st.frame || 'yeshiva')) || other;
+      const len = Number(l.len) || 0;
+      if (l.status === 'trip') continue;
+      if (!l.status) { bucket.open++; bucket.openMin += len; } else if (countsAsCame(state, l.status)) { bucket.came++; bucket.cameMin += len; } else { bucket.absent++; bucket.absentMin += len; }
+    }
+  }
+  const rows = [...out.values()];
+  if (other.came + other.absent + other.open) rows.push(other);
+  return rows.map((r) => ({ ...r, total: r.came + r.absent + r.open, totalMin: r.cameMin + r.absentMin + r.openMin }));
+}
+
 // Students who belong to this day by the regular schedule but are not on a day that was already edited:
 // added to the list later, so they show up without having to add them one by one.
 // Someone taken off this specific day stays off; a day already reported is not changed after the fact.

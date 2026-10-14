@@ -229,7 +229,7 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
 /**
  * Pick a student to add. With onPickMany, a long press on a name starts choosing several at once.
  */
-export function pickStudent(state, { date, title = 'הוספת תלמיד ליום', exclude = [], onPick, onPickMany, allowNew = true }) {
+export function pickStudent(state, { date, title = 'הוספת תלמיד ליום', exclude = [], onPick, onPickMany, allowNew = true, preselect = null }) {
   const body = el(`<div>
     <input class="input" type="search" placeholder="חיפוש לפי שם" autocomplete="off" data-q>
     ${onPickMany ? '<p class="hint" data-tip style="margin:8px 2px 0">לחיצה ארוכה על שם = בחירה של כמה תלמידים בבת אחת</p>' : ''}
@@ -242,8 +242,8 @@ export function pickStudent(state, { date, title = 'הוספת תלמיד ליו
   const q = body.querySelector('[data-q]');
   const list = body.querySelector('[data-list]');
   const bar = body.querySelector('[data-multibar]');
-  const selected = new Set();
-  let multi = false;
+  const selected = new Set(preselect || []);
+  let multi = !!(preselect && onPickMany);
   let sheet;
   const visible = () => {
     const term = q.value.trim();

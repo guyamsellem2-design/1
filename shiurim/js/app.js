@@ -145,10 +145,22 @@ function renderHome(app, root) {
       if (gaps.length >= 4) break;
     }
     if (gaps.length) {
-      const box = el(`<div><div class="section-title">ימים שעוד לא סגורים</div><ul class="list card"></ul></div>`);
+      const box = el(`<div><div class="section-title"><span class="grow">ימים שעוד לא סגורים</span><span class="hint" style="font-weight:400">החלקה ימינה = ביטול היום</span></div><ul class="list card swipe-list"></ul></div>`);
       for (const g of gaps) {
-        const li = el(`<li class="tap"><span class="grow">${e(fmtDay(g.d))}</span><span class="tag">${g.n} בלי סטטוס</span><span>‹</span></li>`);
-        li.addEventListener('click', () => app.go('day', { date: g.d }));
+        const li = el(`<li class="swipe-row">
+          <button type="button" class="swipe-action" aria-label="ביטול היום ${e(fmtDay(g.d))}">🗑️</button>
+          <div class="swipe-content tap"><span class="grow">${e(fmtDay(g.d))}</span><span class="tag">${g.n} בלי סטטוס</span><span>‹</span></div></li>`);
+        enableSwipe(li, {
+          onOpen: () => app.go('day', { date: g.d }),
+          onAction: async () => {
+            if (!await confirmDialog(`לבטל את ${fmtDay(g.d)}? השיעורים של היום הזה יימחקו, והיום יסומן "בוטל" בטבלה. אפשר להחזיר אותו מהטבלה, בעמודת החופשות.`, 'כן, לבטל', true)) return false;
+            M.cancelDay(s, g.d);
+            app.save();
+            toast('היום בוטל');
+            render();
+            return true;
+          },
+        });
         box.querySelector('ul').appendChild(li);
       }
       more.appendChild(box);
@@ -417,7 +429,7 @@ function renderDay(app, root) {
       <div class="title"><label style="cursor:pointer">${e(fmtDay(date))}<input type="date" value="${e(date)}" data-pick style="position:absolute;opacity:0;width:1px;height:1px"></label><small>${e(rel || '')}${day.custom ? `${rel ? ' · ' : ''}שונה מהמערכת הקבועה` : ''}</small></div>
       <button class="icon-btn" data-step="1" aria-label="יום הבא">‹</button>
     </div>
-    ${day.holiday ? `<div class="banner holiday">🎉 ${e(day.holiday)}</div>` : ''}
+    ${day.holiday ? `<div class="banner holiday" style="flex-wrap:wrap"><span class="grow">🎉 ${e(day.holiday)}</span><button type="button" class="btn small" data-anyway>היה שיעור בכל זאת</button></div>` : ''}
     <div class="row-actions" style="margin:0 0 10px">
       ${selecting
         ? `<button class="btn danger" data-delsel ${selected.size ? '' : 'disabled'}>מחק מהיום (${selected.size})</button><button class="btn ghost" data-selall>סמן הכל</button><button class="btn ghost" data-cancelsel>סיום</button>`
@@ -504,6 +516,12 @@ function renderDay(app, root) {
       toast(`${ids.length} נוספו ליום הזה`);
     },
   }));
+  q('[data-anyway]')?.addEventListener('click', () => pickStudent(s, {
+    date, title: 'מי היה בכל זאת?', exclude: day.lessons.map((l) => l.studentId).filter(Boolean), allowNew: false,
+    preselect: M.regularOn(s, date).filter((id) => !day.lessons.some((l) => l.studentId === id)),
+    onPick: ({ studentId }) => { M.setDayLessons(s, date, [...day.lessons, M.newLessonFor(s, date, studentId, day.lessons)]); app.save(); render(); },
+    onPickMany: (ids) => { M.setDayLessons(s, date, [...day.lessons, ...M.newLessonsFor(s, date, ids, day.lessons)]); app.save(); render(); },
+  }));
   q('[data-select]')?.addEventListener('click', () => setParams({ selecting: true, selected: [] }));
   q('[data-cancelsel]')?.addEventListener('click', () => setParams({ selecting: false, selected: [] }));
   q('[data-selall]')?.addEventListener('click', () => setParams({ selected: day.lessons.map((l) => l.id) }));
@@ -541,6 +559,59 @@ function renderDay(app, root) {
         app.go('home');
       }
     });
+  });
+}
+
+// Swipe a row to the right to show a red delete action behind it (touch and mouse).
+function enableSwipe(li, { onOpen, onAction }) {
+  const content = li.querySelector('.swipe-content');
+  const action = li.querySelector('.swipe-action');
+  const OPEN = 84;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+  let base = 0;
+  let tracking = false;
+  let moved = false;
+  const set = (x, anim) => {
+    content.style.transition = anim ? 'transform .2s ease' : 'none';
+    content.style.transform = `translateX(${x}px)`;
+    li.classList.toggle('open', x > 0);
+  };
+  const close = () => { base = 0; set(0, true); };
+  content.addEventListener('pointerdown', (ev) => {
+    tracking = true; moved = false;
+    startX = ev.clientX; startY = ev.clientY; dx = 0;
+  });
+  content.addEventListener('pointermove', (ev) => {
+    if (!tracking) return;
+    const mx = ev.clientX - startX;
+    const my = ev.clientY - startY;
+    if (!moved && Math.abs(mx) > 8 && Math.abs(mx) > Math.abs(my)) {
+      moved = true;
+      try { content.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
+    }
+    if (!moved) return;
+    dx = mx;
+    set(Math.max(0, Math.min(OPEN + 30, base + dx)), false);
+  });
+  const end = () => {
+    if (!tracking) return;
+    tracking = false;
+    if (!moved) return;
+    base = base + dx > OPEN / 2 ? OPEN : 0;
+    set(base, true);
+  };
+  content.addEventListener('pointerup', end);
+  content.addEventListener('pointercancel', end);
+  content.addEventListener('click', (ev) => {
+    if (moved) { ev.preventDefault(); moved = false; return; }
+    if (base) { close(); return; }
+    onOpen();
+  });
+  action.addEventListener('click', async () => {
+    const done = await onAction();
+    if (!done) close();
   });
 }
 

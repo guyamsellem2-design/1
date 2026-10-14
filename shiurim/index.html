@@ -276,6 +276,22 @@ table.grid tr.week-start td { border-top: 2px solid #D1D5DB; }
 a.call { text-decoration: none; }
 .sync-btn { font-size: 22px; }
 .note-card { cursor: pointer; }
+.swipe-list > li.swipe-row { position: relative; padding: 0; overflow: hidden; }
+.swipe-row .swipe-content { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; min-height: 48px; background: var(--card); position: relative; z-index: 1; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.swipe-row .swipe-action {
+  position: absolute; inset-block: 0; left: 0; width: 96px; border: 0; z-index: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+  background: linear-gradient(to left, rgba(220, 38, 38, 0) 0%, rgba(220, 38, 38, .35) 45%, rgba(220, 38, 38, .95) 100%);
+  color: #fff;
+}
+.month-summary { margin-top: 14px; display: grid; gap: 10px; }
+.month-summary .ms-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.month-summary h4 { margin: 0 0 8px; font-size: 15px; }
+.month-summary .ms-row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 14.5px; }
+.month-summary .ms-row .lbl { flex: 1; color: var(--ink-2); }
+.month-summary .ms-row b { font-variant-numeric: tabular-nums; }
+.month-summary .ms-total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px; }
+.month-summary .dot-c { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .note-card .report-head { margin-bottom: 6px; }
 .note-text { white-space: pre-wrap; line-height: 1.55; }
 .song-links { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
@@ -330,7 +346,7 @@ details.help ol { padding-inline-start: 20px; margin: 8px 0; }
   <button class="icon-btn" id="btnSettings" aria-label="הגדרות" title="הגדרות">⚙︎</button>
 </header>
 <nav class="tabs" id="tabs">
-  <button data-view="home"><span class="ic">✏️</span>דיווח</button>
+  <button data-view="home"><span class="ic">✏️</span>דף הבית</button>
   <button data-view="notebook"><span class="ic">📓</span>מחברת</button>
   <button data-view="day"><span class="ic">🗓️</span>סידור יום</button>
   <button data-view="table"><span class="ic">▦</span>טבלה</button>
