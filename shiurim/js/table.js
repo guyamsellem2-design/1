@@ -2,10 +2,10 @@
 // a row per work day, a column per 15 minutes (headers every half hour), merged cells per lesson.
 // Click a cell and type, or pick a status - exactly like in Sheets. Same data as every other view.
 
-import { escapeHtml as e, toMin, fromMin, todayISO, weekday, fmtDate, norm } from './util.js';
+import { escapeHtml as e, toMin, fromMin, todayISO, weekday, fmtDate, norm, endTime } from './util.js';
 import * as M from './model.js';
 import { detectStatus, stripStatusWords, cleanup } from './parser.js';
-import { el, toast, editLesson } from './ui.js';
+import { el, toast, editLesson, pickStudent } from './ui.js';
 import { openExport } from './export.js';
 import { reportDay } from './report.js';
 import { getPref, setPref } from './store.js';
@@ -50,71 +50,112 @@ export function layoutRow(s, lessons, cols) {
   return { placed, outside };
 }
 
+// Two ways to look at the same year:
+//  "רשימה" (list) - a row per day with its lessons as readable cards; made for the phone.
+//  "גיליון" (sheet) - the Excel-like grid with a column per 15 minutes, for the computer or zoomed in.
+// Both can be pinched with two fingers (or ctrl + mouse wheel) to zoom in and out.
 export function renderTable(app, root) {
   const s = app.state;
   const cols = slotColumns(s);
   const today = todayISO();
   const frame = getPref('tableFrame', '');
-  const zoom = getPref('tableZoom', 1);
+  const narrow = window.innerWidth < 700;
+  const mode = getPref('tableMode', narrow ? 'list' : 'grid');
+  const zoomKey = mode === 'list' ? 'tableZoomList' : 'tableZoom';
+  const zoom = Number(getPref(zoomKey, mode === 'grid' && narrow ? 0.8 : 1)) || 1;
+  const legend = s.statuses.map((x) => `<span class="chip" style="background:${e(x.bg)};color:${e(x.fg)}">${e(x.name)}</span>`).join('') + '<span class="chip empty">לא דווח</span>';
   const wrap = el(`<div>
     <div class="table-tools">
-      <button class="btn small primary" data-export>⤓ הורד לאקסל</button>
-      <button class="btn small" data-today>להיום</button>
-      <select class="input" data-frame style="width:auto;min-height:34px;padding:2px 8px;font-size:14px">
+      <div class="seg mode-seg"><button type="button" data-mode="list" aria-pressed="${mode === 'list'}">☰ רשימה</button><button type="button" data-mode="grid" aria-pressed="${mode === 'grid'}">▦ גיליון</button></div>
+      <select class="input" data-frame style="width:auto;min-height:34px;padding:2px 6px;font-size:14px;max-width:96px">
         <option value="">כל המסגרות</option>${s.frames.map((f) => `<option value="${e(f.id)}" ${frame === f.id ? 'selected' : ''}>${e(f.name)}</option>`).join('')}
       </select>
-      <span class="grow"></span>
-      <button class="btn small ghost" data-zoom="-1" aria-label="הקטנה">−</button>
-      <button class="btn small ghost" data-zoom="fit">התאם לרוחב</button>
-      <button class="btn small ghost" data-zoom="1" aria-label="הגדלה">+</button>
+      <button class="btn small" data-today>להיום</button>
+      <button class="btn small primary" data-export title="הורדה לאקסל" aria-label="הורדה לאקסל">⤓ אקסל</button>
+      <span class="zoom-ctl"><button class="btn small ghost" data-zoom="-1" aria-label="הקטנה">−</button><button class="btn small ghost" data-zoom="1" aria-label="הגדלה">+</button></span>
     </div>
-    <p class="hint" style="margin:0 16px 8px">לדיווח: לוחצים על <b>תאריך</b> כדי לסמן את כל היום, או על <b>תא</b> כדי להקליד או לבחור סטטוס לשיעור אחד. תא ריק = הוספת שיעור.</p>
-    <div class="grid-wrap"><table class="grid"><thead></thead><tbody></tbody></table></div>
+    <div class="table-legend">${legend}</div>
+    <p class="hint table-hint">${mode === 'list'
+      ? '<b>תאריך</b> = כל היום · <b>שיעור</b> = סטטוס · <b>+</b> = הוספה · 🤏 שתי אצבעות = זום'
+      : '<b>תאריך</b> = כל היום · <b>תא</b> = הקלדה או סטטוס · עמודה = רבע שעה · 🤏 = זום'}</p>
+    <div class="grid-wrap"><table class="grid ${mode === 'list' ? 'list-mode' : ''}"><thead></thead><tbody></tbody></table></div>
   </div>`);
   root.appendChild(wrap);
   const table = wrap.querySelector('table');
   const gridWrap = wrap.querySelector('.grid-wrap');
 
   // header
-  const hr = document.createElement('tr');
-  hr.innerHTML = `<th class="c-date">תאריך</th><th class="c-hol">חופשות, טיולים והיעדרויות מורה</th>`;
-  for (let i = 0; i < cols.length;) {
-    const t = cols[i];
-    const span = t % 30 === 0 && i + 1 < cols.length ? 2 : 1;
-    hr.insertAdjacentHTML('beforeend', `<th colspan="${span}" dir="ltr">${t % 30 === 0 ? fromMin(t) : ''}</th>`);
-    i += span;
+  if (mode === 'grid') {
+    // Two header rows: the hour over its four quarters, then the minutes, so a lesson's length is easy to read.
+    const h1 = document.createElement('tr');
+    const h2 = document.createElement('tr');
+    h2.className = 'mins';
+    h1.innerHTML = `<th class="c-date" rowspan="2">תאריך</th><th class="c-hol" rowspan="2">חופשות, טיולים והיעדרויות מורה</th>`;
+    for (let i = 0; i < cols.length;) {
+      const t = cols[i];
+      let span = 1;
+      while (i + span < cols.length && Math.floor(cols[i + span] / 60) === Math.floor(t / 60)) span++;
+      h1.insertAdjacentHTML('beforeend', `<th class="hour" colspan="${span}" dir="ltr">${fromMin(Math.floor(t / 60) * 60)}</th>`);
+      i += span;
+    }
+    for (const t of cols) h2.insertAdjacentHTML('beforeend', `<th class="q${t % 60 === 0 ? ' q0' : ''}" dir="ltr">${String(t % 60).padStart(2, '0')}</th>`);
+    h1.insertAdjacentHTML('beforeend', '<th class="c-rem" rowspan="2">הארות ושינויים</th>');
+    table.tHead.append(h1, h2);
+  } else {
+    const h1 = document.createElement('tr');
+    h1.innerHTML = '<th class="c-date">תאריך</th><th class="c-lessons">שיעורים</th>';
+    table.tHead.appendChild(h1);
   }
-  hr.insertAdjacentHTML('beforeend', '<th class="c-rem">הארות ושינויים</th>');
-  table.tHead.appendChild(hr);
 
   const dates = M.yearDates(s);
   const body = table.tBodies[0];
   const frag = document.createDocumentFragment();
   let prevWeek = null;
-  for (const d of dates) frag.appendChild(buildRow(s, d, cols, frame, today, prevWeek !== null && weekday(d) <= prevWeek));
-  function buildRow(s, d, cols, frame, today, weekStart) {
-    const day = M.getDay(s, d);
+  for (const d of dates) frag.appendChild(buildRow(d, prevWeek !== null && weekday(d) <= prevWeek));
+
+  function rowShell(d, day, weekStart) {
     prevWeek = weekday(d);
     const tr = document.createElement('tr');
     tr.dataset.date = d;
     if (d === today) tr.classList.add('today');
     if (day.holiday) tr.classList.add('holiday');
     if (weekStart) tr.classList.add('week-start');
+    return tr;
+  }
+
+  function buildRow(d, weekStart) {
+    const day = M.getDay(s, d);
+    const tr = rowShell(d, day, weekStart);
     const lessons = day.lessons.filter((l) => frameOk(s, l, frame));
+    const dateCell = `<td class="c-date tap-date" title="דיווח על כל היום">${DAY_LETTER[weekday(d)]} ${fmtDate(d)}</td>`;
+    if (mode === 'list') {
+      const chips = lessons.map((l, i) => {
+        const st = l.status && M.statusById(s, l.status);
+        const style = st ? `background:${e(st.bg)};color:${e(st.fg)};border-color:${e(st.bg)}` : '';
+        return `<button type="button" class="lchip ${st ? '' : 'blank'}" style="${style}" data-kind="lesson" data-id="${e(l.id)}" data-col="${i}">
+          <span class="lt" dir="ltr">${e(l.time)}–${e(endTime(l.time, l.len))}</span><span class="ln">${e(M.lessonName(s, l))}</span>${!st && l.note ? `<span class="lx">${e(l.note)}</span>` : ''}</button>`;
+      }).join('');
+      tr.innerHTML = `${dateCell}<td class="c-lessons">
+        ${day.holiday ? `<button type="button" class="lhol" data-kind="hol" data-col="-1">🎉 ${e(day.holiday)}</button>` : ''}
+        ${chips}<button type="button" class="ladd" data-kind="add" data-col="${lessons.length}" aria-label="הוספת שיעור">+</button>
+        ${day.remark ? `<button type="button" class="lrem" data-kind="rem" data-col="${lessons.length + 1}">📝 ${e(day.remark)}</button>` : ''}</td>`;
+      return tr;
+    }
     const { placed, outside } = layoutRow(s, lessons, cols);
-    let html = `<td class="c-date tap-date" title="דיווח על כל היום">${DAY_LETTER[weekday(d)]} ${fmtDate(d)}</td><td class="c-hol" tabindex="0" data-kind="hol" data-col="-1">${e(day.holiday)}</td>`;
+    let html = `${dateCell}<td class="c-hol" tabindex="0" data-kind="hol" data-col="-1">${e(day.holiday)}</td>`;
     let c = 0;
+    const slotTd = (i) => `<td class="slot${cols[i] % 60 === 45 ? ' hr-end' : ''}" tabindex="0" data-kind="slot" data-col="${i}"></td>`;
     for (const p of placed) {
-      for (; c < p.col; c++) html += `<td class="slot${cols[c] % 30 === 0 ? ' half' : ''}" tabindex="0" data-kind="slot" data-col="${c}"></td>`;
+      for (; c < p.col; c++) html += slotTd(c);
       const l = p.lesson;
       const st = l.status && M.statusById(s, l.status);
       const text = st ? st.name : (l.note || '');
       const style = st ? `background:${e(st.bg)};color:${e(st.fg)}` : '';
-      html += `<td class="lesson" colspan="${p.span}" tabindex="0" data-kind="lesson" data-id="${e(l.id)}" data-col="${p.col}" title="${e(`${M.lessonName(s, l)} ${l.time} · ${l.len} דק׳${l.summary ? '\n' + l.summary : ''}${l.note && st ? '\n' + l.note : ''}`)}">
-        <div class="cell ${st || text ? '' : 'blank'}" style="${style}"><span class="nm">${e(M.lessonName(s, l))}</span><span class="st">${e(text || '')}</span></div></td>`;
+      html += `<td class="lesson" colspan="${p.span}" tabindex="0" data-kind="lesson" data-id="${e(l.id)}" data-col="${p.col}" title="${e(`${M.lessonName(s, l)} ${l.time}–${endTime(l.time, l.len)} · ${l.len} דק׳${l.summary ? '\n' + l.summary : ''}${l.note && st ? '\n' + l.note : ''}`)}">
+        <div class="cell ${st || text ? '' : 'blank'}" style="${style}"><span class="nm">${e(M.lessonName(s, l))}</span><span class="st">${e(text || '')}</span><span class="tm" dir="ltr">${e(l.time)}–${e(endTime(l.time, l.len))}</span></div></td>`;
       c = p.col + p.span;
     }
-    for (; c < cols.length; c++) html += `<td class="slot${cols[c] % 30 === 0 ? ' half' : ''}" tabindex="0" data-kind="slot" data-col="${c}"></td>`;
+    for (; c < cols.length; c++) html += slotTd(c);
     const extra = outside.map((l) => `${M.lessonName(s, l)} ${l.time}`).join(', ');
     html += `<td class="c-rem" tabindex="0" data-kind="rem" data-col="${cols.length}">${e([day.remark, extra && `(מחוץ לשעות: ${extra})`].filter(Boolean).join(' '))}</td>`;
     tr.innerHTML = html;
@@ -126,38 +167,87 @@ export function renderTable(app, root) {
     const old = body.querySelector(`tr[data-date="${d}"]`);
     const idx = dates.indexOf(d);
     prevWeek = idx > 0 ? weekday(dates[idx - 1]) : null;
-    const tr = buildRow(s, d, cols, frame, today, prevWeek !== null && weekday(d) <= prevWeek);
+    const tr = buildRow(d, prevWeek !== null && weekday(d) <= prevWeek);
     if (old) old.replaceWith(tr);
     return tr;
   };
 
-  // zoom
-  const applyZoom = (z) => {
-    table.style.setProperty('zoom', z);
-    setPref('tableZoom', z);
+  // The table fills the screen down to the bottom menu.
+  const fitHeight = () => {
+    const top = gridWrap.getBoundingClientRect().top;
+    const nav = document.getElementById('tabs');
+    const navH = nav && getComputedStyle(nav).position === 'fixed' ? nav.offsetHeight : 0;
+    gridWrap.style.height = Math.max(260, window.innerHeight - top - navH - 6) + 'px';
   };
-  applyZoom(zoom);
+  requestAnimationFrame(fitHeight);
+  window.addEventListener('resize', fitHeight);
+
+  // ---------- zoom: buttons, two-finger pinch, ctrl + wheel ----------
+  let z = zoom;
+  const MIN = 0.4;
+  const MAX = 2.2;
+  const applyZoom = (nz, focus) => {
+    nz = Math.max(MIN, Math.min(MAX, nz));
+    const rect = table.getBoundingClientRect();
+    const fx = focus ? (focus.x - rect.left) / rect.width : 0.5;
+    const fy = focus ? (focus.y - rect.top) / rect.height : 0;
+    z = nz;
+    table.style.setProperty('zoom', z);
+    if (focus) {
+      const r2 = table.getBoundingClientRect();
+      gridWrap.scrollBy(r2.left + fx * r2.width - focus.x, r2.top + fy * r2.height - focus.y);
+    }
+  };
+  const saveZoom = () => setPref(zoomKey, +z.toFixed(2));
+  applyZoom(z);
   wrap.querySelectorAll('[data-zoom]').forEach((b) => b.addEventListener('click', () => {
-    let z = Number(getPref('tableZoom', 1));
-    if (b.dataset.zoom === 'fit') {
-      table.style.setProperty('zoom', 1);
-      z = Math.max(0.35, Math.min(1, gridWrap.clientWidth / table.scrollWidth));
-    } else z = Math.max(0.35, Math.min(1.6, +(z + Number(b.dataset.zoom) * 0.15).toFixed(2)));
-    applyZoom(z);
+    const r = gridWrap.getBoundingClientRect();
+    applyZoom(z * (Number(b.dataset.zoom) > 0 ? 1.2 : 1 / 1.2), { x: r.left + r.width / 2, y: r.top + 40 });
+    saveZoom();
   }));
+  let pinch = null;
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const mid = (t) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+  gridWrap.addEventListener('touchstart', (ev) => {
+    if (ev.touches.length === 2) {
+      pinch = { d: dist(ev.touches), z };
+      closeEditor();
+      ev.preventDefault();
+    }
+  }, { passive: false });
+  let raf = 0;
+  gridWrap.addEventListener('touchmove', (ev) => {
+    if (!pinch || ev.touches.length !== 2) return;
+    ev.preventDefault();
+    const nz = pinch.z * (dist(ev.touches) / pinch.d);
+    const m = mid(ev.touches);
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => applyZoom(nz, m));
+  }, { passive: false });
+  const endPinch = (ev) => { if (pinch && ev.touches.length < 2) { pinch = null; saveZoom(); } };
+  gridWrap.addEventListener('touchend', endPinch);
+  gridWrap.addEventListener('touchcancel', endPinch);
+  gridWrap.addEventListener('wheel', (ev) => {
+    if (!ev.ctrlKey) return;
+    ev.preventDefault();
+    applyZoom(z * (ev.deltaY < 0 ? 1.1 : 1 / 1.1), { x: ev.clientX, y: ev.clientY });
+    saveZoom();
+  }, { passive: false });
 
   const scrollToToday = (smooth) => {
     const target = dates.find((d) => d >= today) || dates[dates.length - 1];
     const tr = target && body.querySelector(`tr[data-date="${target}"]`);
     if (tr) {
-      const z = Number(getPref('tableZoom', 1)) || 1;
-      gridWrap.scrollTo({ top: Math.max(0, tr.offsetTop * z - 60), behavior: smooth ? 'smooth' : 'auto' });
+      const head = table.tHead.getBoundingClientRect().height;
+      const top = tr.getBoundingClientRect().top - gridWrap.getBoundingClientRect().top + gridWrap.scrollTop;
+      gridWrap.scrollTo({ top: Math.max(0, top - head - 8), behavior: smooth ? 'smooth' : 'auto' });
     }
   };
-  requestAnimationFrame(() => scrollToToday(false));
+  requestAnimationFrame(() => requestAnimationFrame(() => scrollToToday(false)));
   wrap.querySelector('[data-today]').addEventListener('click', () => scrollToToday(true));
   wrap.querySelector('[data-frame]').addEventListener('change', (ev) => { setPref('tableFrame', ev.target.value); app.render(); });
   wrap.querySelector('[data-export]').addEventListener('click', () => openExport(app));
+  wrap.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { setPref('tableMode', b.dataset.mode); app.render(); }));
 
   // ---------- editing ----------
   let editor = null;
@@ -194,6 +284,20 @@ export function renderTable(app, root) {
     const tr = td.closest('tr');
     const d = tr.dataset.date;
     const kind = td.dataset.kind;
+    if (kind === 'add') {
+      const day0 = M.getDay(s, d);
+      pickStudent(s, {
+        date: d, exclude: day0.lessons.map((l) => l.studentId).filter(Boolean),
+        onPick: ({ studentId, newName }) => {
+          const { id, ...fresh } = studentId ? M.newLessonFor(s, d, studentId, day0.lessons) : { name: newName, time: M.nextFreeTime(s, d), len: 30 };
+          M.addLesson(s, d, fresh);
+          app.save();
+          refreshRow(d);
+        },
+        onPickMany: (ids) => { M.setDayLessons(s, d, [...day0.lessons, ...M.newLessonsFor(s, d, ids, day0.lessons)]); app.save(); refreshRow(d); },
+      });
+      return;
+    }
     const day = M.getDay(s, d);
     const l = kind === 'lesson' ? day.lessons.find((x) => x.id === td.dataset.id) : null;
     const slotTime = kind === 'slot' ? fromMin(cols[Number(td.dataset.col)]) : null;
@@ -248,6 +352,7 @@ export function renderTable(app, root) {
       closeEditor();
       app.save();
       const nt = refreshRow(d);
+      if (mode === 'list') return;
       const target = moveDown ? null : nt.querySelector(`[data-col="${td.dataset.col}"]`) || nt.querySelector('[data-col]');
       if (moveDown) {
         const nextTr = nt.nextElementSibling;
@@ -303,7 +408,8 @@ export function renderTable(app, root) {
       done();
       toast('הוסר מהיום הזה');
     });
-    input.focus();
+    // On a phone, picking a status is the usual tap; the keyboard opens only when tapping the text box.
+    if (!(kind === 'lesson' && !initial && matchMedia('(pointer: coarse)').matches)) input.focus();
     if (initial) input.setSelectionRange(input.value.length, input.value.length);
   }
 
@@ -321,7 +427,7 @@ export function renderTable(app, root) {
       reportDay(app, d, { onSaved: () => refreshRow(d) });
       return;
     }
-    const td = ev.target.closest('td[data-kind]');
+    const td = ev.target.closest('[data-kind]');
     if (td) { td.focus(); openEditor(td); }
   });
 
@@ -337,7 +443,7 @@ export function renderTable(app, root) {
   }
   body.addEventListener('keydown', (ev) => {
     const td = ev.target.closest('td[data-kind]');
-    if (!td || editor) return;
+    if (!td || editor || mode !== 'grid') return;
     const tr = td.closest('tr');
     const col = Number(td.dataset.col);
     let next = null;
