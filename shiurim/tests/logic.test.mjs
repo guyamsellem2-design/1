@@ -164,7 +164,9 @@ test('month summary per frame, holidays and lessons that happened anyway, cancel
   const oct = M.frameSummary(s, '2026-10-01', '2026-10-31');
   const yes = oct.find((r) => r.frame.id === 'yeshiva');
   assert.deepEqual([yes.came, yes.cameMin, yes.absent, yes.absentMin], [1, 30, 1, 45]);
-  assert.equal(yes.total, yes.came + yes.absent + yes.open); // the trip is left out
+  assert.equal(yes.total, yes.came + yes.absent); // only what was reported; the trip is left out
+  assert.equal(yes.totalMin, yes.cameMin + yes.absentMin);
+  assert.ok(yes.open > 0 && yes.open === yes.openPast + yes.openAhead); // unreported lessons are counted apart
   const dec = M.frameSummary(s, '2026-12-01', '2026-12-31').find((r) => r.frame.id === 'private');
   assert.ok(dec.came >= 1 && dec.cameMin >= 60);
   // Cancelling a day: no lessons, marked in the holidays column.
