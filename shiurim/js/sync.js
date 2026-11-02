@@ -35,7 +35,7 @@ function setStatus(s) {
   statusListeners.forEach((fn) => fn(syncStatus()));
 }
 
-async function rpc(fn, args) {
+export async function rpc(fn, args) {
   const res = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: SB_KEY, 'Content-Type': 'application/json' },

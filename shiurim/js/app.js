@@ -722,6 +722,7 @@ async function receiveShared() {
   askPersistence();
   paintSync(syncStatus());
   initSync(app);
+  import('./images.js').then((m) => m.uploadPending()).catch(() => {});
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     // Always check for a newer version when the app opens or comes back to the screen.
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {

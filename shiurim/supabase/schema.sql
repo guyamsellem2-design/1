@@ -167,3 +167,58 @@ revoke all on function public.sync_login(text, text, boolean), public.sync_sessi
   public.sync_pull(text, bigint), public.sync_push(text, bigint, jsonb), public.sync_logout(text) from public;
 grant execute on function public.sync_login(text, text, boolean), public.sync_pull(text, bigint),
   public.sync_push(text, bigint, jsonb), public.sync_logout(text) to anon, authenticated;
+
+-- Pictures attached to notebook notes, stored per account. Same rules as the data: no direct access,
+-- only through functions that check the session token; size limits per picture and per account.
+create table if not exists public.sync_files (
+  email text not null references public.sync_accounts (email) on delete cascade,
+  id text not null check (id ~ '^[A-Za-z0-9_-]{6,64}$'),
+  mime text not null check (mime in ('image/jpeg', 'image/png', 'image/webp')),
+  data text not null,
+  size int not null,
+  created_at timestamptz not null default now(),
+  primary key (email, id)
+);
+alter table public.sync_files enable row level security;
+revoke all on public.sync_files from anon, authenticated;
+
+create or replace function public.sync_file_put(p_token text, p_id text, p_mime text, p_data text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := public.sync_session_email(p_token);
+  v_used bigint;
+begin
+  if v_email is null then return jsonb_build_object('error', 'signed_out'); end if;
+  if p_data is null or length(p_data) > 3000000 then return jsonb_build_object('error', 'too_big'); end if;
+  select coalesce(sum(size), 0) into v_used from public.sync_files where email = v_email;
+  if v_used + length(p_data) > 400000000 then return jsonb_build_object('error', 'quota'); end if;
+  insert into public.sync_files (email, id, mime, data, size) values (v_email, p_id, p_mime, p_data, length(p_data))
+    on conflict (email, id) do nothing;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.sync_file_get(p_token text, p_id text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := public.sync_session_email(p_token);
+  f public.sync_files;
+begin
+  if v_email is null then return jsonb_build_object('error', 'signed_out'); end if;
+  select * into f from public.sync_files where email = v_email and id = p_id;
+  if not found then return jsonb_build_object('error', 'not_found'); end if;
+  return jsonb_build_object('mime', f.mime, 'data', f.data);
+end;
+$$;
+
+create or replace function public.sync_file_delete(p_token text, p_id text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := public.sync_session_email(p_token);
+begin
+  if v_email is not null then delete from public.sync_files where email = v_email and id = p_id; end if;
+end;
+$$;
+
+revoke all on function public.sync_file_put(text, text, text, text), public.sync_file_get(text, text), public.sync_file_delete(text, text) from public;
+grant execute on function public.sync_file_put(text, text, text, text), public.sync_file_get(text, text), public.sync_file_delete(text, text) to anon, authenticated;

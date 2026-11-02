@@ -3,6 +3,7 @@
 import { escapeHtml as e } from './util.js';
 import { el, openSheet, toast } from './ui.js';
 import { signIn } from './sync.js';
+import { uploadPending } from './images.js';
 
 export function openSignIn(app, { onDone } = {}) {
   const body = el(`<div>
@@ -47,6 +48,7 @@ export function openSignIn(app, { onDone } = {}) {
     }
     if (r.error) { msg(r.error); return; }
     sheet.close();
+    uploadPending();
     toast(r.created ? 'החשבון נוצר. מעכשיו הכל נשמר גם בענן ✓' : r.merged ? 'התחברת. מה שהיה במכשיר הזה ומה שבענן אוחדו ✓' : 'התחברת. הנתונים נטענו ✓', 3500);
     app.render();
     onDone && onDone();

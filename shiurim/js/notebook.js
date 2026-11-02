@@ -5,6 +5,7 @@ import { escapeHtml as e, todayISO, fmtDay, fmtDate, norm, normalizeUrl, linkSit
 import * as M from './model.js';
 import { el, openSheet, toast, confirmDialog, chip, editLesson, callLinks } from './ui.js';
 import { getPref, setPref } from './store.js';
+import { addImage, imageURL, deleteImage } from './images.js';
 
 const GENERAL = 'general';
 const kindName = (k) => (M.NOTE_KINDS.find((x) => x.id === k) || M.NOTE_KINDS[0]).name;
@@ -84,6 +85,66 @@ function groupByDay(s, students) {
       day,
       items: items.sort((x, y) => (x.slot && y.slot ? toMin(x.slot.time) - toMin(y.slot.time) : 0) || x.st.name.localeCompare(y.st.name, 'he')),
     }));
+}
+
+// ---------- pictures ----------
+
+// Thumbnails that load from the device (or the cloud) after the card is on screen.
+function fillThumbs(root) {
+  root.querySelectorAll('img[data-img]').forEach(async (img) => {
+    const url = await imageURL(img.dataset.img);
+    if (url) img.src = url;
+    else img.closest('.thumb')?.classList.add('missing');
+  });
+}
+
+function imagesHtml(ids) {
+  if (!ids || !ids.length) return '';
+  return `<div class="thumbs">${ids.map((id) => `<button type="button" class="thumb" data-view="${e(id)}" aria-label="הצגת תמונה"><img data-img="${e(id)}" alt=""></button>`).join('')}</div>`;
+}
+
+// Full-screen picture; swipe or tap outside to close.
+export async function viewImage(id) {
+  const url = await imageURL(id);
+  if (!url) { toast('התמונה עוד לא זמינה במכשיר הזה'); return; }
+  const ov = el(`<div class="img-viewer" role="dialog" aria-label="תמונה"><img src="${url}" alt=""><button type="button" class="icon-btn" aria-label="סגירה">✕</button></div>`);
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (ev) => { if (ev.key === 'Escape') close(); };
+  ov.addEventListener('click', (ev) => { if (ev.target.tagName !== 'IMG') close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+}
+
+// Pictures of a note while writing it: add from the gallery or the camera, remove with ✕.
+function imagesEditor(initial = [], onChange = () => {}) {
+  const ids = [...initial];
+  const box = el(`<div class="images-editor">
+    <div class="thumbs" data-items></div>
+    <label class="btn small" style="cursor:pointer">📷 + תמונה<input type="file" accept="image/*" multiple hidden data-file></label>
+  </div>`);
+  const items = box.querySelector('[data-items]');
+  const paint = () => {
+    items.innerHTML = ids.map((id, i) => `<span class="thumb"><img data-img="${e(id)}" alt=""><button type="button" class="thumb-del" data-del="${i}" aria-label="הסרת תמונה">✕</button></span>`).join('');
+    fillThumbs(items);
+  };
+  paint();
+  box.querySelector('[data-file]').addEventListener('change', async (ev) => {
+    const files = [...ev.target.files];
+    ev.target.value = '';
+    if (!files.length) return;
+    toast(files.length > 1 ? `מוסיף ${files.length} תמונות…` : 'מוסיף תמונה…', 1200);
+    for (const f of files) ids.push(await addImage(f));
+    paint();
+    onChange(ids);
+  });
+  items.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-del]');
+    if (!b) return;
+    ids.splice(Number(b.dataset.del), 1);
+    paint();
+    onChange(ids);
+  });
+  return { el: box, get: () => [...ids] };
 }
 
 function preview(text, n = 70) {
@@ -208,7 +269,7 @@ function renderPage(app, root, who) {
     <section class="page" style="margin-bottom:14px">
       <div class="seg" data-kind style="margin-bottom:6px">${M.NOTE_KINDS.map((k) => `<button type="button" data-k="${k.id}" aria-pressed="${kind === k.id}">${e(k.name)}</button>`).join('')}</div>
       <textarea class="write" data-text style="min-height:calc(var(--row) * 4)" placeholder="${st ? `מה כדאי לזכור על ${e(st.name)}? מה עשינו, מה מתכננים לשיעור הבא…` : 'רעיון, שיר ללמד, משהו לזכור…'}"></textarea>
-      <div data-links></div>
+      <div class="attach-row"><div data-images></div><div data-links></div></div>
       <div class="row-actions">
         <button class="btn primary" data-save>שמור פתק</button>
         <label class="hint">תאריך <input type="date" data-date value="${todayISO()}" style="font-size:14px;border:1px solid var(--border);border-radius:8px;padding:2px 6px"></label>
@@ -229,6 +290,9 @@ function renderPage(app, root, who) {
   const linksDraftKey = `noteLinksDraft.${who}`;
   const composerLinks = linksEditor(getPref(linksDraftKey, []) || [], (links) => setPref(linksDraftKey, links));
   $('[data-links]').appendChild(composerLinks.el);
+  const imagesDraftKey = `noteImagesDraft.${who}`;
+  const composerImages = imagesEditor(getPref(imagesDraftKey, []) || [], (ids) => setPref(imagesDraftKey, ids));
+  $('[data-images]').appendChild(composerImages.el);
 
   $('[data-back]').addEventListener('click', () => app.go('notebook'));
   $('[data-kind]').addEventListener('click', (ev) => {
@@ -241,11 +305,14 @@ function renderPage(app, root, who) {
   $('[data-save]').addEventListener('click', () => {
     const text = ta.value.trim();
     const links = composerLinks.get();
-    if (!text && !links.length) { ta.focus(); return; }
-    M.addNote(s, { studentId, kind, text, links, date: $('[data-date]').value || todayISO() });
+    const images = composerImages.get();
+    if (!text && !links.length && !images.length) { ta.focus(); return; }
+    const n = M.addNote(s, { studentId, kind, text, links, date: $('[data-date]').value || todayISO() });
+    if (images.length) n.images = images;
     app.save();
     setPref(draftKey, '');
     setPref(linksDraftKey, []);
+    setPref(imagesDraftKey, []);
     toast('נשמר ✓');
     app.render();
   });
@@ -277,7 +344,7 @@ function renderPage(app, root, who) {
       const n = x.n;
       return el(`<div class="report-card note-card tap" data-note="${e(n.id)}">
         <div class="report-head">${kindChip(n.kind)}<span class="hint">${e(fmtDay(n.date))}</span></div>
-        ${n.text ? `<div class="note-text">${linkify(n.text)}</div>` : ''}${linksHtml(n.links)}</div>`);
+        ${n.text ? `<div class="note-text">${linkify(n.text)}</div>` : ''}${imagesHtml(n.images)}${linksHtml(n.links)}</div>`);
     }
     const l = x.l;
     return el(`<div class="report-card note-card tap from-lesson" data-lesson="${e(l.id)}" data-date="${e(l.date)}">
@@ -292,9 +359,12 @@ function renderPage(app, root, who) {
     if (rest.length) list.appendChild(el('<div class="section-title">קודם</div>'));
   }
   rest.forEach((x) => list.appendChild(card(x)));
+  fillThumbs(list);
 
   list.addEventListener('click', (ev) => {
     if (ev.target.closest('a')) return; // a link opens the song, not the note
+    const pic = ev.target.closest('[data-view]');
+    if (pic) { viewImage(pic.dataset.view); return; }
     const nc = ev.target.closest('[data-note]');
     if (nc) {
       const n = (s.notes || []).find((x) => x.id === nc.dataset.note);
@@ -321,8 +391,11 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
     <div class="field"><span>סוג</span><div class="seg" data-kind>${M.NOTE_KINDS.map((k) => `<button type="button" data-k="${k.id}" aria-pressed="${f.kind === k.id}">${e(k.name)}</button>`).join('')}</div></div>
     <label class="field"><span>תאריך</span><input class="input" type="date" name="date" value="${e(f.date)}"></label>
     <label class="field"><span>טקסט</span><textarea class="input" name="text" rows="7">${e(f.text)}</textarea></label>
+    <div class="field"><span>תמונות</span><div data-images></div></div>
     <div class="field"><span>קישורים לשירים</span><div data-links></div></div>
   </div>`);
+  const imagesEd = imagesEditor(note?.images || []);
+  body.querySelector('[data-images]').appendChild(imagesEd.el);
   const linksEd = linksEditor(note?.links || []);
   body.querySelector('[data-links]').appendChild(linksEd.el);
   body.querySelector('[data-kind]').addEventListener('click', (ev) => {
@@ -335,8 +408,10 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
     label: 'שמור', cls: 'primary', grow: true, onClick: (close) => {
       const text = body.querySelector('[name=text]').value.trim();
       const links = linksEd.get();
-      if (!text && !links.length) { toast('הפתק ריק'); return; }
-      const patch = { kind: f.kind, studentId: body.querySelector('[name=who]').value || null, date: body.querySelector('[name=date]').value || todayISO(), text, links };
+      const images = imagesEd.get();
+      if (!text && !links.length && !images.length) { toast('הפתק ריק'); return; }
+      const patch = { kind: f.kind, studentId: body.querySelector('[name=who]').value || null, date: body.querySelector('[name=date]').value || todayISO(), text, links, images };
+      if (!isNew) for (const id of note.images || []) if (!images.includes(id)) deleteImage(id);
       if (isNew) M.addNote(s, patch); else M.updateNote(s, note.id, patch);
       app.save();
       close();
@@ -348,6 +423,7 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
     actions.push({
       label: 'מחק', cls: 'ghost danger', onClick: async (close) => {
         if (!await confirmDialog('למחוק את הפתק?', 'מחק', true)) return;
+        for (const id of note.images || []) deleteImage(id);
         M.deleteNote(s, note.id);
         app.save();
         close();

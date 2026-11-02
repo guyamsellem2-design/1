@@ -94,6 +94,11 @@ async function tx(store, mode, fn) {
   });
 }
 
+// Pictures attached to notebook notes (compressed JPEGs), by id.
+export const putPhoto = (id, blob) => tx('photos', 'readwrite', (s) => s.put(blob, id));
+export const getPhoto = (id) => tx('photos', 'readonly', (s) => s.get(id));
+export const delPhoto = (id) => tx('photos', 'readwrite', (s) => s.delete(id));
+
 // Things shared into the app from the phone's share menu land here (written by sw.js).
 export const takeInbox = async () => {
   try {
