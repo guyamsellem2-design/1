@@ -1,7 +1,7 @@
 // The notebook: a page per student with everything written about him (notes, lesson plans, summaries,
 // and what was written in the lesson reports), plus a page of general notes.
 
-import { escapeHtml as e, todayISO, fmtDay, fmtDate, norm, normalizeUrl, linkSite, linkify } from './util.js';
+import { escapeHtml as e, todayISO, fmtDay, fmtDate, norm, normalizeUrl, linkSite, linkify, weekday, toMin, DAY_NAMES } from './util.js';
 import * as M from './model.js';
 import { el, openSheet, toast, confirmDialog, chip, editLesson, callLinks } from './ui.js';
 import { getPref, setPref } from './store.js';
@@ -67,6 +67,25 @@ function linksEditor(initial = [], onChange = () => {}) {
   return { el: box, get: () => links.map((l) => ({ ...l })) };
 }
 
+// Students by the day of the week they usually come (Sunday first), by time within the day;
+// students with no regular day come last, by name.
+function groupByDay(s, students) {
+  const today = todayISO();
+  const groups = new Map();
+  for (const st of students) {
+    const slot = M.currentSlot(st, today);
+    const day = slot ? Number(slot.day) : null;
+    if (!groups.has(day)) groups.set(day, []);
+    groups.get(day).push({ st, slot });
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => (a == null ? 1 : b == null ? -1 : a - b))
+    .map(([day, items]) => ({
+      day,
+      items: items.sort((x, y) => (x.slot && y.slot ? toMin(x.slot.time) - toMin(y.slot.time) : 0) || x.st.name.localeCompare(y.st.name, 'he')),
+    }));
+}
+
 function preview(text, n = 70) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   return t.length > n ? t.slice(0, n - 1) + '…' : t;
@@ -109,25 +128,30 @@ function renderIndex(app, root) {
       <span class="grow"><b>פתקים כלליים</b><br><span class="hint">${general.length ? `${general.length} · ${e(preview(general[0].text || '🎵 ' + ((general[0].links || [])[0]?.title || linkSite((general[0].links || [])[0]?.url || '')), 50))}` : 'רעיונות, שירים, דברים לזכור, שלא קשורים לתלמיד אחד'}</span></span><span>‹</span></li></ul>`);
     body.appendChild(g);
 
-    const students = M.activeStudents(s).slice().sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    const students = M.activeStudents(s);
     if (!students.length) {
       body.appendChild(el(`<p class="muted" style="margin:16px 4px">כשיהיו תלמידים ברשימה, לכל אחד יהיה כאן דף משלו.</p>`));
       return;
     }
-    const box = el(`<div><div class="section-title">תלמידים</div><ul class="list card"></ul></div>`);
-    const ul = box.querySelector('ul');
-    for (const st of students) {
-      const notes = M.notesFor(s, st.id);
-      const lessons = lessonEntries(s, st.id);
-      const latest = [...notes.map((n) => ({ d: n.date, t: n.text || (n.links || []).map((l) => '🎵 ' + (l.title || linkSite(l.url))).join(' ') })), ...lessons.map((l) => ({ d: l.date, t: l.summary || l.note || (l.tasks[0] && l.tasks[0].text) }))]
-        .sort((a, b) => (a.d < b.d ? 1 : -1))[0];
-      const count = notes.length + lessons.length;
-      ul.appendChild(el(`<li class="tap" data-who="${e(st.id)}">
-        <span class="grow"><b>${e(st.name)}</b>${st.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}<br>
-        <span class="hint">${latest ? `${e(fmtDate(latest.d))} · ${e(preview(latest.t, 46))}` : 'עוד לא נכתב כלום'}</span></span>
-        ${count ? `<span class="tag">${count}</span>` : ''}<span>‹</span></li>`));
+    // Grouped by the day each student usually comes, in the order of the week, by time within the day.
+    const todayWd = weekday(todayISO());
+    for (const g of groupByDay(s, students)) {
+      const box = el(`<div><div class="section-title"><span class="grow">${g.day == null ? 'בלי יום קבוע' : `יום ${e(DAY_NAMES[g.day])}`}</span>${g.day === todayWd ? '<span class="tag">היום</span>' : ''}<span class="hint" style="font-weight:400">${g.items.length}</span></div><ul class="list card"></ul></div>`);
+      const ul = box.querySelector('ul');
+      for (const { st, slot } of g.items) {
+        const notes = M.notesFor(s, st.id);
+        const lessons = lessonEntries(s, st.id);
+        const latest = [...notes.map((n) => ({ d: n.date, t: n.text || (n.links || []).map((l) => '🎵 ' + (l.title || linkSite(l.url))).join(' ') })), ...lessons.map((l) => ({ d: l.date, t: l.summary || l.note || (l.tasks[0] && l.tasks[0].text) }))]
+          .sort((a, b) => (a.d < b.d ? 1 : -1))[0];
+        const count = notes.length + lessons.length;
+        ul.appendChild(el(`<li class="tap" data-who="${e(st.id)}">
+          ${slot ? `<span class="nb-time" dir="ltr">${e(slot.time)}</span>` : ''}
+          <span class="grow"><b>${e(st.name)}</b>${st.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}<br>
+          <span class="hint">${latest ? `${e(fmtDate(latest.d))} · ${e(preview(latest.t, 46))}` : 'עוד לא נכתב כלום'}</span></span>
+          ${count ? `<span class="tag">${count}</span>` : ''}<span>‹</span></li>`));
+      }
+      body.appendChild(box);
     }
-    body.appendChild(box);
   };
   paint();
 
@@ -292,9 +316,8 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
   const s = app.state;
   const isNew = !note;
   const f = { kind: note?.kind || 'note', studentId: note ? note.studentId : studentId, date: note?.date || todayISO(), text: note?.text || '' };
-  const students = M.activeStudents(s).slice().sort((a, b) => a.name.localeCompare(b.name, 'he'));
   const body = el(`<div>
-    <label class="field"><span>של מי</span><select class="input" name="who"><option value="">📌 כללי</option>${students.map((x) => `<option value="${e(x.id)}" ${x.id === f.studentId ? 'selected' : ''}>${e(x.name)}</option>`).join('')}</select></label>
+    <label class="field"><span>של מי</span><select class="input" name="who"><option value="">📌 כללי</option>${groupByDay(s, M.activeStudents(s)).map((g) => `<optgroup label="${g.day == null ? 'בלי יום קבוע' : `יום ${e(DAY_NAMES[g.day])}`}">${g.items.map(({ st: x }) => `<option value="${e(x.id)}" ${x.id === f.studentId ? 'selected' : ''}>${e(x.name)}</option>`).join('')}</optgroup>`).join('')}</select></label>
     <div class="field"><span>סוג</span><div class="seg" data-kind>${M.NOTE_KINDS.map((k) => `<button type="button" data-k="${k.id}" aria-pressed="${f.kind === k.id}">${e(k.name)}</button>`).join('')}</div></div>
     <label class="field"><span>תאריך</span><input class="input" type="date" name="date" value="${e(f.date)}"></label>
     <label class="field"><span>טקסט</span><textarea class="input" name="text" rows="7">${e(f.text)}</textarea></label>
