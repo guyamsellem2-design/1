@@ -1,7 +1,7 @@
 // Shared UI pieces: bottom sheets, toasts, status chips and the lesson editor.
 
 import { escapeHtml as e, toMin, endTime, fmtDay, telHref } from './util.js';
-import { statusById, activeStudents, lessonName, studentById } from './model.js';
+import { statusById, activeStudents, lessonName, studentById, newActivity, ACTIVITY_IDEAS } from './model.js';
 
 export function el(html) {
   const t = document.createElement('template');
@@ -100,7 +100,60 @@ export function lenLabel(n) {
 /**
  * Edit one lesson in simple Hebrew fields. Works on a copy; onSave gets the edited lesson.
  */
+// ---------- activity: work without a student ----------
+
+/**
+ * New (lesson = null, give `time`) or existing activity. onSave gets the activity.
+ */
+export function editActivity(state, { date, lesson, time, onSave, onDelete }) {
+  const l = lesson ? JSON.parse(JSON.stringify(lesson)) : newActivity({ name: '', time: time || '14:00', len: 30, frame: state.frames[0]?.id || 'yeshiva' });
+  const lens = [15, 30, 45, 60, 90];
+  const body = el(`<div>
+    <p class="muted" style="margin:-6px 0 12px">${e(fmtDay(date))} · נספר כשעות עבודה</p>
+    <label class="field"><span>מה עשית</span><input class="input" name="name" value="${e(l.name)}" placeholder="למשל: הנחיית הרכב לטקס" autocomplete="off"></label>
+    <div class="seg" data-ideas style="margin:-6px 0 14px">${ACTIVITY_IDEAS.map((x) => `<button type="button" data-idea="${e(x)}" style="font-size:13px;min-height:32px;padding:3px 10px">${e(x)}</button>`).join('')}</div>
+    <div class="two">
+      <label class="field"><span>משעה</span><input class="input" type="time" step="300" name="time" value="${e(l.time)}" dir="ltr"></label>
+      <label class="field"><span>עד</span><input class="input" type="time" step="300" name="end" value="${e(endTime(l.time, l.len))}" dir="ltr"></label>
+    </div>
+    <div class="field"><span>כמה זמן</span><div class="seg" data-len>${lens.map((n) => `<button type="button" data-len="${n}" aria-pressed="${Number(l.len) === n}">${n === 90 ? 'שעה וחצי' : n === 60 ? 'שעה' : n + ' דק׳'}</button>`).join('')}</div></div>
+    ${state.frames.length > 1 ? `<div class="field"><span>במסגרת</span><div class="seg" data-frame>${state.frames.map((f) => `<button type="button" data-fr="${e(f.id)}" aria-pressed="${(l.frame || 'yeshiva') === f.id}">${e(f.name)}</button>`).join('')}</div></div>` : ''}
+    <label class="field"><span>הערה</span><textarea class="input" name="note" rows="2">${e(l.note || '')}</textarea></label>
+  </div>`);
+  const $ = (q) => body.querySelector(q);
+  const syncLen = () => {
+    body.querySelectorAll('[data-len] button').forEach((b) => b.setAttribute('aria-pressed', Number(b.dataset.len) === Number(l.len)));
+    $('[name=end]').value = endTime(l.time, l.len);
+  };
+  body.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.idea) { $('[name=name]').value = b.dataset.idea; }
+    if (b.dataset.len) { l.len = Number(b.dataset.len); syncLen(); }
+    if (b.dataset.fr) { l.frame = b.dataset.fr; body.querySelectorAll('[data-frame] button').forEach((x) => x.setAttribute('aria-pressed', x.dataset.fr === l.frame)); }
+  });
+  body.addEventListener('change', (ev) => {
+    if (ev.target.name === 'time') { l.time = ev.target.value || l.time; $('[name=end]').value = endTime(l.time, l.len); }
+    if (ev.target.name === 'end') { const len = toMin(ev.target.value) - toMin(l.time); if (len > 0) { l.len = len; syncLen(); } }
+  });
+  const actions = [{
+    label: 'שמור', cls: 'primary', grow: true, onClick: (close) => {
+      l.name = $('[name=name]').value.trim();
+      l.note = $('[name=note]').value.trim();
+      if (!l.name) { toast('צריך לכתוב מה עשית'); $('[name=name]').focus(); return; }
+      close();
+      onSave(l);
+    },
+  }];
+  if (onDelete) actions.push({ label: 'הסר', cls: 'ghost danger', onClick: (close) => { close(); onDelete(l); } });
+  actions.push({ label: 'ביטול', cls: 'ghost' });
+  const sh = openSheet({ title: lesson ? 'פעילות' : '🛠️ פעילות בלי תלמיד', body, actions });
+  if (!lesson) setTimeout(() => $('[name=name]').focus(), 50);
+  return sh;
+}
+
 export function editLesson(state, { date, lesson, title, onSave, onDelete, allowStudentChange = true }) {
+  if (lesson && lesson.activity) return editActivity(state, { date, lesson, onSave, onDelete });
   const l = JSON.parse(JSON.stringify(lesson));
   l.tasks = l.tasks || [];
   const students = activeStudents(state, date);
@@ -229,8 +282,9 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
 /**
  * Pick a student to add. With onPickMany, a long press on a name starts choosing several at once.
  */
-export function pickStudent(state, { date, title = 'הוספת תלמיד ליום', exclude = [], onPick, onPickMany, allowNew = true, preselect = null }) {
+export function pickStudent(state, { date, title = 'הוספת תלמיד ליום', exclude = [], onPick, onPickMany, onActivity, allowNew = true, preselect = null }) {
   const body = el(`<div>
+    ${onActivity ? '<button type="button" class="btn block" data-activity style="margin-bottom:10px;justify-content:flex-start">🛠️ פעילות בלי תלמיד <span class="hint" style="font-weight:400">(ניקיון, הרכב, מיתרים, סטאפ…)</span></button>' : ''}
     <input class="input" type="search" placeholder="חיפוש לפי שם" autocomplete="off" data-q>
     ${onPickMany ? '<p class="hint" data-tip style="margin:8px 2px 0">לחיצה ארוכה על שם = בחירה של כמה תלמידים בבת אחת</p>' : ''}
     <ul class="list card pick-list" data-list style="margin-top:10px;max-height:50vh;overflow:auto"></ul>
@@ -324,6 +378,7 @@ export function pickStudent(state, { date, title = 'הוספת תלמיד ליו
     onPickMany(ids);
   });
   body.querySelector('[data-cancelmany]').addEventListener('click', () => { multi = false; selected.clear(); render(); });
+  body.querySelector('[data-activity]')?.addEventListener('click', () => { sheet.close(); onActivity(); });
   render();
   sheet = openSheet({ title, body, actions: [{ label: 'סגור', cls: 'ghost' }] });
   if (matchMedia('(pointer: fine)').matches) setTimeout(() => q.focus(), 50);

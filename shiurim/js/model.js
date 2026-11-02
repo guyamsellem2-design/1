@@ -213,15 +213,19 @@ export function cancelDay(state, date, label = 'בוטל') {
 // otherwise look like paid hours); they are counted apart: days that passed, and days still ahead.
 // Lessons marked as a school constraint (trip, exam…) and holidays are left out; a lesson reported on a holiday counts.
 export function frameSummary(state, from, to, today = todayISO()) {
-  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
+  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
   const out = new Map(state.frames.map((f) => [f.id, { frame: f, ...blank() }]));
   const other = { frame: { id: '', name: 'בלי מסגרת' }, ...blank() };
   for (const d of yearDates(state, from, to)) {
     for (const l of getDay(state, d).lessons) {
-      const st = l.studentId && studentById(state, l.studentId);
-      const bucket = (st && out.get(st.frame || 'yeshiva')) || other;
+      const fr = lessonFrame(state, l);
+      const bucket = (fr && out.get(fr)) || other;
       const len = Number(l.len) || 0;
       if (l.status === 'trip') continue;
+      if (l.activity) {
+        if (d <= today) { bucket.act++; bucket.actMin += len; } else { bucket.open++; bucket.openMin += len; bucket.openAhead++; bucket.openAheadMin += len; }
+        continue;
+      }
       if (!l.status) {
         bucket.open++; bucket.openMin += len;
         if (d < today) { bucket.openPast++; bucket.openPastMin += len; } else { bucket.openAhead++; bucket.openAheadMin += len; }
@@ -229,8 +233,8 @@ export function frameSummary(state, from, to, today = todayISO()) {
     }
   }
   const rows = [...out.values()];
-  if (other.came + other.absent + other.open) rows.push(other);
-  return rows.map((r) => ({ ...r, total: r.came + r.absent, totalMin: r.cameMin + r.absentMin }));
+  if (other.came + other.absent + other.act + other.open) rows.push(other);
+  return rows.map((r) => ({ ...r, total: r.came + r.absent + r.act, totalMin: r.cameMin + r.absentMin + r.actMin }));
 }
 
 // Students who belong to this day by the regular schedule but are not on a day that was already edited:
@@ -516,7 +520,23 @@ export function studentHistory(state, studentId) {
   return out.sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
+// Work without a student (cleaning up, an ensemble, strings and setups…): an "activity".
+// It is reported the moment it is written down, so it carries this fixed status and counts as work hours.
+export const ACTIVITY_STATUS = { id: 'activity', name: 'פעילות', bg: '#E9E3F5', fg: '#4B3B7A' };
+export const ACTIVITY_IDEAS = ['ניקיון החדר', 'הנחיית הרכב', 'חזרות לאירוע', 'החלפת מיתרים', 'סטאפ לגיטרות', 'סידור ציוד'];
+
+export function newActivity({ name, time, len = 30, frame = 'yeshiva', note = '' }) {
+  return { id: uid(), activity: true, studentId: null, name: String(name || '').trim(), time, len: Number(len), timeSet: true, frame, status: 'activity', summary: '', note, tasks: [] };
+}
+
+export function lessonFrame(state, l) {
+  if (l.activity) return l.frame || 'yeshiva';
+  const st = l.studentId && studentById(state, l.studentId);
+  return st ? st.frame || 'yeshiva' : null;
+}
+
 export function statusById(state, id) {
+  if (id === 'activity') return ACTIVITY_STATUS;
   return state.statuses.find((s) => s.id === id);
 }
 

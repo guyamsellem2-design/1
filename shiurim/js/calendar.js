@@ -3,7 +3,7 @@
 
 import { escapeHtml as e, toMin, fromMin, todayISO, addDays, weekday, fmtDate, fromISO, toISO, DAY_NAMES } from './util.js';
 import * as M from './model.js';
-import { el, editLesson, toast, pickStudent } from './ui.js';
+import { el, editLesson, editActivity, toast, pickStudent } from './ui.js';
 import { reportDay } from './report.js';
 import { getPref, setPref } from './store.js';
 
@@ -83,6 +83,10 @@ function renderWeek(app, root, anchor, titleEl) {
           app.render();
           toast(`${ids.length} נוספו מ-${t}`);
         },
+        onActivity: () => editActivity(s, {
+          date: d, time: t,
+          onSave: (l) => { M.setDayLessons(s, d, [...M.getDay(s, d).lessons, l]); app.save(); app.render(); },
+        }),
       });
     });
     for (let t = start; t < end; t += 30) lane.insertAdjacentHTML('beforeend', `<div class="hr" style="top:${(t - start) * PPM}px">${t % 60 === 0 ? fromMin(t) : ''}</div>`);
@@ -187,13 +191,14 @@ function renderMonth(app, root, anchor, titleEl) {
   const cameSt = M.statusById(s, 'came');
   const box = el(`<div class="month-summary"><div class="section-title" style="margin:6px 4px 0">סיכום ${e(MONTHS[a.getMonth()])}</div></div>`);
   if (!rows.length) box.appendChild(el('<p class="muted" style="margin:4px">אין שיעורים בחודש הזה.</p>'));
-  const line = (label, n, min, extra = '') => `<div class="ms-row ${extra}"><span class="lbl">${label}</span><b>${hrs(min)} שעות</b><span class="hint">(${n === 1 ? 'שיעור אחד' : `${n} שיעורים`})</span></div>`;
+  const line = (label, n, min, extra = '', one = 'שיעור אחד', many = 'שיעורים') => `<div class="ms-row ${extra}"><span class="lbl">${label}</span><b>${hrs(min)} שעות</b><span class="hint">(${n === 1 ? one : `${n} ${many}`})</span></div>`;
   for (const r of rows) {
     box.appendChild(el(`<div class="ms-card">
       <h4>${e(r.frame.name)}</h4>
       ${line(`<span class="dot-c" style="background:${e(cameSt?.bg || '#11734B')}"></span> הגיעו`, r.came, r.cameMin)}
       ${line('<span class="dot-c" style="background:#B10202"></span> לא הגיעו', r.absent, r.absentMin)}
-      ${line('<b style="color:var(--ink)">סה״כ שדווח</b>', r.total, r.totalMin, 'ms-total')}
+      ${r.act ? line(`<span class="dot-c" style="background:${e(M.ACTIVITY_STATUS.bg)};border:1px solid ${e(M.ACTIVITY_STATUS.fg)}"></span> פעילויות בלי תלמיד`, r.act, r.actMin, '', 'פעילות אחת', 'פעילויות') : ''}
+      ${line('<b style="color:var(--ink)">סה״כ שדווח</b>', r.total, r.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}
       ${r.open ? `<div class="ms-open">
         <div class="ms-open-title">לא נכלל בסה״כ</div>
         ${r.openPast ? line('<span class="dot-c" style="border:1px dashed #B7791F"></span> ימים שעברו ולא דווחו', r.openPast, r.openPastMin) : ''}
@@ -202,9 +207,9 @@ function renderMonth(app, root, anchor, titleEl) {
     </div>`));
   }
   if (rows.length > 1) {
-    const sum = rows.reduce((acc, r) => ({ came: acc.came + r.came, cameMin: acc.cameMin + r.cameMin, absent: acc.absent + r.absent, absentMin: acc.absentMin + r.absentMin, total: acc.total + r.total, totalMin: acc.totalMin + r.totalMin }), { came: 0, cameMin: 0, absent: 0, absentMin: 0, total: 0, totalMin: 0 });
-    box.appendChild(el(`<div class="ms-card"><h4>כל המסגרות</h4>${line('הגיעו', sum.came, sum.cameMin)}${line('לא הגיעו', sum.absent, sum.absentMin)}${line('<b style="color:var(--ink)">סה״כ שדווח</b>', sum.total, sum.totalMin, 'ms-total')}</div>`));
+    const sum = rows.reduce((acc, r) => ({ came: acc.came + r.came, cameMin: acc.cameMin + r.cameMin, absent: acc.absent + r.absent, absentMin: acc.absentMin + r.absentMin, act: acc.act + r.act, actMin: acc.actMin + r.actMin, total: acc.total + r.total, totalMin: acc.totalMin + r.totalMin }), { came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, total: 0, totalMin: 0 });
+    box.appendChild(el(`<div class="ms-card"><h4>כל המסגרות</h4>${line('הגיעו', sum.came, sum.cameMin)}${line('לא הגיעו', sum.absent, sum.absentMin)}${sum.act ? line('פעילויות בלי תלמיד', sum.act, sum.actMin, '', 'פעילות אחת', 'פעילויות') : ''}${line('<b style="color:var(--ink)">סה״כ שדווח</b>', sum.total, sum.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}</div>`));
   }
-  box.appendChild(el('<p class="hint" style="margin:0 4px">הסה״כ כולל רק שיעורים שדווחו (הגיע / לא הגיע). שיעורים שעוד לא דווחו, שיעורים שסומנו "טיול ישיבתי / אילוצי מערכת" וימי חג לא נכללים. יום שלא היו בו לימודים (למשל בחירות) כדאי לבטל מדף הבית, בהחלקה ימינה, כדי שלא יישאר ברשימה.</p>'));
+  box.appendChild(el('<p class="hint" style="margin:0 4px">הסה״כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע) ופעילויות בלי תלמיד. שיעורים שעוד לא דווחו, שיעורים שסומנו "טיול ישיבתי / אילוצי מערכת" וימי חג לא נכללים. יום שלא היו בו לימודים (למשל בחירות) כדאי לבטל מדף הבית, בהחלקה ימינה, כדי שלא יישאר ברשימה.</p>'));
   root.appendChild(box);
 }

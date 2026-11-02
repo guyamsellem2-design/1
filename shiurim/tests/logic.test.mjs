@@ -174,3 +174,17 @@ test('month summary per frame, holidays and lessons that happened anyway, cancel
   assert.equal(M.getDay(s, '2026-10-20').lessons.length, 0);
   assert.equal(M.getDay(s, '2026-10-20').holiday, 'בוטל');
 });
+
+test('an activity without a student counts as work hours, in its frame', () => {
+  const { s, ids } = setup();
+  M.updateLesson(s, TUE, 'p-' + ids.shlomo, { status: 'came' });
+  const a = M.newActivity({ name: 'הנחיית הרכב', time: '17:00', len: 60, frame: 'yeshiva' });
+  M.setDayLessons(s, TUE, [...M.getDay(s, TUE).lessons, a]);
+  const day = M.getDay(s, TUE);
+  assert.ok(day.lessons.some((l) => l.activity && l.name === 'הנחיית הרכב'));
+  assert.equal(M.statusById(s, 'activity').name, 'פעילות');
+  const r = M.frameSummary(s, '2026-10-01', '2026-10-31', '2026-10-31').find((x) => x.frame.id === 'yeshiva');
+  assert.deepEqual([r.act, r.actMin], [1, 60]);
+  assert.equal(r.totalMin, r.cameMin + r.absentMin + r.actMin);
+  assert.equal(M.lessonFrame(s, a), 'yeshiva');
+});

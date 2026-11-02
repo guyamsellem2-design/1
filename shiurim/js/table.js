@@ -5,7 +5,7 @@
 import { escapeHtml as e, toMin, fromMin, todayISO, weekday, fmtDate, norm, endTime } from './util.js';
 import * as M from './model.js';
 import { detectStatus, stripStatusWords, cleanup } from './parser.js';
-import { el, toast, editLesson, pickStudent } from './ui.js';
+import { el, toast, editLesson, editActivity, pickStudent } from './ui.js';
 import { openExport } from './export.js';
 import { reportDay } from './report.js';
 import { getPref, setPref } from './store.js';
@@ -23,9 +23,8 @@ export function slotColumns(s) {
 
 function frameOk(s, l, frame) {
   if (!frame) return true;
-  if (!l.studentId) return true;
-  const st = M.studentById(s, l.studentId);
-  return !st || (st.frame || 'yeshiva') === frame;
+  const fr = M.lessonFrame(s, l);
+  return !fr || fr === frame;
 }
 
 // Lay lessons out on the slot columns: [{col, span, lesson}] plus any that fall outside the day.
@@ -295,11 +294,20 @@ export function renderTable(app, root) {
           refreshRow(d);
         },
         onPickMany: (ids) => { M.setDayLessons(s, d, [...day0.lessons, ...M.newLessonsFor(s, d, ids, day0.lessons)]); app.save(); refreshRow(d); },
+        onActivity: () => editActivity(s, { date: d, time: M.nextFreeTime(s, d), onSave: (l) => { M.setDayLessons(s, d, [...M.getDay(s, d).lessons, l]); app.save(); refreshRow(d); } }),
       });
       return;
     }
     const day = M.getDay(s, d);
     const l = kind === 'lesson' ? day.lessons.find((x) => x.id === td.dataset.id) : null;
+    if (l && l.activity) {
+      editActivity(s, {
+        date: d, lesson: l,
+        onSave: (nl) => { M.updateLesson(s, d, l.id, nl); app.save(); refreshRow(d); },
+        onDelete: () => { M.removeLessons(s, d, [l.id]); app.save(); refreshRow(d); },
+      });
+      return;
+    }
     const slotTime = kind === 'slot' ? fromMin(cols[Number(td.dataset.col)]) : null;
     let options = [];
     let placeholder = '';
@@ -344,7 +352,7 @@ export function renderTable(app, root) {
       if (q && kind === 'lesson' && shown.length === 1 && norm(shown[0].text).startsWith(q)) active = 0;
       ul.innerHTML = shown.slice(0, 30).map((o, i) => `<li role="option" data-i="${i}" aria-selected="${i === active}">${o.html}</li>`).join('');
       if (kind === 'slot' && input.value.trim() && !shown.some((o) => norm(o.text).startsWith(q))) {
-        ul.insertAdjacentHTML('beforeend', `<li data-free="1" class="hint">Enter: שיעור עם "${e(input.value.trim())}"</li>`);
+        ul.insertAdjacentHTML('beforeend', `<li data-free="1" class="hint">Enter: 🛠️ פעילות "${e(input.value.trim())}" (בלי תלמיד)</li>`);
       }
     };
     renderOpts();
@@ -380,7 +388,8 @@ export function renderTable(app, root) {
     const commitFree = () => {
       const t = input.value.trim();
       if (kind === 'lesson') { if (t) commitLessonText(d, l, t); }
-      else if (kind === 'slot') { if (t) M.addLesson(s, d, { name: t, time: slotTime, len: 30, studentId: null }); }
+      // Text that isn't a student's name in an empty cell: an activity at that time ("ניקיון", "הרכב"…).
+      else if (kind === 'slot') { if (t) M.setDayLessons(s, d, [...M.getDay(s, d).lessons, M.newActivity({ name: t, time: slotTime, len: 30, frame: frame || 'yeshiva' })]); }
       else if (kind === 'hol') { s.holidayOverride[d] = t; }
       else if (kind === 'rem') { s.days[d] = { ...(s.days[d] || {}), remark: t }; }
       done(true);

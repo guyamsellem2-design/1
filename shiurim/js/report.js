@@ -3,7 +3,7 @@
 
 import { escapeHtml as e, fmtDay, endTime, clone } from './util.js';
 import * as M from './model.js';
-import { el, openSheet, editLesson, pickStudent, toast, callLinks } from './ui.js';
+import { el, openSheet, editLesson, editActivity, pickStudent, toast, callLinks } from './ui.js';
 
 export function reportDay(app, date, { onSaved, extraAction } = {}) {
   const s = app.state;
@@ -30,12 +30,14 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
       const card = el(`<div class="report-card" data-i="${i}">
         <div class="report-head">
           <span class="t" dir="ltr">${e(l.time)}–${e(endTime(l.time, l.len))}</span>
-          <button type="button" class="link-btn" data-edit><b>${e(M.lessonName(s, l))}</b>${st?.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}</button>
+          <button type="button" class="link-btn" data-edit>${l.activity ? '🛠️ ' : ''}<b>${e(M.lessonName(s, l))}</b>${st?.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}</button>
           <span class="grow"></span>
           ${callLinks(st, { short: true })}
         </div>
-        <div class="seg report-status">${s.statuses.map((x) => `<button type="button" data-status="${e(x.id)}" aria-pressed="${l.status === x.id}" style="${l.status === x.id ? `background:${e(x.bg)};color:${e(x.fg)};border-color:${e(x.bg)}` : ''}">${e(x.name)}</button>`).join('')}</div>
-        <input class="input" data-summary value="${e(l.summary || '')}" placeholder="מה עשינו (לא חובה)" style="margin-top:8px;min-height:40px">
+        ${l.activity
+          ? `<div class="hint">פעילות בלי תלמיד · נספרת כשעות עבודה${l.note ? ` · ${e(l.note)}` : ''}</div>`
+          : `<div class="seg report-status">${s.statuses.map((x) => `<button type="button" data-status="${e(x.id)}" aria-pressed="${l.status === x.id}" style="${l.status === x.id ? `background:${e(x.bg)};color:${e(x.fg)};border-color:${e(x.bg)}` : ''}">${e(x.name)}</button>`).join('')}</div>
+        <input class="input" data-summary value="${e(l.summary || '')}" placeholder="מה עשינו (לא חובה)" style="margin-top:8px;min-height:40px">`}
       </div>`);
       list.appendChild(card);
     });
@@ -85,6 +87,7 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
       lessons.push(...M.newLessonsFor(s, date, ids, lessons));
       render();
     },
+    onActivity: () => editActivity(s, { date, time: M.nextFreeTime(s, date, lessons), onSave: (l) => { lessons.push(l); render(); } }),
   }));
 
   const actions = [{

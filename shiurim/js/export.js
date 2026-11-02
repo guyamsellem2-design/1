@@ -25,9 +25,9 @@ function loadExcel() {
 const argb = (hex) => 'FF' + String(hex || '#000000').replace('#', '').toUpperCase().padStart(6, '0');
 
 function frameOk(s, l, frame) {
-  if (!frame || !l.studentId) return true;
-  const st = M.studentById(s, l.studentId);
-  return !st || (st.frame || 'yeshiva') === frame;
+  if (!frame) return true;
+  const fr = M.lessonFrame(s, l);
+  return !fr || fr === frame;
 }
 
 export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = false }, ExcelJS) {
@@ -114,12 +114,13 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
       const l = p.lesson;
       const st = l.status && M.statusById(s, l.status);
       const nm = M.lessonName(s, l);
-      let value = st ? st.name : (l.note || '');
-      if (names) value = value ? `${value} · ${nm}` : nm;
+      let value = l.activity ? `🛠️ ${l.name}` : st ? st.name : (l.note || '');
+      if (names && !l.activity) value = value ? `${value} · ${nm}` : nm;
       const c0 = 3 + p.col;
       if (p.span > 1) ws.mergeCells(r, c0, r, c0 + p.span - 1);
       const cell = row.getCell(c0);
       cell.value = value || null;
+      if (l.activity) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(M.ACTIVITY_STATUS.bg) } };
       if (!names && nm) cell.note = { texts: [{ text: [`${nm} ${l.time}`, l.summary, st && l.note].filter(Boolean).join('\n') }] };
     }
     const rem = [day.remark, outside.length ? `(מחוץ לשעות: ${outside.map((l) => `${M.lessonName(s, l)} ${l.time}`).join(', ')})` : ''].filter(Boolean).join(' ');
@@ -153,23 +154,23 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
   // Hours summary: the total is only what was REPORTED (came / didn't come). Lessons not reported yet
   // are listed apart and never added in, so the hours can be trusted as they are.
   const sum = wb.addWorksheet('סיכום שעות', { views: [{ rightToLeft: true }] });
-  sum.columns = [{ width: 24 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 15 }, { width: 15 }];
+  sum.columns = [{ width: 24 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 16 }, { width: 15 }];
   const hrs = (m) => +(m / 60).toFixed(2);
   const styleRow = (row, fill) => row.eachCell((c) => { c.border = border; if (fill) c.fill = fill; });
   sum.addRow([`סיכום ${fmtDateFull(from)} – ${fmtDateFull(to)}${frameName ? ` · ${frameName}` : ''}`]).font = { bold: true, size: 13 };
-  sum.addRow(['הסה"כ כולל רק שיעורים שדווחו (הגיע / לא הגיע). שיעורים שלא דווחו, "טיול ישיבתי / אילוצי מערכת" וימי חג לא נכללים.']).font = { color: { argb: 'FF6B7280' } };
+  sum.addRow(['הסה"כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע) ופעילויות בלי תלמיד. שיעורים שלא דווחו, "טיול ישיבתי / אילוצי מערכת" וימי חג לא נכללים.']).font = { color: { argb: 'FF6B7280' } };
   sum.addRow([]);
 
   const frames = M.frameSummary(s, from, to).filter((r) => (!frame || r.frame.id === frame) && (r.total || r.open));
-  const fh = sum.addRow(['מסגרת', 'הגיעו (שעות)', 'הגיעו (שיעורים)', 'לא הגיעו (שעות)', 'לא הגיעו (שיעורים)', 'סה"כ שדווח (שעות)', 'סה"כ שדווח (שיעורים)']);
+  const fh = sum.addRow(['מסגרת', 'הגיעו (שעות)', 'הגיעו (שיעורים)', 'לא הגיעו (שעות)', 'לא הגיעו (שיעורים)', 'פעילויות בלי תלמיד (שעות)', 'סה"כ שדווח (שעות)']);
   fh.font = { bold: true };
   fh.alignment = { wrapText: true, vertical: 'middle' };
   styleRow(fh, headFill);
-  for (const r of frames) styleRow(sum.addRow([r.frame.name, hrs(r.cameMin), r.came, hrs(r.absentMin), r.absent, hrs(r.totalMin), r.total]));
+  for (const r of frames) styleRow(sum.addRow([r.frame.name, hrs(r.cameMin), r.came, hrs(r.absentMin), r.absent, hrs(r.actMin), hrs(r.totalMin)]));
   const total = frames.reduce((a, r) => a + r.cameMin, 0);
   if (frames.length > 1) {
-    const t = frames.reduce((a, r) => ({ c: a.c + r.cameMin, cn: a.cn + r.came, x: a.x + r.absentMin, xn: a.xn + r.absent, t: a.t + r.totalMin, tn: a.tn + r.total }), { c: 0, cn: 0, x: 0, xn: 0, t: 0, tn: 0 });
-    const tr = sum.addRow(['כל המסגרות', hrs(t.c), t.cn, hrs(t.x), t.xn, hrs(t.t), t.tn]);
+    const t = frames.reduce((a, r) => ({ c: a.c + r.cameMin, cn: a.cn + r.came, x: a.x + r.absentMin, xn: a.xn + r.absent, ac: a.ac + r.actMin, t: a.t + r.totalMin }), { c: 0, cn: 0, x: 0, xn: 0, ac: 0, t: 0 });
+    const tr = sum.addRow(['כל המסגרות', hrs(t.c), t.cn, hrs(t.x), t.xn, hrs(t.ac), hrs(t.t)]);
     tr.font = { bold: true };
     styleRow(tr, headFill);
   }
@@ -188,10 +189,12 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
   sh.font = { bold: true };
   styleRow(sh, headFill);
   const per = new Map();
+  const acts = [];
   const counts = Object.fromEntries(s.statuses.map((x) => [x.id, 0]));
   for (const d of dates) {
     for (const l of M.getDay(s, d).lessons.filter((x) => frameOk(s, x, frame))) {
       if (l.status === 'trip') { counts.trip = (counts.trip || 0) + 1; continue; }
+      if (l.activity) { acts.push({ d, l }); continue; }
       const k = l.studentId || 'n:' + l.name;
       const cur = per.get(k) || { name: M.lessonName(s, l), came: 0, min: 0, absent: 0, open: 0 };
       if (!l.status) cur.open++;
@@ -207,6 +210,14 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
   const pt = sum.addRow(['סך הכל', people.reduce((a, p) => a + p.came, 0), hrs(total), people.reduce((a, p) => a + p.absent, 0), people.reduce((a, p) => a + p.open, 0) || null]);
   pt.font = { bold: true };
   styleRow(pt, headFill);
+
+  if (acts.length) {
+    sum.addRow([]);
+    const ah = sum.addRow(['פעילויות בלי תלמיד', 'תאריך', 'שעה', 'שעות']);
+    ah.font = { bold: true };
+    styleRow(ah, headFill);
+    for (const { d, l } of acts) styleRow(sum.addRow([l.name + (l.note ? ` (${l.note})` : ''), fmtDateFull(d), `${l.time}`, hrs(Number(l.len))]));
+  }
 
   sum.addRow([]);
   sum.addRow(['נוכחות לפי סטטוס']).font = { bold: true };

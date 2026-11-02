@@ -4,7 +4,7 @@ import { todayISO, addDays, weekday, fmtDay, fmtDate, relDay, escapeHtml as e, D
 import * as M from './model.js';
 import { parseReport } from './parser.js';
 import { loadState, saveState, getDraft, setDraft, askPersistence, takeInbox, getPref, setPref, backupBlob } from './store.js';
-import { el, toast, openSheet, confirmDialog, chip, chipButton, editLesson, pickStudent, timeRange } from './ui.js';
+import { el, toast, openSheet, confirmDialog, chip, chipButton, editLesson, editActivity, pickStudent, timeRange } from './ui.js';
 import { initSync, isSignedIn, onSyncStatus, syncStatus } from './sync.js';
 import { openSignIn } from './account.js';
 import { initInstall, installApp, isInstalled, onInstallChange } from './install.js';
@@ -367,6 +367,10 @@ function renderReview(app, root) {
         rv.rows.sort(M.byTime);
         render();
       },
+      onActivity: () => editActivity(s, {
+        date: rv.date, time: M.nextFreeTime(s, rv.date, rv.rows),
+        onSave: (l) => { rv.rows.push({ ...l, mentioned: true, flags: {} }); rv.rows.sort(M.byTime); render(); },
+      }),
     }));
     bulk.appendChild(add);
 
@@ -515,6 +519,10 @@ function renderDay(app, root) {
       render();
       toast(`${ids.length} נוספו ליום הזה`);
     },
+    onActivity: () => editActivity(s, {
+      date, time: M.nextFreeTime(s, date),
+      onSave: (l) => { M.setDayLessons(s, date, [...M.getDay(s, date).lessons, l]); app.save(); render(); toast('הפעילות נוספה ✓'); },
+    }),
   }));
   q('[data-anyway]')?.addEventListener('click', () => pickStudent(s, {
     date, title: 'מי היה בכל זאת?', exclude: day.lessons.map((l) => l.studentId).filter(Boolean), allowNew: false,
