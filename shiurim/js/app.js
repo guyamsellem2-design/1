@@ -715,7 +715,10 @@ async function receiveShared() {
   paintSync(syncStatus());
   initSync(app);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // Always check for a newer version when the app opens or comes back to the screen.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    }).catch(() => {});
   }
   if (!getPref('seenWelcome') && !app.state.teacher.name) {
     setPref('seenWelcome', true);
