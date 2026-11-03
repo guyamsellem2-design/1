@@ -188,3 +188,46 @@ test('an activity without a student counts as work hours, in its frame', () => {
   assert.equal(r.totalMin, r.cameMin + r.absentMin + r.actMin);
   assert.equal(M.lessonFrame(s, a), 'yeshiva');
 });
+
+test('payments: only per-lesson frames, owed when it happened, "שילם" in writing, old data migrates', () => {
+  const { s, ids } = setup();
+  const priv = M.studentById(s, ids.david);
+  priv.frame = 'private';
+  priv.price = 150;
+  const shlomo = M.studentById(s, ids.shlomo); // yeshiva: never asked about payment
+  const [rv] = review(s, 'שלמה הגיע\nדוד - עבדנו על אקורדים, לא שילם\nיוסף לא הגיע');
+  assert.equal(row(rv, ids.david).paid, false);
+  assert.equal(row(rv, ids.shlomo).paid, undefined);
+  M.applyReview(s, rv);
+  assert.equal(M.paysPerLesson(s, M.getDay(s, TUE).lessons.find((l) => l.studentId === shlomo.id)), false);
+  let u = M.unpaidByStudent(s, TUE);
+  assert.equal(u.length, 1);
+  assert.equal(u[0].student.id, ids.david);
+  assert.equal(u[0].amount, 150);
+
+  // A week later he pays, written in the report.
+  const next = '2026-10-20';
+  const [rv2] = review(s, 'דוד הגיע ושילם', next);
+  assert.equal(row(rv2, ids.david).paid, true);
+  M.applyReview(s, rv2);
+  u = M.unpaidByStudent(s, next);
+  assert.equal(u[0].count, 1, 'the earlier lesson is still open');
+  const p = M.paymentSummary(s, 'private', '2026-10-01', '2026-10-31', next);
+  assert.deepEqual([p.paid, p.unpaid, p.amountPaid, p.amountUnpaid], [1, 1, 150, 150]);
+
+  // Marked paid from the payments list.
+  M.setPaid(s, TUE, u[0].lessons[0].id, true, next);
+  assert.equal(M.unpaidByStudent(s, next).length, 0);
+
+  // A private student who didn't come owes nothing.
+  const [rv3] = review(s, 'דוד לא הגיע והודיע', '2026-10-27');
+  M.applyReview(s, rv3);
+  assert.equal(M.unpaidByStudent(s, '2026-10-27').length, 0);
+
+  // Data from before this feature: the private frame becomes per-lesson, the yeshiva doesn't.
+  const old = M.migrate({ frames: [{ id: 'yeshiva', name: 'ישיבה' }, { id: 'private', name: 'פרטי' }] });
+  assert.equal(M.perLessonFrame(old, 'private'), true);
+  assert.equal(M.perLessonFrame(old, 'yeshiva'), false);
+  const turnedOff = M.migrate({ ...old, frames: [{ id: 'private', name: 'פרטי', perLesson: false }] });
+  assert.equal(M.perLessonFrame(turnedOff, 'private'), false, 'a choice made in settings stays');
+});

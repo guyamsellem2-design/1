@@ -4,6 +4,7 @@
 import { escapeHtml as e, fmtDay, endTime, clone } from './util.js';
 import * as M from './model.js';
 import { el, openSheet, editLesson, editActivity, pickStudent, toast, callLinks } from './ui.js';
+import { payButton } from './payments.js';
 
 export function reportDay(app, date, { onSaved, extraAction } = {}) {
   const s = app.state;
@@ -32,6 +33,7 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
           <span class="t" dir="ltr">${e(l.time)}–${e(endTime(l.time, l.len))}</span>
           <button type="button" class="link-btn" data-edit>${l.activity ? '🛠️ ' : ''}<b>${e(M.lessonName(s, l))}</b>${st?.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}</button>
           <span class="grow"></span>
+          ${M.paysPerLesson(s, l) ? payButton(l) : ''}
           ${callLinks(st, { short: true })}
         </div>
         ${l.activity
@@ -49,7 +51,10 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
     if (!card) return;
     const l = lessons[Number(card.dataset.i)];
     const b = ev.target.closest('button');
-    if (b && b.dataset.status) {
+    if (b && b.dataset.pay != null) {
+      M.setPaidFields(l, !l.paid);
+      render();
+    } else if (b && b.dataset.status) {
       l.status = l.status === b.dataset.status ? null : b.dataset.status;
       render();
     } else if (b && b.dataset.edit != null) {

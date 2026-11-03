@@ -188,6 +188,15 @@ function renderMonth(app, root, anchor, titleEl) {
     return (Math.round(h * 100) / 100).toString();
   };
   const rows = M.frameSummary(s, first, last).filter((r) => r.total || r.open);
+  // Private lessons: how many of the lessons that happened were paid.
+  const money = (n) => `₪${Math.round(n).toLocaleString('he-IL')}`;
+  const payLine = (frameId) => {
+    if (!frameId || !M.perLessonFrame(s, frameId)) return '';
+    const p = M.paymentSummary(s, frameId, first, last);
+    if (!p.paid && !p.unpaid) return '';
+    const amt = (n) => (p.priced && n ? ` · ${money(n)}` : '');
+    return `<div class="ms-pay"><span>💰 שולם: <b>${p.paid}</b>${amt(p.amountPaid)}</span><span class="${p.unpaid ? 'ms-pay-due' : ''}">עוד לא שולם: <b>${p.unpaid}</b>${amt(p.amountUnpaid)}</span></div>`;
+  };
   const cameSt = M.statusById(s, 'came');
   const box = el(`<div class="month-summary"><div class="section-title" style="margin:6px 4px 0">סיכום ${e(MONTHS[a.getMonth()])}</div></div>`);
   if (!rows.length) box.appendChild(el('<p class="muted" style="margin:4px">אין שיעורים בחודש הזה.</p>'));
@@ -199,6 +208,7 @@ function renderMonth(app, root, anchor, titleEl) {
       ${line('<span class="dot-c" style="background:#B10202"></span> לא הגיעו', r.absent, r.absentMin)}
       ${r.act ? line(`<span class="dot-c" style="background:${e(M.ACTIVITY_STATUS.bg)};border:1px solid ${e(M.ACTIVITY_STATUS.fg)}"></span> פעילויות בלי תלמיד`, r.act, r.actMin, '', 'פעילות אחת', 'פעילויות') : ''}
       ${line('<b style="color:var(--ink)">סה״כ שדווח</b>', r.total, r.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}
+      ${payLine(r.frame.id)}
       ${r.open ? `<div class="ms-open">
         <div class="ms-open-title">לא נכלל בסה״כ</div>
         ${r.openPast ? line('<span class="dot-c" style="border:1px dashed #B7791F"></span> ימים שעברו ולא דווחו', r.openPast, r.openPastMin) : ''}

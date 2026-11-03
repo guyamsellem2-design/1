@@ -37,7 +37,7 @@ export function defaultState() {
     },
     frames: [
       { id: 'yeshiva', name: 'ישיבה' },
-      { id: 'private', name: 'פרטי' },
+      { id: 'private', name: 'פרטי', perLesson: true },
     ],
     statuses: clone(DEFAULT_STATUSES),
     students: [],
@@ -56,6 +56,11 @@ export function migrate(s) {
   out.teacher = { ...d.teacher, ...(s.teacher || {}) };
   out.settings = { ...d.settings, ...(s.settings || {}) };
   out.frames = s.frames?.length ? s.frames : d.frames;
+  // Private lessons are paid one by one (the yeshiva pays a salary): ask about payment only there.
+  if (!out.paymentsSetUp) {
+    out.frames = out.frames.map((f) => (f.id === 'private' && f.perLesson === undefined ? { ...f, perLesson: true } : f));
+    out.paymentsSetUp = true;
+  }
   out.statuses = s.statuses?.length ? s.statuses : d.statuses;
   out.students = s.students || [];
   out.days = s.days || {};
@@ -463,6 +468,7 @@ export function buildReview(state, parsedDay) {
     if (it.status === 'absent') row.flags.askNotified = true;
     if (it.summary) row.summary = row.summary && row.mentioned ? `${row.summary}, ${it.summary}` : it.summary;
     if (it.tasks.length) row.tasks = [...(row.mentioned ? row.tasks : []), ...it.tasks.map((t) => ({ text: t, done: false }))];
+    if (it.paid !== undefined && paysPerLesson(state, row)) setPaidFields(row, it.paid);
     if (it.ambiguous) row.flags.ambiguous = it.alternatives;
     if (it.fuzzy) row.flags.fuzzy = it.name;
     row.mentioned = true;
@@ -533,6 +539,75 @@ export function lessonFrame(state, l) {
   if (l.activity) return l.frame || 'yeshiva';
   const st = l.studentId && studentById(state, l.studentId);
   return st ? st.frame || 'yeshiva' : null;
+}
+
+// ---------- payments (private lessons) ----------
+// A frame can be "paid per lesson" (private students). The yeshiva pays a monthly salary, so its lessons
+// never ask about payment. A lesson is owed when it happened and isn't marked paid; a lesson the student
+// missed is not owed, but can still be marked paid (paid in advance, or a no-show the teacher charges for).
+
+export function perLessonFrame(state, frameId) {
+  const f = (state.frames || []).find((x) => x.id === frameId);
+  return !!(f && f.perLesson);
+}
+
+export function paysPerLesson(state, l) {
+  if (!l || l.activity || !l.studentId) return false;
+  return perLessonFrame(state, lessonFrame(state, l));
+}
+
+export function owes(state, l) {
+  return paysPerLesson(state, l) && countsAsCame(state, l.status) && !l.paid;
+}
+
+export function setPaidFields(l, paid, today = todayISO()) {
+  // "false" rather than removing the field, so editors that copy fields over (Object.assign) carry it.
+  if (paid) { l.paid = true; l.paidOn = l.paidOn || today; } else { l.paid = false; l.paidOn = null; }
+  return l;
+}
+
+export function setPaid(state, date, id, paid, today = todayISO()) {
+  const l = updateLesson(state, date, id, {});
+  if (l) setPaidFields(l, paid, today);
+  return l;
+}
+
+// Lessons not paid yet, per student: oldest first; the amount when the student has a price per lesson.
+export function unpaidByStudent(state, today = todayISO()) {
+  const by = new Map();
+  for (const [date, rec] of Object.entries(state.days)) {
+    if (date > today) continue;
+    for (const l of rec.lessons || []) {
+      if (!owes(state, l)) continue;
+      if (!by.has(l.studentId)) by.set(l.studentId, []);
+      by.get(l.studentId).push({ date, ...l });
+    }
+  }
+  const out = [];
+  for (const [studentId, lessons] of by) {
+    const st = studentById(state, studentId);
+    if (!st) continue;
+    lessons.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : byTime(a, b)));
+    const price = Number(st.price) || 0;
+    out.push({ student: st, lessons, count: lessons.length, amount: price ? price * lessons.length : null, oldest: lessons[0].date });
+  }
+  return out.sort((a, b) => (a.oldest < b.oldest ? -1 : a.oldest > b.oldest ? 1 : a.student.name.localeCompare(b.student.name, 'he')));
+}
+
+// Paid / not paid in a range, for the month summary of a per-lesson frame.
+export function paymentSummary(state, frameId, from, to, today = todayISO()) {
+  const r = { paid: 0, unpaid: 0, amountPaid: 0, amountUnpaid: 0, priced: true };
+  for (const [date, rec] of Object.entries(state.days)) {
+    if (date < from || date > to || date > today) continue;
+    for (const l of rec.lessons || []) {
+      if (!paysPerLesson(state, l) || lessonFrame(state, l) !== frameId) continue;
+      if (!countsAsCame(state, l.status) && !l.paid) continue;
+      const price = Number(studentById(state, l.studentId)?.price) || 0;
+      if (!price) r.priced = false;
+      if (l.paid) { r.paid++; r.amountPaid += price; } else { r.unpaid++; r.amountUnpaid += price; }
+    }
+  }
+  return r;
 }
 
 export function statusById(state, id) {

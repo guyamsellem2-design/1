@@ -1,7 +1,7 @@
 // Shared UI pieces: bottom sheets, toasts, status chips and the lesson editor.
 
 import { escapeHtml as e, toMin, endTime, fmtDay, telHref } from './util.js';
-import { statusById, activeStudents, lessonName, studentById, newActivity, ACTIVITY_IDEAS } from './model.js';
+import { statusById, activeStudents, lessonName, studentById, newActivity, ACTIVITY_IDEAS, paysPerLesson, setPaidFields } from './model.js';
 
 export function el(html) {
   const t = document.createElement('template');
@@ -182,6 +182,8 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
     <div class="field"><span>נוכחות</span>
       <div class="seg" data-status>${state.statuses.map((s) => `<button type="button" data-status="${e(s.id)}" aria-pressed="${l.status === s.id}" style="${l.status === s.id ? `background:${e(s.bg)};color:${e(s.fg)};border-color:${e(s.bg)}` : ''}">${e(s.name)}</button>`).join('')}
       <button type="button" data-status="" aria-pressed="${!l.status}">בלי סטטוס</button></div></div>
+    ${paysPerLesson(state, l) ? `<div class="field"><span>תשלום</span><div class="seg" data-paidseg>
+      <button type="button" data-paid="1" aria-pressed="${!!l.paid}">💰 שולם</button><button type="button" data-paid="0" aria-pressed="${!l.paid}">עוד לא</button></div></div>` : ''}
     <label class="field"><span>מה עשינו (סיכום)</span><textarea class="input" name="summary" rows="2">${e(l.summary || '')}</textarea></label>
     <div class="field"><span>משימות לי</span><div data-tasks></div>
       <button type="button" class="btn small ghost" data-addtask>+ משימה</button></div>
@@ -245,6 +247,10 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
         const st = statusById(state, x.dataset.status);
         x.style.cssText = on && st ? `background:${st.bg};color:${st.fg};border-color:${st.bg}` : '';
       });
+    }
+    if (b.dataset.paid != null) {
+      setPaidFields(l, b.dataset.paid === '1');
+      body.querySelectorAll('[data-paidseg] button').forEach((x) => x.setAttribute('aria-pressed', (x.dataset.paid === '1') === !!l.paid));
     }
     if (b.dataset.addtask != null) {
       l.tasks.push({ text: '', done: false });

@@ -27,6 +27,10 @@ const STATUS_STRIP = [
   /\s*ו?(?:הודיע[הו]?|ביטל[הו]?|התקשר[ה]?)/,
   /\s*(?:הגיע[הו]?|השתתפ?ה?)(?=$|[\s,.\-–—:])/,
 ];
+// Payment (private lessons): "שילם", "העביר תשלום", "קיבלתי כסף"; and "לא שילם" / "עוד לא שילם".
+const PAY_END = '(?=$|[\\s,.\\-–—:!])';
+const UNPAID_RX = new RegExp(`(?:^|\\s)(?:ו?עוד\\s+)?ו?לא\\s+(?:שילם|שילמה|שילמו|שולם|העביר|העבירה)(?:\\s+(?:תשלום|כסף|את\\s+הכסף))?${PAY_END}`, 'g');
+const PAID_RX = new RegExp(`(?:^|\\s)(?:ו?(?:שילם|שילמה|שילמו|שולם)(?:\\s+(?:על\\s+השיעור|בביט|במזומן|בפייבוקס|בהעברה))?|ו?(?:העביר|העבירה)\\s+(?:תשלום|כסף|את\\s+הכסף)|ו?קיבלתי\\s+(?:תשלום|כסף|את\\s+הכסף))${PAY_END}`, 'g');
 const NOT_COMING = /\s*ש?(?:הוא\s+)?לא\s+(?:יגיע|תגיע|יבוא|תבוא|יוכל|תוכל)(?:\s+היום)?/;
 
 const TASK_RX = /^(?:ו?אני\s+)?(?:צריך|צריכה|חייב|חייבת|לזכור|משימה|תזכורת|לי\s*:)/;
@@ -336,6 +340,15 @@ function analyseContent(content, ctx) {
     if (TASK_RX.test(bare)) tasks.push(bare);
     else rest.push(c);
   }
+  let paid;
+  for (let i = 0; i < rest.length; i++) {
+    const c = rest[i];
+    if (UNPAID_RX.test(c)) { paid = false; rest[i] = c.replace(UNPAID_RX, ' '); }
+    UNPAID_RX.lastIndex = 0;
+    if (PAID_RX.test(rest[i])) { if (paid === undefined) paid = true; rest[i] = rest[i].replace(PAID_RX, ' '); }
+    PAID_RX.lastIndex = 0;
+  }
+  for (let i = rest.length - 1; i >= 0; i--) if (!rest[i].trim()) rest.splice(i, 1);
   const statusText = rest.join(', ');
   const status = detectStatus(statusText, ctx.extraStatuses || []);
   let summary = cleanup(stripStatusWords(rest.join(', ')).replace(NOT_COMING, ' '));
@@ -350,7 +363,8 @@ function analyseContent(content, ctx) {
     status,
     summary,
     tasks: tasks.map((t) => makeTask(t, summary)).filter(Boolean),
-    hasContent: !!(summary || tasks.length || status),
+    paid,
+    hasContent: !!(summary || tasks.length || status || paid !== undefined),
   };
 }
 
@@ -557,6 +571,7 @@ export function parseReport(text, ctx) {
         status: src.status || (src.hasContent || a.hasContent ? 'came' : null),
         summary: src === a ? a.summary : (a.summary || src.summary),
         tasks: a.tasks,
+        paid: a.paid,
         mentionedOnly: !a.hasContent && !(src !== a),
       };
     });

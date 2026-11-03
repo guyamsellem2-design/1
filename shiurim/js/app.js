@@ -13,6 +13,7 @@ import { renderNotebook } from './notebook.js';
 import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
 import { renderCalendar } from './calendar.js';
+import { unpaidBox, payButton } from './payments.js';
 
 const app = {
   state: loadState(),
@@ -167,6 +168,10 @@ function renderHome(app, root) {
     }
   }
 
+  // Private lessons that weren't paid yet.
+  const pay = unpaidBox(app, render);
+  if (pay) more.appendChild(pay);
+
   // Everything lives on this device until cloud sync is connected: nudge a backup every two weeks.
   const reportedDays = Object.keys(s.days).length;
   const lastBackup = getPref('lastBackup');
@@ -277,6 +282,7 @@ function renderReview(app, root) {
       else if (r.flags.unreported) what.push('<span class="chip empty">לא דווח</span>');
       else if (r.flags.askNotified) what.push('<span class="chip" style="background:#FDECEC;color:#8A1C1C">לא הגיע</span>');
       if (r.summary) what.push(`<span>${e(r.summary)}</span>`);
+      if (M.paysPerLesson(s, r) && (r.paid || M.countsAsCame(s, r.status))) what.push(payButton(r, 'data-pay'));
       if (r.tasks?.length) what.push(`<span class="sub">משימה: ${e(r.tasks.map((t) => t.text).join(' · '))}</span>`);
       if (r.note) what.push(`<span class="sub">${e(r.note)}</span>`);
       const li = el(`<li class="line ${attn ? 'attn' : ''}" data-row="${e(r.id)}">
@@ -303,6 +309,11 @@ function renderReview(app, root) {
         const b = ev.target.closest('button');
         if (b && b.dataset.set) {
           r.status = b.dataset.set;
+          render();
+          return;
+        }
+        if (b && b.dataset.pay != null) {
+          M.setPaidFields(r, !r.paid);
           render();
           return;
         }

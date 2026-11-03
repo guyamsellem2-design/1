@@ -3,6 +3,7 @@
 import { escapeHtml as e, DAY_NAMES, todayISO, fmtDate, fmtDay, norm, toMin, telHref } from './util.js';
 import * as M from './model.js';
 import { el, toast, openSheet, confirmDialog, chip, lenLabel, callLinks } from './ui.js';
+import { openPayments, owedLabel } from './payments.js';
 
 export function renderStudents(app, root) {
   const s = app.state;
@@ -20,6 +21,7 @@ export function renderStudents(app, root) {
   if (!list.length) {
     groups.appendChild(el(`<div class="empty-state"><div class="big">👥</div><p>עוד אין תלמידים.<br>הכי מהיר: "הוספה מהירה" והדבקה של הרשימה שכבר יש לך.</p></div>`));
   }
+  const owed = new Map(M.unpaidByStudent(s, today).map((u) => [u.student.id, u]));
   for (const fr of s.frames) {
     const items = list.filter((st) => (st.frame || 'yeshiva') === fr.id).sort(sortBySlot(today));
     if (!items.length) continue;
@@ -29,6 +31,7 @@ export function renderStudents(app, root) {
       const v = M.currentSlot(st, today);
       const li = el(`<li class="tap"><span class="grow"><b>${e(st.name)}</b>${st.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}${st.aliases?.length ? ` <span class="hint">(${e(st.aliases.join(', '))})</span>` : ''}</span>
         <span class="muted" style="font-size:14px">${v ? `${e(DAY_NAMES[v.day])} ${e(v.time)} · ${e(lenLabel(v.len))}` : 'בלי שעה קבועה'}</span>
+        ${owed.has(st.id) ? `<span class="tag pay-tag" title="עוד לא שולם">₪ ${e(owedLabel(owed.get(st.id)))}</span>` : ''}
         <span class="calls">${callLinks(st, { short: true })}</span><span>‹</span></li>`);
       li.addEventListener('click', (ev) => { if (!ev.target.closest('a.call')) editStudent(app, st); });
       ul.appendChild(li);
@@ -80,6 +83,7 @@ export function editStudent(app, student, opts = {}) {
     parentPhone: student?.parentPhone || '',
     grade: student?.grade || '',
     noSlot: student ? !v : !!opts.oneTimeOption,
+    price: student?.price || '',
   };
   const days = [...new Set([...s.settings.workDays.map(Number), Number(f.day)])].sort();
   const allDays = [0, 1, 2, 3, 4, 5].filter((d) => !days.includes(d));
@@ -92,6 +96,7 @@ export function editStudent(app, student, opts = {}) {
     <label class="field"><span>כיתה</span><input class="input" name="grade" value="${e(f.grade)}" placeholder="למשל: י׳2" autocomplete="off"></label>
     <label class="field"><span>כינויים (איך שאני כותב אותו לפעמים, מופרד בפסיקים)</span><input class="input" name="aliases" value="${e(f.aliases)}" placeholder="למשל: בני, בנימין כ."></label>
     <div class="field"><span>מסגרת</span><div class="seg" data-frame>${s.frames.map((fr) => `<button type="button" data-v="${e(fr.id)}" aria-pressed="${f.frame === fr.id}">${e(fr.name)}</button>`).join('')}</div></div>
+    <label class="field" data-pricewrap ${M.perLessonFrame(s, f.frame) ? '' : 'hidden'}><span>מחיר לשיעור ₪ (לא חובה, כדי לראות סכומים)</span><input class="input" type="number" inputmode="numeric" min="0" step="5" name="price" value="${e(f.price)}" placeholder="למשל 150" dir="ltr"></label>
     <div class="field"><span>יום קבוע</span><div class="seg" data-day>${days.map((d) => `<button type="button" data-v="${d}" aria-pressed="${!f.noSlot && Number(f.day) === d}">${e(DAY_NAMES[d])}</button>`).join('')}
       ${allDays.length ? `<select class="input" data-otherday style="width:auto;min-height:38px;padding:4px 8px"><option value="">יום אחר…</option>${allDays.map((d) => `<option value="${d}">${e(DAY_NAMES[d])}</option>`).join('')}</select>` : ''}</div></div>
     <div class="two">
@@ -122,7 +127,7 @@ export function editStudent(app, student, opts = {}) {
     const b = ev.target.closest('button[data-v]');
     if (!b) return;
     const g = b.parentElement.dataset;
-    if ('frame' in g) { f.frame = b.dataset.v; press('frame', f.frame); }
+    if ('frame' in g) { f.frame = b.dataset.v; press('frame', f.frame); $('[data-pricewrap]').hidden = !M.perLessonFrame(s, f.frame); }
     if ('day' in g) {
       f.noSlot = !f.noSlot && Number(f.day) === Number(b.dataset.v) && !!opts.oneTimeOption;
       f.day = Number(b.dataset.v);
@@ -154,13 +159,15 @@ export function editStudent(app, student, opts = {}) {
       const phone = $('[name=phone]').value.trim();
       const parentPhone = $('[name=parentPhone]').value.trim();
       const grade = $('[name=grade]').value.trim();
+      const price = Number($('[name=price]').value) > 0 ? Number($('[name=price]').value) : null;
       const dupe = s.students.find((x) => x !== student && !x.deleted && norm(x.name) === norm(name));
       if (dupe && isNew && !confirm(`כבר יש תלמיד בשם ${dupe.name}. להוסיף עוד אחד?`)) return;
       let st = student;
       if (isNew) {
         st = M.addStudent(s, { name, aliases, frame: f.frame, notes, phone, parentPhone, grade, day: f.noSlot ? null : f.day, time: f.time, len: f.len, from: opts.from && opts.from < defaultFrom(s) ? opts.from : defaultFrom(s) });
+        if (price) st.price = price;
       } else {
-        Object.assign(st, { name, aliases, frame: f.frame, notes, phone, parentPhone, grade });
+        Object.assign(st, { name, aliases, frame: f.frame, notes, phone, parentPhone, grade, price });
         if (slotChanged() || (!v && !f.noSlot)) M.setSlot(st, { day: f.day, time: f.time, len: f.len }, $('[name=from]')?.value || today);
       }
       app.save();
@@ -188,6 +195,12 @@ export function editStudent(app, student, opts = {}) {
     const nb = el(`<button type="button" class="btn" style="margin-bottom:12px">📓 המחברת של ${e(student.name)}</button>`);
     nb.addEventListener('click', () => { sheet.close(); app.go('notebook', { who: student.id }); });
     body.insertBefore(nb, body.firstChild);
+    if (M.perLessonFrame(s, student.frame || 'yeshiva')) {
+      const u = M.unpaidByStudent(s, today).find((x) => x.student.id === student.id);
+      const pb = el(`<button type="button" class="btn" style="margin:0 0 12px 8px">${u ? `💰 עוד לא שולם: ${e(owedLabel(u))}` : '💰 תשלומים: הכל שולם ✓'}</button>`);
+      pb.addEventListener('click', () => { sheet.close(); openPayments(app, student.id, { onDone: () => app.render() }); });
+      nb.after(pb);
+    }
   }
   if (isNew && !f.name) setTimeout(() => $('[name=name]').focus(), 50);
 }

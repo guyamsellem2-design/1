@@ -199,12 +199,16 @@ export function renderSettings(app, root) {
 
   // frames
   const renderFrames = () => {
-    $('[data-frames]').innerHTML = s.frames.map((f, i) => `<div style="display:flex;gap:6px;margin-bottom:6px"><input class="input" data-fn="${i}" value="${e(f.name)}"></div>`).join('');
+    $('[data-frames]').innerHTML = s.frames.map((f, i) => `<div style="display:flex;gap:10px;margin-bottom:6px;align-items:center;flex-wrap:wrap"><input class="input" data-fn="${i}" value="${e(f.name)}" style="flex:1;min-width:140px">
+      <label class="hint" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input type="checkbox" data-fpay="${i}" ${f.perLesson ? 'checked' : ''}> 💰 תשלום לכל שיעור</label></div>`).join('')
+      + '<p class="hint" style="margin:2px 2px 8px">"תשלום לכל שיעור" = מסמנים בכל שיעור אם שילמו (כמו בפרטיים). בישיבה, שמשלמת משכורת, לא צריך.</p>';
   };
   renderFrames();
   $('[data-frames]').addEventListener('change', (ev) => {
     const i = ev.target.dataset.fn;
     if (i != null && ev.target.value.trim()) { s.frames[i].name = ev.target.value.trim(); app.save(); }
+    const k = ev.target.dataset.fpay;
+    if (k != null) { s.frames[k].perLesson = ev.target.checked; app.save(); }
   });
   $('[data-addframe]').addEventListener('click', () => {
     s.frames.push({ id: 'f' + uid(), name: 'מסגרת חדשה' });
