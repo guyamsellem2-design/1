@@ -5,7 +5,7 @@ import { escapeHtml as e, todayISO, fmtDay, fmtDate, norm, normalizeUrl, linkSit
 import * as M from './model.js';
 import { el, openSheet, toast, confirmDialog, chip, editLesson, callLinks } from './ui.js';
 import { getPref, setPref } from './store.js';
-import { addImage, imageURL, deleteImage } from './images.js';
+import { addImage, imageURL, deleteImage, addFile, fileURL, fileIsLocal, deleteFile, MAX_FILE } from './images.js';
 
 const GENERAL = 'general';
 const kindName = (k) => (M.NOTE_KINDS.find((x) => x.id === k) || M.NOTE_KINDS[0]).name;
@@ -39,7 +39,7 @@ function linksEditor(initial = [], onChange = () => {}) {
   const items = box.querySelector('[data-items]');
   const form = box.querySelector('[data-form]');
   const paint = () => {
-    items.innerHTML = links.map((l, i) => `<div class="link-row"><span class="song-ic">🎵</span><span class="grow"><b>${e(l.title || linkSite(l.url))}</b><small dir="ltr">${e(l.url)}</small></span><button type="button" class="icon-btn" data-del="${i}" aria-label="הסר קישור">✕</button></div>`).join('');
+    items.innerHTML = links.map((l, i) => `<div class="link-row"><a class="link-open grow" href="${e(l.url)}" target="_blank" rel="noopener"><span class="song-ic">🎵</span><span class="grow"><b>${e(l.title || linkSite(l.url))}</b><small dir="ltr">${e(l.url)}</small></span><span aria-hidden="true">↗</span></a><button type="button" class="icon-btn" data-del="${i}" aria-label="הסר קישור">✕</button></div>`).join('');
   };
   paint();
   const open = (on) => { form.hidden = !on; box.querySelector('[data-open]').hidden = on; if (on) form.querySelector('[data-url]').focus(); };
@@ -147,6 +147,112 @@ function imagesEditor(initial = [], onChange = () => {}) {
   return { el: box, get: () => [...ids] };
 }
 
+// ---------- files (PDF, audio, anything) ----------
+
+const ext = (f) => (String(f.name || '').match(/\.([a-z0-9]{1,5})$/i) || [])[1]?.toLowerCase() || '';
+const isAudio = (f) => /^audio\//.test(f.mime || '') || ['mp3', 'm4a', 'wav', 'ogg', 'oga', 'opus', 'aac', 'flac', 'amr', '3gp'].includes(ext(f));
+const isPdf = (f) => f.mime === 'application/pdf' || ext(f) === 'pdf';
+function fileIcon(f) {
+  if (isAudio(f)) return '🎧';
+  if (isPdf(f)) return '📄';
+  if (/^video\//.test(f.mime || '')) return '🎬';
+  if (/^image\//.test(f.mime || '')) return '🖼️';
+  if (['doc', 'docx', 'txt', 'rtf', 'odt'].includes(ext(f))) return '📝';
+  if (['gp', 'gp3', 'gp4', 'gp5', 'gpx', 'mid', 'midi', 'mscz', 'musicxml', 'mxl'].includes(ext(f))) return '🎼';
+  return '📎';
+}
+export function fmtSize(n) {
+  if (!n && n !== 0) return '';
+  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))}KB`;
+  return `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)}MB`;
+}
+const fileLabel = (f) => `<span class="file-ic" aria-hidden="true">${fileIcon(f)}</span><span class="grow"><b>${e(f.name)}</b><small data-file-hint>${e(fmtSize(f.size))}${isAudio(f) ? ' · לחיצה להשמעה' : ' · לחיצה לפתיחה'}</small></span>`;
+
+function filesHtml(files) {
+  if (!files || !files.length) return '';
+  return `<div class="file-list">${files.map((f) => `<button type="button" class="file-row" data-file="${e(f.id)}">${fileLabel(f)}</button>`).join('')}</div>`;
+}
+
+// Tapping a file: audio plays right here; anything else opens (a PDF in the browser's viewer, or - on
+// Android, where the browser can't show it - saved to the phone and opened from there).
+// A file that is only in the cloud downloads on the first tap and opens on the second, because the
+// browser only lets a page open something right after a tap.
+async function openFile(f, row) {
+  const hint = row?.querySelector('[data-file-hint]');
+  if (!await fileIsLocal(f.id)) {
+    if (hint) hint.textContent = '⏳ מוריד…';
+    const url = await fileURL(f.id);
+    if (!url) {
+      if (hint) hint.textContent = fmtSize(f.size);
+      toast('הקובץ עוד לא זמין במכשיר הזה. הוא יגיע אחרי שהמכשיר שבו צירפת אותו יעלה אותו לענן.', 4000);
+      return;
+    }
+    if (hint) hint.textContent = `ירד ✓ · לחיצה ${isAudio(f) ? 'להשמעה' : 'לפתיחה'}`;
+    if (!isAudio(f)) return;
+  }
+  const url = await fileURL(f.id);
+  if (!url) { toast('לא הצלחתי לפתוח את הקובץ'); return; }
+  if (isAudio(f) && row) {
+    const box = el(`<div class="file-row file-playing"><span class="file-ic" aria-hidden="true">🎧</span><span class="grow"><b>${e(f.name)}</b><audio controls preload="auto" src="${url}"></audio></span></div>`);
+    row.replaceWith(box);
+    box.querySelector('audio').play().catch(() => {});
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  const viewable = isPdf(f) || /^(image|text|video|audio)\//.test(f.mime || '');
+  if (/Android/i.test(navigator.userAgent) || !viewable) a.download = f.name || 'file';
+  else { a.target = '_blank'; a.rel = 'noopener'; }
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// Files of a note while writing it: add any file from the phone or the computer, remove with ✕.
+function filesEditor(initial = [], onChange = () => {}) {
+  const files = initial.map((f) => ({ ...f }));
+  const box = el(`<div class="files-editor">
+    <div data-items></div>
+    <label class="btn small" style="cursor:pointer">📎 + קובץ<input type="file" multiple hidden data-pick></label>
+  </div>`);
+  const items = box.querySelector('[data-items]');
+  const paint = () => {
+    items.innerHTML = files.map((f, i) => `<div class="file-edit"><button type="button" class="file-row" data-file="${e(f.id)}">${fileLabel(f)}</button><button type="button" class="icon-btn" data-del="${i}" aria-label="הסרת הקובץ">✕</button></div>`).join('');
+  };
+  paint();
+  box.querySelector('[data-pick]').addEventListener('change', async (ev) => {
+    const picked = [...ev.target.files];
+    ev.target.value = '';
+    if (!picked.length) return;
+    const big = picked.filter((f) => f.size > MAX_FILE);
+    if (big.length) toast(`${big.map((f) => f.name).join(', ')}: גדול מדי (עד ${fmtSize(MAX_FILE)} לקובץ). קובץ ענק אפשר לשים בגוגל דרייב ולצרף כאן קישור.`, 6000);
+    const ok = picked.filter((f) => f.size <= MAX_FILE);
+    if (!ok.length) return;
+    toast(ok.length > 1 ? `מוסיף ${ok.length} קבצים…` : 'מוסיף קובץ…', 1200);
+    try {
+      for (const f of ok) files.push(await addFile(f));
+    } catch (err) {
+      console.warn(err);
+      toast('לא הצלחתי לשמור את הקובץ במכשיר (אולי אין מקום)');
+    }
+    paint();
+    onChange(files);
+  });
+  items.addEventListener('click', (ev) => {
+    const d = ev.target.closest('[data-del]');
+    if (d) {
+      files.splice(Number(d.dataset.del), 1);
+      paint();
+      onChange(files);
+      return;
+    }
+    const r = ev.target.closest('[data-file]');
+    const f = r && files.find((x) => x.id === r.dataset.file);
+    if (f) openFile(f, r);
+  });
+  return { el: box, get: () => files.map((f) => ({ ...f })) };
+}
+
 function preview(text, n = 70) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   return t.length > n ? t.slice(0, n - 1) + '…' : t;
@@ -228,8 +334,8 @@ function paintSearch(app, body, term) {
   const s = app.state;
   const hits = [];
   for (const n of s.notes || []) {
-    const linkText = (n.links || []).map((l) => `${l.title || ''} ${l.url}`).join(' ');
-    if (norm(n.text).includes(term) || norm(linkText).includes(term)) hits.push({ who: n.studentId || GENERAL, date: n.date, html: `${kindChip(n.kind)} ${e(preview(n.text || (n.links || []).map((l) => '🎵 ' + (l.title || linkSite(l.url))).join(' '), 90))}` });
+    const linkText = (n.links || []).map((l) => `${l.title || ''} ${l.url}`).join(' ') + ' ' + (n.files || []).map((f) => f.name).join(' ');
+    if (norm(n.text).includes(term) || norm(linkText).includes(term)) hits.push({ who: n.studentId || GENERAL, date: n.date, html: `${kindChip(n.kind)} ${e(preview(n.text || [...(n.links || []).map((l) => '🎵 ' + (l.title || linkSite(l.url))), ...(n.files || []).map((f) => fileIcon(f) + ' ' + f.name)].join(' '), 90))}` });
   }
   for (const st of s.students) {
     if (norm(st.name).includes(term)) hits.push({ who: st.id, date: '9999', html: `<b>${e(st.name)}</b> · הדף של התלמיד` });
@@ -269,7 +375,7 @@ function renderPage(app, root, who) {
     <section class="page" style="margin-bottom:14px">
       <div class="seg" data-kind style="margin-bottom:6px">${M.NOTE_KINDS.map((k) => `<button type="button" data-k="${k.id}" aria-pressed="${kind === k.id}">${e(k.name)}</button>`).join('')}</div>
       <textarea class="write" data-text style="min-height:calc(var(--row) * 4)" placeholder="${st ? `מה כדאי לזכור על ${e(st.name)}? מה עשינו, מה מתכננים לשיעור הבא…` : 'רעיון, שיר ללמד, משהו לזכור…'}"></textarea>
-      <div class="attach-row"><div data-images></div><div data-links></div></div>
+      <div class="attach-row"><div data-images></div><div data-files></div><div data-links></div></div>
       <div class="row-actions">
         <button class="btn primary" data-save>שמור פתק</button>
         <label class="hint">תאריך <input type="date" data-date value="${todayISO()}" style="font-size:14px;border:1px solid var(--border);border-radius:8px;padding:2px 6px"></label>
@@ -293,6 +399,9 @@ function renderPage(app, root, who) {
   const imagesDraftKey = `noteImagesDraft.${who}`;
   const composerImages = imagesEditor(getPref(imagesDraftKey, []) || [], (ids) => setPref(imagesDraftKey, ids));
   $('[data-images]').appendChild(composerImages.el);
+  const filesDraftKey = `noteFilesDraft.${who}`;
+  const composerFiles = filesEditor(getPref(filesDraftKey, []) || [], (files) => setPref(filesDraftKey, files));
+  $('[data-files]').appendChild(composerFiles.el);
 
   $('[data-back]').addEventListener('click', () => app.go('notebook'));
   $('[data-kind]').addEventListener('click', (ev) => {
@@ -306,13 +415,16 @@ function renderPage(app, root, who) {
     const text = ta.value.trim();
     const links = composerLinks.get();
     const images = composerImages.get();
-    if (!text && !links.length && !images.length) { ta.focus(); return; }
+    const files = composerFiles.get();
+    if (!text && !links.length && !images.length && !files.length) { ta.focus(); return; }
     const n = M.addNote(s, { studentId, kind, text, links, date: $('[data-date]').value || todayISO() });
     if (images.length) n.images = images;
+    if (files.length) n.files = files;
     app.save();
     setPref(draftKey, '');
     setPref(linksDraftKey, []);
     setPref(imagesDraftKey, []);
+    setPref(filesDraftKey, []);
     toast('נשמר ✓');
     app.render();
   });
@@ -344,7 +456,7 @@ function renderPage(app, root, who) {
       const n = x.n;
       return el(`<div class="report-card note-card tap" data-note="${e(n.id)}">
         <div class="report-head">${kindChip(n.kind)}<span class="hint">${e(fmtDay(n.date))}</span></div>
-        ${n.text ? `<div class="note-text">${linkify(n.text)}</div>` : ''}${imagesHtml(n.images)}${linksHtml(n.links)}</div>`);
+        ${n.text ? `<div class="note-text">${linkify(n.text)}</div>` : ''}${imagesHtml(n.images)}${filesHtml(n.files)}${linksHtml(n.links)}</div>`);
     }
     const l = x.l;
     return el(`<div class="report-card note-card tap from-lesson" data-lesson="${e(l.id)}" data-date="${e(l.date)}">
@@ -365,7 +477,14 @@ function renderPage(app, root, who) {
     if (ev.target.closest('a')) return; // a link opens the song, not the note
     const pic = ev.target.closest('[data-view]');
     if (pic) { viewImage(pic.dataset.view); return; }
+    const fr = ev.target.closest('[data-file]');
     const nc = ev.target.closest('[data-note]');
+    if (fr && nc) {
+      const f = ((s.notes || []).find((x) => x.id === nc.dataset.note)?.files || []).find((x) => x.id === fr.dataset.file);
+      if (f) openFile(f, fr);
+      return;
+    }
+    if (ev.target.closest('.file-playing')) return; // the audio player's own buttons
     if (nc) {
       const n = (s.notes || []).find((x) => x.id === nc.dataset.note);
       if (n) editNote(app, n, { onSaved: () => app.render() });
@@ -392,10 +511,13 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
     <label class="field"><span>תאריך</span><input class="input" type="date" name="date" value="${e(f.date)}"></label>
     <label class="field"><span>טקסט</span><textarea class="input" name="text" rows="7">${e(f.text)}</textarea></label>
     <div class="field"><span>תמונות</span><div data-images></div></div>
+    <div class="field"><span>קבצים (PDF, הקלטות וכו')</span><div data-files></div></div>
     <div class="field"><span>קישורים לשירים</span><div data-links></div></div>
   </div>`);
   const imagesEd = imagesEditor(note?.images || []);
   body.querySelector('[data-images]').appendChild(imagesEd.el);
+  const filesEd = filesEditor(note?.files || []);
+  body.querySelector('[data-files]').appendChild(filesEd.el);
   const linksEd = linksEditor(note?.links || []);
   body.querySelector('[data-links]').appendChild(linksEd.el);
   body.querySelector('[data-kind]').addEventListener('click', (ev) => {
@@ -409,9 +531,11 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
       const text = body.querySelector('[name=text]').value.trim();
       const links = linksEd.get();
       const images = imagesEd.get();
-      if (!text && !links.length && !images.length) { toast('הפתק ריק'); return; }
-      const patch = { kind: f.kind, studentId: body.querySelector('[name=who]').value || null, date: body.querySelector('[name=date]').value || todayISO(), text, links, images };
+      const files = filesEd.get();
+      if (!text && !links.length && !images.length && !files.length) { toast('הפתק ריק'); return; }
+      const patch = { kind: f.kind, studentId: body.querySelector('[name=who]').value || null, date: body.querySelector('[name=date]').value || todayISO(), text, links, images, files };
       if (!isNew) for (const id of note.images || []) if (!images.includes(id)) deleteImage(id);
+      if (!isNew) for (const x of note.files || []) if (!files.some((y) => y.id === x.id)) deleteFile(x.id);
       if (isNew) M.addNote(s, patch); else M.updateNote(s, note.id, patch);
       app.save();
       close();
@@ -424,6 +548,7 @@ export function editNote(app, note, { studentId = null, onSaved } = {}) {
       label: 'מחק', cls: 'ghost danger', onClick: async (close) => {
         if (!await confirmDialog('למחוק את הפתק?', 'מחק', true)) return;
         for (const id of note.images || []) deleteImage(id);
+        for (const x of note.files || []) deleteFile(x.id);
         M.deleteNote(s, note.id);
         app.save();
         close();

@@ -309,7 +309,7 @@ table.grid tr.week-start td { border-top: 2px solid #D1D5DB; }
 a.call { text-decoration: none; }
 .sync-btn { font-size: 22px; }
 .note-card { cursor: pointer; }
-.attach-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.attach-row { display: flex; flex-direction: column; gap: 2px; align-items: stretch; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .thumbs:empty { display: none; }
 .thumb { position: relative; width: 76px; height: 76px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--paper-2); padding: 0; display: inline-block; }
@@ -348,6 +348,19 @@ a.call { text-decoration: none; }
 .song-ic { font-size: 18px; }
 .note-text a { word-break: break-all; }
 .links-editor { margin: 6px 0 2px; }
+.file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.file-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; text-align: start; cursor: pointer; }
+.file-row .grow { min-width: 0; }
+.file-row b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.file-row small { display: block; color: var(--ink-2); font-size: 12px; }
+.file-row audio { display: block; width: 100%; margin-top: 6px; height: 40px; }
+.file-playing { cursor: default; }
+.file-ic { font-size: 20px; flex: none; }
+.files-editor { margin: 6px 0 2px; }
+.file-edit { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.file-edit .file-row { background: var(--card); padding: 6px 10px; }
+.link-open { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-decoration: none; color: var(--ink); }
+.link-open .grow { min-width: 0; }
 .link-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); margin-bottom: 6px; }
 .link-form { display: grid; gap: 6px; margin-bottom: 6px; }
 .note-card.from-lesson { background: var(--paper); border-style: dashed; }

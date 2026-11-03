@@ -33,12 +33,13 @@ const toB64 = (blob) => new Promise((resolve, reject) => {
   r.readAsDataURL(blob);
 });
 
-function fromB64(b64, mime) {
-  const bin = atob(b64);
+function b64Bytes(b64) {
+  const bin = atob(b64 || '');
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type: mime || 'image/jpeg' });
+  return bytes;
 }
+const fromB64 = (b64, mime) => new Blob([b64Bytes(b64)], { type: mime || 'image/jpeg' });
 
 // A picture chosen from the gallery or the camera → its id.
 export async function addImage(file) {
@@ -50,12 +51,21 @@ export async function addImage(file) {
   return id;
 }
 
-// Upload whatever is waiting (after adding a picture, on sign-in, when the connection comes back).
+// Upload whatever is waiting (after adding a picture or a file, on sign-in, when the connection comes back).
 let uploading = false;
 export async function uploadPending() {
   const cfg = syncConfig();
   if (!cfg?.token || uploading) return;
   uploading = true;
+  try {
+    await uploadImages(cfg);
+    await uploadFiles(cfg);
+  } finally {
+    uploading = false;
+  }
+}
+
+async function uploadImages(cfg) {
   try {
     for (const id of queue()) {
       const blob = await getPhoto(id).catch(() => null);
@@ -66,8 +76,6 @@ export async function uploadPending() {
     }
   } catch (err) {
     console.warn('image upload', err);
-  } finally {
-    uploading = false;
   }
 }
 
@@ -95,6 +103,104 @@ export async function deleteImage(id) {
   setQueue(queue().filter((x) => x !== id));
   const cfg = syncConfig();
   if (cfg?.token) rpc('sync_file_delete', { p_token: cfg.token, p_id: id }).catch(() => {});
+}
+
+// ---------- files (PDF, audio, anything) ----------
+// Kept on the device as they are (not shrunk). In the cloud a file goes up in parts of 1.5MB, so a large
+// file never needs one big request, and an interrupted upload continues from the part it stopped at.
+
+const FILE_QUEUE = 'shiurim.fileQueue';
+const FILE_PROGRESS = 'shiurim.fileProgress';
+const PART = 1536 * 1024;
+export const MAX_FILE = 25 * 1024 * 1024;
+
+const readJSON = (k, def) => { try { return JSON.parse(localStorage.getItem(k) || '') ?? def; } catch { return def; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
+const fileQueue = () => readJSON(FILE_QUEUE, []);
+const setFileQueue = (q) => writeJSON(FILE_QUEUE, [...new Set(q)]);
+function fileProgress(id, next) {
+  const p = readJSON(FILE_PROGRESS, {});
+  if (next === undefined) return p[id] || 0;
+  if (next === null) delete p[id]; else p[id] = next;
+  writeJSON(FILE_PROGRESS, p);
+}
+function fileDone(id) {
+  setFileQueue(fileQueue().filter((x) => x !== id));
+  fileProgress(id, null);
+}
+
+// A file chosen on the device → what the note keeps about it (the file itself stays out of the data).
+export async function addFile(file) {
+  const id = 'file_' + uid();
+  await putPhoto(id, file);
+  setFileQueue([...fileQueue(), id]);
+  uploadPending();
+  return { id, name: String(file.name || 'קובץ').slice(0, 200), mime: String(file.type || '').slice(0, 120), size: file.size };
+}
+
+async function uploadFiles(cfg) {
+  try {
+    for (const id of fileQueue()) {
+      const blob = await getPhoto(id).catch(() => null);
+      if (!blob) { fileDone(id); continue; }
+      const parts = Math.max(1, Math.ceil(blob.size / PART));
+      for (let i = fileProgress(id); i < parts; i++) {
+        const r = await rpc('sync_part_put', {
+          p_token: cfg.token, p_id: id, p_part: i, p_parts: parts,
+          p_mime: (blob.type || 'application/octet-stream').slice(0, 120),
+          p_data: await toB64(blob.slice(i * PART, (i + 1) * PART)),
+        });
+        if (r && (r.error === 'too_big' || r.error === 'bad_data')) { fileDone(id); break; }
+        if (!r || !r.ok) return; // signed out, cloud full or unreachable: try again later
+        fileProgress(id, i + 1);
+      }
+      if (fileQueue().includes(id) && fileProgress(id) >= parts) fileDone(id);
+    }
+  } catch (err) {
+    console.warn('file upload', err);
+  }
+}
+
+// Is the file already on this device?
+export async function fileIsLocal(id) {
+  return !!(await getPhoto(id).catch(() => null));
+}
+
+// The file itself: from the device, or downloaded from the cloud (part by part) the first time.
+export async function fileBlob(id) {
+  const local = await getPhoto(id).catch(() => null);
+  if (local) return local;
+  const cfg = syncConfig();
+  if (!cfg?.token) return null;
+  try {
+    const first = await rpc('sync_part_get', { p_token: cfg.token, p_id: id, p_part: 0 });
+    if (!first || first.data == null) return null;
+    const chunks = [b64Bytes(first.data)];
+    for (let i = 1; i < (first.parts || 1); i++) {
+      const r = await rpc('sync_part_get', { p_token: cfg.token, p_id: id, p_part: i });
+      if (!r || r.data == null) return null;
+      chunks.push(b64Bytes(r.data));
+    }
+    const blob = new Blob(chunks, { type: first.mime || '' });
+    await putPhoto(id, blob).catch(() => {});
+    return blob;
+  } catch { return null; }
+}
+
+export async function fileURL(id) {
+  if (urls.has(id)) return urls.get(id);
+  const blob = await fileBlob(id);
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  urls.set(id, url);
+  return url;
+}
+
+export async function deleteFile(id) {
+  await delPhoto(id).catch(() => {});
+  fileDone(id);
+  const cfg = syncConfig();
+  if (cfg?.token) rpc('sync_part_delete', { p_token: cfg.token, p_id: id }).catch(() => {});
 }
 
 window.addEventListener('online', () => uploadPending());

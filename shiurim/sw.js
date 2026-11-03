@@ -2,7 +2,7 @@
    Files come from the network first (a new version shows up right away) and from the saved copy offline.
    Text shared from another app arrives here as a POST to ./share; it is parked in IndexedDB
    and the app picks it up on ./?shared=1. Nothing the teacher writes ever passes through this file. */
-const CACHE = 'shiurim-v19';
+const CACHE = 'shiurim-v21';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './js/app.js', './js/util.js', './js/parser.js', './js/model.js', './js/store.js', './js/ui.js',

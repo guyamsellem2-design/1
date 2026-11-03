@@ -222,3 +222,93 @@ $$;
 
 revoke all on function public.sync_file_put(text, text, text, text), public.sync_file_get(text, text), public.sync_file_delete(text, text) from public;
 grant execute on function public.sync_file_put(text, text, text, text), public.sync_file_get(text, text), public.sync_file_delete(text, text) to anon, authenticated;
+
+-- (Not applied to the cloud yet: waiting for the owner's approval. Until then files stay on the device.)
+-- Files attached to notebook notes (PDF, audio, anything). Sent in parts of up to ~1.5MB each, so a
+-- large file never goes in one request, and stored as raw bytes. Together with the pictures, an account
+-- holds up to 300MB, well inside the free database (500MB), so the data itself always has room.
+create table if not exists public.sync_file_parts (
+  email text not null references public.sync_accounts (email) on delete cascade,
+  id text not null check (id ~ '^[A-Za-z0-9_-]{6,64}$'),
+  part int not null check (part >= 0 and part < 64),
+  parts int not null check (parts between 1 and 64),
+  mime text not null check (length(mime) <= 120),
+  data bytea not null,
+  created_at timestamptz not null default now(),
+  primary key (email, id, part)
+);
+alter table public.sync_file_parts enable row level security;
+revoke all on public.sync_file_parts from anon, authenticated;
+
+create or replace function public.sync_storage_used(p_email text)
+returns bigint language sql stable security definer set search_path = '' as $$
+  select coalesce((select sum(size) * 3 / 4 from public.sync_files where email = p_email), 0)
+       + coalesce((select sum(octet_length(data)) from public.sync_file_parts where email = p_email), 0);
+$$;
+revoke all on function public.sync_storage_used(text) from public, anon, authenticated;
+
+create or replace function public.sync_part_put(p_token text, p_id text, p_part int, p_parts int, p_mime text, p_data text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := public.sync_session_email(p_token);
+  v_bytes bytea;
+begin
+  if v_email is null then return jsonb_build_object('error', 'signed_out'); end if;
+  if p_id is null or p_id !~ '^[A-Za-z0-9_-]{6,64}$' or p_part is null or p_parts is null
+     or p_part < 0 or p_part >= p_parts or p_parts > 64 or p_mime is null or length(p_mime) > 120 then
+    return jsonb_build_object('error', 'bad_data');
+  end if;
+  if p_data is null or length(p_data) > 2200000 then return jsonb_build_object('error', 'too_big'); end if;
+  v_bytes := decode(p_data, 'base64');
+  if public.sync_storage_used(v_email) + octet_length(v_bytes) > 300000000 then
+    return jsonb_build_object('error', 'quota');
+  end if;
+  insert into public.sync_file_parts (email, id, part, parts, mime, data)
+    values (v_email, p_id, p_part, p_parts, p_mime, v_bytes)
+    on conflict (email, id, part) do update set parts = excluded.parts, mime = excluded.mime, data = excluded.data;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.sync_part_get(p_token text, p_id text, p_part int)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := public.sync_session_email(p_token);
+  f public.sync_file_parts;
+begin
+  if v_email is null then return jsonb_build_object('error', 'signed_out'); end if;
+  select * into f from public.sync_file_parts where email = v_email and id = p_id and part = p_part;
+  if not found then return jsonb_build_object('error', 'not_found'); end if;
+  return jsonb_build_object('mime', f.mime, 'parts', f.parts, 'data', translate(encode(f.data, 'base64'), E'\n', ''));
+end;
+$$;
+
+create or replace function public.sync_part_delete(p_token text, p_id text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := public.sync_session_email(p_token);
+begin
+  if v_email is not null then delete from public.sync_file_parts where email = v_email and id = p_id; end if;
+end;
+$$;
+
+-- Pictures count toward the same 300MB.
+create or replace function public.sync_file_put(p_token text, p_id text, p_mime text, p_data text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := public.sync_session_email(p_token);
+begin
+  if v_email is null then return jsonb_build_object('error', 'signed_out'); end if;
+  if p_id is null or p_id !~ '^[A-Za-z0-9_-]{6,64}$' or p_mime not in ('image/jpeg', 'image/png', 'image/webp') then
+    return jsonb_build_object('error', 'bad_data');
+  end if;
+  if p_data is null or length(p_data) > 3000000 then return jsonb_build_object('error', 'too_big'); end if;
+  if public.sync_storage_used(v_email) + length(p_data) * 3 / 4 > 300000000 then return jsonb_build_object('error', 'quota'); end if;
+  insert into public.sync_files (email, id, mime, data, size) values (v_email, p_id, p_mime, p_data, length(p_data))
+    on conflict (email, id) do nothing;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+revoke all on function public.sync_part_put(text, text, int, int, text, text), public.sync_part_get(text, text, int), public.sync_part_delete(text, text) from public;
+grant execute on function public.sync_part_put(text, text, int, int, text, text), public.sync_part_get(text, text, int), public.sync_part_delete(text, text) to anon, authenticated;
