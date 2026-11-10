@@ -14,6 +14,7 @@ import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
 import { renderCalendar } from './calendar.js';
 import { unpaidBox, payButton } from './payments.js';
+import { initBack } from './back.js';
 
 const app = {
   state: loadState(),
@@ -24,9 +25,10 @@ const app = {
     saveState(this.state, opts);
   },
   go(view, params = {}) {
+    if (view !== this.view) this.prevView = this.view;
     this.view = view;
     this.params = params;
-    try { history.replaceState(null, '', view === 'home' ? location.pathname : `#${view}`); } catch { /* file:// */ }
+    try { history.replaceState(history.state, '', view === 'home' ? location.pathname : `#${view}`); } catch { /* file:// */ }
     render();
     window.scrollTo(0, 0);
   },
@@ -726,10 +728,31 @@ async function receiveShared() {
   return false;
 }
 
+// The phone's back button: close what's open, go up one level, or (on a main screen) ask for a second press.
+const escape = (target = document) => target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+function handleBack() {
+  const viewer = document.querySelector('.img-viewer');
+  if (viewer) { viewer.querySelector('.icon-btn')?.click(); if (viewer.isConnected) viewer.remove(); return true; }
+  const scrims = document.querySelectorAll('.scrim');
+  if (scrims.length) { escape(); return true; }
+  const cell = document.querySelector('.cell-editor input');
+  if (cell) { escape(cell); return true; }
+  const endSelect = document.querySelector('[data-cancelsel]');
+  if (endSelect) { endSelect.click(); return true; }
+  if (app.view === 'review') {
+    confirmDialog('לצאת ממסך האישור בלי לשמור? מה שכתבת נשאר בתיבה בדף הבית.', 'כן, לצאת').then((ok) => { if (ok) { app.pending = null; app.go('home'); } });
+    return true;
+  }
+  if (app.view === 'notebook' && app.params.who) { app.go('notebook'); return true; }
+  if (app.view === 'settings') { app.go(app.prevView && app.prevView !== 'settings' ? app.prevView : 'home'); return true; }
+  return false;
+}
+
 (async function boot() {
   const hashView = location.hash.replace('#', '');
   const shared = await receiveShared();
   if (!shared) app.go(['day', 'table', 'calendar', 'students', 'settings', 'notebook'].includes(hashView) ? hashView : 'home');
+  initBack({ onBack: handleBack, onArm: () => toast('לחיצה נוספת על "הקודם" תצא מהאפליקציה', 2500) });
   askPersistence();
   paintSync(syncStatus());
   initSync(app);
