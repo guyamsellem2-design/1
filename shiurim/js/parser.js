@@ -275,6 +275,10 @@ export function detectStatus(text, extraStatuses = []) {
   for (const st of extraStatuses) {
     if (st.name && norm(t).includes(norm(st.name))) return st.id;
   }
+  // "טיול, הודיעו מראש" / "אילוץ מערכת, לא הודיעו מראש": which of the two trip statuses.
+  if (RX.trip.test(t) && /מראש|הודעה|הודיעו/.test(t)) {
+    return /(?:לא|בלי|ללא)\s+(?:הודיעו|הודיע|הודעה|להודיע)/.test(t) ? 'trip' : 'tripNotice';
+  }
   if (RX.absent.test(t)) {
     if (RX.noshow.test(t)) return 'noshow';
     if (RX.notified.test(t)) return 'notified';

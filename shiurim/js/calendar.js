@@ -187,7 +187,7 @@ function renderMonth(app, root, anchor, titleEl) {
     const h = m / 60;
     return (Math.round(h * 100) / 100).toString();
   };
-  const rows = M.frameSummary(s, first, last).filter((r) => r.total || r.open);
+  const rows = M.frameSummary(s, first, last).filter((r) => r.total || r.open || r.pre);
   // Private lessons: how many of the lessons that happened were paid.
   const money = (n) => `₪${Math.round(n).toLocaleString('he-IL')}`;
   const payLine = (frameId) => {
@@ -199,6 +199,7 @@ function renderMonth(app, root, anchor, titleEl) {
   };
   const cameSt = M.statusById(s, 'came');
   const sysSt = M.statusById(s, 'trip');
+  const preSt = M.statusById(s, 'tripNotice');
   const box = el(`<div class="month-summary"><div class="section-title" style="margin:6px 4px 0">סיכום ${e(MONTHS[a.getMonth()])}</div></div>`);
   if (!rows.length) box.appendChild(el('<p class="muted" style="margin:4px">אין שיעורים בחודש הזה.</p>'));
   const line = (label, n, min, extra = '', one = 'שיעור אחד', many = 'שיעורים') => `<div class="ms-row ${extra}"><span class="lbl">${label}</span><b>${hrs(min)} שעות</b><span class="hint">(${n === 1 ? one : `${n} ${many}`})</span></div>`;
@@ -211,8 +212,9 @@ function renderMonth(app, root, anchor, titleEl) {
       ${r.sys ? line(`<span class="dot-c" style="background:${e(sysSt?.bg || '#753800')}"></span> אילוצי מערכת בלי הודעה מראש`, r.sys, r.sysMin) : ''}
       ${line('<b style="color:var(--ink)">סה״כ שדווח</b>', r.total, r.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}
       ${payLine(r.frame.id)}
-      ${r.open ? `<div class="ms-open">
+      ${r.open || r.pre ? `<div class="ms-open">
         <div class="ms-open-title">לא נכלל בסה״כ</div>
+        ${r.pre ? line(`<span class="dot-c" style="background:${e(preSt?.bg || '#F1E4D6')};border:1px solid ${e(preSt?.fg || '#6B3A10')}"></span> אילוצי מערכת שהודיעו מראש (להשלמה)`, r.pre, r.preMin) : ''}
         ${r.openPast ? line('<span class="dot-c" style="border:1px dashed #B7791F"></span> ימים שעברו ולא דווחו', r.openPast, r.openPastMin) : ''}
         ${r.openAhead ? line('<span class="dot-c" style="border:1px dashed var(--ink-3)"></span> מתוכנן עד סוף החודש', r.openAhead, r.openAheadMin) : ''}
       </div>` : ''}
@@ -222,6 +224,6 @@ function renderMonth(app, root, anchor, titleEl) {
     const sum = rows.reduce((acc, r) => ({ came: acc.came + r.came, cameMin: acc.cameMin + r.cameMin, absent: acc.absent + r.absent, absentMin: acc.absentMin + r.absentMin, act: acc.act + r.act, actMin: acc.actMin + r.actMin, sys: acc.sys + r.sys, sysMin: acc.sysMin + r.sysMin, total: acc.total + r.total, totalMin: acc.totalMin + r.totalMin }), { came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, sys: 0, sysMin: 0, total: 0, totalMin: 0 });
     box.appendChild(el(`<div class="ms-card"><h4>כל המסגרות</h4>${line('הגיעו', sum.came, sum.cameMin)}${line('לא הגיעו', sum.absent, sum.absentMin)}${sum.act ? line('פעילויות בלי תלמיד', sum.act, sum.actMin, '', 'פעילות אחת', 'פעילויות') : ''}${sum.sys ? line('אילוצי מערכת בלי הודעה מראש', sum.sys, sum.sysMin) : ''}${line('<b style="color:var(--ink)">סה״כ שדווח</b>', sum.total, sum.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}</div>`));
   }
-  box.appendChild(el('<p class="hint" style="margin:0 4px">הסה״כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע), פעילויות בלי תלמיד, ו"טיול ישיבתי / אילוצי מערכת" (מסמנים אותו רק כשלא הודיעו מראש. כשהודיעו מראש, מורידים את השיעור מהיום ומשלימים). שיעורים שעוד לא דווחו וימי חג לא נכללים. יום שלא היו בו לימודים (למשל בחירות) כדאי לבטל מדף הבית, בהחלקה ימינה, כדי שלא יישאר ברשימה.</p>'));
+  box.appendChild(el('<p class="hint" style="margin:0 4px">הסה״כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע), פעילויות בלי תלמיד, וטיול / אילוץ מערכת שלא הודיעו עליו מראש. טיול / אילוץ שהודיעו עליו מראש מופיע בנפרד, להשלמה, ולא נספר. שיעורים שעוד לא דווחו וימי חג לא נכללים. יום שלא היו בו לימודים (למשל בחירות) כדאי לבטל מדף הבית, בהחלקה ימינה, כדי שלא יישאר ברשימה.</p>'));
   root.appendChild(box);
 }

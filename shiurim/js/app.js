@@ -244,7 +244,7 @@ function startReview(text) {
   app.go('review');
 }
 
-const STATUS_WORD = { came: 'הגיע', notified: 'לא הגיע והודיע', noshow: 'לא הגיע לא הודיע', trip: 'טיול / אילוצים' };
+const STATUS_WORD = { came: 'הגיע', notified: 'לא הגיע והודיע', noshow: 'לא הגיע לא הודיע', trip: 'טיול / אילוץ – לא הודיעו מראש', tripNotice: 'טיול / אילוץ – הודיעו מראש' };
 
 function renderReview(app, root) {
   const s = app.state;

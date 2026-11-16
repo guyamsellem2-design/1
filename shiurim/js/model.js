@@ -8,7 +8,10 @@ export const DEFAULT_STATUSES = [
   { id: 'came', name: 'הגיע', bg: '#11734B', fg: '#D4EDBC', counts: true },
   { id: 'notified', name: 'לא הגיע והודיע', bg: '#FFE5A0', fg: '#473821' },
   { id: 'noshow', name: 'לא הגיע לא הודיע', bg: '#B10202', fg: '#FFCFC9' },
-  { id: 'trip', name: 'טיול ישיבתי / אילוצי מערכת', bg: '#753800', fg: '#FFC8AA' },
+  // Trip / school constraint: not announced in advance = the hour was the teacher's and counts;
+  // announced in advance = no lesson, made up later, left out of the hours.
+  { id: 'trip', name: 'טיול / אילוץ מערכת – לא הודיעו מראש', bg: '#753800', fg: '#FFC8AA' },
+  { id: 'tripNotice', name: 'טיול / אילוץ מערכת – הודיעו מראש', bg: '#F1E4D6', fg: '#6B3A10' },
 ];
 
 // תשפ"ז, from the Ministry of Education calendar (high schools). Editable in settings.
@@ -62,6 +65,16 @@ export function migrate(s) {
     out.paymentsSetUp = true;
   }
   out.statuses = s.statuses?.length ? s.statuses : d.statuses;
+  // Once: the trip status splits into "not announced in advance" (counts) and "announced in advance" (doesn't).
+  if (!out.tripSplit) {
+    out.statuses = out.statuses.map((x) => (x.id === 'trip' && x.name === 'טיול ישיבתי / אילוצי מערכת' ? { ...x, name: DEFAULT_STATUSES[3].name } : x));
+    if (!out.statuses.some((x) => x.id === 'tripNotice')) {
+      const at = out.statuses.findIndex((x) => x.id === 'trip');
+      out.statuses = [...out.statuses];
+      out.statuses.splice(at >= 0 ? at + 1 : out.statuses.length, 0, clone(DEFAULT_STATUSES[4]));
+    }
+    out.tripSplit = true;
+  }
   out.students = s.students || [];
   out.days = s.days || {};
   // Once: a student's regular slot starts with the school year, so every day that should have him shows him.
@@ -220,7 +233,7 @@ export function cancelDay(state, date, label = 'בוטל') {
 // when the school didn't say in advance (he came and the hour was his); when told in advance, the lesson is taken
 // off the day and made up later. Holidays are left out; a lesson reported on a holiday counts.
 export function frameSummary(state, from, to, today = todayISO()) {
-  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, sys: 0, sysMin: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
+  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, sys: 0, sysMin: 0, pre: 0, preMin: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
   const out = new Map(state.frames.map((f) => [f.id, { frame: f, ...blank() }]));
   const other = { frame: { id: '', name: 'בלי מסגרת' }, ...blank() };
   for (const d of yearDates(state, from, to)) {
@@ -229,6 +242,7 @@ export function frameSummary(state, from, to, today = todayISO()) {
       const bucket = (fr && out.get(fr)) || other;
       const len = Number(l.len) || 0;
       if (l.status === 'trip') { bucket.sys++; bucket.sysMin += len; continue; }
+      if (l.status === 'tripNotice') { bucket.pre++; bucket.preMin += len; continue; }
       if (l.activity) {
         if (d <= today) { bucket.act++; bucket.actMin += len; } else { bucket.open++; bucket.openMin += len; bucket.openAhead++; bucket.openAheadMin += len; }
         continue;
@@ -240,7 +254,7 @@ export function frameSummary(state, from, to, today = todayISO()) {
     }
   }
   const rows = [...out.values()];
-  if (other.came + other.absent + other.act + other.sys + other.open) rows.push(other);
+  if (other.came + other.absent + other.act + other.sys + other.pre + other.open) rows.push(other);
   return rows.map((r) => ({ ...r, total: r.came + r.absent + r.act + r.sys, totalMin: r.cameMin + r.absentMin + r.actMin + r.sysMin }));
 }
 

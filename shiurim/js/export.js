@@ -158,10 +158,10 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
   const hrs = (m) => +(m / 60).toFixed(2);
   const styleRow = (row, fill) => row.eachCell((c) => { c.border = border; if (fill) c.fill = fill; });
   sum.addRow([`סיכום ${fmtDateFull(from)} – ${fmtDateFull(to)}${frameName ? ` · ${frameName}` : ''}`]).font = { bold: true, size: 13 };
-  sum.addRow(['הסה"כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע), פעילויות בלי תלמיד, ושיעורים שבוטלו בגלל טיול ישיבתי / אילוצי מערכת בלי הודעה מראש. שיעורים שלא דווחו וימי חג לא נכללים.']).font = { color: { argb: 'FF6B7280' } };
+  sum.addRow(['הסה"כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע), פעילויות בלי תלמיד, ושיעורים שבוטלו בגלל טיול / אילוץ מערכת שלא הודיעו עליו מראש. אילוץ שהודיעו עליו מראש, שיעורים שלא דווחו וימי חג לא נכללים.']).font = { color: { argb: 'FF6B7280' } };
   sum.addRow([]);
 
-  const frames = M.frameSummary(s, from, to).filter((r) => (!frame || r.frame.id === frame) && (r.total || r.open));
+  const frames = M.frameSummary(s, from, to).filter((r) => (!frame || r.frame.id === frame) && (r.total || r.open || r.pre));
   const fh = sum.addRow(['מסגרת', 'הגיעו (שעות)', 'הגיעו (שיעורים)', 'לא הגיעו (שעות)', 'לא הגיעו (שיעורים)', 'פעילויות בלי תלמיד (שעות)', 'אילוצי מערכת בלי הודעה מראש (שעות)', 'סה"כ שדווח (שעות)']);
   fh.font = { bold: true };
   fh.alignment = { wrapText: true, vertical: 'middle' };
@@ -176,9 +176,11 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
   }
   const openPast = frames.reduce((a, r) => ({ n: a.n + r.openPast, m: a.m + r.openPastMin }), { n: 0, m: 0 });
   const openAhead = frames.reduce((a, r) => ({ n: a.n + r.openAhead, m: a.m + r.openAheadMin }), { n: 0, m: 0 });
-  if (openPast.n || openAhead.n) {
+  const pre = frames.reduce((a, r) => ({ n: a.n + r.pre, m: a.m + r.preMin }), { n: 0, m: 0 });
+  if (openPast.n || openAhead.n || pre.n) {
     sum.addRow([]);
     sum.addRow(['לא נכלל בסה"כ']).font = { bold: true, color: { argb: 'FF6B7280' } };
+    if (pre.n) sum.addRow(['טיול / אילוץ מערכת שהודיעו מראש (להשלמה)', hrs(pre.m), pre.n]).font = { color: { argb: 'FF6B7280' } };
     if (openPast.n) sum.addRow(['ימים שעברו ולא דווחו', hrs(openPast.m), openPast.n]).font = { color: { argb: 'FF6B7280' } };
     if (openAhead.n) sum.addRow(['מתוכנן, עוד לא התקיים', hrs(openAhead.m), openAhead.n]).font = { color: { argb: 'FF6B7280' } };
   }
@@ -193,7 +195,7 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
   const counts = Object.fromEntries(s.statuses.map((x) => [x.id, 0]));
   for (const d of dates) {
     for (const l of M.getDay(s, d).lessons.filter((x) => frameOk(s, x, frame))) {
-      if (l.status === 'trip') { counts.trip = (counts.trip || 0) + 1; continue; }
+      if (l.status === 'trip' || l.status === 'tripNotice') { counts[l.status] = (counts[l.status] || 0) + 1; continue; }
       if (l.activity) { acts.push({ d, l }); continue; }
       const k = l.studentId || 'n:' + l.name;
       const cur = per.get(k) || { name: M.lessonName(s, l), came: 0, min: 0, absent: 0, open: 0 };

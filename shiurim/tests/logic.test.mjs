@@ -261,3 +261,29 @@ test('payments: "שילמה על אוקטובר" pays that month, without making
   assert.equal(M.paidMonthKey('2026-10-25', 11), '2026-11', 'paid in advance');
   assert.equal(M.paidMonthKey('2026-12-28', 1), '2027-01');
 });
+
+test('trips: announced in advance (not counted, to make up) vs not announced (counted)', () => {
+  const { s, ids } = setup();
+  const [rv] = review(s, 'שלמה ויוסף לא הגיעו - טיול, לא הודיעו לי מראש\nבנימין - טיול, הודיעו מראש\nדוד לא הגיע, טיול');
+  assert.equal(row(rv, ids.shlomo).status, 'trip');
+  assert.equal(row(rv, ids.yosef).status, 'trip');
+  assert.equal(row(rv, ids.binyamin).status, 'tripNotice');
+  assert.equal(row(rv, ids.david).status, 'trip', 'a trip reported on the day is one nobody announced');
+  M.applyReview(s, rv);
+  const [yes] = M.frameSummary(s, TUE, TUE, TUE);
+  assert.equal(yes.sys, 3);
+  assert.equal(yes.pre, 1);
+  assert.equal(yes.total, 3, 'the announced one is left out');
+  assert.equal(yes.totalMin, 30 + 30 + 60);
+
+  // Data from before: the old trip status is renamed (when untouched) and the new one is added after it.
+  const old = M.migrate({ statuses: [
+    { id: 'came', name: 'הגיע', bg: '#11734B', fg: '#D4EDBC', counts: true },
+    { id: 'trip', name: 'טיול ישיבתי / אילוצי מערכת', bg: '#753800', fg: '#FFC8AA' },
+    { id: 'x1', name: 'שלי', bg: '#000', fg: '#fff' },
+  ] });
+  assert.deepEqual(old.statuses.map((x) => x.id), ['came', 'trip', 'tripNotice', 'x1']);
+  assert.equal(old.statuses[1].name, 'טיול / אילוץ מערכת – לא הודיעו מראש');
+  const again = M.migrate({ ...old, statuses: old.statuses.filter((x) => x.id !== 'tripNotice') });
+  assert.ok(!again.statuses.some((x) => x.id === 'tripNotice'), 'deleting it in settings stays deleted');
+});

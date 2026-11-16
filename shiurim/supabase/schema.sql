@@ -223,7 +223,6 @@ $$;
 revoke all on function public.sync_file_put(text, text, text, text), public.sync_file_get(text, text), public.sync_file_delete(text, text) from public;
 grant execute on function public.sync_file_put(text, text, text, text), public.sync_file_get(text, text), public.sync_file_delete(text, text) to anon, authenticated;
 
--- (Not applied to the cloud yet: waiting for the owner's approval. Until then files stay on the device.)
 -- Files attached to notebook notes (PDF, audio, anything). Sent in parts of up to ~1.5MB each, so a
 -- large file never goes in one request, and stored as raw bytes. Together with the pictures, an account
 -- holds up to 300MB, well inside the free database (500MB), so the data itself always has room.
