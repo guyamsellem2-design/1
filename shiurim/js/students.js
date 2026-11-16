@@ -27,8 +27,18 @@ export function renderStudents(app, root) {
     if (!items.length) continue;
     const box = el(`<div><div class="section-title"><span class="grow">${e(fr.name)}</span><span class="hint">${items.length}</span></div><ul class="list card"></ul></div>`);
     const ul = box.querySelector('ul');
+    // A divider before each day: the students of one day, then a line, then the next day's.
+    const dayOf = (st) => { const v = M.currentSlot(st, today); return v ? Number(v.day) : null; };
+    const perDay = new Map();
+    for (const st of items) perDay.set(dayOf(st), (perDay.get(dayOf(st)) || 0) + 1);
+    let lastDay;
     for (const st of items) {
       const v = M.currentSlot(st, today);
+      const d = dayOf(st);
+      if (d !== lastDay) {
+        ul.appendChild(el(`<li class="day-sep"><span class="grow">${d == null ? 'בלי יום קבוע' : `יום ${e(DAY_NAMES[d])}`}</span><span class="hint">${perDay.get(d)}</span></li>`));
+        lastDay = d;
+      }
       const li = el(`<li class="tap"><span class="grow"><b>${e(st.name)}</b>${st.grade ? ` <span class="tag">${e(st.grade)}</span>` : ''}${st.aliases?.length ? ` <span class="hint">(${e(st.aliases.join(', '))})</span>` : ''}</span>
         <span class="muted" style="font-size:14px">${v ? `${e(DAY_NAMES[v.day])} ${e(v.time)} · ${e(lenLabel(v.len))}` : 'בלי שעה קבועה'}</span>
         ${owed.has(st.id) ? `<span class="tag pay-tag" title="עוד לא שולם">₪ ${e(owedLabel(owed.get(st.id)))}</span>` : ''}
