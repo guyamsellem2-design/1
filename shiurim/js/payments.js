@@ -5,6 +5,9 @@ import { escapeHtml as e, fmtDay, todayISO } from './util.js';
 import * as M from './model.js';
 import { el, openSheet, toast, callLinks } from './ui.js';
 
+const MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+const monthName = (ym) => MONTHS[Number(ym.slice(5, 7)) - 1] || ym;
+
 export const money = (n) => `₪${Math.round(n).toLocaleString('he-IL')}`;
 
 // "3 שיעורים · ₪450", or just the count when the student has no price.
@@ -30,11 +33,13 @@ export function openPayments(app, studentId, { onDone } = {}) {
   const body = el(`<div>
     <p class="muted" style="margin:-6px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="grow">${lessons.length ? `${e(owedLabel(u))} שעוד לא שולמו` : 'הכל שולם ✓'}</span>${callLinks(st)}</p>
-    <ul class="list card pay-list">${lessons.map((l) => `<li><label class="grow" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+    <ul class="list card pay-list">${byMonth(lessons).map(([ym, ls]) => `<li class="day-sep pay-month"><span class="grow">${e(monthName(ym))} <span class="hint" style="font-weight:400">· ${ls.length === 1 ? 'שיעור אחד' : `${ls.length} שיעורים`}${price ? ` · ${money(price * ls.length)}` : ''}</span></span>
+      ${lessons.length > 1 ? `<button type="button" class="btn small" data-month="${e(ym)}">💰 שולם על ${e(monthName(ym))}</button>` : ''}</li>
+      ${ls.map((l) => `<li><label class="grow" style="display:flex;align-items:center;gap:10px;cursor:pointer">
       <input type="checkbox" data-pay-id="${e(l.id)}" data-date="${e(l.date)}">
       <span class="grow">${e(fmtDay(l.date))} <span class="hint" dir="ltr">${e(l.time)}</span>${l.summary ? `<br><span class="hint">${e(l.summary)}</span>` : ''}</span>
-      ${price ? `<span class="hint">${money(price)}</span>` : ''}</label></li>`).join('')}</ul>
-    ${lessons.length > 1 ? '<p class="hint" style="margin:8px 2px 0">מסמנים את מה ששולם ולוחצים "שמור". שיעור שסומן בטעות אפשר להחזיר מהשיעור עצמו.</p>' : ''}
+      ${price ? `<span class="hint">${money(price)}</span>` : ''}</label></li>`).join('')}`).join('')}</ul>
+    ${lessons.length > 1 ? '<p class="hint" style="margin:8px 2px 0">משלמים על חודש? "שולם על…" ליד החודש. אחרת מסמנים את מה ששולם ולוחצים "שמור". שיעור שסומן בטעות אפשר להחזיר מהשיעור עצמו.</p>' : ''}
     ${price ? '' : `<p class="hint" style="margin:8px 2px 0">אפשר לכתוב מחיר לשיעור בכרטיס של ${e(st.name)} ברשימת התלמידים, ואז יופיע גם הסכום.</p>`}
   </div>`);
   const mark = (pairs) => {
@@ -43,10 +48,16 @@ export function openPayments(app, studentId, { onDone } = {}) {
     toast(pairs.length === 1 ? 'סומן ששולם ✓' : `${pairs.length} שיעורים סומנו ששולמו ✓`);
     onDone && onDone();
   };
+  let sheet;
+  body.querySelectorAll('[data-month]').forEach((b) => b.addEventListener('click', () => {
+    const ym = b.dataset.month;
+    sheet.close();
+    mark(lessons.filter((l) => l.date.startsWith(ym)).map((l) => ({ date: l.date, id: l.id })));
+  }));
   const actions = [];
   if (lessons.length === 1) {
     body.querySelector('[data-pay-id]').checked = true;
-    actions.push({ label: 'שילם ✓', cls: 'primary', grow: true, onClick: (close) => { close(); mark([{ date: lessons[0].date, id: lessons[0].id }]); } });
+    actions.push({ label: 'שולם ✓', cls: 'primary', grow: true, onClick: (close) => { close(); mark([{ date: lessons[0].date, id: lessons[0].id }]); } });
   } else if (lessons.length) {
     actions.push({
       label: 'שמור', cls: 'primary', grow: true, onClick: (close) => {
@@ -56,11 +67,23 @@ export function openPayments(app, studentId, { onDone } = {}) {
       },
     });
     if (lessons.length > 1) {
-      actions.push({ label: 'שילם על הכל', cls: '', onClick: (close) => { close(); mark(lessons.map((l) => ({ date: l.date, id: l.id }))); } });
+      actions.push({ label: 'הכל שולם', cls: '', onClick: (close) => { close(); mark(lessons.map((l) => ({ date: l.date, id: l.id }))); } });
     }
   }
   actions.push({ label: lessons.length ? 'ביטול' : 'סגור', cls: 'ghost' });
-  return openSheet({ title: `💰 תשלומים · ${st.name}`, body, actions });
+  sheet = openSheet({ title: `💰 תשלומים · ${st.name}`, body, actions });
+  return sheet;
+}
+
+// Lessons grouped by month (oldest first): [['2026-10', [...]], ...].
+function byMonth(lessons) {
+  const m = new Map();
+  for (const l of lessons) {
+    const ym = l.date.slice(0, 7);
+    if (!m.has(ym)) m.set(ym, []);
+    m.get(ym).push(l);
+  }
+  return [...m.entries()];
 }
 
 // The home page box: who still owes, oldest first. Nothing when everything is paid.

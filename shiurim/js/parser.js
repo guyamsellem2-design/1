@@ -31,10 +31,13 @@ const STATUS_STRIP = [
 const PAY_END = '(?=$|[\\s,.\\-–—:!])';
 const UNPAID_RX = new RegExp(`(?:^|\\s)(?:ו?עוד\\s+)?ו?לא\\s+(?:שילם|שילמה|שילמו|שולם|העביר|העבירה)(?:\\s+(?:תשלום|כסף|את\\s+הכסף))?${PAY_END}`, 'g');
 const PAID_RX = new RegExp(`(?:^|\\s)(?:ו?(?:שילם|שילמה|שילמו|שולם)(?:\\s+(?:על\\s+השיעור|בביט|במזומן|בפייבוקס|בהעברה))?|ו?(?:העביר|העבירה)\\s+(?:תשלום|כסף|את\\s+הכסף)|ו?קיבלתי\\s+(?:תשלום|כסף|את\\s+הכסף))${PAY_END}`, 'g');
+// "שילמה על אוקטובר" / "שילם לנובמבר": paid for a whole month (not a lesson today).
+const HEB_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+const PAY_MONTH_RX = new RegExp(`(?:^|\\s)ו?(?:שילם|שילמה|שילמו|שולם|העביר|העבירה)(?:\\s+(?:לי|תשלום|כסף|את\\s+הכסף))?\\s+(?:(?:על|עבור)\\s+|ל-?)(?:חודש\\s+)?(${HEB_MONTHS.join('|')})${PAY_END}`);
 const NOT_COMING = /\s*ש?(?:הוא\s+)?לא\s+(?:יגיע|תגיע|יבוא|תבוא|יוכל|תוכל)(?:\s+היום)?/;
 
 const TASK_RX = /^(?:ו?אני\s+)?(?:צריך|צריכה|חייב|חייבת|לזכור|משימה|תזכורת|לי\s*:)/;
-const STOP_NAMES = new Set(['אני', 'היום', 'אתמול', 'כולם', 'השאר', 'כל', 'לא', 'עבדנו', 'היה', 'שיעור', 'יום', 'הוא', 'היא', 'הם', 'אנחנו', 'עוד', 'גם', 'רק', 'אחר', 'אחרי', 'לפני', 'משימה', 'תזכורת', 'צריך', 'סה"כ', 'סהכ']
+const STOP_NAMES = new Set(['אני', 'היום', 'אתמול', 'כולם', 'השאר', 'כל', 'לא', 'עבדנו', 'היה', 'שיעור', 'יום', 'הוא', 'היא', 'הם', 'אנחנו', 'עוד', 'גם', 'רק', 'אחר', 'אחרי', 'לפני', 'משימה', 'תזכורת', 'צריך', 'סה"כ', 'סהכ', 'שילם', 'שילמה', 'שילמו', 'שולם', 'העביר', 'העבירה', 'קיבלתי']
   .map(norm));
 
 // ---------- dates ----------
@@ -341,7 +344,10 @@ function analyseContent(content, ctx) {
     else rest.push(c);
   }
   let paid;
+  let paidMonth;
   for (let i = 0; i < rest.length; i++) {
+    const pm = rest[i].match(PAY_MONTH_RX);
+    if (pm) { paidMonth = HEB_MONTHS.indexOf(pm[1]) + 1; rest[i] = rest[i].replace(PAY_MONTH_RX, ' '); }
     const c = rest[i];
     if (UNPAID_RX.test(c)) { paid = false; rest[i] = c.replace(UNPAID_RX, ' '); }
     UNPAID_RX.lastIndex = 0;
@@ -349,6 +355,8 @@ function analyseContent(content, ctx) {
     PAID_RX.lastIndex = 0;
   }
   for (let i = rest.length - 1; i >= 0; i--) if (!rest[i].trim()) rest.splice(i, 1);
+  // Nothing but "שילם על <חודש>" on the line: a payment, not a lesson.
+  const paymentOnly = !!paidMonth && !rest.length && !tasks.length;
   const statusText = rest.join(', ');
   const status = detectStatus(statusText, ctx.extraStatuses || []);
   let summary = cleanup(stripStatusWords(rest.join(', ')).replace(NOT_COMING, ' '));
@@ -364,6 +372,8 @@ function analyseContent(content, ctx) {
     summary,
     tasks: tasks.map((t) => makeTask(t, summary)).filter(Boolean),
     paid,
+    paidMonth,
+    paymentOnly,
     hasContent: !!(summary || tasks.length || status || paid !== undefined),
   };
 }
@@ -568,17 +578,19 @@ export function parseReport(text, ctx) {
         len: len || null,
         explicitTime: !!time,
         was: a.was,
-        status: src.status || (src.hasContent || a.hasContent ? 'came' : null),
+        status: a.paymentOnly ? null : src.status || (src.hasContent || a.hasContent ? 'came' : null),
         summary: src === a ? a.summary : (a.summary || src.summary),
         tasks: a.tasks,
         paid: a.paid,
+        paidMonth: a.paidMonth,
+        paymentOnly: a.paymentOnly,
         mentionedOnly: !a.hasContent && !(src !== a),
       };
     });
 
     // A name alone ("יוסף") counts as "came" unless the whole block is a schedule.
     const plan = items.length >= 2 && items.every((it) => it.explicitTime && it.mentionedOnly);
-    if (!plan) for (const it of items) if (!it.status && it.mentionedOnly) it.status = 'came';
+    if (!plan) for (const it of items) if (!it.status && it.mentionedOnly && !it.paymentOnly) it.status = 'came';
     if (plan) for (const it of items) it.status = null;
 
     if (items.length || remarks.length || everyoneElseCame) {

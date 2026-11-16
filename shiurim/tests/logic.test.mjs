@@ -231,3 +231,32 @@ test('payments: only per-lesson frames, owed when it happened, "שילם" in wri
   const turnedOff = M.migrate({ ...old, frames: [{ id: 'private', name: 'פרטי', perLesson: false }] });
   assert.equal(M.perLessonFrame(turnedOff, 'private'), false, 'a choice made in settings stays');
 });
+
+test('payments: "שילמה על אוקטובר" pays that month, without making up a lesson today', () => {
+  const { s, ids } = setup();
+  const tamar = M.addStudent(s, { name: 'תמר', frame: 'private', day: 2, time: '17:00', len: 45, from: '2026-09-01' });
+  tamar.price = 120;
+  for (const d of ['2026-10-06', '2026-10-13', '2026-10-20', '2026-11-03', '2026-11-10']) {
+    M.setDayLessons(s, d, M.getDay(s, d).lessons.map((l) => ({ ...l, status: 'came' })));
+  }
+  assert.equal(M.unpaidByStudent(s, '2026-11-16').find((u) => u.student.id === tamar.id).count, 5);
+
+  const today = '2026-11-16'; // a Monday, no lessons for her
+  const [rv] = review(s, 'תמר שילמה על אוקטובר', today);
+  assert.deepEqual(rv.payments, [{ studentId: tamar.id, ym: '2026-10' }]);
+  assert.ok(!rv.rows.some((r) => r.studentId === tamar.id), 'no lesson invented for today');
+  M.applyReview(s, rv);
+  const u = M.unpaidByStudent(s, today).find((x) => x.student.id === tamar.id);
+  assert.equal(u.count, 2, 'November is still open');
+  assert.equal(u.amount, 240);
+  assert.ok(u.lessons.every((l) => l.date.startsWith('2026-11')));
+
+  // In the same line as a lesson: the lesson is reported, and the month paid.
+  const [rv2] = review(s, 'תמר הגיעה, שילמה לנובמבר', '2026-11-17');
+  assert.equal(row(rv2, tamar.id).status, 'came');
+  assert.deepEqual(rv2.payments, [{ studentId: tamar.id, ym: '2026-11' }]);
+
+  assert.equal(M.paidMonthKey('2027-01-05', 12), '2026-12');
+  assert.equal(M.paidMonthKey('2026-10-25', 11), '2026-11', 'paid in advance');
+  assert.equal(M.paidMonthKey('2026-12-28', 1), '2027-01');
+});

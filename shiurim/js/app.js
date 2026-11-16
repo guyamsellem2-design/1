@@ -262,6 +262,12 @@ function renderReview(app, root) {
       </h2>
       ${rv.plan ? '<p class="hint" style="margin:0 0 6px">זה נראה כמו סידור יום: השיעורים יוחלפו בסדר שכתבת, ליום הזה בלבד.</p>' : ''}
       ${M.holidayOn(s, rv.date) ? `<div class="banner holiday">🎉 ${e(M.holidayOn(s, rv.date))} — לפי הלוח זה יום חופש</div>` : ''}
+      ${(rv.payments || []).map((pm) => {
+        const st = M.studentById(s, pm.studentId);
+        const n = M.owedInMonth(s, pm.studentId, pm.ym).length;
+        const mName = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'][Number(pm.ym.slice(5, 7)) - 1];
+        return `<div class="banner" style="margin:4px 0 8px">💰 <span class="grow"><b>${e(st?.name || '')}</b>: שולם על ${e(mName)}. ${n ? `${n === 1 ? 'שיעור אחד ייסמן' : `${n} שיעורים ייסמנו`} ${n === 1 ? 'כשולם' : 'כשולמו'}.` : `אין ב${e(mName)} שיעורים שמחכים לתשלום.`}</span></div>`;
+      }).join('')}
       <ul class="lines"></ul>
       <div class="row-actions" data-bulk></div>
       <label class="field" style="margin-top:10px"><span>הארות ושינויים ליום</span><input class="input" data-remark value="${e(rv.remark || '')}" placeholder="למשל: שיעור קצר בגלל אסיפה"></label>

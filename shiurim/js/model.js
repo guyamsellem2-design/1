@@ -436,7 +436,10 @@ export function buildReview(state, parsedDay) {
     return { date, rows: rows.sort(byTime), remark: [day.remark, ...parsedDay.remarks].filter(Boolean).join(' · '), plan: true };
   }
 
+  const payments = [];
   for (const it of parsedDay.items) {
+    if (it.paidMonth && it.studentId) payments.push({ studentId: it.studentId, ym: paidMonthKey(date, it.paidMonth) });
+    if (it.paymentOnly) continue; // "שילמה על אוקטובר" says nothing about a lesson today
     let row = it.studentId ? rows.find((r) => r.studentId === it.studentId && !r.mentioned) || rows.find((r) => r.studentId === it.studentId) : null;
     if (!row && !it.studentId) row = rows.find((r) => !r.studentId && r.name && norm(r.name) === norm(it.name));
     if (!row) {
@@ -485,6 +488,7 @@ export function buildReview(state, parsedDay) {
     rows: rows.sort(byTime),
     remark: [day.remark, ...parsedDay.remarks].filter(Boolean).join(' · '),
     plan: false,
+    payments,
   };
 }
 
@@ -500,6 +504,7 @@ export function applyReview(state, review) {
   });
   setDayLessons(state, review.date, lessons);
   if (review.remark != null) state.days[review.date].remark = review.remark;
+  for (const p of review.payments || []) markMonthPaid(state, p.studentId, p.ym);
 }
 
 // ---------- tasks ----------
@@ -592,6 +597,32 @@ export function unpaidByStudent(state, today = todayISO()) {
     out.push({ student: st, lessons, count: lessons.length, amount: price ? price * lessons.length : null, oldest: lessons[0].date });
   }
   return out.sort((a, b) => (a.oldest < b.oldest ? -1 : a.oldest > b.oldest ? 1 : a.student.name.localeCompare(b.student.name, 'he')));
+}
+
+// The month meant by "שילם על <month>", written on `date`: the latest such month, or next month
+// (paid in advance).
+export function paidMonthKey(date, month) {
+  let y = Number(date.slice(0, 4));
+  const cur = Number(date.slice(5, 7));
+  if (cur === 12 && month === 1) y += 1;
+  else if (month > cur + 1) y -= 1;
+  return `${y}-${String(month).padStart(2, '0')}`;
+}
+
+// Lessons of a student in a month ("2026-10") that happened and are not paid yet.
+export function owedInMonth(state, studentId, ym) {
+  const out = [];
+  for (const [date, rec] of Object.entries(state.days)) {
+    if (!date.startsWith(ym)) continue;
+    for (const l of rec.lessons || []) if (l.studentId === studentId && owes(state, l)) out.push({ date, l });
+  }
+  return out;
+}
+
+export function markMonthPaid(state, studentId, ym, today = todayISO()) {
+  const owed = owedInMonth(state, studentId, ym);
+  for (const { l } of owed) setPaidFields(l, true, today);
+  return owed.length;
 }
 
 // Paid / not paid in a range, for the month summary of a per-lesson frame.
