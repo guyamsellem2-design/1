@@ -287,3 +287,42 @@ test('trips: announced in advance (not counted, to make up) vs not announced (co
   const again = M.migrate({ ...old, statuses: old.statuses.filter((x) => x.id !== 'tripNotice') });
   assert.ok(!again.statuses.some((x) => x.id === 'tripNotice'), 'deleting it in settings stays deleted');
 });
+
+test('make-ups: a trip announced in advance waits for a make-up date; reporting the make-up closes it', () => {
+  const { s, ids } = setup();
+  const [rv] = review(s, 'בנימין - טיול, הודיעו מראש');
+  M.applyReview(s, rv);
+  const orig = M.getDay(s, TUE).lessons.find((l) => l.studentId === ids.binyamin);
+  assert.equal(orig.status, 'tripNotice');
+  assert.deepEqual(M.openMakeups(s).map((x) => [x.date, x.info.state]), [[TUE, 'open']]);
+
+  // Set a date: a real lesson on that day, at that time, counted there.
+  const THU = '2026-10-15';
+  const m = M.scheduleMakeup(s, TUE, orig.id, { date: THU, time: '16:00', len: 45 });
+  assert.equal(M.getDay(s, THU).lessons.find((l) => l.id === m.id).time, '16:00', 'stays at the chosen time');
+  assert.equal(M.openMakeups(s)[0].info.state, 'scheduled');
+
+  // Moving it replaces the earlier make-up (no duplicates).
+  const FRI = '2026-10-16';
+  const m2 = M.scheduleMakeup(s, TUE, orig.id, { date: FRI, time: '10:00', len: 45 });
+  assert.ok(!M.getDay(s, THU).lessons.some((l) => l.makeupFor), 'the old date is cleared');
+  assert.equal(M.getDay(s, FRI).lessons.filter((l) => l.makeupFor).length, 1);
+
+  // Reported as "came" → made up, gone from the list; the hours count on the make-up day.
+  M.updateLesson(s, FRI, m2.id, { status: 'came' });
+  assert.equal(M.openMakeups(s).length, 0);
+  const [sum] = M.frameSummary(s, '2026-10-01', '2026-10-31', '2026-10-31');
+  assert.equal(sum.pre, 1);
+  assert.equal(sum.preDone, 1);
+
+  // An editor that saved the original without its link still finds the make-up by the back-link.
+  delete M.getDay(s, TUE).lessons.find((l) => l.id === orig.id).makeup;
+  assert.equal(M.makeupInfo(s, TUE, M.getDay(s, TUE).lessons.find((l) => l.id === orig.id)).state, 'done');
+
+  // Marked by hand / cancelled.
+  M.cancelMakeup(s, TUE, orig.id);
+  assert.ok(!M.getDay(s, FRI).lessons.some((l) => l.makeupFor));
+  assert.equal(M.openMakeups(s).length, 1);
+  M.setMakeupDone(s, TUE, orig.id, true);
+  assert.equal(M.openMakeups(s).length, 0);
+});

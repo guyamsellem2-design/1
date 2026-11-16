@@ -181,7 +181,9 @@ export function editLesson(state, { date, lesson, title, onSave, onDelete, allow
       <button type="button" data-len="other" aria-pressed="${isCustomLen}">${isCustomLen ? l.len + ' דק׳' : 'אחר'}</button></div></div>
     <div class="field"><span>נוכחות</span>
       <div class="seg" data-status>${state.statuses.map((s) => `<button type="button" data-status="${e(s.id)}" aria-pressed="${l.status === s.id}" style="${l.status === s.id ? `background:${e(s.bg)};color:${e(s.fg)};border-color:${e(s.bg)}` : ''}">${e(s.name)}</button>`).join('')}
-      <button type="button" data-status="" aria-pressed="${!l.status}">בלי סטטוס</button></div></div>
+      <button type="button" data-status="" aria-pressed="${!l.status}">בלי סטטוס</button></div>
+      ${l.makeupFor ? `<p class="hint" style="margin:6px 2px 0">📅 שיעור השלמה לשיעור של ${e(fmtDay(l.makeupFor.date))}</p>` : ''}
+      ${lesson.status === 'tripNotice' ? '<p class="hint" style="margin:6px 2px 0">📅 שיעור להשלמה: את המועד קובעים (או מסמנים שכבר הושלם) בדף הבית, ב"שיעורים להשלמה".</p>' : ''}</div>
     ${paysPerLesson(state, l) ? `<div class="field"><span>תשלום</span><div class="seg" data-paidseg>
       <button type="button" data-paid="1" aria-pressed="${!!l.paid}">💰 שולם</button><button type="button" data-paid="0" aria-pressed="${!l.paid}">עוד לא</button></div></div>` : ''}
     <label class="field"><span>מה עשינו (סיכום)</span><textarea class="input" name="summary" rows="2">${e(l.summary || '')}</textarea></label>

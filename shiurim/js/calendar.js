@@ -214,7 +214,7 @@ function renderMonth(app, root, anchor, titleEl) {
       ${payLine(r.frame.id)}
       ${r.open || r.pre ? `<div class="ms-open">
         <div class="ms-open-title">לא נכלל בסה״כ</div>
-        ${r.pre ? line(`<span class="dot-c" style="background:${e(preSt?.bg || '#F1E4D6')};border:1px solid ${e(preSt?.fg || '#6B3A10')}"></span> אילוצי מערכת שהודיעו מראש (להשלמה)`, r.pre, r.preMin) : ''}
+        ${r.pre ? line(`<span class="dot-c" style="background:${e(preSt?.bg || '#F1E4D6')};border:1px solid ${e(preSt?.fg || '#6B3A10')}"></span> אילוצי מערכת שהודיעו מראש${r.preDone ? ` (${r.preDone === r.pre ? 'כולם הושלמו' : `${r.preDone} הושלמו`})` : ' (להשלמה)'}`, r.pre, r.preMin) : ''}
         ${r.openPast ? line('<span class="dot-c" style="border:1px dashed #B7791F"></span> ימים שעברו ולא דווחו', r.openPast, r.openPastMin) : ''}
         ${r.openAhead ? line('<span class="dot-c" style="border:1px dashed var(--ink-3)"></span> מתוכנן עד סוף החודש', r.openAhead, r.openAheadMin) : ''}
       </div>` : ''}

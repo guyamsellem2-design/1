@@ -14,6 +14,7 @@ import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
 import { renderCalendar } from './calendar.js';
 import { unpaidBox, payButton } from './payments.js';
+import { makeupBox } from './makeups.js';
 import { initBack } from './back.js';
 
 const app = {
@@ -173,6 +174,10 @@ function renderHome(app, root) {
   // Private lessons that weren't paid yet.
   const pay = unpaidBox(app, render);
   if (pay) more.appendChild(pay);
+
+  // Lessons cancelled with notice in advance, waiting for a make-up date.
+  const mk = makeupBox(app, render);
+  if (mk) more.appendChild(mk);
 
   // Everything lives on this device until cloud sync is connected: nudge a backup every two weeks.
   const reportedDays = Object.keys(s.days).length;

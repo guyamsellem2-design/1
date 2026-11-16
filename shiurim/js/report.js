@@ -5,6 +5,7 @@ import { escapeHtml as e, fmtDay, endTime, clone } from './util.js';
 import * as M from './model.js';
 import { el, openSheet, editLesson, editActivity, pickStudent, toast, callLinks } from './ui.js';
 import { payButton } from './payments.js';
+import { makeupLabel } from './makeups.js';
 
 export function reportDay(app, date, { onSaved, extraAction } = {}) {
   const s = app.state;
@@ -38,7 +39,9 @@ export function reportDay(app, date, { onSaved, extraAction } = {}) {
         </div>
         ${l.activity
           ? `<div class="hint">פעילות בלי תלמיד · נספרת כשעות עבודה${l.note ? ` · ${e(l.note)}` : ''}</div>`
-          : `<div class="seg report-status">${s.statuses.map((x) => `<button type="button" data-status="${e(x.id)}" aria-pressed="${l.status === x.id}" style="${l.status === x.id ? `background:${e(x.bg)};color:${e(x.fg)};border-color:${e(x.bg)}` : ''}">${e(x.name)}</button>`).join('')}</div>
+          : `${l.makeupFor ? `<div class="hint" style="margin-bottom:6px">📅 שיעור השלמה לשיעור של ${e(fmtDay(l.makeupFor.date))}</div>` : ''}
+        ${l.status === 'tripNotice' ? `<div class="hint" style="margin-bottom:6px">📅 ${e(M.makeupInfo(s, date, l) ? makeupLabel(M.makeupInfo(s, date, l)) : '')}${M.makeupInfo(s, date, l)?.state === 'done' ? '' : ' · את מועד ההשלמה קובעים בדף הבית, ב"שיעורים להשלמה"'}</div>` : ''}
+        <div class="seg report-status">${s.statuses.map((x) => `<button type="button" data-status="${e(x.id)}" aria-pressed="${l.status === x.id}" style="${l.status === x.id ? `background:${e(x.bg)};color:${e(x.fg)};border-color:${e(x.bg)}` : ''}">${e(x.name)}</button>`).join('')}</div>
         <input class="input" data-summary value="${e(l.summary || '')}" placeholder="מה עשינו (לא חובה)" style="margin-top:8px;min-height:40px">`}
       </div>`);
       list.appendChild(card);

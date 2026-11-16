@@ -233,7 +233,7 @@ export function cancelDay(state, date, label = 'בוטל') {
 // when the school didn't say in advance (he came and the hour was his); when told in advance, the lesson is taken
 // off the day and made up later. Holidays are left out; a lesson reported on a holiday counts.
 export function frameSummary(state, from, to, today = todayISO()) {
-  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, sys: 0, sysMin: 0, pre: 0, preMin: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
+  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, sys: 0, sysMin: 0, pre: 0, preMin: 0, preDone: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
   const out = new Map(state.frames.map((f) => [f.id, { frame: f, ...blank() }]));
   const other = { frame: { id: '', name: 'בלי מסגרת' }, ...blank() };
   for (const d of yearDates(state, from, to)) {
@@ -242,7 +242,11 @@ export function frameSummary(state, from, to, today = todayISO()) {
       const bucket = (fr && out.get(fr)) || other;
       const len = Number(l.len) || 0;
       if (l.status === 'trip') { bucket.sys++; bucket.sysMin += len; continue; }
-      if (l.status === 'tripNotice') { bucket.pre++; bucket.preMin += len; continue; }
+      if (l.status === 'tripNotice') {
+        bucket.pre++; bucket.preMin += len;
+        if (makeupInfo(state, d, l)?.state === 'done') bucket.preDone++;
+        continue;
+      }
       if (l.activity) {
         if (d <= today) { bucket.act++; bucket.actMin += len; } else { bucket.open++; bucket.openMin += len; bucket.openAhead++; bucket.openAheadMin += len; }
         continue;
@@ -560,6 +564,88 @@ export function lessonFrame(state, l) {
   if (l.activity) return l.frame || 'yeshiva';
   const st = l.studentId && studentById(state, l.studentId);
   return st ? st.frame || 'yeshiva' : null;
+}
+
+// ---------- make-up lessons (a trip / constraint announced in advance) ----------
+// The make-up is a real lesson on another day, linked both ways (orig.makeup → {date, lessonId},
+// makeupLesson.makeupFor → {date, lessonId}). It counts as an ordinary lesson on its own day; once it is
+// reported as "came", the original counts as made up. "Already made up" can also be marked by hand.
+
+const findLesson = (state, date, id) => (state.days[date]?.lessons || []).find((x) => x.id === id) || null;
+
+// The make-up lesson of a cancelled one: by its link, or (if an editor dropped the link) by the back-link.
+function findMakeup(state, date, l) {
+  if (l.makeup) {
+    const m = findLesson(state, l.makeup.date, l.makeup.lessonId);
+    if (m) return { date: l.makeup.date, m };
+  }
+  for (const [d, rec] of Object.entries(state.days)) {
+    const m = (rec.lessons || []).find((x) => x.makeupFor && x.makeupFor.date === date && x.makeupFor.lessonId === l.id);
+    if (m) return { date: d, m };
+  }
+  return null;
+}
+
+export function makeupInfo(state, date, l) {
+  if (!l || l.status !== 'tripNotice') return null;
+  if (l.makeupDone) return { state: 'done', manual: true };
+  {
+    const found = findMakeup(state, date, l);
+    if (found) {
+      const m = found.m;
+      const when = { date: found.date, time: m.time, len: m.len };
+      if (countsAsCame(state, m.status)) return { state: 'done', when };
+      return { state: 'scheduled', when, missed: !!m.status };
+    }
+  }
+  return { state: 'open' };
+}
+
+// Lessons waiting to be made up (not done yet), oldest first.
+export function openMakeups(state) {
+  const out = [];
+  for (const [date, rec] of Object.entries(state.days)) {
+    for (const l of rec.lessons || []) {
+      const info = makeupInfo(state, date, l);
+      if (info && info.state !== 'done') out.push({ date, l, info });
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : byTime(a.l, b.l)));
+}
+
+function dropMakeupLesson(state, date, orig) {
+  const found = findMakeup(state, date, orig);
+  if (found) {
+    const rec = state.days[found.date];
+    rec.lessons = rec.lessons.filter((x) => x !== found.m);
+  }
+  delete orig.makeup;
+}
+
+export function scheduleMakeup(state, date, lessonId, { date: newDate, time, len }) {
+  const orig = updateLesson(state, date, lessonId, {});
+  if (!orig) return null;
+  dropMakeupLesson(state, date, orig);
+  const m = addLesson(state, newDate, {
+    studentId: orig.studentId, name: orig.studentId ? '' : orig.name, time, len: Number(len) || Number(orig.len) || 30,
+    timeSet: true, lenSet: true, makeupFor: { date, lessonId },
+  });
+  orig.makeup = { date: newDate, lessonId: m.id };
+  delete orig.makeupDone;
+  return m;
+}
+
+export function cancelMakeup(state, date, lessonId) {
+  const orig = updateLesson(state, date, lessonId, {});
+  if (orig) dropMakeupLesson(state, date, orig);
+  return orig;
+}
+
+export function setMakeupDone(state, date, lessonId, done) {
+  const orig = updateLesson(state, date, lessonId, {});
+  if (!orig) return null;
+  if (done) orig.makeupDone = true; else delete orig.makeupDone;
+  return orig;
 }
 
 // ---------- payments (private lessons) ----------
