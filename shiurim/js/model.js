@@ -216,9 +216,11 @@ export function cancelDay(state, date, label = 'בוטל') {
 // Hours per frame for a range: who came, who didn't, and the total of what was REPORTED.
 // Lessons not reported yet are never part of the total (a day with no school that nobody marked would
 // otherwise look like paid hours); they are counted apart: days that passed, and days still ahead.
-// Lessons marked as a school constraint (trip, exam…) and holidays are left out; a lesson reported on a holiday counts.
+// A lesson marked "טיול ישיבתי / אילוצי מערכת" counts as work hours, on a line of its own: the teacher only marks it
+// when the school didn't say in advance (he came and the hour was his); when told in advance, the lesson is taken
+// off the day and made up later. Holidays are left out; a lesson reported on a holiday counts.
 export function frameSummary(state, from, to, today = todayISO()) {
-  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
+  const blank = () => ({ came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, sys: 0, sysMin: 0, open: 0, openMin: 0, openPast: 0, openPastMin: 0, openAhead: 0, openAheadMin: 0 });
   const out = new Map(state.frames.map((f) => [f.id, { frame: f, ...blank() }]));
   const other = { frame: { id: '', name: 'בלי מסגרת' }, ...blank() };
   for (const d of yearDates(state, from, to)) {
@@ -226,7 +228,7 @@ export function frameSummary(state, from, to, today = todayISO()) {
       const fr = lessonFrame(state, l);
       const bucket = (fr && out.get(fr)) || other;
       const len = Number(l.len) || 0;
-      if (l.status === 'trip') continue;
+      if (l.status === 'trip') { bucket.sys++; bucket.sysMin += len; continue; }
       if (l.activity) {
         if (d <= today) { bucket.act++; bucket.actMin += len; } else { bucket.open++; bucket.openMin += len; bucket.openAhead++; bucket.openAheadMin += len; }
         continue;
@@ -238,8 +240,8 @@ export function frameSummary(state, from, to, today = todayISO()) {
     }
   }
   const rows = [...out.values()];
-  if (other.came + other.absent + other.act + other.open) rows.push(other);
-  return rows.map((r) => ({ ...r, total: r.came + r.absent + r.act, totalMin: r.cameMin + r.absentMin + r.actMin }));
+  if (other.came + other.absent + other.act + other.sys + other.open) rows.push(other);
+  return rows.map((r) => ({ ...r, total: r.came + r.absent + r.act + r.sys, totalMin: r.cameMin + r.absentMin + r.actMin + r.sysMin }));
 }
 
 // Students who belong to this day by the regular schedule but are not on a day that was already edited:

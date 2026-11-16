@@ -164,8 +164,9 @@ test('month summary per frame, holidays and lessons that happened anyway, cancel
   const oct = M.frameSummary(s, '2026-10-01', '2026-10-31');
   const yes = oct.find((r) => r.frame.id === 'yeshiva');
   assert.deepEqual([yes.came, yes.cameMin, yes.absent, yes.absentMin], [1, 30, 1, 45]);
-  assert.equal(yes.total, yes.came + yes.absent); // only what was reported; the trip is left out
-  assert.equal(yes.totalMin, yes.cameMin + yes.absentMin);
+  assert.equal(yes.sys, 1, 'a trip nobody announced counts as work hours, on its own line');
+  assert.equal(yes.total, yes.came + yes.absent + yes.sys);
+  assert.equal(yes.totalMin, yes.cameMin + yes.absentMin + yes.sysMin);
   assert.ok(yes.open > 0 && yes.open === yes.openPast + yes.openAhead); // unreported lessons are counted apart
   const dec = M.frameSummary(s, '2026-12-01', '2026-12-31').find((r) => r.frame.id === 'private');
   assert.ok(dec.came >= 1 && dec.cameMin >= 60);
@@ -185,7 +186,7 @@ test('an activity without a student counts as work hours, in its frame', () => {
   assert.equal(M.statusById(s, 'activity').name, 'פעילות');
   const r = M.frameSummary(s, '2026-10-01', '2026-10-31', '2026-10-31').find((x) => x.frame.id === 'yeshiva');
   assert.deepEqual([r.act, r.actMin], [1, 60]);
-  assert.equal(r.totalMin, r.cameMin + r.absentMin + r.actMin);
+  assert.equal(r.totalMin, r.cameMin + r.absentMin + r.actMin + r.sysMin);
   assert.equal(M.lessonFrame(s, a), 'yeshiva');
 });
 

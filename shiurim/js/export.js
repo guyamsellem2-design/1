@@ -154,23 +154,23 @@ export async function buildWorkbook(s, { from, to, frame = 'yeshiva', names = fa
   // Hours summary: the total is only what was REPORTED (came / didn't come). Lessons not reported yet
   // are listed apart and never added in, so the hours can be trusted as they are.
   const sum = wb.addWorksheet('סיכום שעות', { views: [{ rightToLeft: true }] });
-  sum.columns = [{ width: 24 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 16 }, { width: 15 }];
+  sum.columns = [{ width: 24 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 16 }, { width: 16 }, { width: 15 }];
   const hrs = (m) => +(m / 60).toFixed(2);
   const styleRow = (row, fill) => row.eachCell((c) => { c.border = border; if (fill) c.fill = fill; });
   sum.addRow([`סיכום ${fmtDateFull(from)} – ${fmtDateFull(to)}${frameName ? ` · ${frameName}` : ''}`]).font = { bold: true, size: 13 };
-  sum.addRow(['הסה"כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע) ופעילויות בלי תלמיד. שיעורים שלא דווחו, "טיול ישיבתי / אילוצי מערכת" וימי חג לא נכללים.']).font = { color: { argb: 'FF6B7280' } };
+  sum.addRow(['הסה"כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע), פעילויות בלי תלמיד, ושיעורים שבוטלו בגלל טיול ישיבתי / אילוצי מערכת בלי הודעה מראש. שיעורים שלא דווחו וימי חג לא נכללים.']).font = { color: { argb: 'FF6B7280' } };
   sum.addRow([]);
 
   const frames = M.frameSummary(s, from, to).filter((r) => (!frame || r.frame.id === frame) && (r.total || r.open));
-  const fh = sum.addRow(['מסגרת', 'הגיעו (שעות)', 'הגיעו (שיעורים)', 'לא הגיעו (שעות)', 'לא הגיעו (שיעורים)', 'פעילויות בלי תלמיד (שעות)', 'סה"כ שדווח (שעות)']);
+  const fh = sum.addRow(['מסגרת', 'הגיעו (שעות)', 'הגיעו (שיעורים)', 'לא הגיעו (שעות)', 'לא הגיעו (שיעורים)', 'פעילויות בלי תלמיד (שעות)', 'אילוצי מערכת בלי הודעה מראש (שעות)', 'סה"כ שדווח (שעות)']);
   fh.font = { bold: true };
   fh.alignment = { wrapText: true, vertical: 'middle' };
   styleRow(fh, headFill);
-  for (const r of frames) styleRow(sum.addRow([r.frame.name, hrs(r.cameMin), r.came, hrs(r.absentMin), r.absent, hrs(r.actMin), hrs(r.totalMin)]));
+  for (const r of frames) styleRow(sum.addRow([r.frame.name, hrs(r.cameMin), r.came, hrs(r.absentMin), r.absent, hrs(r.actMin), hrs(r.sysMin), hrs(r.totalMin)]));
   const total = frames.reduce((a, r) => a + r.cameMin, 0);
   if (frames.length > 1) {
-    const t = frames.reduce((a, r) => ({ c: a.c + r.cameMin, cn: a.cn + r.came, x: a.x + r.absentMin, xn: a.xn + r.absent, ac: a.ac + r.actMin, t: a.t + r.totalMin }), { c: 0, cn: 0, x: 0, xn: 0, ac: 0, t: 0 });
-    const tr = sum.addRow(['כל המסגרות', hrs(t.c), t.cn, hrs(t.x), t.xn, hrs(t.ac), hrs(t.t)]);
+    const t = frames.reduce((a, r) => ({ c: a.c + r.cameMin, cn: a.cn + r.came, x: a.x + r.absentMin, xn: a.xn + r.absent, ac: a.ac + r.actMin, sy: a.sy + r.sysMin, t: a.t + r.totalMin }), { c: 0, cn: 0, x: 0, xn: 0, ac: 0, sy: 0, t: 0 });
+    const tr = sum.addRow(['כל המסגרות', hrs(t.c), t.cn, hrs(t.x), t.xn, hrs(t.ac), hrs(t.sy), hrs(t.t)]);
     tr.font = { bold: true };
     styleRow(tr, headFill);
   }

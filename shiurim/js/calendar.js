@@ -198,6 +198,7 @@ function renderMonth(app, root, anchor, titleEl) {
     return `<div class="ms-pay"><span>💰 שולם: <b>${p.paid}</b>${amt(p.amountPaid)}</span><span class="${p.unpaid ? 'ms-pay-due' : ''}">עוד לא שולם: <b>${p.unpaid}</b>${amt(p.amountUnpaid)}</span></div>`;
   };
   const cameSt = M.statusById(s, 'came');
+  const sysSt = M.statusById(s, 'trip');
   const box = el(`<div class="month-summary"><div class="section-title" style="margin:6px 4px 0">סיכום ${e(MONTHS[a.getMonth()])}</div></div>`);
   if (!rows.length) box.appendChild(el('<p class="muted" style="margin:4px">אין שיעורים בחודש הזה.</p>'));
   const line = (label, n, min, extra = '', one = 'שיעור אחד', many = 'שיעורים') => `<div class="ms-row ${extra}"><span class="lbl">${label}</span><b>${hrs(min)} שעות</b><span class="hint">(${n === 1 ? one : `${n} ${many}`})</span></div>`;
@@ -207,6 +208,7 @@ function renderMonth(app, root, anchor, titleEl) {
       ${line(`<span class="dot-c" style="background:${e(cameSt?.bg || '#11734B')}"></span> הגיעו`, r.came, r.cameMin)}
       ${line('<span class="dot-c" style="background:#B10202"></span> לא הגיעו', r.absent, r.absentMin)}
       ${r.act ? line(`<span class="dot-c" style="background:${e(M.ACTIVITY_STATUS.bg)};border:1px solid ${e(M.ACTIVITY_STATUS.fg)}"></span> פעילויות בלי תלמיד`, r.act, r.actMin, '', 'פעילות אחת', 'פעילויות') : ''}
+      ${r.sys ? line(`<span class="dot-c" style="background:${e(sysSt?.bg || '#753800')}"></span> אילוצי מערכת בלי הודעה מראש`, r.sys, r.sysMin) : ''}
       ${line('<b style="color:var(--ink)">סה״כ שדווח</b>', r.total, r.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}
       ${payLine(r.frame.id)}
       ${r.open ? `<div class="ms-open">
@@ -217,9 +219,9 @@ function renderMonth(app, root, anchor, titleEl) {
     </div>`));
   }
   if (rows.length > 1) {
-    const sum = rows.reduce((acc, r) => ({ came: acc.came + r.came, cameMin: acc.cameMin + r.cameMin, absent: acc.absent + r.absent, absentMin: acc.absentMin + r.absentMin, act: acc.act + r.act, actMin: acc.actMin + r.actMin, total: acc.total + r.total, totalMin: acc.totalMin + r.totalMin }), { came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, total: 0, totalMin: 0 });
-    box.appendChild(el(`<div class="ms-card"><h4>כל המסגרות</h4>${line('הגיעו', sum.came, sum.cameMin)}${line('לא הגיעו', sum.absent, sum.absentMin)}${sum.act ? line('פעילויות בלי תלמיד', sum.act, sum.actMin, '', 'פעילות אחת', 'פעילויות') : ''}${line('<b style="color:var(--ink)">סה״כ שדווח</b>', sum.total, sum.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}</div>`));
+    const sum = rows.reduce((acc, r) => ({ came: acc.came + r.came, cameMin: acc.cameMin + r.cameMin, absent: acc.absent + r.absent, absentMin: acc.absentMin + r.absentMin, act: acc.act + r.act, actMin: acc.actMin + r.actMin, sys: acc.sys + r.sys, sysMin: acc.sysMin + r.sysMin, total: acc.total + r.total, totalMin: acc.totalMin + r.totalMin }), { came: 0, cameMin: 0, absent: 0, absentMin: 0, act: 0, actMin: 0, sys: 0, sysMin: 0, total: 0, totalMin: 0 });
+    box.appendChild(el(`<div class="ms-card"><h4>כל המסגרות</h4>${line('הגיעו', sum.came, sum.cameMin)}${line('לא הגיעו', sum.absent, sum.absentMin)}${sum.act ? line('פעילויות בלי תלמיד', sum.act, sum.actMin, '', 'פעילות אחת', 'פעילויות') : ''}${sum.sys ? line('אילוצי מערכת בלי הודעה מראש', sum.sys, sum.sysMin) : ''}${line('<b style="color:var(--ink)">סה״כ שדווח</b>', sum.total, sum.totalMin, 'ms-total', 'רשומה אחת', 'רשומות')}</div>`));
   }
-  box.appendChild(el('<p class="hint" style="margin:0 4px">הסה״כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע) ופעילויות בלי תלמיד. שיעורים שעוד לא דווחו, שיעורים שסומנו "טיול ישיבתי / אילוצי מערכת" וימי חג לא נכללים. יום שלא היו בו לימודים (למשל בחירות) כדאי לבטל מדף הבית, בהחלקה ימינה, כדי שלא יישאר ברשימה.</p>'));
+  box.appendChild(el('<p class="hint" style="margin:0 4px">הסה״כ כולל רק מה שדווח: שיעורים (הגיע / לא הגיע), פעילויות בלי תלמיד, ו"טיול ישיבתי / אילוצי מערכת" (מסמנים אותו רק כשלא הודיעו מראש. כשהודיעו מראש, מורידים את השיעור מהיום ומשלימים). שיעורים שעוד לא דווחו וימי חג לא נכללים. יום שלא היו בו לימודים (למשל בחירות) כדאי לבטל מדף הבית, בהחלקה ימינה, כדי שלא יישאר ברשימה.</p>'));
   root.appendChild(box);
 }
