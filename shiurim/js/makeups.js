@@ -15,7 +15,7 @@ export function makeupLabel(info) {
   return 'עוד לא נקבעה השלמה';
 }
 
-export function openMakeup(app, date, lessonId, { onDone } = {}) {
+export function openMakeup(app, date, lessonId, { onDone, prompt = false, onClosed } = {}) {
   const s = app.state;
   const l = (s.days[date]?.lessons || []).find((x) => x.id === lessonId);
   if (!l) return null;
@@ -25,6 +25,7 @@ export function openMakeup(app, date, lessonId, { onDone } = {}) {
   const defDate = info.when?.date || (todayISO() > date ? todayISO() : addDays(date, 1));
   const defTime = info.when?.time || slot?.time || l.time;
   const body = el(`<div>
+    ${prompt ? '<p style="margin:-4px 0 8px;font-size:16px">מתי תהיה ההשלמה? אפשר לקבוע עכשיו, או אחר כך מדף הבית ("שיעורים להשלמה").</p>' : ''}
     <p class="muted" style="margin:-6px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="grow">השיעור של ${e(fmtDay(date))} ב-${e(l.time)} בוטל (טיול / אילוץ מערכת, הודיעו מראש).</span>${callLinks(st)}</p>
     <div class="banner" style="margin:0 0 12px">${e(makeupLabel(info))}</div>
@@ -54,8 +55,34 @@ export function openMakeup(app, date, lessonId, { onDone } = {}) {
   if (info.state === 'scheduled') {
     actions.push({ label: 'בטל מועד', cls: 'ghost danger', onClick: (close) => { M.cancelMakeup(s, date, lessonId); close(); done('המועד בוטל, השיעור חזר לרשימת ההשלמות'); } });
   }
-  actions.push({ label: 'סגור', cls: 'ghost' });
-  return openSheet({ title: `📅 השלמה · ${M.lessonName(s, l)}`, body, actions });
+  actions.push({ label: prompt ? 'אחר כך' : 'סגור', cls: 'ghost' });
+  return openSheet({ title: `📅 השלמה · ${M.lessonName(s, l)}`, body, actions, onClose: onClosed });
+}
+
+// Right after a lesson is marked "trip / constraint, announced in advance": ask when the make-up will be,
+// one lesson after the other when several were marked together. `prev` is the data before this save.
+export function promptNewMakeups(app, prev) {
+  if (!prev) return;
+  const before = new Set();
+  for (const [date, rec] of Object.entries(prev.days || {})) {
+    for (const l of rec.lessons || []) if (l.status === 'tripNotice') before.add(`${date}|${l.id}`);
+  }
+  const fresh = [];
+  for (const [date, rec] of Object.entries(app.state.days)) {
+    for (const l of rec.lessons || []) {
+      if (l.status !== 'tripNotice' || before.has(`${date}|${l.id}`)) continue;
+      if (M.makeupInfo(app.state, date, l)?.state === 'open') fresh.push({ date, id: l.id });
+    }
+  }
+  if (!fresh.length) return;
+  fresh.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const next = (i) => {
+    if (i >= fresh.length) return;
+    const sheet = openMakeup(app, fresh[i].date, fresh[i].id, { prompt: true, onDone: () => app.render(), onClosed: () => setTimeout(() => next(i + 1), 250) });
+    if (!sheet) next(i + 1);
+  };
+  // After the sheet that saved has closed and the screen was redrawn.
+  setTimeout(() => next(0), 350);
 }
 
 // The home page box: lessons waiting to be made up, oldest first.

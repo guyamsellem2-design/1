@@ -14,7 +14,7 @@ import { renderSettings } from './settings.js';
 import { renderTable } from './table.js';
 import { renderCalendar } from './calendar.js';
 import { unpaidBox, payButton } from './payments.js';
-import { makeupBox } from './makeups.js';
+import { makeupBox, promptNewMakeups } from './makeups.js';
 import { initBack } from './back.js';
 
 const app = {
@@ -23,7 +23,8 @@ const app = {
   params: {},
   pending: null, // the review in progress, never saved until "שמור"
   save(opts) {
-    saveState(this.state, opts);
+    const prev = saveState(this.state, opts);
+    promptNewMakeups(this, prev);
   },
   go(view, params = {}) {
     if (view !== this.view) this.prevView = this.view;

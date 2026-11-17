@@ -32,12 +32,15 @@ function write(state) {
   }
 }
 
+// Returns what was on disk before this save, so callers can see what this save changed.
 export function saveState(state, { touch = true } = {}) {
   if (touch) state.updatedAt = Date.now();
+  const prev = lastSaved;
   stampChanges(lastSaved, state);
   write(state);
   lastSaved = clone(state);
   listeners.forEach((fn) => fn(state));
+  return prev;
 }
 
 // Data that arrived from the other device: stored as is, without counting as a local edit.
