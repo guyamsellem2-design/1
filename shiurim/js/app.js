@@ -49,7 +49,7 @@ function render() {
     : `<b>דיווח שיעורים</b><span>${e(s.teacher.subject || '')}</span>`;
   document.querySelectorAll('#tabs button').forEach((b) => {
     if (b.dataset.view === 'gigs') b.hidden = !s.settings.showGigs;
-    const active = b.dataset.view === app.view || (app.view === 'review' && b.dataset.view === 'home');
+    const active = b.dataset.view === app.view || (app.view === 'review' && b.dataset.view === 'home') || (app.view === 'table' && b.dataset.view === 'calendar');
     b.toggleAttribute('aria-current', false);
     if (active) b.setAttribute('aria-current', 'page');
   });
@@ -698,7 +698,10 @@ function enableDrag(ul, onDrop) {
 
 document.getElementById('tabs').addEventListener('click', (ev) => {
   const b = ev.target.closest('button[data-view]');
-  if (b) app.go(b.dataset.view);
+  if (!b) return;
+  // The calendar tab opens the view used last: week, month or the table.
+  if (b.dataset.view === 'calendar' && getPref('calMode', 'week') === 'table') app.go('table');
+  else app.go(b.dataset.view);
 });
 document.getElementById('btnSettings').addEventListener('click', () => app.go('settings'));
 // "התקנה" stays in the top bar until the site runs as an installed app.

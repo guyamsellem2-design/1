@@ -10,15 +10,31 @@ import { getPref, setPref } from './store.js';
 const PPM = 1.15; // pixels per minute
 const MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 
+// The calendar tab has three views: week, month and the table (the yeshiva's sheet). The last one used
+// is remembered, so the tab opens where you left it.
+export function calendarViews(app, current, { date } = {}) {
+  const box = el(`<div class="seg cal-views" style="justify-content:center;margin-bottom:10px">
+    <button data-mode="week" aria-pressed="${current === 'week'}">שבוע</button>
+    <button data-mode="month" aria-pressed="${current === 'month'}">חודש</button>
+    <button data-mode="table" aria-pressed="${current === 'table'}">▦ טבלה</button>
+  </div>`);
+  box.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
+    const m = b.dataset.mode;
+    if (m === current) return;
+    setPref('calMode', m);
+    if (m === 'table') app.go('table');
+    else app.go('calendar', { mode: m, ...(date ? { date } : {}) });
+  }));
+  return box;
+}
+
 export function renderCalendar(app, root) {
   const s = app.state;
-  const mode = app.params.mode || getPref('calMode', 'week');
+  const saved = getPref('calMode', 'week');
+  const mode = app.params.mode || (saved === 'table' ? 'week' : saved);
   const anchor = app.params.date || todayISO();
   const head = el(`<div>
-    <div class="seg" style="justify-content:center;margin-bottom:10px">
-      <button data-mode="week" aria-pressed="${mode === 'week'}">שבוע</button>
-      <button data-mode="month" aria-pressed="${mode === 'month'}">חודש</button>
-    </div>
+    <div data-views></div>
     <div class="cal-head">
       <button class="icon-btn" data-step="-1" aria-label="הקודם">›</button>
       <div class="title"></div>
@@ -28,7 +44,7 @@ export function renderCalendar(app, root) {
     <div data-body></div>
   </div>`);
   root.appendChild(head);
-  head.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { setPref('calMode', b.dataset.mode); app.go('calendar', { mode: b.dataset.mode, date: anchor }); }));
+  head.querySelector('[data-views]').replaceWith(calendarViews(app, mode, { date: anchor }));
   head.querySelector('[data-today]').addEventListener('click', () => app.go('calendar', { mode, date: todayISO() }));
   head.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
     const dir = Number(b.dataset.step);

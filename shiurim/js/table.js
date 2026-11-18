@@ -9,6 +9,7 @@ import { el, toast, editLesson, editActivity, pickStudent } from './ui.js';
 import { openExport } from './export.js';
 import { reportDay } from './report.js';
 import { getPref, setPref } from './store.js';
+import { calendarViews } from './calendar.js';
 
 const DAY_LETTER = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
 const SLOT = 15;
@@ -64,6 +65,7 @@ export function renderTable(app, root) {
   const zoom = Number(getPref(zoomKey, mode === 'grid' && narrow ? 0.8 : 1)) || 1;
   const legend = s.statuses.map((x) => `<span class="chip" style="background:${e(x.bg)};color:${e(x.fg)}">${e(x.name)}</span>`).join('') + '<span class="chip empty">לא דווח</span>';
   const wrap = el(`<div>
+    <div data-views></div>
     <div class="table-tools">
       <div class="seg mode-seg"><button type="button" data-mode="list" aria-pressed="${mode === 'list'}">☰ רשימה</button><button type="button" data-mode="grid" aria-pressed="${mode === 'grid'}">▦ גיליון</button></div>
       <select class="input" data-frame style="width:auto;min-height:34px;padding:2px 6px;font-size:14px;max-width:96px">
@@ -80,6 +82,7 @@ export function renderTable(app, root) {
     <div class="grid-wrap"><table class="grid ${mode === 'list' ? 'list-mode' : ''}"><thead></thead><tbody></tbody></table></div>
   </div>`);
   root.appendChild(wrap);
+  wrap.querySelector('[data-views]').replaceWith(calendarViews(app, 'table'));
   const table = wrap.querySelector('table');
   const gridWrap = wrap.querySelector('.grid-wrap');
 
