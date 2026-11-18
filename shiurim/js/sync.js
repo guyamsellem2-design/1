@@ -57,7 +57,7 @@ const ERRORS = {
 };
 
 function hasContent(s) {
-  return (s.students || []).length > 0 || Object.keys(s.days || {}).length > 0 || !!(s.teacher && s.teacher.name);
+  return (s.students || []).length > 0 || Object.keys(s.days || {}).length > 0 || (s.gigs || []).length > 0 || !!(s.teacher && s.teacher.name);
 }
 
 // The state is only swapped when nothing on screen is holding on to the old one.
@@ -70,10 +70,11 @@ function safeToReplace() {
 }
 
 function applyLocal(next, { announce = false } = {}) {
-  const before = JSON.stringify({ d: app.state.days, s: app.state.students, g: app.state.settings, t: app.state.teacher });
+  const pick = (x) => JSON.stringify({ d: x.days, s: x.students, g: x.settings, t: x.teacher, n: x.notes, gg: x.gigs });
+  const before = pick(app.state);
   app.state = next;
   replaceState(next);
-  const after = JSON.stringify({ d: next.days, s: next.students, g: next.settings, t: next.teacher });
+  const after = pick(next);
   if (before !== after) {
     // Don't pull the page out from under someone who is typing in the notebook; the next screen shows it.
     if (document.activeElement?.id !== 'write') app.render();

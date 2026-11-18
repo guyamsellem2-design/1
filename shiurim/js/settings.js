@@ -58,6 +58,12 @@ export function renderSettings(app, root) {
       <button class="btn small" data-addhol>+ חופשה / טיול / היעדרות</button>
     </div>
 
+    <div class="section-title">לשוניות נוספות</div>
+    <div class="card" style="padding:14px">
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-showgigs ${st.showGigs ? 'checked' : ''}> 🎤 גיגים</label>
+      <p class="hint" style="margin:6px 0 0">לשונית להופעות: הצעות שהגיעו, הצעת מחיר, גיג שסוכם, משימות לקראתו, הערות, ואחרי הגיג: חשבון עסקה, תשלום וקבלה.</p>
+    </div>
+
     <div class="section-title">מסגרות</div>
     <div class="card" style="padding:14px">
       <div data-frames></div>
@@ -217,6 +223,12 @@ export function renderSettings(app, root) {
 
   // export
   $('[data-exportnames]').addEventListener('change', (ev) => { st.exportNames = ev.target.checked; app.save(); });
+  $('[data-showgigs]').addEventListener('change', (ev) => {
+    st.showGigs = ev.target.checked;
+    app.save();
+    app.render();
+    toast(st.showGigs ? 'לשונית הגיגים נוספה למטה 🎤' : 'לשונית הגיגים הוסתרה (הגיגים עצמם נשמרים)');
+  });
   $('[data-export]').addEventListener('click', () => openExport(app));
 
   // iPhone shortcut URL

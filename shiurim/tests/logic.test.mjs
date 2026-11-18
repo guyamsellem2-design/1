@@ -326,3 +326,26 @@ test('make-ups: a trip announced in advance waits for a make-up date; reporting 
   M.setMakeupDone(s, TUE, orig.id, true);
   assert.equal(M.openMakeups(s).length, 0);
 });
+
+test('gigs: grouped by what needs attention, money left to close', () => {
+  const s = M.defaultState();
+  const today = '2026-11-18';
+  M.addGig(s, { title: 'הצעה', stage: 'offer' });
+  M.addGig(s, { title: 'עבר', stage: 'booked', date: '2026-11-10' });
+  M.addGig(s, { title: 'בקרוב', stage: 'booked', date: '2026-11-25' });
+  const unpaid = M.addGig(s, { title: 'בוצע', stage: 'done', date: '2026-11-01', invoice: 'sent', receipt: 'need' });
+  M.addGig(s, { title: 'סגור', stage: 'done', date: '2026-10-01', paid: true });
+  M.addGig(s, { title: 'לא יצא', stage: 'lost' });
+  const G = M.gigGroups(s, today);
+  const t = (list) => list.map((g) => g.title);
+  assert.deepEqual(t(G.past), ['עבר']);
+  assert.deepEqual(t(G.upcoming), ['בקרוב']);
+  assert.deepEqual(t(G.offers), ['הצעה']);
+  assert.deepEqual(t(G.money), ['בוצע']);
+  assert.deepEqual(t(G.closed), ['סגור']);
+  assert.deepEqual(t(G.lost), ['לא יצא']);
+  assert.deepEqual(M.gigMoneyTodo(unpaid), ['לקבל תשלום', 'להוציא קבלה']);
+  M.updateGig(s, unpaid.id, { paid: true, receipt: 'sent' });
+  assert.deepEqual(t(M.gigGroups(s, today).closed), ['בוצע', 'סגור']);
+  assert.deepEqual(M.migrate({}).gigs, []);
+});

@@ -48,6 +48,7 @@ export function defaultState() {
     holidays: HOLIDAYS_5787.map((h) => ({ id: uid(), ...h })),
     holidayOverride: {},
     notes: [],
+    gigs: [],
     updatedAt: 0,
   };
 }
@@ -88,6 +89,7 @@ export function migrate(s) {
   out.holidays = s.holidays || d.holidays;
   out.holidayOverride = s.holidayOverride || {};
   out.notes = Array.isArray(s.notes) ? s.notes : [];
+  out.gigs = Array.isArray(s.gigs) ? s.gigs : [];
   return out;
 }
 
@@ -782,3 +784,74 @@ export function hoursSummary(state, from, to) {
   }
   return { totalMinutes: total, perStudent: [...per.values()].sort((a, b) => b.minutes - a.minutes) };
 }
+
+// ---------- gigs (an optional tab, turned on in settings) ----------
+// A gig goes offer → quote sent → agreed → done (or "didn't happen"). The money side is tracked apart:
+// an invoice / payment request (when needed), the payment, and a receipt (when needed).
+
+export const GIG_STAGES = [
+  { id: 'offer', name: 'הצעה' },
+  { id: 'quoted', name: 'נשלחה הצעת מחיר' },
+  { id: 'booked', name: 'סוכם' },
+  { id: 'done', name: 'בוצע' },
+  { id: 'lost', name: 'לא יצא' },
+];
+// invoice / receipt: 'no' = not needed, 'need' = needed and not issued yet, 'sent' = issued.
+
+export function newGig(fields = {}) {
+  const now = Date.now();
+  return {
+    id: uid(), title: '', date: '', time: '', place: '', contact: '', phone: '', fee: null,
+    stage: 'offer', invoice: 'no', paid: false, paidOn: null, receipt: 'no', tasks: [], notes: '',
+    createdAt: now, updatedAt: now, ...fields,
+  };
+}
+
+export function addGig(state, fields) {
+  state.gigs = state.gigs || [];
+  const g = newGig(fields);
+  state.gigs.push(g);
+  return g;
+}
+
+export function updateGig(state, id, patch) {
+  const g = (state.gigs || []).find((x) => x.id === id);
+  if (g) Object.assign(g, patch, { updatedAt: Date.now() });
+  return g;
+}
+
+export function deleteGig(state, id) {
+  state.gigs = (state.gigs || []).filter((x) => x.id !== id);
+}
+
+// Done, but the money isn't closed yet: not paid, or an invoice / receipt still to issue.
+export function gigMoneyOpen(g) {
+  return g.stage === 'done' && (!g.paid || g.invoice === 'need' || g.receipt === 'need');
+}
+
+// What is left to do about the money, in words.
+export function gigMoneyTodo(g) {
+  const out = [];
+  if (g.invoice === 'need') out.push('להוציא חשבון עסקה');
+  if (!g.paid) out.push('לקבל תשלום');
+  if (g.receipt === 'need') out.push('להוציא קבלה');
+  return out;
+}
+
+const byGigDate = (a, b) => (a.date || '9999') < (b.date || '9999') ? -1 : (a.date || '9999') > (b.date || '9999') ? 1 : (a.time || '') < (b.time || '') ? -1 : 1;
+
+// The gigs tab, in the order things need attention.
+export function gigGroups(state, today = todayISO()) {
+  const gigs = state.gigs || [];
+  const booked = gigs.filter((g) => g.stage === 'booked');
+  return {
+    past: booked.filter((g) => g.date && g.date < today).sort(byGigDate), // happened? mark done
+    upcoming: booked.filter((g) => !g.date || g.date >= today).sort(byGigDate),
+    offers: gigs.filter((g) => g.stage === 'offer' || g.stage === 'quoted').sort(byGigDate),
+    money: gigs.filter((g) => gigMoneyOpen(g)).sort(byGigDate),
+    closed: gigs.filter((g) => g.stage === 'done' && !gigMoneyOpen(g)).sort((a, b) => -byGigDate(a, b)),
+    lost: gigs.filter((g) => g.stage === 'lost').sort((a, b) => -byGigDate(a, b)),
+  };
+}
+
+export const gigOpenTasks = (g) => (g.tasks || []).filter((t) => !t.done && t.text.trim()).length;

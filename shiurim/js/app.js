@@ -15,6 +15,7 @@ import { renderTable } from './table.js';
 import { renderCalendar } from './calendar.js';
 import { unpaidBox, payButton } from './payments.js';
 import { makeupBox, promptNewMakeups } from './makeups.js';
+import { renderGigs, gigsHomeBox } from './gigs.js';
 import { initBack } from './back.js';
 
 const app = {
@@ -47,13 +48,15 @@ function render() {
     ? `<b>${e(s.teacher.name)}</b><span>${e(s.teacher.subject || '')}</span>`
     : `<b>דיווח שיעורים</b><span>${e(s.teacher.subject || '')}</span>`;
   document.querySelectorAll('#tabs button').forEach((b) => {
+    if (b.dataset.view === 'gigs') b.hidden = !s.settings.showGigs;
     const active = b.dataset.view === app.view || (app.view === 'review' && b.dataset.view === 'home');
     b.toggleAttribute('aria-current', false);
     if (active) b.setAttribute('aria-current', 'page');
   });
   viewEl.className = app.view === 'table' ? 'wide' : '';
   viewEl.innerHTML = '';
-  const views = { home: renderHome, review: renderReview, day: renderDay, table: renderTable, calendar: renderCalendar, students: renderStudents, settings: renderSettings, notebook: renderNotebook };
+  const views = { home: renderHome, review: renderReview, day: renderDay, table: renderTable, calendar: renderCalendar, students: renderStudents, settings: renderSettings, notebook: renderNotebook, gigs: renderGigs };
+  if (app.view === 'gigs' && !s.settings.showGigs) app.view = 'home';
   (views[app.view] || renderHome)(app, viewEl);
 }
 
@@ -179,6 +182,10 @@ function renderHome(app, root) {
   // Lessons cancelled with notice in advance, waiting for a make-up date.
   const mk = makeupBox(app, render);
   if (mk) more.appendChild(mk);
+
+  // Gigs (when the tab is on): coming up soon, past ones to mark done, money to close.
+  const gg = gigsHomeBox(app, render);
+  if (gg) more.appendChild(gg);
 
   // Everything lives on this device until cloud sync is connected: nudge a backup every two weeks.
   const reportedDays = Object.keys(s.days).length;
@@ -763,7 +770,7 @@ function handleBack() {
 (async function boot() {
   const hashView = location.hash.replace('#', '');
   const shared = await receiveShared();
-  if (!shared) app.go(['day', 'table', 'calendar', 'students', 'settings', 'notebook'].includes(hashView) ? hashView : 'home');
+  if (!shared) app.go(['day', 'table', 'calendar', 'students', 'settings', 'notebook', 'gigs'].includes(hashView) ? hashView : 'home');
   initBack({ onBack: handleBack, onArm: () => toast('לחיצה נוספת על "הקודם" תצא מהאפליקציה', 2500) });
   askPersistence();
   paintSync(syncStatus());

@@ -83,3 +83,18 @@ test('notebook notes from both devices are kept, deleted ones stay deleted', () 
   assert.deepEqual(m.notes.map((n) => n.text).sort(), ['להביא תווים', 'רעיון לשיר'].sort());
   assert.deepEqual(mergeStates(pc, phone).notes.map((n) => n.text).sort(), ['להביא תווים', 'רעיון לשיר'].sort());
 });
+
+test('gigs from both devices are kept, the newest edit wins, deleted ones stay deleted', () => {
+  const cloud = base();
+  edit(cloud, (s) => { M.addGig(s, { title: 'חתונה', stage: 'booked', date: '2026-12-10' }); M.addGig(s, { title: 'ערב שירה' }); }, 1500);
+  const phone = clone(cloud);
+  const pc = clone(cloud);
+  edit(phone, (s) => { M.updateGig(s, s.gigs[0].id, { stage: 'done', paid: true }); M.addGig(s, { title: 'בר מצווה' }); }, 2000);
+  edit(pc, (s) => { M.deleteGig(s, s.gigs[1].id); }, 2500);
+  for (const m of [mergeStates(phone, pc), mergeStates(pc, phone)]) {
+    assert.deepEqual(m.gigs.map((g) => g.title).sort(), ['בר מצווה', 'חתונה'].sort());
+    const w = m.gigs.find((g) => g.title === 'חתונה');
+    assert.equal(w.stage, 'done');
+    assert.equal(w.paid, true);
+  }
+});
